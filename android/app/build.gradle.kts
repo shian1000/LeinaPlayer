@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.shian1000.music_database_app"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requires compiling against API 37+ (Flutter's default is lower).
+    // Only the compile SDK; targetSdk stays at Flutter's default.
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

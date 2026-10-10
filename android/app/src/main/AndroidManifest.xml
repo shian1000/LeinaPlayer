@@ -1,8 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Downloads music.db / tag.db from the server set in Ustawienia › Źródła muzyki › Baza danych. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Reading the Wi-Fi name (Ustawienia › Źródła muzyki › Baza danych › Wi-Fi sieci lokalnej)
+         to choose between the local and the remote server. Android only reveals the SSID to apps
+         holding location permission; it's requested when the user taps "Użyj bieżącego
+         połączenia". -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Reading music files in the folders chosen under Ustawienia › Źródła muzyki › Muzyka
+         lokalna: storage up to Android 12, READ_MEDIA_AUDIO from Android 13. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <!-- requestLegacyExternalStorage: on Android 10 only, lets the scan read music files by path
+         (scoped storage would hide them); ignored from Android 11, where READ_MEDIA_AUDIO /
+         storage permission give path access to media files. -->
+    <!-- Cleartext allowed because that server is reached over Tailscale (already encrypted) and
+         is typically a plain `python3 -m http.server`; see docs/decisions/0002-database-download.md. -->
     <application
         android:label="music_database_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

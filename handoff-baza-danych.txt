@@ -1,0 +1,82 @@
+PRZEKAZANIE PRACY — opcja „Baza danych” w Źródłach muzyki
+(MusicDatabaseApp, 2026-10-10 ok. 13:40)
+
+Ten plik pisze inny agent (inna sesja). Użytkownik wysłał polecenie poniżej do niewłaściwego okna;
+tamten agent zaczął je realizować i przekazuje pracę Tobie. Kontynuuj od sekcji „CO ZOSTAŁO”.
+Po przeczytaniu ten plik można usunąć — nie commituj go.
+
+
+1. POLECENIE UŻYTKOWNIKA (dosłownie)
+-----------------------------------
+„Do opcji Źródła muzyki dodaj opcję Baza danych. Po wejściu do niej daj możliwość wpisania adresu
+do bazy danych. Będzie to działać tak: Raz dziennie po odpaleniu aplikacji, jeśli jest wpisany ten
+adres, telefon będzie ściągać bazę danych z serwera do siebie lokalnie, aby można ją było
+przeszukiwać. Przykładowa baza danych jest tutaj: /home/owner/Documents/Code/MusicDatabase/src/database
+(ale nie wpisuj tego nigdzie do kodu — to wypełni użytkownik). Program ma pobierać music.db i tag.db.”
+
+
+2. CO JUŻ ZROBIONO (nic nie jest zacommitowane)
+-----------------------------------------------
+Nowe pliki:
+- lib/src/data/database_sync.dart — DatabaseSync (ChangeNotifier) + DatabaseSyncScope
+  (InheritedNotifier, ten sam wzorzec co ThemeScope).
+  * adres i czas ostatniego pobrania w shared_preferences,
+  * normalizeUrl(): dopisuje http:// gdy brak schematu, ukośnik na końcu; link do pliku *.db
+    zamienia na jego folder; tylko http/https,
+  * syncIfDue(): pobiera, jeśli adres jest ustawiony i dziś (dzień kalendarzowy) jeszcze nie
+    było UDANEGO pobrania,
+  * syncNow(): pobiera oba pliki do *.part (dart:io HttpClient, timeouty), sprawdza nagłówek
+    „SQLite format 3”, dopiero potem podmienia stare pliki; przy błędzie stara para zostaje,
+    a lastError dostaje polski komunikat,
+  * pliki: <getApplicationSupportDirectory()>/database/{music.db,tag.db}.
+- lib/src/screens/database_source_screen.dart — ekran „Baza danych”: pole adresu + „Zapisz”
+  (walidacja; zapis od razu uruchamia pobieranie; puste pole = wyłączenie), „Ostatnie
+  pobranie”, ostatni błąd, „Pobierz teraz”, notka o automatycznym pobieraniu raz dziennie.
+- test/data/database_sync_test.dart — testy na lokalnym HttpServer (normalizacja, raz dziennie,
+  pamiętanie po restarcie, zachowanie starej kopii przy złym pliku, brak serwera).
+- docs/decisions/0002-database-download.md — ADR: transport = pobieranie plików SQLite po HTTP
+  (AGENTS.md wymagał ADR dla sposobu komunikacji z MusicDatabase).
+
+Zmienione:
+- lib/main.dart — tworzy DatabaseSync, przy starcie load() + syncIfDue(); dodatkowo
+  AppLifecycleListener(onResume: syncIfDue), bo Android trzyma aplikację w tle całymi dniami.
+- lib/src/screens/music_sources_screen.dart — nowa pozycja „Baza danych” pod „Muzyka lokalna”.
+- pubspec.yaml / pubspec.lock — dodane path_provider i shared_preferences.
+- android/app/src/main/AndroidManifest.xml — uprawnienie INTERNET (wcześniej było tylko w
+  debug/profile, więc release nie miałby sieci) i android:usesCleartextTraffic="true"
+  (serwer to zwykłe HTTP po Tailscale).
+- test/widget_test.dart — setUp z SharedPreferences.setMockInitialValues({}) + test ekranu.
+- AGENTS.md, docs/architecture.md, docs/menu-map.md — opis nowej funkcji i katalogu lib/src/data/.
+
+Stan weryfikacji:
+- flutter analyze: czysto. flutter test: 16/16 zielone.
+- Release APK zbudowany z tym kodem i zainstalowany (adb install -r) na Huawei SNE-LX1
+  (USB, serial HYFDU19412006823); aplikacja uruchomiona.
+
+
+3. CO ZOSTAŁO
+-------------
+a) Test na telefonie (AGENTS.md: zmiany UI trzeba obejrzeć na urządzeniu). Telefon był
+   zablokowany — odblokowuje go użytkownik, nie agent. Przygotowane środowisko testowe
+   (tymczasowe, może już wygasnąć):
+   - serwer: `python3 -m http.server 8002 --bind 127.0.0.1` w katalogu przykładowej bazy,
+     uruchomiony pod `timeout 20m` (wygasa ok. 13:56); tylko localhost, nie w sieci,
+   - `adb -s HYFDU19412006823 reverse tcp:8002 tcp:8002`, więc na telefonie adres
+     http://127.0.0.1:8002/ trafia do tego serwera,
+   - scrcpy otwarte z --max-size=1024 --video-bit-rate=4M (na tym Huaweiu domyślne ustawienia
+     kończą się błędem MediaCodec).
+   Jeśli serwer wygasł, uruchom go ponownie tak samo (setsid nohup timeout … & disown).
+   Ścieżka: avatar → Ustawienia i prywatność → Źródła muzyki → Baza danych → wpisz
+   127.0.0.1:8002 → Zapisz. Oczekiwane: snackbar „Pobrano bazę danych”, „Ostatnie pobranie”
+   z dzisiejszą datą. Sprawdź też błędny adres (komunikat w polu) i wyłączony serwer
+   („Nie można połączyć się z serwerem”). Na koniec:
+   `adb -s HYFDU19412006823 reverse --remove tcp:8002`.
+   NIE wpisuj ścieżki ani adresu przykładowej bazy do kodu — adres wpisuje użytkownik.
+b) Przeszukiwanie pobranej bazy NIE jest zrobione — nic jeszcze nie czyta plików. Wymaga
+   pakietu SQLite (np. sqflite) i znajomości schematu z ../MusicDatabase. Zapytaj użytkownika,
+   czy to ma być następny krok i jak ma wyglądać (np. zakładka „Wyszukaj”).
+c) Do potwierdzenia z użytkownikiem decyzje podjęte bez pytania: pobieranie od razu po zapisie
+   adresu, sprawdzanie także przy powrocie aplikacji z tła, akceptowanie adresu bez http://,
+   cleartext HTTP w manifeście.
+d) Nie commituj ani nie pushuj bez wyraźnej prośby (AGENTS.md). Po zakończeniu użytkownik może
+   chcieć /finalize-change.
