@@ -1,0 +1,299 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
+import 'newpipe.dart';
+import 'source_settings.dart';
+import 'youtube_audio.dart';
+import 'youtube_playlist.dart';
+import 'youtube_video.dart';
+
+export 'youtube_video.dart';
+
+/// Why no [YouTubeSearch] method returned results; [message] is shown to the user as is.
+class YouTubeSearchException implements Exception {
+  const YouTubeSearchException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+typedef YouTubeSearchFn = Future<List<YouTubeVideo>> Function(String query);
+typedef YouTubeApiSearchFn = Future<List<YouTubeVideo>> Function(
+  String query,
+  String apiKey,
+);
+
+/// Searches YouTube with the methods switched on in [SourceSettings], in [YouTubeMethod] order,
+/// moving to the next one when a method fails. The functions can be replaced in tests.
+class YouTubeSearch {
+  YouTubeSearch({
+    YouTubeSearchFn? newPipe,
+    YouTubeSearchFn? explode,
+    YouTubeApiSearchFn? api,
+    bool? newPipeAvailable,
+  }) : _newPipe = newPipe ?? newPipeSearch,
+       _explode = explode ?? _searchWithExplode,
+       _api = api ?? _searchWithApi,
+       newPipeAvailable = newPipeAvailable ?? (!kIsWeb && Platform.isAndroid);
+
+  static const maxResults = 15;
+
+  final YouTubeSearchFn _newPipe;
+  final YouTubeSearchFn _explode;
+  final YouTubeApiSearchFn _api;
+
+  /// NewPipeExtractor is a Java library, so only the Android build has it.
+  final bool newPipeAvailable;
+
+  /// Videos for [query], best match first. Throws [YouTubeSearchException] when no method
+  /// worked; an empty list means YouTube was searched and found nothing.
+  Future<List<YouTubeVideo>> search(
+    String query,
+    SourceSettings settings,
+  ) async {
+    final methods = [
+      for (final m in YouTubeMethod.values)
+        if (settings.methods.contains(m) &&
+            (m != YouTubeMethod.newPipe || newPipeAvailable))
+          m,
+    ];
+    if (methods.isEmpty) {
+      throw const YouTubeSearchException(
+        'Nie wybrano sposobu wyszukiwania w Ustawienia › Źródła muzyki › YouTube.',
+      );
+    }
+    final errors = <String>[];
+    for (final method in methods) {
+      try {
+        switch (method) {
+          case YouTubeMethod.newPipe:
+            return (await _newPipe(query)).take(maxResults).toList();
+          case YouTubeMethod.explode:
+            return await _explode(query);
+          case YouTubeMethod.ytDlpServer:
+            // Needs a search endpoint on MusicDatabase's server, which doesn't exist yet.
+            errors.add('yt-dlp przez serwer: jeszcze niedostępne');
+          case YouTubeMethod.api:
+            final key = settings.apiKey;
+            if (key == null) {
+              errors.add('API: brak kodu YouTube API');
+            } else {
+              return await _api(query, key);
+            }
+        }
+      } catch (e) {
+        debugPrint('YouTube search (${method.name}) failed: $e');
+        errors.add('${_methodName(method)}: ${_describe(e)}');
+      }
+    }
+    throw YouTubeSearchException(
+      'Nie udało się wyszukać na YouTube (${errors.join('; ')}).',
+    );
+  }
+
+  static String _methodName(YouTubeMethod m) => switch (m) {
+    YouTubeMethod.newPipe => 'NewPipe',
+    YouTubeMethod.explode => 'youtube_explode',
+    YouTubeMethod.ytDlpServer => 'yt-dlp przez serwer',
+    YouTubeMethod.api => 'API',
+  };
+
+  static String _describe(Object e) => switch (e) {
+    SocketException() || HttpException() => 'brak połączenia',
+    YouTubeSearchException(:final message) => message,
+    // youtube_explode wraps network errors in package:http's ClientException.
+    _ when '$e'.contains('SocketException') => 'brak połączenia',
+    _ => 'błąd',
+  };
+
+  static Future<List<YouTubeVideo>> _searchWithExplode(String query) async {
+    final yt = YoutubeExplode();
+    try {
+      final videos = await yt.search.search(query);
+      return [
+        for (final v in videos.take(maxResults))
+          YouTubeVideo(
+            id: v.id.value,
+            title: v.title,
+            channel: v.author,
+            duration: v.duration,
+            viewCount: v.engagement.viewCount,
+          ),
+      ];
+    } finally {
+      yt.close();
+    }
+  }
+
+  static Future<List<YouTubeVideo>> _searchWithApi(
+    String query,
+    String apiKey,
+  ) async {
+    final uri = Uri.https('www.googleapis.com', '/youtube/v3/search', {
+      'part': 'snippet',
+      'type': 'video',
+      'maxResults': '$maxResults',
+      'q': query,
+      'key': apiKey,
+    });
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
+    try {
+      final request = await client.getUrl(uri);
+      final response = await request.close().timeout(
+        const Duration(seconds: 15),
+      );
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode != HttpStatus.ok) {
+        throw YouTubeSearchException(
+          response.statusCode == HttpStatus.forbidden ||
+                  response.statusCode == HttpStatus.badRequest
+              ? 'odrzucony kod API albo wyczerpany limit'
+              : 'odpowiedź HTTP ${response.statusCode}',
+        );
+      }
+      final items = (jsonDecode(body) as Map<String, Object?>)['items'];
+      return [
+        for (final item in (items as List?) ?? const [])
+          if (item case {
+            'id': {'videoId': final String id},
+            'snippet': {
+              'title': final String title,
+              'channelTitle': final String channel,
+            },
+          })
+            YouTubeVideo(
+              id: id,
+              title: _unescapeHtml(title),
+              channel: _unescapeHtml(channel),
+            ),
+      ];
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// The Data API returns titles HTML-escaped ("Rock &amp; Roll", "Don&#39;t").
+  static String _unescapeHtml(String s) => s
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&amp;', '&');
+}
+
+typedef YouTubePlaylistFn = Future<YouTubePlaylistData> Function(
+  String playlistId,
+);
+
+/// Fetches a whole YouTube playlist for import, with the search methods switched on
+/// ([YouTubeMethod]): NewPipeExtractor (Android), then youtube_explode.
+class YouTubePlaylists {
+  YouTubePlaylists({
+    YouTubePlaylistFn? newPipe,
+    YouTubePlaylistFn? explode,
+    bool? newPipeAvailable,
+  }) : _newPipe = newPipe ?? newPipePlaylist,
+       _explode = explode ?? _fetchWithExplode,
+       newPipeAvailable = newPipeAvailable ?? (!kIsWeb && Platform.isAndroid);
+
+  final YouTubePlaylistFn _newPipe;
+  final YouTubePlaylistFn _explode;
+  final bool newPipeAvailable;
+
+  /// Throws [YouTubeSearchException] when no method could read the playlist.
+  Future<YouTubePlaylistData> fetch(
+    String playlistId,
+    SourceSettings settings,
+  ) async {
+    final errors = <String>[];
+    for (final method in [YouTubeMethod.newPipe, YouTubeMethod.explode]) {
+      if (!settings.methods.contains(method)) continue;
+      if (method == YouTubeMethod.newPipe && !newPipeAvailable) continue;
+      try {
+        final data = await (method == YouTubeMethod.newPipe
+            ? _newPipe
+            : _explode)(playlistId);
+        // youtube_explode has been seen to report a playlist's size but return no videos.
+        if (data.videos.isNotEmpty) return data;
+        errors.add('${YouTubeSearch._methodName(method)}: brak filmów');
+      } catch (e) {
+        debugPrint('YouTube playlist (${method.name}) failed: $e');
+        errors.add(
+          '${YouTubeSearch._methodName(method)}: ${YouTubeSearch._describe(e)}',
+        );
+      }
+    }
+    throw YouTubeSearchException(
+      errors.isEmpty
+          ? 'Włącz NewPipeExtractor albo youtube_explode w Ustawienia › Źródła muzyki › '
+                'YouTube, żeby importować playlisty.'
+          : 'Nie udało się odczytać playlisty (${errors.join('; ')}). Sprawdź, czy jest '
+                'publiczna lub niepubliczna (nie prywatna) i czy nie jest pusta.',
+    );
+  }
+
+  static Future<YouTubePlaylistData> _fetchWithExplode(
+    String playlistId,
+  ) async {
+    final yt = YoutubeExplode();
+    try {
+      final playlist = await yt.playlists.get(playlistId);
+      final videos = await yt.playlists.getVideos(playlistId).toList();
+      return YouTubePlaylistData(
+        id: playlistId,
+        name: playlist.title,
+        owner: playlist.author,
+        videos: [
+          for (final v in videos)
+            YouTubeVideo(
+              id: v.id.value,
+              title: v.title,
+              channel: v.author,
+              duration: v.duration,
+              viewCount: v.engagement.viewCount,
+            ),
+        ],
+      );
+    } finally {
+      yt.close();
+    }
+  }
+}
+
+/// Makes YouTube search and audio reachable from any screen; tests pass fakes.
+class YouTubeScope extends InheritedWidget {
+  const YouTubeScope({
+    super.key,
+    required this.search,
+    required this.audio,
+    required this.playlists,
+    required super.child,
+  });
+
+  final YouTubeSearch search;
+  final YouTubeAudio audio;
+  final YouTubePlaylists playlists;
+
+  static YouTubeScope _of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<YouTubeScope>()!;
+
+  static YouTubeSearch searchOf(BuildContext context) => _of(context).search;
+
+  static YouTubeAudio audioOf(BuildContext context) => _of(context).audio;
+
+  static YouTubePlaylists playlistsOf(BuildContext context) =>
+      _of(context).playlists;
+
+  @override
+  bool updateShouldNotify(YouTubeScope oldWidget) =>
+      search != oldWidget.search ||
+      audio != oldWidget.audio ||
+      playlists != oldWidget.playlists;
+}

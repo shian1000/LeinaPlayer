@@ -2,7 +2,8 @@
 
 ## Current state
 
-UI skeleton only (see [`menu-map.md`](menu-map.md)). `AppShell` (`lib/src/screens/app_shell.dart`)
+A Spotify-style UI where most leaves are still dummies (see [`menu-map.md`](menu-map.md)) around
+real search, playback and playlists. `AppShell` (`lib/src/screens/app_shell.dart`)
 is the root: a `Scaffold` with the profile drawer, a custom bottom bar, and an `IndexedStack` of one
 nested `Navigator` per tab, so pushed screens (playlist, settings) keep the bottom bar visible and
 each tab keeps its own back stack. Back is handled centrally in `AppShell` via `PopScope`.
@@ -23,9 +24,26 @@ the folders to scan and the phone's own SQLite `local.db` (`<app support>/local/
 keeps all rows in memory so `combined_search.dart` can search both databases per keystroke.
 
 Playback: `lib/src/playback/player_controller.dart` (`PlayerController`, via `PlayerScope`) plays
-phone files with `just_audio`, behind a small `AudioBackend` interface so tests use a fake; the
-backend is created on first play. One song at a time, no queue and no background/notification
-service yet — Android may stop playback when the app is in the background for long.
+phone files and streams with `just_audio`, behind a small `AudioBackend` interface so tests use a
+fake; the backend is created on first play. `just_audio_background` (`audio_service`) adds the
+media notification and the foreground service that keeps music playing in the background. One
+song at a time, no queue yet. Which source plays a song is the user's order
+(`SourceSettings.playbackOrder`, `lib/src/data/source_settings.dart`, via `SourceSettingsScope`).
+
+YouTube ([`agent-notes/youtube.md`](agent-notes/youtube.md)): search
+(`youtube_search.dart`), the phone's own song→video matching (`youtube_matcher.dart`, a lite
+version of MusicDatabase's — [ADR 0003](decisions/0003-app-supports-musicdatabase.md)) and
+playback through the user's ordered methods (`lib/src/playback/youtube_playback.dart`: cache →
+NewPipeExtractor → … → the YouTube app). NewPipeExtractor is a Java library reached over a method
+channel (`android/app/src/main/kotlin/.../NewPipeBridge.kt`, `lib/src/data/newpipe.dart`), so it
+exists on Android only. Phone-found matches and the audio cache are tables in `local.db`
+(`youtube_library.dart`, `YouTubeLibraryScope`).
+
+Playlists ([`agent-notes/playlists.md`](agent-notes/playlists.md)): `PlaylistLibrary`
+(`playlist_library.dart`, `PlaylistLibraryScope`) keeps playlists imported from YouTube in
+`local.db`; their tracks render with the same `SongTile` (`lib/src/widgets/song_tile.dart`) as
+search results. `local.db` schema versions live in `LocalLibrary._open` (v2 YouTube tables, v3
+playlists).
 
 Artwork is drawn as gradient placeholders (`CoverArt`) rather than images, which keeps rendering
 cheap on the old Huawei test phone.
@@ -51,7 +69,9 @@ MusicDatabase's `normalize()`; `tag.db` isn't read yet.
 
 ## Boundary with MusicDatabase
 
-This app must not reimplement business logic (matching, enrichment, database schema
-assumptions) that belongs in [`MusicDatabase`](../../MusicDatabase). It consumes what that
-backend exposes. If a screen seems to need logic that isn't available from the backend yet, that's
-a sign the backend needs a new endpoint/capability — not that this app should grow one locally.
+[`MusicDatabase`](../../MusicDatabase) owns business logic (matching, enrichment, the schema)
+and its values always win. The app may fill a gap locally — e.g. find a YouTube link a song
+doesn't have yet — with deliberately simplified logic whose results stay on the phone until
+MusicDatabase has its own ([ADR 0003](decisions/0003-app-supports-musicdatabase.md)). The app must
+keep working when MusicDatabase's server is unreachable. Proper fixes still belong in
+MusicDatabase; sending phone-found data back to it for review is planned but not designed yet.

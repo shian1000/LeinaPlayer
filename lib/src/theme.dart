@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 /// Font sizes calibrated by measuring the reference app and this app on the same phone, so text
@@ -268,6 +269,17 @@ ThemeData buildAppTheme(AppThemeDef def) {
           onSurfaceVariant: p.textSecondary,
           outline: p.outline ?? p.divider,
         ),
+    // Flutter's Android default (PredictiveBackPageTransitionsBuilder) lets a route inside a tab
+    // navigator grab the predictive back gesture (Android 16+) whenever it's top of its own
+    // navigator — even under the full player, a root bottom sheet or the open drawer — so Back
+    // popped the hidden tab screen instead. Same look on push; Back stays with AppShell._onBack.
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+      },
+    ),
     iconTheme: IconThemeData(color: p.textPrimary),
     dividerTheme: DividerThemeData(color: p.divider),
     appBarTheme: AppBarTheme(

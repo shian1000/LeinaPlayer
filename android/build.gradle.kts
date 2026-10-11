@@ -2,6 +2,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // NewPipeExtractor (YouTube playback) is published only on JitPack.
+        maven("https://jitpack.io")
     }
 }
 

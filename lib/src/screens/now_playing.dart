@@ -180,15 +180,19 @@ class NowPlayingScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            track.searchQuery == null
-                                ? 'Teraz odtwarzane'
-                                : 'Odtwarzanie z wyników wyszukiwania',
+                            track.playlistName != null
+                                ? 'Odtwarzanie z playlisty'
+                                : track.searchQuery != null
+                                ? 'Odtwarzanie z wyników wyszukiwania'
+                                : 'Teraz odtwarzane',
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontSize: AppFontSize.small),
                           ),
-                          if (track.searchQuery != null)
+                          if (track.playlistName != null ||
+                              track.searchQuery != null)
                             Text(
-                              '„${track.searchQuery}” w wyszukiwarce',
+                              track.playlistName ??
+                                  '„${track.searchQuery}” w wyszukiwarce',
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

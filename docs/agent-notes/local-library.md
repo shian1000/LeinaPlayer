@@ -43,9 +43,25 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 ## Search results and playback
 
 - Results combine MusicDatabase songs (with the phone files linked to them) and phone-only
-  pending files. `SongAvailability`: **available** = has a phone file (pending or not);
-  **potentiallyAvailable** exists for future sources and is empty; everything else unavailable.
-  Only available results play.
-- Playback (`PlayerController` over `just_audio`) is one song, no queue, no background/media
-  notification service. "Poprzedni" restarts the song. `just_audio`'s `play()` future completes
-  only when playback stops — never await it.
+  pending files. `SongAvailability`: **available** = has a phone file (pending or not) or a
+  stored `youtube_video_id`; **potentiallyAvailable** = no video id stored (YouTube search may
+  find it); **unavailable** = not on the phone and `youtube_video_id` is MusicDatabase's
+  `NO_VIDEO_SENTINEL` ("N/A" — confirmed by hand as not on YouTube; an empty string counts as
+  nothing stored). Older `music.db` files without the column are read as "nothing stored".
+- Which source plays a song is `SourceSettings.playbackOrder` (user-ordered; first source that
+  `SearchHit.playableFrom` wins). YouTube is searched (`YouTubeSearch`) only on an explicit
+  action — the "Wyszukaj na YouTubie" button or tapping a song no source has — never per
+  keystroke. YouTube search, matching and playback: [`youtube.md`](youtube.md).
+- Snackbars on the search screen use `clearSnackBars()`, not `hideCurrentSnackBar()`: a
+  "Szukam…" snackbar shown while another is still visible sits in the queue, so a fast answer
+  would otherwise wait behind it for its whole duration.
+- Playback (`PlayerController` over `just_audio`) is one song, no queue. "Poprzedni" restarts
+  the song. `just_audio`'s `play()` future completes only when playback stops — never await it.
+- Background playback and the media notification come from `just_audio_background`
+  (`audio_service`): `JustAudioBackground.init` in `main()`, `MainActivity` extends
+  `AudioServiceActivity`, the service/receiver/permissions in `AndroidManifest.xml`, and every
+  audio source needs a `MediaItem` tag (`JustAudioBackend.open`). While music plays, the
+  foreground service keeps Android from killing the app (checked: still playing after 2+ minutes
+  locked on the Huawei); when paused the service leaves the foreground, as Android expects.
+  `android/app/src/main/res/raw/keep.xml` must stay: release resource shrinking otherwise
+  removes audio_service's button icons and the notification shows no play/pause/stop.

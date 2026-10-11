@@ -9,7 +9,8 @@ Future<void> writeMusicDb(String path) async {
   );
   await db.execute(
     'CREATE TABLE songs (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL, '
-    'album VARCHAR, year INTEGER, language VARCHAR, artist_id INTEGER NOT NULL)',
+    'album VARCHAR, year INTEGER, language VARCHAR, artist_id INTEGER NOT NULL, '
+    'youtube_video_id VARCHAR)',
   );
   await db.execute(
     'CREATE TABLE additional_song_artists (song_id INTEGER NOT NULL, '
@@ -25,11 +26,11 @@ Future<void> writeMusicDb(String path) async {
   );
   await db.rawInsert(
     "INSERT INTO songs VALUES "
-    "(1, 'Małomiasteczkowy', 'Małomiasteczkowy', 2018, 'Polish', 1), "
-    "(2, 'Going to California', 'Led Zeppelin IV', 1971, 'English', 2), "
-    "(3, 'Pay Your Respect', 'Singles', NULL, 'Unknown', 3), "
-    "(4, 'Pusty', NULL, 2014, 'Polish', 5), "
-    "(5, 'California Dreaming', 'Covers', 2001, 'English', 2)",
+    "(1, 'Małomiasteczkowy', 'Małomiasteczkowy', 2018, 'Polish', 1, 'X2XWBcd5jn0'), "
+    "(2, 'Going to California', 'Led Zeppelin IV', 1971, 'English', 2, NULL), "
+    "(3, 'Pay Your Respect', 'Singles', NULL, 'Unknown', 3, 'N/A'), "
+    "(4, 'Pusty', NULL, 2014, 'Polish', 5, ''), "
+    "(5, 'California Dreaming', 'Covers', 2001, 'English', 2, NULL)",
   );
   await db.rawInsert(
     "INSERT INTO additional_song_artists VALUES (3, 4, 'feat'), (4, 6, 'main')",

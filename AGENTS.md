@@ -6,18 +6,26 @@ MusicDatabaseApp is the mobile frontend for [MusicDatabase](../MusicDatabase) �
 library / metadata enrichment tool. MusicDatabase today is a Python terminal app with a local
 SQLite database and enrichment from MusicBrainz, Wikipedia, iTunes, and Genius.
 
-This app is a Flutter client, targeting Android first, with iOS support kept buildable for a
-possible future release. It does not implement any business logic itself — that lives in
-MusicDatabase. This app is a presentation/consumption layer only (see
-[`docs/decisions/0001-project-setup.md`](docs/decisions/0001-project-setup.md)).
+This app is a Flutter client, targeting Android first, with iOS support kept buildable. It is
+for private use only and is never published in an app store; the app is GPLv3
+([ADR 0004](docs/decisions/0004-license-and-distribution.md)). It uses MusicDatabase's data and
+supports MusicDatabase: when something is missing there (so far: YouTube links), the phone may
+work it out itself with simplified local logic, kept only on the phone until MusicDatabase has
+its own value ([ADR 0003](docs/decisions/0003-app-supports-musicdatabase.md)). The app must keep
+working without the server.
 
 Current state: navigation and menus are modelled on the Spotify Android app. Most leaf elements
-are still dummies that show `Atrapa: <ID>`, and Home/Biblioteka show static placeholder data;
+are still dummies that show `Atrapa: <ID>`, and Home shows static placeholder data;
 [`docs/menu-map.md`](docs/menu-map.md) lists every element and marks what's implemented. Real so
 far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `tag.db` from a remote
 or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)), scanning music
 folders on the phone into the phone's own `local.db`, song search over both databases, and
-playing phone files with a mini/full player.
+playing phone files with a mini/full player and a media notification (keeps playing in the
+background). YouTube: searching it on request, showing which songs
+MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
+audio on Android through NewPipeExtractor, with a cache of played songs — see
+[`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube links
+([`playlists.md`](docs/agent-notes/playlists.md)).
 
 ## Read order
 
@@ -29,12 +37,14 @@ playing phone files with a mini/full player.
 
 ## Sources of truth
 
-- Business logic, data model, and enrichment rules live in `MusicDatabase`, not here. Do not
-  duplicate them in this repo.
+- Business logic, data model, and enrichment rules live in `MusicDatabase`; its values always
+  win. This repo may only add deliberately simplified ("lite") logic to fill gaps locally, per
+  [ADR 0003](docs/decisions/0003-app-supports-musicdatabase.md) — name the MusicDatabase
+  counterpart where you do, and don't turn it into a full port kept in sync.
 - The app gets MusicDatabase's data by downloading its SQLite files over HTTP
   ([ADR 0002](docs/decisions/0002-database-download.md)). Any other way of talking to it (an API,
-  writing data back) is not decided — check with the user first, and record the decision as an
-  ADR in `docs/decisions/`.
+  sending phone-found data back for review — the intended direction) is not decided — check with
+  the user first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands
 
@@ -51,18 +61,27 @@ flutter build apk            # build a release Android APK
 - `lib/main.dart` — app entry point.
 - `lib/src/screens/` — one file per screen/sheet; `app_shell.dart` holds the bottom nav, drawer and
   per-tab navigators.
-- `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers).
+- `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers,
+  `SongTile` — the song row with source icons used by search and playlists).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
   `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
-  search over both (`combined_search.dart`), and the port of MusicDatabase's `normalize()`
+  search over both (`combined_search.dart`), YouTube search / matching / audio
+  (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
+  links and the audio cache (`youtube_library.dart`), music source settings
+  and playback order (`source_settings.dart`), and the port of MusicDatabase's `normalize()`
   (`text_normalizer.dart`).
-- `lib/src/playback/` — `PlayerController` (`just_audio`).
+- `lib/src/playback/` — `PlayerController` (`just_audio`) and `YouTubePlayback` (the user's
+  ordered ways of playing a YouTube video).
 - `lib/src/theme.dart`, `lib/src/theme_controller.dart` — themes and the appearance settings.
 - `lib/src/dummy.dart` — `showDummy()`, used by every not-yet-implemented element.
 - `lib/src/sample_content.dart` — static placeholder content.
 - `test/` — widget/unit tests, mirrors `lib/`.
+- `tool/` — plain-Dart scripts run on the computer (`youtube_match_benchmark.dart`).
 - `android/`, `ios/` — platform projects generated by `flutter create`. Avoid hand-editing
-  generated platform files unless a specific platform integration requires it.
+  generated platform files unless a specific platform integration requires it. Hand-written:
+  `android/app/src/main/kotlin/.../NewPipeBridge.kt` (NewPipeExtractor behind a method channel),
+  `MainActivity.kt` (extends `AudioServiceActivity` for background playback),
+  `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `docs/` — documentation for humans and AI agents (see [`docs/index.md`](docs/index.md)).
 
 ## Coding conventions
@@ -75,12 +94,17 @@ flutter build apk            # build a release Android APK
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `PlayerScope`); no state-management package. Settings persist via
-  `shared_preferences`.
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `PlaylistLibraryScope`, `PlayerScope`,
+  `SourceSettingsScope`; plus
+  `YouTubeScope`, an `InheritedWidget` so tests can swap YouTube search, audio and playlist
+  fetching); no
+  state-management package. Settings persist via `shared_preferences`.
 - Screens never hard-code colours or font sizes: `context.palette` and `AppFontSize`
   ([`theming.md`](docs/agent-notes/theming.md), [`ui-sizing.md`](docs/agent-notes/ui-sizing.md)).
 - System Back in `AppShell` pops tab routes directly (bypassing their `PopScope`), so a pushed
-  sub-screen can't hand a result back through `pop` — pass a callback instead.
+  sub-screen can't hand a result back through `pop` — pass a callback instead. Keep Flutter's
+  `PredictiveBackPageTransitionsBuilder` out of the theme: on Android 16+ it lets a hidden tab
+  route take the back gesture from whatever covers it (full player, root sheets, drawer).
 - No comments explaining *what* code does; only *why*, when non-obvious.
 
 ## Testing & verification
@@ -107,7 +131,13 @@ flutter build apk            # build a release Android APK
 - [`theming.md`](docs/agent-notes/theming.md) — themes (Dummify, Lain), `context.palette`, how to add
   one.
 - [`local-library.md`](docs/agent-notes/local-library.md) — phone music scan, matching files to
-  MusicDatabase (tags first — user's decision), `local.db`, search availability, playback limits.
+  MusicDatabase (tags first — user's decision), `local.db`, search availability (incl. YouTube
+  links), playback order, playback limits.
+- [`youtube.md`](docs/agent-notes/youtube.md) — YouTube search methods, the lite matcher and its
+  benchmark, NewPipe playback (build requirements, 403s), remembered matches and the audio cache
+  (why it downloads in 1 MB ranges), what's not done.
+- [`playlists.md`](docs/agent-notes/playlists.md) — Biblioteka playlists: `local.db` tables,
+  YouTube import (fetching, title parsing, recognising songs by video first), R8 rules.
 - [`ui-sizing.md`](docs/agent-notes/ui-sizing.md) — font sizes/spacing are calibrated against the
   reference app; why there's no screen-size scaling.
 

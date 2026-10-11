@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:music_database_app/main.dart';
 import 'package:music_database_app/src/screens/database_source_screen.dart';
-import 'package:music_database_app/src/screens/playlist_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/widgets/common.dart';
 
@@ -41,38 +41,119 @@ void main() {
     expect(find.text('Atrapa: Utwórz › Blend'), findsOneWidget);
   });
 
-  testWidgets('library playlist opens and its track menu is reachable', (
+  testWidgets('empty Biblioteka; "+" › Playlista offers new and import', (
     tester,
   ) async {
     await tester.pumpWidget(const MusicDatabaseApp());
-
     await tester.tap(find.text('Biblioteka'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Przykładowa playlista A'));
-    await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Odtwórz playlistę'), findsOneWidget);
-    expect(find.text('Biblioteka'), findsOneWidget);
+    expect(find.text('Brak playlist'), findsOneWidget);
+    expect(find.textContaining('Przykładowa'), findsNothing);
 
-    await tester.scrollUntilVisible(
-      find.text('Utwór 2'),
-      200,
-      scrollable: find
-          .descendant(
-            of: find.byType(PlaylistScreen),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    await tester.tap(find.byTooltip('Menu utworu (⋮)').first);
+    await tester.tap(find.byTooltip('Utwórz (+)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Dodaj do kolejki'));
+    await tester.tap(find.text('Playlista'));
     await tester.pumpAndSettle();
-
+    expect(find.text('Importuj playlistę'), findsOneWidget);
+    await tester.tap(find.text('Utwórz nową playlistę'));
+    await tester.pumpAndSettle();
     expect(
-      find.text('Atrapa: Playlista › Utwór › Menu (⋮) › Dodaj do kolejki'),
+      find.text(
+        'Atrapa: Biblioteka › Utwórz (+) › Playlista › Utwórz nową playlistę',
+      ),
       findsOneWidget,
     );
+
+    await tester.tap(find.byTooltip('Utwórz (+)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Playlista'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Importuj playlistę'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'https://example.com/nic');
+    await tester.tap(find.text('Importuj'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('To nie jest link do playlisty'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'predictive back gesture closes a root sheet, not the tab screen under it',
+    (tester) async {
+      await tester.pumpWidget(const MusicDatabaseApp());
+      // A pushed tab route (Ustawienia) with a root sheet (Utwórz) over it.
+      await tester.tap(find.byType(CircleAvatar).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ustawienia'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Utwórz'));
+      await tester.pumpAndSettle();
+      expect(find.text('Blend'), findsOneWidget);
+
+      Future<void> sendBackGesture(String method, [Object? arguments]) =>
+          tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+            SystemChannels.backGesture.name,
+            SystemChannels.backGesture.codec.encodeMethodCall(
+              MethodCall(method, arguments),
+            ),
+            (_) {},
+          );
+      await sendBackGesture('startBackGesture', {
+        'touchOffset': [5.0, 300.0],
+        'progress': 0.0,
+        'swipeEdge': 0,
+      });
+      await sendBackGesture('commitBackGesture');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Blend'), findsNothing);
+      expect(find.text('Źródła muzyki'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Informacje i pomoc: private use, licence and source link', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MusicDatabaseApp());
+    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ustawienia'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Informacje i pomoc'), 200);
+    await tester.tap(find.text('Informacje i pomoc'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
+    expect(find.textContaining('GPLv3'), findsOneWidget);
+    expect(
+      find.text('https://github.com/shian1000/MusicDatabaseApp'),
+      findsOneWidget,
+    );
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.ensureVisible(find.byTooltip('Kopiuj link'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Kopiuj link'));
+    await tester.pumpAndSettle();
+    expect(copied, 'https://github.com/shian1000/MusicDatabaseApp');
+    expect(find.text('Skopiowano link do kodu źródłowego'), findsOneWidget);
   });
 
   testWidgets('profile drawer opens settings inside current tab', (
@@ -161,6 +242,59 @@ void main() {
     await tester.tap(find.text('Skanuj teraz'));
     await tester.pump();
     expect(find.text('Najpierw dodaj folder z muzyką.'), findsOneWidget);
+  });
+
+  testWidgets('YouTube settings and playback order under Źródła muzyki', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MusicDatabaseApp());
+
+    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ustawienia'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Źródła muzyki'));
+    await tester.pumpAndSettle();
+    expect(find.text('1. Telefon, 2. YouTube'), findsOneWidget);
+    await tester.tap(find.text('YouTube'));
+    await tester.pumpAndSettle();
+
+    SwitchListTile switchOf(String label) => tester.widget<SwitchListTile>(
+      find.widgetWithText(SwitchListTile, label),
+    );
+    // Methods can only be chosen once YouTube search is on.
+    expect(switchOf('Korzystaj z pakietu youtube_explode').onChanged, isNull);
+    await tester.tap(find.text('Włącz szukanie w serwisie YouTube'));
+    await tester.pumpAndSettle();
+    expect(switchOf('Korzystaj z pakietu youtube_explode').value, isTrue);
+    await tester.tap(find.text('Korzystaj z API'));
+    await tester.pumpAndSettle();
+    expect(find.text('Wymaga kodu YouTube API'), findsOneWidget);
+
+    await tester.tap(find.text('Kod YouTube API'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), ' AIzaSyTEST1234 ');
+    await tester.tap(find.text('Zapisz'));
+    await tester.pumpAndSettle();
+    expect(find.text('••••1234'), findsOneWidget);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('youtube.search_enabled'), isTrue);
+    expect(prefs.getBool('youtube.method.api'), isTrue);
+    expect(prefs.getString('youtube.api_key'), 'AIzaSyTEST1234');
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kolejność odtwarzania'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byIcon(Icons.drag_handle).first,
+      const Offset(0, 120),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('1. YouTube'), findsOneWidget);
+    expect(find.text('2. Telefon'), findsOneWidget);
+    expect(prefs.getStringList('sources.playback_order'), ['youtube', 'phone']);
   });
 
   testWidgets('database address is validated and saved under Źródła muzyki', (

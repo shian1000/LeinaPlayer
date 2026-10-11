@@ -6,6 +6,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'database_sync.dart';
 import 'text_normalizer.dart';
+import 'youtube_matcher.dart';
 
 /// What song search can look at, chosen with the filter icon on the Wyszukaj tab.
 enum SearchField {
@@ -38,6 +39,18 @@ int titleMatchRank(String normalizedTitle, String normalizedQuery) {
   return 3;
 }
 
+/// What MusicDatabase knows about a song on YouTube (`songs.youtube_video_id`).
+enum YouTubeLink {
+  /// A video id is stored.
+  linked,
+
+  /// Nothing stored — the song may still be found by searching YouTube.
+  unknown,
+
+  /// Marked by hand as not on YouTube at all (MusicDatabase's `NO_VIDEO_SENTINEL`, "N/A").
+  notOnYouTube,
+}
+
 /// One row of MusicDatabase's `songs` table, with its artists already joined in.
 class CatalogSong {
   CatalogSong({
@@ -47,10 +60,23 @@ class CatalogSong {
     this.album,
     this.year,
     this.language,
+    String? youtubeVideoId,
+    MatchTarget? youTubeTarget,
     List<String> artistNames = const [],
     List<String> origins = const [],
     List<String> synonyms = const [],
-  }) : _normalizedTitle = normalizeForSearch(title),
+  }) : youTubeTarget =
+           youTubeTarget ??
+           MatchTarget(title: title, mainArtists: [MatchArtist(artistLabel)]),
+       youtubeVideoId = const {null, '', 'N/A'}.contains(youtubeVideoId)
+           ? null
+           : youtubeVideoId,
+       youTube = switch (youtubeVideoId) {
+         null || '' => YouTubeLink.unknown,
+         'N/A' => YouTubeLink.notOnYouTube,
+         _ => YouTubeLink.linked,
+       },
+       _normalizedTitle = normalizeForSearch(title),
        _normalizedArtists = {
          normalizeForSearch(artistLabel),
          for (final name in [...artistNames, ...synonyms])
@@ -80,6 +106,13 @@ class CatalogSong {
   final String? album;
   final int? year;
   final String? language;
+
+  /// Set only when [youTube] is [YouTubeLink.linked].
+  final String? youtubeVideoId;
+  final YouTubeLink youTube;
+
+  /// What to look for when the phone searches YouTube for this song itself.
+  final MatchTarget youTubeTarget;
 
   final String _normalizedTitle;
 
@@ -197,6 +230,8 @@ class SongCatalog extends ChangeNotifier {
     } finally {
       _searchTexts = null;
       _byTitle = null;
+      _byYouTubeId = null;
+      _byId = null;
       _loading = null;
       notifyListeners();
     }
@@ -220,8 +255,12 @@ class SongCatalog extends ChangeNotifier {
       options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
     );
     try {
+      // Older databases have no youtube_video_id column.
+      final hasYouTube = (await db.rawQuery('PRAGMA table_info(songs)'))
+          .any((c) => c['name'] == 'youtube_video_id');
       final rows = await db.rawQuery('''
         SELECT s.id, s.title, s.album, s.year, s.language,
+               ${hasYouTube ? 's.youtube_video_id' : 'NULL'} AS youtube_video_id,
                a.name AS artist, a.origin, a.synonyms
         FROM songs s JOIN artists a ON a.id = s.artist_id''');
       final extra = await _readAdditionalArtists(db);
@@ -242,6 +281,18 @@ class SongCatalog extends ChangeNotifier {
       album: row['album'] as String?,
       year: row['year'] as int?,
       language: present(row['language'] as String?),
+      youtubeVideoId: (row['youtube_video_id'] as String?)?.trim(),
+      youTubeTarget: MatchTarget(
+        title: row['title']! as String,
+        mainArtists: [
+          for (final a in artists)
+            if (a.role == 'main') MatchArtist(a.name, a.synonyms),
+        ],
+        featArtists: [
+          for (final a in artists)
+            if (a.role == 'feat') MatchArtist(a.name, a.synonyms),
+        ],
+      ),
       artistLabel: _artistLabel(artists),
       artistNames: [for (final a in artists) a.name],
       origins: [for (final a in artists) ?present(a.origin)],
@@ -292,6 +343,18 @@ class SongCatalog extends ChangeNotifier {
   }
 
   Map<String, List<CatalogSong>>? _byTitle;
+  Map<String, CatalogSong>? _byYouTubeId;
+
+  /// The song MusicDatabase links to this YouTube video, or `null`.
+  CatalogSong? findByYouTubeId(String videoId) => (_byYouTubeId ??= {
+    for (final song in _songs)
+      if (song.youtubeVideoId != null) song.youtubeVideoId!: song,
+  })[videoId];
+
+  /// The song with this `songs.id`, or `null`.
+  CatalogSong? byId(int id) =>
+      (_byId ??= {for (final song in _songs) song.id: song})[id];
+  Map<int, CatalogSong>? _byId;
 
   /// The song with exactly this title and artist (both compared after normalization, so case,
   /// accents and punctuation don't matter), or `null`. The artist may be any of the song's

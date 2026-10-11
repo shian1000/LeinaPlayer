@@ -97,7 +97,7 @@ void main() {
         (await sync.localFile('music.db')).path,
       );
       await db.rawInsert(
-        "INSERT INTO songs VALUES (6, 'Nowa', NULL, NULL, NULL, 1)",
+        "INSERT INTO songs VALUES (6, 'Nowa', NULL, NULL, NULL, 1, NULL)",
       );
       await db.close();
       expect(catalog.search('nowa'), isEmpty);
@@ -180,6 +180,18 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
       expect(again.searchFields, {SearchField.year, SearchField.title});
+    });
+
+    test('YouTube link: id, "N/A" annotation, or nothing stored', () async {
+      await loadSample();
+      CatalogSong song(String title) => catalog.search(title).first;
+
+      expect(song('Małomiasteczkowy').youTube, YouTubeLink.linked);
+      expect(song('Małomiasteczkowy').youtubeVideoId, 'X2XWBcd5jn0');
+      expect(song('Pay Your Respect').youTube, YouTubeLink.notOnYouTube);
+      expect(song('Pay Your Respect').youtubeVideoId, isNull);
+      expect(song('Pusty').youTube, YouTubeLink.unknown);
+      expect(song('Going to California').youTube, YouTubeLink.unknown);
     });
   });
 }

@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../data/source_settings.dart';
 import '../theme.dart';
 import 'database_source_screen.dart';
 import 'local_music_screen.dart';
+import 'playback_order_screen.dart';
+import 'youtube_source_screen.dart';
 
 /// "Ustawienia › Źródła muzyki" — where the app gets music from: folders on the device and the
-/// MusicDatabase database downloaded from a server.
+/// MusicDatabase database downloaded from a server, YouTube, and which of them plays first.
 class MusicSourcesScreen extends StatelessWidget {
   const MusicSourcesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final order = SourceSettingsScope.of(context).playbackOrder;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.palette.surface,
@@ -36,6 +40,33 @@ class MusicSourcesScreen extends StatelessWidget {
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const DatabaseSourceScreen(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.smart_display_outlined),
+            title: const Text('YouTube'),
+            subtitle: const Text('Wyszukiwanie utworów w serwisie YouTube'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const YouTubeSourceScreen(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.low_priority),
+            title: const Text('Kolejność odtwarzania'),
+            subtitle: Text(
+              [
+                for (final (i, source) in order.indexed)
+                  '${i + 1}. ${source.label}',
+              ].join(', '),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PlaybackOrderScreen(),
               ),
             ),
           ),

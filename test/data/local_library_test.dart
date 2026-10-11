@@ -114,7 +114,7 @@ void main() {
         (await sync.localFile('music.db')).path,
       );
       await db.rawInsert(
-        "INSERT INTO songs VALUES (6, 'Nowa', NULL, NULL, NULL, 1)",
+        "INSERT INTO songs VALUES (6, 'Nowa', NULL, NULL, NULL, 1, NULL)",
       );
       await db.close();
 

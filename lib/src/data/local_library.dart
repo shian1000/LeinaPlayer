@@ -225,8 +225,9 @@ class LocalLibrary extends ChangeNotifier {
     );
   }
 
-  /// Opened once; concurrent callers share the same opening.
-  Future<Database> _database() => _db ??= _open();
+  /// Opened once; concurrent callers share the same opening. Also used by [YouTubeLibrary],
+  /// whose tables live in the same file.
+  Future<Database> database() => _db ??= _open();
 
   Future<Database> _open() async {
     final dir = await Directory('${(await _storageRoot()).path}/local')
@@ -234,8 +235,9 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: (db, _) => db.execute('''
+        version: 3,
+        onCreate: (db, _) async {
+          await db.execute('''
           CREATE TABLE local_songs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             -- Same columns as MusicDatabase's songs table, filled from the file's tags/name
@@ -256,15 +258,73 @@ class LocalLibrary extends ChangeNotifier {
             pending INTEGER NOT NULL DEFAULT 0,
             added_at INTEGER NOT NULL,
             checked_at INTEGER
-          )'''),
+          )''');
+          await _createYouTubeTables(db);
+          await _createPlaylistTables(db);
+        },
+        onUpgrade: (db, from, _) async {
+          if (from < 2) await _createYouTubeTables(db);
+          if (from < 3) await _createPlaylistTables(db);
+        },
       ),
     );
+  }
+
+  /// Version 3: the user's playlists (see `playlist_library.dart`).
+  static Future<void> _createPlaylistTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE playlists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name VARCHAR NOT NULL,
+        owner VARCHAR,
+        -- Where it was imported from ('youtube' + the playlist id), for re-importing.
+        source VARCHAR,
+        source_id VARCHAR,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )''');
+    await db.execute('''
+      CREATE TABLE playlist_tracks (
+        playlist_id INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        artist VARCHAR,
+        title VARCHAR NOT NULL,
+        -- The MusicDatabase song, when the track was recognised (music.db's songs.id).
+        main_db_id INTEGER,
+        youtube_video_id VARCHAR,
+        duration_s INTEGER,
+        PRIMARY KEY (playlist_id, position)
+      )''');
+  }
+
+  /// Version 2: what the phone knows about YouTube itself (see `youtube_library.dart`).
+  static Future<void> _createYouTubeTables(Database db) async {
+    // A video the phone found for a MusicDatabase song that has no youtube_video_id. Kept
+    // even after the audio leaves the cache; music.db's own link wins once it has one.
+    await db.execute('''
+      CREATE TABLE youtube_matches (
+        main_db_id INTEGER PRIMARY KEY,
+        video_id VARCHAR NOT NULL,
+        video_title VARCHAR,
+        channel VARCHAR,
+        matched_at INTEGER NOT NULL
+      )''');
+    // Audio of played YouTube videos, kept on the phone up to the user's limit (least recently
+    // played goes first).
+    await db.execute('''
+      CREATE TABLE youtube_cache (
+        video_id VARCHAR PRIMARY KEY,
+        file_name VARCHAR NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        downloaded_at INTEGER NOT NULL,
+        last_played_at INTEGER NOT NULL
+      )''');
   }
 
   /// Re-reads `local.db` into memory (a few hundred/thousand rows) so search can use it on every
   /// keystroke without querying SQLite.
   Future<void> _refreshCounts() async {
-    final rows = await (await _database()).query('local_songs');
+    final rows = await (await database()).query('local_songs');
     _songs = [for (final row in rows) _fromRow(row)];
     _byMainId = {};
     for (final song in _songs) {
@@ -293,7 +353,7 @@ class LocalLibrary extends ChangeNotifier {
   }
 
   Future<List<LocalSong>> pendingSongs() async {
-    final rows = await (await _database()).query(
+    final rows = await (await database()).query(
       'local_songs',
       where: 'pending = 1',
       orderBy: 'artist COLLATE NOCASE, title COLLATE NOCASE',
@@ -331,7 +391,7 @@ class LocalLibrary extends ChangeNotifier {
       await _catalog.ensureLoaded();
       final matching = _catalog.status == CatalogStatus.ready;
       final files = await _audioFiles(_folders);
-      final db = await _database();
+      final db = await database();
       final known = {
         for (final row in await db.query('local_songs', columns: ['file_path']))
           row['file_path']! as String,

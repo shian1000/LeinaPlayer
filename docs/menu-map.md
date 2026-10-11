@@ -15,6 +15,8 @@ Legend: **→** opens another screen/sheet (implemented), everything else is a d
 
 ## Player (`lib/src/screens/now_playing.dart`, `lib/src/playback/player_controller.dart`)
 
+- Media notification (and lock screen): title, artist, progress, pause/play and stop — the
+  system's media controls, from `just_audio_background`; headset buttons work too.
 - Mini player — appears above the bottom bar once something plays: cover, title, artist,
   play/pause, thin progress line. Tapping it **→ full player** (slides up, covers the bottom bar):
   - Header: ⌄ (collapse), "Odtwarzanie z wyników wyszukiwania / „<query>” w wyszukiwarce",
@@ -81,6 +83,33 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
     answer), elsewhere the remote one. The download also runs automatically once a day on start —
     see [`decisions/0002-database-download.md`](decisions/0002-database-download.md).
+  - YouTube **→ YouTube** (`youtube_source_screen.dart`, state in `SourceSettings`), three
+    sections — *Wyszukiwanie*:
+    - "Włącz szukanie w serwisie YouTube" — turns on the "Wyszukaj na YouTubie" button and
+      looking up songs on YouTube when tapped (see song search below).
+    - "Korzystaj z NewPipeExtractor" (on; Android only), "Korzystaj z pakietu youtube_explode"
+      (on), "Korzystaj z yt-dlp przez serwer", "Korzystaj z API" — the search methods, tried top
+      to bottom, the next one only when the previous fails (`YouTubeSearch`). Only selectable while search is on. **yt-dlp przez
+      serwer is not implemented** (MusicDatabase's server has no search endpoint; that needs an
+      ADR) — it's skipped with a note in the error message.
+    - "Kod YouTube API" — dialog for the Data API key, used by "Korzystaj z API"; the tile shows
+      only its last four characters, empty input clears it. Stored in plain
+      `shared_preferences`.
+
+    *Odtwarzanie* — "Sposoby odtwarzania" **→ Sposoby odtwarzania** (`youtube_playback_screen.dart`):
+    every `YouTubePlaybackMethod` with a switch and a drag handle; the first switched-on one that
+    works plays the video (`YouTubePlayback`). Default order and state: "Pamięć podręczna" (on),
+    "Korzystaj z NewPipeExtractor" (on; disabled with "Dostępne tylko na Androidzie"
+    elsewhere), "Korzystaj z pakietu youtube_explode" (off — YouTube answers 403), "Korzystaj z
+    yt-dlp przez serwer" (off, not implemented), "Otwórz w aplikacji YouTube" (on — the last
+    resort: opens the video in the YouTube app, or the browser without it, and pauses this
+    app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
+
+    *Pamięć podręczna* — "Liczba utworów" (dialog, default 25; lowering it deletes the excess
+    at once), "Zajęte miejsce" ("N utworów, X MB"), "Wyczyść pamięć podręczną" (confirm dialog).
+  - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
+    reorder the playback sources (default: 1. Telefon, 2. YouTube). When a song is playable
+    from several, the first one in this order is used.
 - Wygląd **→ Wygląd** (`appearance_screen.dart`) — **implemented**, everything applies at once
   and is remembered after restart:
   - Motyw jasny **→ list of light themes** (Dummify) — used while dark mode is off.
@@ -95,7 +124,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 - `Ustawienia › Powiadomienia`
 - `Ustawienia › Oszczędzanie danych i tryb offline`
 - `Ustawienia › Jakość zawartości multimedialnej`
-- `Ustawienia › Informacje i pomoc`
+- Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: "Tylko do
+  użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
+  the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
+  bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
 - `Ustawienia › Wyloguj`
 
 ## Home (`home_screen.dart`)
@@ -122,12 +154,31 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   search. Shows a hint with a link to "Baza danych" settings when there's nothing to search.
   - Each result has a column of three icons on the right (cover height, half its width), top to
     bottom: database (song is in MusicDatabase), phone (a file on the phone; with a green "*" when
-    it isn't in MusicDatabase yet), and a YouTube-style play icon (no action yet). Hidden icons
+    it isn't in MusicDatabase yet), and YouTube: full when MusicDatabase stores the song's
+    `youtube_video_id` or the phone found a video itself, dimmed when neither (phone-only songs
+    too), none when it's
+    marked "N/A" (no video on YouTube). All use the theme's secondary text colour. Hidden icons
     keep their slot so the column lines up.
-  - Results are "Dostępne" (playable — for now: a file on the phone, pending or not),
-    "Potencjalnie dostępne" (nothing yet) or "Niedostępne" (`SongAvailability`). Tapping a
-    "Dostępne" result plays the phone file (**implemented**, `just_audio`) and highlights the row
-    (green title + equalizer icon); tapping any other shows "Ten utwór jest niedostępny".
+  - Results are "Dostępne" (a phone file, pending or not, or a stored YouTube video),
+    "Potencjalnie dostępne" (dimmed YouTube icon, not on the phone) or "Niedostępne"
+    (`SongAvailability`). Tapping a result uses the first source in "Kolejność odtwarzania"
+    that has it: phone → plays the file (**implemented**, `just_audio`, row highlighted with a
+    green title + equalizer icon); YouTube → streams the video's audio (**implemented on Android**
+    through NewPipeExtractor, `youtube_audio.dart` + `NewPipeBridge.kt`; Opus 251, else AAC 140;
+    on iOS only from the cache or via youtube_explode).
+    With no such source and a dimmed icon it searches YouTube for "main artists + title" (if
+    YouTube search is on), picks the best candidate with the lite matcher
+    (`youtube_matcher.dart`), remembers it on the phone (`youtube_matches`; the icon turns full,
+    tooltip "Na YouTube (znalezione przez telefon)") and plays it, telling which video it is
+    ("Z YouTube: …"); nothing convincing → "Nie znaleziono na YouTube pewnego dopasowania".
+    YouTube videos play with the methods from "Sposoby odtwarzania" (see the YouTube settings
+    above): from the cache, streamed (and downloaded to the cache meanwhile) or in the YouTube
+    app ("Otwarto w aplikacji YouTube.").
+    Otherwise "Ten utwór jest niedostępny".
+  - While YouTube search is on, the list starts with a "Wyszukaj na YouTubie" button. YouTube is
+    searched only when it's tapped (never while typing); the results (up to 15: title, channel,
+    duration) replace the button and are dropped when the query changes. Tapping one streams it
+    like a song with a stored link.
 - `Wyszukaj › Odkryj coś nowego › <#tag>` (`#polskie indie`, `#mod rock`, `#dance rock`)
 - `Wyszukaj › Kategoria: <nazwa>` — grid "Przeglądaj wszystko"; full list in
   `searchCategories` in `lib/src/sample_content.dart`.
@@ -144,36 +195,43 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   - `Biblioteka › Sortuj wg › Twórca`
 - `Biblioteka › Widok siatki`
 - `Biblioteka › Importuj swoją muzykę`
-- Library items: playlists **→ Playlista**; albums and artists are dummies
-  `Biblioteka › Element: <tytuł>`.
+- Library items: the user's playlists (`PlaylistLibrary`, newest first; cover, name,
+  "Playlista • <owner>") **→ Playlista**. No sample items any more; with no playlists the list
+  shows "Brak playlist" and how to add one. Albums/artists don't exist yet.
 
-## Playlista (`playlist_screen.dart`)
+## Playlista (`playlist_screen.dart`) — **implemented** for imported playlists
 
-- Back arrow — pops the screen.
-- Menu (⋮) in the app bar **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`:
-  `Udostępnij`, `Usuń z Biblioteki`, `Pobierz`, `Dodaj do tej playlisty`, `Edytuj playlistę`,
-  `Dodaj do innej playlisty`, `Rozpocznij Jam`, `Zgłoś`, `Przenieś do folderu`, `Usuń z profilu`,
-  `Opuść playlistę`, `Nie uwzględniaj playlisty w profilu gustu`, `Pokaż kod playlisty`.
-- `Playlista › Wiadomość`
-- `Playlista › Dodano do Biblioteki (✓)`
-- `Playlista › Pobierz (ikona)`
-- `Playlista › Udostępnij (ikona)`
-- `Playlista › Odtwarzanie losowe`
-- `Playlista › Odtwórz playlistę`
-- `Playlista › Dodaj (do tej playlisty)` / `Edytuj (playlistę)` / `Sortuj (playlistę)`
-- Tapping a track: `Playlista › Utwór (odtwórz) <n>`
-- Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`:
-  `Udostępnij`, `Dodaj do Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`,
-  `Dodaj do kolejki`, `Przejdź do kolejki`, `Przejdź do albumu`, `Przejdź do wykonawców`,
-  `Rozpocznij Jam`, `Nie uwzględniaj utworu w profilu gustu`, `Przejdź do radia utworu`,
-  `Pokaż autorów utworu`, `Pokaż kod utworu`.
+- Transparent app bar over the header; once the header scrolls away it turns solid and shows
+  the playlist name (as in the reference app). Back arrow pops.
+- Header: 2×2 mosaic of the first four tracks' covers (one cover with fewer tracks), name, owner
+  avatar + name (the YouTube channel), "N utworów • X godz. Y min" (sum of the known lengths).
+- Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: `Udostępnij`, **`Usuń z
+  Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), `Dodaj do tej
+  playlisty`, `Edytuj playlistę`, `Dodaj do innej playlisty`, `Przenieś do folderu`, `Pokaż kod
+  playlisty`.
+- `Playlista › Pobierz (ikona)`, `Playlista › Udostępnij (ikona)`, `Playlista › Odtwarzanie
+  losowe`, `Playlista › Odtwórz playlistę` (dummy until there's a play queue),
+  `Playlista › Dodaj (do tej playlisty)` / `Edytuj (playlistę)` / `Sortuj (playlistę)`.
+- Tracks: the same rows as song search (`SongTile`: cover, title highlighted while playing,
+  source icons) but with just the artist under the title, plus a ⋮. Tapping plays like in search
+  (phone file / YouTube in the user's order); the full player says "Odtwarzanie z playlisty
+  <name>". A recognised track is its MusicDatabase song (database icon, phone icon if the file is
+  on the phone); every track has its YouTube video, so the YouTube icon is full.
+- Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: `Udostępnij`, `Dodaj do
+  Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`, `Dodaj do kolejki`,
+  `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
 
 ## Utwórz sheet (`create_sheet.dart`)
 
 Opened from the bottom-nav tab (prefix `Utwórz`) or the Library "+" (prefix
 `Biblioteka › Utwórz (+)`):
 
-- `… › Playlista`
+- Playlista **→ sheet** (`playlist_import.dart`):
+  - `… › Playlista › Utwórz nową playlistę` (dummy)
+  - Importuj playlistę **→ dialog** for a YouTube playlist link (or bare id; anything without
+    `list=` is refused in the dialog), then "Importuję playlistę…" and a snackbar
+    "Zaimportowano/Zaktualizowano „<name>”: N utw., w bazie danych M." The playlist appears in
+    Biblioteka. Importing the same playlist again replaces its tracks.
 - `… › Współtworzone playlisty`
 - `… › Blend`
 

@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (2026-09-24)
+Accepted (2026-09-24). The "thin client, no business logic" part is superseded by
+[ADR 0003](0003-app-supports-musicdatabase.md).
 
 ## Context
 

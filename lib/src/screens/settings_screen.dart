@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../dummy.dart';
 import '../theme.dart';
+import 'about_screen.dart';
 import 'appearance_screen.dart';
 import 'music_sources_screen.dart';
 
@@ -55,13 +56,16 @@ const _entries = [
   _SettingsEntry(
     Icons.info_outline,
     'Informacje i pomoc',
-    'Wersja • Polityka prywatności',
+    'Użytek prywatny • Licencja • Kod źródłowy',
+    opens: _openAbout,
   ),
 ];
 
 Widget _openAppearance(BuildContext context) => const AppearanceScreen();
 
 Widget _openMusicSources(BuildContext context) => const MusicSourcesScreen();
+
+Widget _openAbout(BuildContext context) => const AboutScreen();
 
 /// "Ustawienia", opened from the profile drawer.
 class SettingsScreen extends StatelessWidget {

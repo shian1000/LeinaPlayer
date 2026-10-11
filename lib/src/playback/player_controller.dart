@@ -2,26 +2,39 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 /// What's loaded in the player.
 class NowPlaying {
   const NowPlaying({
     required this.title,
     required this.artist,
-    required this.filePath,
+    required this.source,
     required this.coverSeed,
     this.searchQuery,
+    this.playlistName,
+    this.youtubeVideoId,
   });
 
   final String title;
   final String artist;
-  final String filePath;
+
+  /// A file path on the phone, or an http(s) address of a stream.
+  final String source;
+
+  /// Set when [source] is this YouTube video's audio.
+  final String? youtubeVideoId;
+
+  bool get isStream => source.startsWith('http');
 
   /// Seed for the placeholder cover, so the player shows the same art as the result list.
   final String coverSeed;
 
   /// The search the song was started from ("Odtwarzanie z wyników wyszukiwania").
   final String? searchQuery;
+
+  /// The playlist the song was started from ("Odtwarzanie z playlisty").
+  final String? playlistName;
 }
 
 /// The bits of an audio player the app uses; [JustAudioBackend] in the app, a fake in tests.
@@ -32,7 +45,9 @@ abstract class AudioBackend {
   /// Emits when playback starts/stops and when a track finishes.
   Stream<({bool playing, bool completed})> get state;
 
-  Future<void> open(String filePath);
+  /// Loads [track] ([NowPlaying.source]: a file path or an http(s) URL); its title and artist
+  /// also go to the media notification.
+  Future<void> open(NowPlaying track);
   Future<void> play();
   Future<void> pause();
   Future<void> seek(Duration position);
@@ -58,7 +73,18 @@ class JustAudioBackend implements AudioBackend {
       );
 
   @override
-  Future<void> open(String filePath) => _player.setFilePath(filePath);
+  Future<void> open(NowPlaying track) async {
+    final tag = MediaItem(
+      id: track.youtubeVideoId ?? track.source,
+      title: track.title,
+      artist: track.artist,
+    );
+    await _player.setAudioSource(
+      track.isStream
+          ? AudioSource.uri(Uri.parse(track.source), tag: tag)
+          : AudioSource.file(track.source, tag: tag),
+    );
+  }
 
   @override
   Future<void> play() async {
@@ -76,7 +102,7 @@ class JustAudioBackend implements AudioBackend {
   Future<void> dispose() => _player.dispose();
 }
 
-/// Plays songs from the phone and tells the mini player / "Teraz odtwarzane" screen what's on.
+/// Plays songs (phone files or streams) and tells the mini player / "Teraz odtwarzane" screen what's on.
 /// The audio backend is created on the first [play], so merely opening the app never touches the
 /// audio plugin.
 class PlayerController extends ChangeNotifier {
@@ -134,13 +160,14 @@ class PlayerController extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     try {
-      await backend.open(track.filePath);
+      await backend.open(track);
       await backend.play();
       return true;
     } catch (e) {
-      debugPrint('Playing ${track.filePath} failed: $e');
-      _lastError =
-          'Nie udało się odtworzyć pliku ${track.filePath.split('/').last}';
+      debugPrint('Playing ${track.source} failed: $e');
+      _lastError = track.isStream
+          ? 'Nie udało się odtworzyć utworu „${track.title}” z YouTube'
+          : 'Nie udało się odtworzyć pliku ${track.source.split('/').last}';
       _current = null;
       _playing = false;
       notifyListeners();

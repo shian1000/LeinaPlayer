@@ -23,9 +23,9 @@ class FakeBackend implements AudioBackend {
   Stream<({bool playing, bool completed})> get state => _state.stream;
 
   @override
-  Future<void> open(String filePath) async {
+  Future<void> open(NowPlaying track) async {
     if (failOpen) throw Exception('cannot open');
-    opened.add(filePath);
+    opened.add(track.source);
     _duration.add(const Duration(minutes: 4, seconds: 26));
   }
 
@@ -43,7 +43,7 @@ class FakeBackend implements AudioBackend {
 const _track = NowPlaying(
   title: 'The Seed',
   artist: 'AURORA',
-  filePath: '/music/AURORA - The Seed.mp3',
+  source: '/music/AURORA - The Seed.mp3',
   coverSeed: 'seed',
   searchQuery: 'aurora',
 );
@@ -63,7 +63,7 @@ void main() {
     test('plays, pauses and resumes', () async {
       expect(await player.play(_track), isTrue);
       await pumpEventQueue();
-      expect(backend.opened, [_track.filePath]);
+      expect(backend.opened, [_track.source]);
       expect(player.current, same(_track));
       expect(player.playing, isTrue);
       expect(player.duration, const Duration(minutes: 4, seconds: 26));

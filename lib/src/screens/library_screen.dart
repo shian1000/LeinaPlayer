@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../dummy.dart';
-import '../sample_content.dart';
+import '../data/playlist_library.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/cover_art.dart';
@@ -55,20 +55,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
-  void _openItem(LibraryItem item) {
-    if (item.kind == LibraryItemKind.playlist) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => PlaylistScreen(title: item.title, owner: item.owner),
-        ),
-      );
-    } else {
-      showDummy(context, '$_id › Element: ${item.title}');
-    }
+  void _openPlaylist(PlaylistSummary playlist) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PlaylistScreen(playlist: playlist),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final playlists = PlaylistLibraryScope.of(context).playlists;
     return SafeArea(
       // Stretch: a centred Column would push the (narrower) filter-chip row inwards.
       child: Column(
@@ -167,8 +164,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ),
                 ),
-                for (final item in libraryItems)
-                  _LibraryTile(item: item, onTap: () => _openItem(item)),
+                if (playlists.isEmpty)
+                  const _EmptyLibrary()
+                else
+                  for (final playlist in playlists)
+                    _PlaylistTile(
+                      playlist: playlist,
+                      onTap: () => _openPlaylist(playlist),
+                    ),
               ],
             ),
           ),
@@ -178,57 +181,59 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 }
 
-class _LibraryTile extends StatelessWidget {
-  const _LibraryTile({required this.item, required this.onTap});
+class _PlaylistTile extends StatelessWidget {
+  const _PlaylistTile({required this.playlist, required this.onTap});
 
-  final LibraryItem item;
+  final PlaylistSummary playlist;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    final isArtist = item.kind == LibraryItemKind.artist;
-    final subtitle = isArtist
-        ? item.kindLabel
-        : '${item.kindLabel} • ${item.owner}';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: item.title == likedSongsTitle
-          ? Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                borderRadius: palette.radius(4),
-                border: palette.outline == null
-                    ? null
-                    : Border.all(color: palette.outline!),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: palette.likedGradient,
-                ),
-              ),
-              child: Icon(Icons.favorite, color: palette.textPrimary),
-            )
-          : CoverArt(
-              seed: item.title,
-              size: 64,
-              circle: isArtist,
-              icon: isArtist ? Icons.person : Icons.music_note,
-            ),
-      title: Text(item.title),
-      subtitle: Row(
+      leading: CoverArt(seed: playlist.name, size: 64),
+      title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        ['Playlista', ?playlist.owner].join(' • '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _EmptyLibrary extends StatelessWidget {
+  const _EmptyLibrary();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
+      child: Column(
         children: [
-          if (item.pinned) ...[
-            Icon(Icons.push_pin, size: 16, color: palette.accent),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          Icon(
+            Icons.library_music_outlined,
+            size: 48,
+            color: palette.textSecondary,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Brak playlist',
+            style: TextStyle(
+              fontSize: AppFontSize.listTitle,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Dodaj playlistę przyciskiem + u góry, np. importując ją z YouTube.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: palette.textSecondary),
           ),
         ],
       ),
-      onTap: onTap,
     );
   }
 }

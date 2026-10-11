@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
@@ -5,8 +7,12 @@ import '../data/database_sync.dart';
 import '../data/local_library.dart';
 import '../playback/player_controller.dart';
 import '../data/song_catalog.dart';
+import '../data/source_settings.dart';
+import '../data/youtube_library.dart';
+import '../data/youtube_search.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
+import '../widgets/song_tile.dart';
 import 'database_source_screen.dart';
 import 'search_fields_sheet.dart';
 
@@ -21,6 +27,31 @@ class SongSearchScreen extends StatefulWidget {
 
 class _SongSearchScreenState extends State<SongSearchScreen> {
   final _query = TextEditingController();
+
+  /// The last "Wyszukaj na YouTubie" search; dropped as soon as the query changes.
+  _YouTubeResults? _youTube;
+
+  void _onQueryChanged() {
+    setState(() {
+      if (_youTube?.query != _query.text.trim()) _youTube = null;
+    });
+  }
+
+  Future<void> _searchYouTube() async {
+    final query = _query.text.trim();
+    if (query.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    final search = YouTubeScope.searchOf(context);
+    final settings = SourceSettingsScope.of(context);
+    final pending = _YouTubeResults(query);
+    setState(() => _youTube = pending);
+    try {
+      pending.videos = await search.search(query, settings);
+    } on YouTubeSearchException catch (e) {
+      pending.error = e.message;
+    }
+    if (mounted && _youTube == pending) setState(() {});
+  }
 
   @override
   void didChangeDependencies() {
@@ -60,7 +91,7 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
             hintStyle: TextStyle(color: palette.textSecondary),
             border: InputBorder.none,
           ),
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => _onQueryChanged(),
         ),
         actions: [
           const SearchFieldsButton(),
@@ -68,25 +99,50 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
             IconButton(
               tooltip: 'Wyczyść',
               icon: const Icon(Icons.close),
-              onPressed: () => setState(_query.clear),
+              onPressed: () {
+                _query.clear();
+                _onQueryChanged();
+              },
             ),
         ],
       ),
-      body: _Results(query: _query.text),
+      body: _Results(
+        query: _query.text,
+        youTube: _youTube,
+        onSearchYouTube: _searchYouTube,
+      ),
     );
   }
 }
 
-class _Results extends StatelessWidget {
-  const _Results({required this.query});
+/// State of one "Wyszukaj na YouTubie" search: loading until [videos] or [error] is set.
+class _YouTubeResults {
+  _YouTubeResults(this.query);
 
   final String query;
+  List<YouTubeVideo>? videos;
+  String? error;
+
+  bool get loading => videos == null && error == null;
+}
+
+class _Results extends StatelessWidget {
+  const _Results({
+    required this.query,
+    required this.youTube,
+    required this.onSearchYouTube,
+  });
+
+  final String query;
+  final _YouTubeResults? youTube;
+  final VoidCallback onSearchYouTube;
 
   @override
   Widget build(BuildContext context) {
     final catalog = SongCatalogScope.of(context);
     final library = LocalLibraryScope.of(context);
     final sync = DatabaseSyncScope.of(context);
+    final youTubeEnabled = SourceSettingsScope.of(context).youTubeSearchEnabled;
     final mainReady = catalog.status == CatalogStatus.ready;
 
     // Without MusicDatabase's file, phone songs can still be searched; only explain the missing
@@ -135,193 +191,167 @@ class _Results extends StatelessWidget {
         details: 'Wpisz tytuł utworu albo wykonawcę.',
       );
     }
-    final results = searchEverywhere(query, catalog, library);
-    if (results.isEmpty) {
+    final youTubeLibrary = YouTubeLibraryScope.of(context);
+    final results = searchEverywhere(
+      query,
+      catalog,
+      library,
+      youTubeMatch: youTubeLibrary.matchFor,
+    );
+    final youTubeSection = youTubeEnabled
+        ? _YouTubeSection(
+            results: youTube,
+            query: query.trim(),
+            onSearch: onSearchYouTube,
+          )
+        : null;
+    if (results.isEmpty && youTubeSection == null) {
       return _Message(
         icon: Icons.search_off,
         title: 'Brak wyników dla „${query.trim()}”',
       );
     }
+    final header = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text(
+        results.isEmpty
+            ? 'Brak utworów dla „${query.trim()}” w bazie i na telefonie'
+            : 'Utwory: ${results.length}',
+        style: TextStyle(
+          color: context.palette.textSecondary,
+          fontSize: AppFontSize.small,
+        ),
+      ),
+    );
+    final leading = [?youTubeSection, header];
     return ListView.builder(
-      itemCount: results.length + 1,
-      itemBuilder: (context, i) {
-        if (i == 0) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Text(
-              'Utwory: ${results.length}',
-              style: TextStyle(
-                color: context.palette.textSecondary,
-                fontSize: AppFontSize.small,
-              ),
+      itemCount: results.length + leading.length,
+      itemBuilder: (context, i) => i < leading.length
+          ? leading[i]
+          : SongTile(
+              hit: results[i - leading.length],
+              searchQuery: query.trim(),
             ),
-          );
-        }
-        return _SongTile(hit: results[i - 1], query: query.trim());
-      },
     );
   }
 }
 
-const _coverSize = 48.0;
+/// Top of the results while YouTube search is on: the "Wyszukaj na YouTubie" button, then what
+/// it found. YouTube is only searched on request, never while typing.
+class _YouTubeSection extends StatelessWidget {
+  const _YouTubeSection({
+    required this.results,
+    required this.query,
+    required this.onSearch,
+  });
 
-class _SongTile extends StatelessWidget {
-  const _SongTile({required this.hit, required this.query});
+  final _YouTubeResults? results;
+  final String query;
+  final VoidCallback onSearch;
 
-  final SearchHit hit;
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final results = this.results;
+    if (results == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: palette.textPrimary,
+            shape: palette.pillShape,
+            side: BorderSide(color: palette.outline ?? palette.textSecondary),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          icon: const Icon(Icons.smart_display_outlined),
+          label: const Text('Wyszukaj na YouTubie'),
+          onPressed: onSearch,
+        ),
+      );
+    }
+    final videos = results.videos;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Text(
+            videos == null ? 'YouTube' : 'YouTube: ${videos.length}',
+            style: TextStyle(
+              color: palette.textSecondary,
+              fontSize: AppFontSize.small,
+            ),
+          ),
+        ),
+        if (results.loading)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(
+              child: SizedBox.square(
+                dimension: 28,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+            ),
+          )
+        else if (results.error != null)
+          ListTile(
+            leading: Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            title: Text(results.error!),
+            trailing: IconButton(
+              tooltip: 'Spróbuj ponownie',
+              icon: const Icon(Icons.refresh),
+              onPressed: onSearch,
+            ),
+          )
+        else if (videos!.isEmpty)
+          ListTile(
+            leading: const Icon(Icons.search_off),
+            title: Text('Brak wyników na YouTube dla „$query”'),
+          )
+        else
+          for (final video in videos) _YouTubeTile(video: video, query: query),
+        const Divider(height: 16),
+      ],
+    );
+  }
+}
 
-  /// The search the result came from, shown in the full player.
+class _YouTubeTile extends StatelessWidget {
+  const _YouTubeTile({required this.video, required this.query});
+
+  final YouTubeVideo video;
   final String query;
 
-  String get _coverSeed => hit.mainSong != null
-      ? '${hit.mainSong!.id}'
-      : hit.phoneFiles.first.filePath;
-
-  Future<void> _onTap(BuildContext context, PlayerController player) async {
-    final messenger = ScaffoldMessenger.of(context);
-    switch (hit.availability) {
-      case SongAvailability.available:
-        final ok = await player.play(
-          NowPlaying(
-            title: hit.title,
-            artist: hit.artistLabel,
-            filePath: hit.phoneFiles.first.filePath,
-            coverSeed: _coverSeed,
-            searchQuery: query,
-          ),
-        );
-        if (!ok && player.lastError != null) {
-          messenger.showSnackBar(SnackBar(content: Text(player.lastError!)));
-        }
-      case SongAvailability.potentiallyAvailable:
-      case SongAvailability.unavailable:
-        messenger
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Ten utwór jest niedostępny — nie ma go na telefonie.',
-              ),
-            ),
-          );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    final player = PlayerScope.of(context);
+    final duration = video.duration;
     final isCurrent =
-        hit.onPhone &&
-        player.current?.filePath != null &&
-        hit.phoneFiles.any((f) => f.filePath == player.current!.filePath);
-    final details = [
-      hit.artistLabel,
-      if (hit.album != null && hit.album!.isNotEmpty) hit.album!,
-      if (hit.year != null) '${hit.year}',
-    ].join(' • ');
+        PlayerScope.of(context).current?.youtubeVideoId == video.id;
     return ListTile(
-      leading: CoverArt(seed: _coverSeed, size: _coverSize),
-      // The song in the player is highlighted like in the reference app.
-      title: Row(
-        children: [
-          if (isCurrent) ...[
-            Icon(Icons.equalizer, size: 18, color: palette.accent),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Text(
-              hit.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: isCurrent ? TextStyle(color: palette.accent) : null,
-            ),
-          ),
-        ],
+      leading: CoverArt(seed: video.id, size: SongTile.coverSize),
+      title: CurrentTitle(text: video.title, isCurrent: isCurrent),
+      subtitle: Text(
+        [
+          video.channel,
+          ?(duration == null ? null : formatDuration(duration)),
+        ].join(' • '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(details, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: _SourceIcons(hit: hit),
-      onTap: () => _onTap(context, player),
-    );
-  }
-}
-
-/// Column of three small icons next to a result, as tall as the cover and half as wide:
-/// in MusicDatabase, on the phone (with "*" when not in MusicDatabase yet), and a play button.
-/// Each icon keeps its slot even when hidden, so they line up from row to row.
-class _SourceIcons extends StatelessWidget {
-  const _SourceIcons({required this.hit});
-
-  final SearchHit hit;
-
-  static const _slot = _coverSize / 3;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    Widget slot({
-      required bool visible,
-      required String tooltip,
-      required Widget child,
-    }) => SizedBox.square(
-      dimension: _slot,
-      child: visible
-          ? Tooltip(
-              message: tooltip,
-              child: Center(child: child),
-            )
-          : null,
-    );
-
-    return SizedBox(
-      width: _coverSize / 2,
-      height: _coverSize,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          slot(
-            visible: hit.inMainDatabase,
-            tooltip: 'W bazie danych',
-            child: Icon(Icons.storage, size: 14, color: palette.textSecondary),
-          ),
-          slot(
-            visible: hit.onPhone,
-            tooltip: hit.pending
-                ? 'Na telefonie, spoza bazy danych'
-                : 'Na telefonie',
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(Icons.smartphone, size: 14, color: palette.textSecondary),
-                if (hit.pending)
-                  Positioned(
-                    right: -5,
-                    top: -5,
-                    child: Text(
-                      '*',
-                      style: TextStyle(
-                        color: palette.accent,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        height: 1,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          // No action yet — a placeholder for future playback (YouTube-style icon).
-          slot(
-            visible: true,
-            tooltip: 'Odtwórz',
-            child: const Icon(
-              Icons.smart_display,
-              size: 16,
-              color: Color(0xFFFF0033),
-            ),
-          ),
-        ],
-      ),
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        playYouTubeVideo(
+          context,
+          videoId: video.id,
+          title: video.title,
+          artist: video.channel,
+          coverSeed: video.id,
+          searchQuery: query,
+        );
+      },
     );
   }
 }
