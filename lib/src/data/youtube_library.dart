@@ -149,25 +149,31 @@ class YouTubeLibrary extends ChangeNotifier {
     return entry.file;
   }
 
+  /// Whether [videoId]'s audio is in the cache (without marking it played).
+  bool isCached(String videoId) => _cache.containsKey(videoId);
+
   /// Where a new download of [videoId] should be written.
   Future<File> newCacheFile(String videoId, String extension) async =>
       File('${(await _cacheDir()).path}/$videoId.$extension');
 
   /// Saves [url]'s audio as [videoId]'s cache file and records it, dropping the least recently
   /// played beyond [limit]. Failures only leave nothing cached; playback doesn't depend on it.
-  Future<void> download(
+  /// Returns whether the audio is cached now (or being downloaded already).
+  Future<bool> download(
     String videoId,
     String url,
     String extension,
     int limit,
   ) async {
-    if (_cache.containsKey(videoId) || !_downloading.add(videoId)) return;
+    if (_cache.containsKey(videoId) || !_downloading.add(videoId)) return true;
     final file = await newCacheFile(videoId, extension);
     final part = File('${file.path}.part');
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15);
     try {
-      final sink = part.openWrite();
+      // Not openWrite(): its errors (e.g. the cache folder deleted meanwhile) escape the
+      // try/catch, and a failed download must never crash anything.
+      final out = await part.open(mode: FileMode.write);
       try {
         var offset = 0;
         int? total;
@@ -189,7 +195,7 @@ class YouTubeLibrary extends ChangeNotifier {
           await for (final chunk in response.timeout(
             const Duration(seconds: 20),
           )) {
-            sink.add(chunk);
+            await out.writeFrom(chunk);
             received += chunk.length;
           }
           offset += received;
@@ -201,13 +207,15 @@ class YouTubeLibrary extends ChangeNotifier {
           }
         }
       } finally {
-        await sink.close();
+        await out.close();
       }
       await part.rename(file.path);
       await cacheComplete(videoId, file, limit);
+      return true;
     } catch (e) {
       debugPrint('Caching YouTube audio $videoId failed: $e');
       if (await part.exists()) await part.delete();
+      return false;
     } finally {
       client.close(force: true);
       _downloading.remove(videoId);
@@ -245,6 +253,49 @@ class YouTubeLibrary extends ChangeNotifier {
     for (final entry in byAge.take(excess)) {
       await _remove(entry);
     }
+    await _reloadCache(await _database());
+  }
+
+  /// The cached songs, most recently played first.
+  List<YouTubeCacheEntry> get cacheEntries =>
+      _cache.values.toList()
+        ..sort((a, b) => b.lastPlayed.compareTo(a.lastPlayed));
+
+  /// Title and artist the phone has seen for each of [videoIds] — in a playlist, the history or
+  /// a match it found — for videos MusicDatabase doesn't know.
+  Future<Map<String, ({String title, String? artist})>> knownTitles(
+    Iterable<String> videoIds,
+  ) async {
+    final ids = videoIds.toSet().toList();
+    if (ids.isEmpty) return const {};
+    final marks = List.filled(ids.length, '?').join(', ');
+    final db = await _database();
+    final found = <String, ({String title, String? artist})>{};
+    for (final query in [
+      'SELECT youtube_video_id AS id, title, artist FROM playlist_tracks '
+          'WHERE youtube_video_id IN ($marks)',
+      'SELECT youtube_video_id AS id, title, artist FROM play_history '
+          'WHERE youtube_video_id IN ($marks)',
+      'SELECT video_id AS id, video_title AS title, channel AS artist FROM youtube_matches '
+          'WHERE video_id IN ($marks)',
+    ]) {
+      for (final row in await db.rawQuery(query, ids)) {
+        final title = row['title'] as String?;
+        if (title == null) continue;
+        found.putIfAbsent(
+          row['id']! as String,
+          () => (title: title, artist: row['artist'] as String?),
+        );
+      }
+    }
+    return found;
+  }
+
+  /// Deletes one song's cached audio.
+  Future<void> removeFromCache(String videoId) async {
+    final entry = _cache[videoId];
+    if (entry == null) return;
+    await _remove(entry);
     await _reloadCache(await _database());
   }
 

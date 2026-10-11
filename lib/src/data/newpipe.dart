@@ -26,6 +26,13 @@ Future<List<YouTubeAudioStream>> newPipeAudioStreams(String videoId) async {
   ];
 }
 
+/// Title, channel and length of one video.
+Future<YouTubeVideo> newPipeVideo(String videoId) async => _video(
+  (await _channel.invokeMapMethod<Object?, Object?>('video', {
+    'videoId': videoId,
+  }))!,
+);
+
 /// Videos (not channels or playlists) on the first page of YouTube's search for [query].
 Future<List<YouTubeVideo>> newPipeSearch(String query) async {
   final raw = await _channel.invokeListMethod<Map<Object?, Object?>>('search', {

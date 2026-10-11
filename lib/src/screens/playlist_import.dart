@@ -35,17 +35,26 @@ Future<void> showPlaylistSheet(
 
 /// Asks for a YouTube playlist link, fetches the playlist and saves it to Biblioteka.
 Future<void> importYouTubePlaylist(BuildContext context) async {
-  final messenger = ScaffoldMessenger.of(context);
-  final playlists = PlaylistLibraryScope.of(context);
-  final fetcher = YouTubeScope.playlistsOf(context);
-  final settings = SourceSettingsScope.of(context);
-  final navigator = Navigator.of(context, rootNavigator: true);
-
   final playlistId = await showDialog<String>(
     context: context,
     builder: (_) => const _LinkDialog(),
   );
   if (playlistId == null || !context.mounted) return;
+  await runPlaylistImport(context, playlistId);
+}
+
+/// Fetches YouTube playlist [playlistId] and saves it to Biblioteka, with a progress dialog and
+/// a message about how it went; returns the playlist when it worked. Also used for a playlist
+/// shared to the app.
+Future<PlaylistSummary?> runPlaylistImport(
+  BuildContext context,
+  String playlistId,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final playlists = PlaylistLibraryScope.of(context);
+  final fetcher = YouTubeScope.playlistsOf(context);
+  final settings = SourceSettingsScope.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
 
   var progressOpen = true;
   // Not awaited: closed below once the import is done.
@@ -70,10 +79,11 @@ Future<void> importYouTubePlaylist(BuildContext context) async {
   ).whenComplete(() => progressOpen = false);
 
   String message;
+  PlaylistSummary? imported;
   try {
     final data = await fetcher.fetch(playlistId, settings);
     final result = await playlists.importYouTube(data);
-    final p = result.playlist;
+    final p = imported = result.playlist;
     message =
         '${result.updated ? 'Zaktualizowano' : 'Zaimportowano'} „${p.name}”: '
         '${p.trackCount} utw., w bazie danych ${result.recognised}.';
@@ -87,6 +97,7 @@ Future<void> importYouTubePlaylist(BuildContext context) async {
   messenger.showSnackBar(
     SnackBar(content: Text(message), duration: const Duration(seconds: 6)),
   );
+  return imported;
 }
 
 /// Link field; returns the playlist id, and won't close on a link without one.

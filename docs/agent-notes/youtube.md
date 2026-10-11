@@ -55,8 +55,9 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 - Build needs core library desugaring with `desugar_jdk_libs_nio` (minSdk < 33) and R8 rules in
   `android/app/proguard-rules.pro` (Rhino; `-dontwarn` for desktop-JDK classes) — the release
   build fails without them.
-- After many requests for the same video from one IP, YouTube can answer 403 for that video only
-  for a while (seen with `X2XWBcd5jn0` during testing). Test with varied videos.
+- YouTube regularly answers 403 for one video's stream address for a while (seen often, also
+  after many requests for the same video from one IP) while a freshly resolved address works:
+  `YouTubePlayback` resolves and tries once more before giving up. Test with varied videos.
 
 ## What the phone remembers (`youtube_library.dart`, tables in `local.db` v2)
 
@@ -70,8 +71,13 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 Playback (`lib/src/playback/youtube_playback.dart`, `YouTubePlayback`): the switched-on
 `YouTubePlaybackMethod`s in the user's order (Ustawienia › … › YouTube › Sposoby odtwarzania;
 default cache → NewPipe → youtube_explode → yt-dlp server → YouTube app), first that works wins.
-The YouTube app method opens `https://www.youtube.com/watch?v=<id>` with url_launcher
-(non-browser app first, then any), pauses our player and ends — it can't report whether the video
+The YouTube app method opens `https://www.youtube.com/watch?v=<id>` — on Android by naming the
+YouTube app's package (`openInYouTubeApp` → `MainActivity.kt`, then a browser that isn't this
+app), never through url_launcher's "whatever handles the link": the app handles YouTube links
+itself now, so that would open Leina Radio again. Elsewhere url_launcher (`openInYouTube`) — for a song played from an imported YouTube
+playlist, `watch?v=<that playlist's video>&list=<playlist id>` instead (`TrackPlayer.youTubeUri`;
+the playlist's video may differ from music.db's, and only it opens at the song's place in the
+playlist). It pauses our player and ends — it can't report whether the video
 then plays. A streamed song is cached by `YouTubeLibrary.download()` **next to** playback, with
 1 MB `Range` requests. Don't switch to just_audio's `LockCachingAudioSource`: it fetches with one
 long request, which YouTube throttles to about playback speed, so the file was only complete at
@@ -81,6 +87,29 @@ of the separate download is fetching each new song twice (~4 MB).
 NewPipe also offers a YouTube Music songs filter (`YoutubeSearchQueryHandlerFactory.MUSIC_SONGS`)
 with cleaner artist/title results; not used, because the matcher and its benchmark are tuned on
 plain video search.
+
+## Links given to the app (`incoming_links.dart`, `video_link.dart`, `MainActivity.kt`)
+
+- Two intent filters on `MainActivity`: `SEND text/plain` ("Udostępnij") and `VIEW` for
+  youtube.com / m. / music. / youtu.be. Not `autoVerify` — only YouTube can verify its domains, so
+  on Android 12+ YouTube keeps its links until the user turns off "Otwieraj obsługiwane linki" for
+  YouTube and allows them for Leina Radio (Informacje i pomoc explains it and opens the settings
+  screen). Older Android (the Huawei) shows a chooser, unless YouTube was set as "always".
+- Delivery: `AudioServiceActivity` keeps one cached engine, so a link can arrive (a) on a cold
+  start — `LinksBridge` keeps it and Dart asks with `initialLink` after the first frame, when
+  `AppShell` listens — or (b) to a new activity / `onNewIntent` on a running engine — pushed with
+  `invokeMethod('link')`, which falls back to `initialLink` if Dart isn't listening yet. Intents
+  redelivered when the app is reopened from Recents (`FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY`) are
+  ignored.
+- A video is recognised like a playlist track (music.db's video, a phone match, then title →
+  `findExact`); a song found by title gets the video saved as a phone match unless MusicDatabase
+  says something about its video (incl. N/A). Reading the title costs one request (NewPipe
+  `video`, else youtube_explode `videos.get`); a song known by its video needs none.
+- Testing with adb: target the activity (`am start -n com.shian1000.music_database_app/.MainActivity
+  -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT <link>`). Don't
+  `am start -a android.intent.action.CHOOSER` with a made-up `EXTRA_INTENT`: on the Huawei it
+  started an endless loop of invisible chooser activities that blocked the screen until
+  `am force-stop com.android.systemui`.
 
 Not done yet: PO tokens (not needed so far), iOS streaming without youtube_explode, yt-dlp via
 the server.

@@ -25,9 +25,13 @@ keeps all rows in memory so `combined_search.dart` can search both databases per
 
 Playback: `lib/src/playback/player_controller.dart` (`PlayerController`, via `PlayerScope`) plays
 phone files and streams with `just_audio`, behind a small `AudioBackend` interface so tests use a
-fake; the backend is created on first play. `just_audio_background` (`audio_service`) adds the
-media notification and the foreground service that keeps music playing in the background. One
-song at a time, no queue yet. Which source plays a song is the user's order
+fake; the backend is created on first play. `MediaSession` (an `audio_service` handler created in
+`main()`) adds the media notification with previous/next and the foreground service that keeps
+music playing in the background. `PlaybackQueue` (`playback_queue.dart`, via
+`PlaybackQueueScope`) holds what plays next (context, shuffle, added songs; shown by
+`queue_screen.dart`), plays each song through `TrackPlayer` (`track_player.dart`) and caches the
+next few ahead. Which source plays a song is the
+user's order
 (`SourceSettings.playbackOrder`, `lib/src/data/source_settings.dart`, via `SourceSettingsScope`).
 
 YouTube ([`agent-notes/youtube.md`](agent-notes/youtube.md)): search
@@ -43,7 +47,19 @@ Playlists ([`agent-notes/playlists.md`](agent-notes/playlists.md)): `PlaylistLib
 (`playlist_library.dart`, `PlaylistLibraryScope`) keeps playlists imported from YouTube in
 `local.db`; their tracks render with the same `SongTile` (`lib/src/widgets/song_tile.dart`) as
 search results. `local.db` schema versions live in `LocalLibrary._open` (v2 YouTube tables, v3
-playlists).
+playlists, v4 `play_history`).
+
+History and resuming: `PlayHistory` (`play_history.dart`, `PlayHistoryScope`) records every song
+the queue starts (`PlaybackQueue.played`) in `local.db`, shown by `recents_screen.dart`.
+`QueueSession` (`lib/src/playback/queue_session.dart`) saves the queue snapshot and the position
+in `shared_preferences` and restores them on start. Both keep songs as `TrackRef`s
+(`track_ref.dart`: MusicDatabase id / file / video + title), turned back into rows with
+`resolveTrack`.
+
+Links from outside (Android): `MainActivity.kt`'s `LinksBridge` passes YouTube links shared to the
+app or opened with it to `IncomingLinks` (`incoming_links.dart`); `AppShell` imports a playlist
+or plays a video (`video_link.dart`). The same bridge opens the YouTube app by package
+(`openInYouTubeApp`) — the system's choice for youtube.com links may be this app itself.
 
 Artwork is drawn as gradient placeholders (`CoverArt`) rather than images, which keeps rendering
 cheap on the old Huawei test phone.

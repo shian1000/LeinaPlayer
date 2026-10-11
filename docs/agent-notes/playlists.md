@@ -36,5 +36,16 @@ NewPipe pages through playlists with protobuf-lite, which reads message fields b
 rules in `android/app/proguard-rules.pro` that keep `…youtube.protos.**` and
 `GeneratedMessageLite` fields are required ("Field browseId_ … not found" otherwise).
 
-Not done yet: creating playlists by hand, editing, play queue ("Odtwórz playlistę"), playlists
-from other sources.
+A playlist link shared to the app ("Udostępnij") or opened with it goes through the same import
+(`runPlaylistImport` in `playlist_import.dart`) and then opens the playlist in Biblioteka.
+
+Playing: a track tap (or "Odtwórz playlistę" / "Odtwarzanie losowe") fills the `PlaybackQueue`
+with the playlist; see [`local-library.md`](local-library.md) for the queue.
+
+Tracks not recognised as MusicDatabase songs are listed by the playlist ⋮ › "Wyświetl utwory,
+których nie ma w bazie danych" (`missing_tracks_screen.dart`). Only a list so far: sending them
+to MusicDatabase as add requests is the user's intended next step, but how the phone talks back
+to MusicDatabase isn't decided — that needs an ADR first (see `AGENTS.md`, Sources of truth).
+
+Not done yet: creating playlists by hand, editing, playlists from other sources, asking
+MusicDatabase to add the missing tracks.

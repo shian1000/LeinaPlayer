@@ -3,9 +3,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../dummy.dart';
+import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
+import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
+import '../widgets/song_tile.dart';
+import 'queue_screen.dart';
 
 const _id = 'Odtwarzacz';
 
@@ -106,6 +110,7 @@ class _ProgressLine extends StatelessWidget {
     final palette = context.palette;
     return StreamBuilder<Duration>(
       stream: player.position,
+      initialData: player.currentPosition,
       builder: (context, snapshot) {
         final total = player.duration?.inMilliseconds ?? 0;
         final done = snapshot.data?.inMilliseconds ?? 0;
@@ -139,10 +144,27 @@ class NowPlayingScreen extends StatelessWidget {
     );
   }
 
+  /// The song in the YouTube app (inside its playlist when played from one); this app's player
+  /// pauses so the two don't play over each other.
+  static Future<void> _openInYouTube(
+    BuildContext context,
+    PlayerController player,
+    Uri uri,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (player.playing) await player.togglePlay();
+    if (!await openInYouTube(uri)) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Nie udało się otworzyć YouTube.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final player = PlayerScope.of(context);
+    final queue = PlaybackQueueScope.of(context);
     final track = player.current;
     if (track == null) {
       // Playback failed or was cleared while this screen was open.
@@ -152,6 +174,7 @@ class NowPlayingScreen extends StatelessWidget {
       return const Scaffold();
     }
     void dummy(String label) => showDummy(context, '$_id › $label');
+    final youTubeUri = queue.currentYouTubeUri;
     final size = MediaQuery.sizeOf(context);
     final coverSize = min(size.width - 48, size.height * 0.42);
 
@@ -242,6 +265,13 @@ class NowPlayingScreen extends StatelessWidget {
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Otwórz w YouTube',
+                      icon: const Icon(Icons.smart_display_outlined, size: 30),
+                      onPressed: youTubeUri == null
+                          ? null
+                          : () => _openInYouTube(context, player, youTubeUri),
+                    ),
+                    IconButton(
                       tooltip: 'Dodaj (+)',
                       icon: const Icon(Icons.add_circle_outline, size: 30),
                       onPressed: () => dummy('Dodaj (+)'),
@@ -255,15 +285,22 @@ class NowPlayingScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      tooltip: 'Losowo',
-                      icon: const Icon(Icons.shuffle, size: 28),
-                      onPressed: () => dummy('Losowo'),
+                      tooltip: queue.shuffle ? 'Losowo: wł.' : 'Losowo: wył.',
+                      icon: Icon(
+                        Icons.shuffle,
+                        size: 28,
+                        color: queue.shuffle ? palette.accent : null,
+                      ),
+                      onPressed: () => queue.setShuffle(!queue.shuffle),
                     ),
                     IconButton(
                       tooltip: 'Poprzedni',
                       icon: const Icon(Icons.skip_previous, size: 40),
-                      // No queue yet: "previous" restarts the song, as players do mid-track.
-                      onPressed: () => player.seek(Duration.zero),
+                      // Restarts the song, or near its start goes back (PlaybackQueue.previous).
+                      onPressed: () => runQueueAction(
+                        context,
+                        (onStatus) => queue.previous(onStatus: onStatus),
+                      ),
                     ),
                     Material(
                       color: palette.textPrimary,
@@ -284,7 +321,12 @@ class NowPlayingScreen extends StatelessWidget {
                     IconButton(
                       tooltip: 'Następny',
                       icon: const Icon(Icons.skip_next, size: 40),
-                      onPressed: () => dummy('Następny'),
+                      onPressed: queue.hasNext
+                          ? () => runQueueAction(
+                              context,
+                              (onStatus) => queue.next(onStatus: onStatus),
+                            )
+                          : null,
                     ),
                     IconButton(
                       tooltip: 'Wyłącznik czasowy',
@@ -310,7 +352,7 @@ class NowPlayingScreen extends StatelessWidget {
                     IconButton(
                       tooltip: 'Kolejka',
                       icon: const Icon(Icons.queue_music),
-                      onPressed: () => dummy('Kolejka'),
+                      onPressed: () => QueueScreen.open(context),
                     ),
                   ],
                 ),
@@ -343,6 +385,7 @@ class _SeekBarState extends State<_SeekBar> {
     final total = widget.player.duration ?? Duration.zero;
     return StreamBuilder<Duration>(
       stream: widget.player.position,
+      initialData: widget.player.currentPosition,
       builder: (context, snapshot) {
         final maxMs = max(total.inMilliseconds.toDouble(), 1.0);
         final positionMs =

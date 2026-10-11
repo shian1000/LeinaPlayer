@@ -2,4 +2,4 @@
 <!-- audio_service picks its notification button icons by name at runtime, so the release build's
      resource shrinking removed them and the media notification had no play/pause buttons. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/audio_service_*" />
+    tools:keep="@drawable/audio_service_*,@drawable/ic_stat_leina" />

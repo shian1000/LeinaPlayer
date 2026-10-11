@@ -4,6 +4,8 @@ import '../dummy.dart';
 import '../theme.dart';
 import 'about_screen.dart';
 import 'appearance_screen.dart';
+import 'data_saver_screen.dart';
+import 'history_settings_screen.dart';
 import 'music_sources_screen.dart';
 
 const _id = 'Ustawienia';
@@ -28,7 +30,7 @@ const _entries = [
   _SettingsEntry(
     Icons.library_music_outlined,
     'Źródła muzyki',
-    'Muzyka lokalna',
+    'Muzyka lokalna • YouTube • Cachowanie kolejki',
     opens: _openMusicSources,
   ),
   _SettingsEntry(
@@ -42,11 +44,18 @@ const _entries = [
     'Odtwarzanie',
     'Odtwarzanie ciągłe • Autoodtwarzanie',
   ),
+  _SettingsEntry(
+    Icons.history,
+    'Historia odtwarzania',
+    'Przechowywanie • Wyczyść historię',
+    opens: _openHistory,
+  ),
   _SettingsEntry(Icons.notifications_none, 'Powiadomienia', 'Push • E-mail'),
   _SettingsEntry(
     Icons.download_for_offline_outlined,
     'Oszczędzanie danych i tryb offline',
-    'Tryb oszczędzania danych • Pobieranie przez sieć komórkową',
+    'Cache kolejki tylko przez Wi-Fi',
+    opens: _openDataSaver,
   ),
   _SettingsEntry(
     Icons.equalizer,
@@ -66,6 +75,10 @@ Widget _openAppearance(BuildContext context) => const AppearanceScreen();
 Widget _openMusicSources(BuildContext context) => const MusicSourcesScreen();
 
 Widget _openAbout(BuildContext context) => const AboutScreen();
+
+Widget _openDataSaver(BuildContext context) => const DataSaverScreen();
+
+Widget _openHistory(BuildContext context) => const HistorySettingsScreen();
 
 /// "Ustawienia", opened from the profile drawer.
 class SettingsScreen extends StatelessWidget {

@@ -6,13 +6,33 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:music_database_app/main.dart';
 import 'package:music_database_app/src/screens/database_source_screen.dart';
 import 'package:music_database_app/src/theme.dart';
+import 'package:music_database_app/src/theme_controller.dart';
 import 'package:music_database_app/src/widgets/common.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  // Lain (the default dark theme) draws section titles differently; these tests read Dummify's.
+  setUp(
+    () => SharedPreferences.setMockInitialValues({
+      'appearance.dark_theme': 'Dummify',
+    }),
+  );
+
+  /// With the appearance settings already read, as `main()` does before the first frame.
+  Future<void> pumpApp(WidgetTester tester) async {
+    final themes = ThemeController();
+    await themes.load();
+    await tester.pumpWidget(MusicDatabaseApp(themeController: themes));
+  }
+
+  test('Lain is the dark theme until the user picks another', () async {
+    SharedPreferences.setMockInitialValues({});
+    final themes = ThemeController();
+    await themes.load();
+    expect(themes.dark, same(lainTheme));
+  });
 
   testWidgets('shows bottom navigation with all tabs', (tester) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
 
     for (final label in ['Home', 'Wyszukaj', 'Biblioteka', 'Utwórz']) {
       expect(find.text(label), findsWidgets);
@@ -22,7 +42,7 @@ void main() {
   });
 
   testWidgets('dummy leaf reports its menu id', (tester) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
 
     await tester.tap(find.text('Muzyka'));
     await tester.pump();
@@ -31,7 +51,7 @@ void main() {
   });
 
   testWidgets('Utwórz tab opens create sheet', (tester) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
 
     await tester.tap(find.text('Utwórz'));
     await tester.pumpAndSettle();
@@ -44,7 +64,7 @@ void main() {
   testWidgets('empty Biblioteka; "+" › Playlista offers new and import', (
     tester,
   ) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
     await tester.tap(find.text('Biblioteka'));
     await tester.pumpAndSettle();
 
@@ -83,7 +103,7 @@ void main() {
   testWidgets(
     'predictive back gesture closes a root sheet, not the tab screen under it',
     (tester) async {
-      await tester.pumpWidget(const MusicDatabaseApp());
+      await pumpApp(tester);
       // A pushed tab route (Ustawienia) with a root sheet (Utwórz) over it.
       await tester.tap(find.byType(CircleAvatar).first);
       await tester.pumpAndSettle();
@@ -117,16 +137,24 @@ void main() {
   testWidgets('Informacje i pomoc: private use, licence and source link', (
     tester,
   ) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
     await tester.tap(find.byType(CircleAvatar).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Informacje i pomoc'), 200);
+    // Clear of the bottom bar, which would take the tap.
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Informacje i pomoc'));
     await tester.pumpAndSettle();
 
     expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
+    expect(find.text('Linki z YouTube'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('https://github.com/shian1000/MusicDatabaseApp'),
+      200,
+    );
     expect(find.textContaining('GPLv3'), findsOneWidget);
     expect(
       find.text('https://github.com/shian1000/MusicDatabaseApp'),
@@ -159,7 +187,7 @@ void main() {
   testWidgets('profile drawer opens settings inside current tab', (
     tester,
   ) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
 
     await tester.tap(find.byType(CircleAvatar).first);
     await tester.pumpAndSettle();
@@ -172,7 +200,7 @@ void main() {
   testWidgets(
     'appearance: themes, dark-mode switch and system mode all apply',
     (tester) async {
-      await tester.pumpWidget(const MusicDatabaseApp());
+      await pumpApp(tester);
 
       await tester.tap(find.byType(CircleAvatar).first);
       await tester.pumpAndSettle();
@@ -221,7 +249,7 @@ void main() {
   testWidgets('Muzyka lokalna shows folders, scan button and counters', (
     tester,
   ) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
 
     await tester.tap(find.byType(CircleAvatar).first);
     await tester.pumpAndSettle();
@@ -247,7 +275,7 @@ void main() {
   testWidgets('YouTube settings and playback order under Źródła muzyki', (
     tester,
   ) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
 
     await tester.tap(find.byType(CircleAvatar).first);
     await tester.pumpAndSettle();
@@ -300,7 +328,7 @@ void main() {
   testWidgets('database address is validated and saved under Źródła muzyki', (
     tester,
   ) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
 
     await tester.tap(find.byType(CircleAvatar).first);
     await tester.pumpAndSettle();
@@ -360,7 +388,7 @@ void main() {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
     await tester.pumpAndSettle();
 
     Rect avatar() =>
@@ -376,7 +404,7 @@ void main() {
   testWidgets('filter icon on Wyszukaj chooses the search fields', (
     tester,
   ) async {
-    await tester.pumpWidget(const MusicDatabaseApp());
+    await pumpApp(tester);
     await tester.tap(find.text('Wyszukaj').last);
     await tester.pumpAndSettle();
 

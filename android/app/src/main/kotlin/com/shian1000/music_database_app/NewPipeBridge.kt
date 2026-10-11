@@ -25,7 +25,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfoItem
  * Exposes NewPipeExtractor to Dart on the `music_database_app/newpipe` channel
  * (`lib/src/data/youtube_audio.dart`). Extraction does network I/O, so it runs off the main thread.
  */
-class NewPipeBridge(messenger: BinaryMessenger) : MethodChannel.MethodCallHandler {
+class NewPipeBridge(val messenger: BinaryMessenger) : MethodChannel.MethodCallHandler {
     private val channel = MethodChannel(messenger, "music_database_app/newpipe")
     private val executor = Executors.newSingleThreadExecutor()
     private val mainThread = Handler(Looper.getMainLooper())
@@ -44,6 +44,14 @@ class NewPipeBridge(messenger: BinaryMessenger) : MethodChannel.MethodCallHandle
                     return
                 }
                 runInBackground(result) { audioStreams(videoId) }
+            }
+            "video" -> {
+                val videoId = call.argument<String>("videoId")
+                if (videoId == null) {
+                    result.error("bad_args", "videoId missing", null)
+                    return
+                }
+                runInBackground(result) { video(videoId) }
             }
             "search" -> {
                 val query = call.argument<String>("query")
@@ -98,6 +106,21 @@ class NewPipeBridge(messenger: BinaryMessenger) : MethodChannel.MethodCallHandle
                 "delivery" to it.deliveryMethod.name,
             )
         }
+    }
+
+    /** Title, channel and length of one video (a link opened with the app). */
+    private fun video(videoId: String): Map<String, Any?> {
+        val info = StreamInfo.getInfo(
+            ServiceList.YouTube,
+            "https://www.youtube.com/watch?v=$videoId",
+        )
+        return mapOf(
+            "id" to videoId,
+            "title" to info.name,
+            "channel" to info.uploaderName,
+            "duration" to info.duration,
+            "views" to info.viewCount,
+        )
     }
 
     /** Videos only (not channels/playlists), first results page (~20). */

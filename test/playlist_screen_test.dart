@@ -11,7 +11,9 @@ import 'package:music_database_app/src/data/youtube_audio.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_playlist.dart';
 import 'package:music_database_app/src/data/youtube_search.dart';
+import 'package:music_database_app/src/playback/playback_queue.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
+import 'package:music_database_app/src/playback/track_player.dart';
 import 'package:music_database_app/src/screens/library_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,6 +32,7 @@ void main() {
   late PlaylistLibrary playlists;
   late SourceSettings settings;
   late PlayerController player;
+  late PlaybackQueue queue;
   late List<String> fetched;
 
   setUp(() {
@@ -38,6 +41,7 @@ void main() {
   });
 
   tearDown(() async {
+    queue.dispose();
     player.dispose();
     playlists.dispose();
     youTubeLibrary.dispose();
@@ -48,9 +52,11 @@ void main() {
     await storage.delete(recursive: true);
   });
 
-  /// Lets real SQLite work finish; spinners shown meanwhile never settle, so only pump.
-  Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 20; i++) {
+  /// Lets real SQLite work finish — until [until] shows, when given (a fixed wait was too short
+  /// with the whole suite running in parallel); spinners never settle, so only pump.
+  Future<void> settle(WidgetTester tester, {Finder? until}) async {
+    for (var i = 0; i < (until == null ? 20 : 200); i++) {
+      if (until != null && i >= 5 && until.evaluate().isNotEmpty) break;
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 50)),
       );
@@ -83,6 +89,15 @@ void main() {
       await playlists.load();
       await settings.load();
     });
+    queue = PlaybackQueue(
+      TrackPlayer(
+        player: player,
+        settings: settings,
+        youTubeLibrary: youTubeLibrary,
+        youTubeAudio: YouTubeAudio(newPipeAvailable: false),
+        youTubeSearch: YouTubeSearch(),
+      ),
+    );
     await tester.pumpWidget(
       DatabaseSyncScope(
         notifier: sync,
@@ -96,39 +111,42 @@ void main() {
                 notifier: playlists,
                 child: PlayerScope(
                   notifier: player,
-                  child: SourceSettingsScope(
-                    notifier: settings,
-                    child: YouTubeScope(
-                      search: YouTubeSearch(),
-                      audio: YouTubeAudio(newPipeAvailable: false),
-                      playlists: YouTubePlaylists(
-                        newPipeAvailable: false,
-                        explode: (id) async {
-                          fetched.add(id);
-                          return YouTubePlaylistData(
-                            id: id,
-                            name: 'Do auta',
-                            owner: 'Shian',
-                            videos: const [
-                              YouTubeVideo(
-                                id: 'X2XWBcd5jn0',
-                                title: 'Dawid Podsiadło - Małomiasteczkowy',
-                                channel: 'Dawid Podsiadło',
-                                duration: Duration(minutes: 4),
-                              ),
-                              YouTubeVideo(
-                                id: 'nn',
-                                title: 'Nieznany - Utwór (Official Video)',
-                                channel: 'Nieznany',
-                                duration: Duration(minutes: 3),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      child: MaterialApp(
-                        theme: buildAppTheme(dummifyTheme),
-                        home: const Scaffold(body: LibraryScreen()),
+                  child: PlaybackQueueScope(
+                    notifier: queue,
+                    child: SourceSettingsScope(
+                      notifier: settings,
+                      child: YouTubeScope(
+                        search: YouTubeSearch(),
+                        audio: YouTubeAudio(newPipeAvailable: false),
+                        playlists: YouTubePlaylists(
+                          newPipeAvailable: false,
+                          explode: (id) async {
+                            fetched.add(id);
+                            return YouTubePlaylistData(
+                              id: id,
+                              name: 'Do auta',
+                              owner: 'Shian',
+                              videos: const [
+                                YouTubeVideo(
+                                  id: 'X2XWBcd5jn0',
+                                  title: 'Dawid Podsiadło - Małomiasteczkowy',
+                                  channel: 'Dawid Podsiadło',
+                                  duration: Duration(minutes: 4),
+                                ),
+                                YouTubeVideo(
+                                  id: 'nn',
+                                  title: 'Nieznany - Utwór (Official Video)',
+                                  channel: 'Nieznany',
+                                  duration: Duration(minutes: 3),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        child: MaterialApp(
+                          theme: buildAppTheme(dummifyTheme),
+                          home: const Scaffold(body: LibraryScreen()),
+                        ),
                       ),
                     ),
                   ),
@@ -159,7 +177,7 @@ void main() {
       'https://www.youtube.com/playlist?list=PLtest',
     );
     await tester.tap(find.text('Importuj'));
-    await settle(tester);
+    await settle(tester, until: find.textContaining('Zaimportowano'));
 
     expect(fetched, ['PLtest']);
     expect(
@@ -170,7 +188,7 @@ void main() {
     expect(find.text('Playlista • Shian'), findsOneWidget);
 
     await tester.tap(find.text('Do auta'));
-    await settle(tester);
+    await settle(tester, until: find.text('Utwór'));
     expect(find.text('2 utwory • 7 min'), findsOneWidget);
     expect(find.text('Małomiasteczkowy'), findsOneWidget);
     expect(find.text('Utwór'), findsOneWidget);
@@ -185,5 +203,17 @@ void main() {
       find.byTooltip('Na YouTube (znalezione przez telefon)'),
       findsOneWidget,
     );
+
+    // ⋮ › the tracks MusicDatabase doesn't have: only the unrecognised one.
+    await tester.tap(find.byTooltip('Menu playlisty (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+    );
+    await settle(tester, until: find.text('Poza bazą danych: 1 z 2'));
+    expect(find.text('Utwory spoza bazy danych'), findsOneWidget);
+    expect(find.text('Poza bazą danych: 1 z 2'), findsOneWidget);
+    expect(find.text('Utwór'), findsOneWidget);
+    expect(find.text('Małomiasteczkowy'), findsNothing);
   });
 }

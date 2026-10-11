@@ -1,24 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../data/combined_search.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
+import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../dummy.dart';
+import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/song_tile.dart';
+import 'missing_tracks_screen.dart';
 
 const _id = 'Playlista';
 
 /// One of the user's playlists (Biblioteka › playlist), laid out like a playlist in the
 /// reference app; its tracks are rows like the song search's, with the same source icons.
 class PlaylistScreen extends StatefulWidget {
-  const PlaylistScreen({super.key, required this.playlist});
+  const PlaylistScreen({super.key, required this.playlist, this.reveal});
 
   final PlaylistSummary playlist;
+
+  /// A song to jump to (from "Ostatnie"); otherwise the song playing, if it's from here.
+  final TrackRef? reveal;
 
   @override
   State<PlaylistScreen> createState() => _PlaylistScreenState();
@@ -31,6 +38,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   /// Once the header has scrolled away the app bar turns solid and shows the name, as in the
   /// reference app (until then it's transparent over the cover).
   final _scroll = ScrollController();
+  final _firstRowKey = GlobalKey();
   bool _headerHidden = false;
 
   @override
@@ -61,7 +69,47 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Future<void> _load() async {
     final tracks = await PlaylistLibraryScope.of(context)
         .tracks(widget.playlist.id);
-    if (mounted) setState(() => _tracks = tracks);
+    if (!mounted) return;
+    setState(() => _tracks = tracks);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+  }
+
+  /// Opening the playlist jumps to [PlaylistScreen.reveal] or else the song playing (when it
+  /// plays from here), third from the top, like the reference app.
+  void _reveal() {
+    final tracks = _tracks;
+    if (tracks == null || !_scroll.hasClients) return;
+    final wanted = widget.reveal;
+    final queue = PlaybackQueueScope.of(context);
+    final index = wanted != null
+        ? _indexOf(wanted, tracks)
+        : queue.playlistId == _playlist.id
+        ? queue.currentContextIndex
+        : null;
+    if (index == null || index < 0 || index >= tracks.length) return;
+    // Rows all have the first one's height; rows far down aren't built yet to measure.
+    final first = _firstRowKey.currentContext?.findRenderObject() as RenderBox?;
+    if (first == null) return;
+    final firstTop = RenderAbstractViewport.of(first)
+        .getOffsetToReveal(first, 0)
+        .offset;
+    // The app bar is drawn over the list.
+    final covered = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    final target = firstTop + (index - 2) * first.size.height - covered;
+    _scroll.jumpTo(target.clamp(0, _scroll.position.maxScrollExtent));
+  }
+
+  /// Where [track] is in the playlist: by MusicDatabase song, else video, else title.
+  static int _indexOf(TrackRef track, List<PlaylistTrack> tracks) {
+    bool Function(PlaylistTrack) test = track.mainDbId != null
+        ? (t) => t.mainDbId == track.mainDbId
+        : track.videoId != null
+        ? (t) => t.youtubeVideoId == track.videoId
+        : (t) => t.title == track.title;
+    final found = tracks.indexWhere(test);
+    return found >= 0
+        ? found
+        : tracks.indexWhere((t) => t.title == track.title);
   }
 
   PlaylistSummary get _playlist => widget.playlist;
@@ -95,6 +143,17 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     navigator.pop();
   }
 
+  void _showMissing() {
+    final tracks = _tracks;
+    if (tracks == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            MissingTracksScreen(playlist: _playlist, tracks: tracks),
+      ),
+    );
+  }
+
   void _showPlaylistMenu() {
     showMenuSheet(
       context,
@@ -109,6 +168,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         MenuSheetEntry(Icons.check_circle, 'Usuń z Biblioteki', onTap: _delete),
         const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
         const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),
+        MenuSheetEntry(
+          Icons.rule,
+          'Wyświetl utwory, których nie ma w bazie danych',
+          onTap: _showMissing,
+        ),
         const MenuSheetEntry(Icons.playlist_add, 'Dodaj do innej playlisty'),
         const MenuSheetEntry(
           Icons.drive_file_move_outline,
@@ -128,18 +192,25 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         title: hit.title,
         subtitle: hit.artistLabel,
       ),
-      entries: const [
-        MenuSheetEntry(Icons.share_outlined, 'Udostępnij'),
-        MenuSheetEntry(
+      entries: [
+        const MenuSheetEntry(Icons.share_outlined, 'Udostępnij'),
+        const MenuSheetEntry(
           Icons.add_circle_outline,
           'Dodaj do Polubionych utworów',
         ),
-        MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
-        MenuSheetEntry(Icons.remove_circle_outline, 'Usuń z tej playlisty'),
-        MenuSheetEntry(Icons.queue_music, 'Dodaj do kolejki'),
-        MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
-        MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
-        MenuSheetEntry(Icons.radio, 'Przejdź do radia utworu'),
+        const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
+        const MenuSheetEntry(
+          Icons.remove_circle_outline,
+          'Usuń z tej playlisty',
+        ),
+        MenuSheetEntry(
+          Icons.queue_music,
+          'Dodaj do kolejki',
+          onTap: () => addToQueue(context, hit),
+        ),
+        const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
+        const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
+        const MenuSheetEntry(Icons.radio, 'Przejdź do radia utworu'),
       ],
     );
   }
@@ -288,7 +359,19 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 IconButton(
                   tooltip: 'Odtwarzanie losowe',
                   icon: Icon(Icons.shuffle, color: palette.accent, size: 30),
-                  onPressed: () => dummy('Odtwarzanie losowe'),
+                  onPressed: hits.isEmpty
+                      ? null
+                      : () => runQueueAction(
+                          context,
+                          (onStatus) =>
+                              PlaybackQueueScope.of(context).startShuffled(
+                                hits,
+                                playlistId: _playlist.id,
+                                youTubeListId: _playlist.youTubeId,
+                                playlistName: _playlist.name,
+                                onStatus: onStatus,
+                              ),
+                        ),
                 ),
                 const SizedBox(width: 4),
                 FloatingActionButton(
@@ -299,7 +382,20 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   shape: palette.rounded
                       ? const CircleBorder()
                       : const RoundedRectangleBorder(),
-                  onPressed: () => dummy('Odtwórz playlistę'),
+                  onPressed: hits.isEmpty
+                      ? null
+                      : () => runQueueAction(
+                          context,
+                          (onStatus) => PlaybackQueueScope.of(context).start(
+                            hits,
+                            0,
+                            playlistId: _playlist.id,
+                            youTubeListId: _playlist.youTubeId,
+                            playlistName: _playlist.name,
+                            shuffle: false,
+                            onStatus: onStatus,
+                          ),
+                        ),
                   child: const Icon(Icons.play_arrow, size: 36),
                 ),
               ],
@@ -334,9 +430,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               child: Center(child: CircularProgressIndicator()),
             )
           else
-            for (final hit in hits)
+            for (final (i, hit) in hits.indexed)
               SongTile(
+                key: i == 0 ? _firstRowKey : null,
                 hit: hit,
+                // Tapping a track queues the whole playlist, starting at that track.
+                queue: hits,
+                queueIndex: i,
+                playlistId: _playlist.id,
+                youTubeListId: _playlist.youTubeId,
                 playlistName: _playlist.name,
                 // Like the reference app's playlists: just the artist.
                 subtitle: hit.artistLabel,

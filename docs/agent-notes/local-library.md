@@ -55,12 +55,59 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 - Snackbars on the search screen use `clearSnackBars()`, not `hideCurrentSnackBar()`: a
   "Szukam…" snackbar shown while another is still visible sits in the queue, so a fast answer
   would otherwise wait behind it for its whole duration.
-- Playback (`PlayerController` over `just_audio`) is one song, no queue. "Poprzedni" restarts
-  the song. `just_audio`'s `play()` future completes only when playback stops — never await it.
-- Background playback and the media notification come from `just_audio_background`
-  (`audio_service`): `JustAudioBackground.init` in `main()`, `MainActivity` extends
-  `AudioServiceActivity`, the service/receiver/permissions in `AndroidManifest.xml`, and every
-  audio source needs a `MediaItem` tag (`JustAudioBackend.open`). While music plays, the
+- `PlayerController` (over `just_audio`) plays one song; `PlaybackQueue`
+  (`lib/src/playback/playback_queue.dart`) decides what comes next and plays each song through
+  `TrackPlayer` (`track_player.dart`: the source choice, YouTube search and matching — no UI, so
+  it also works with the screen off). On `PlayerController.completions` the queue plays the next
+  song that can be played; moving on by itself never opens the YouTube app. "Poprzedni" uses
+  `PlayerController.currentPosition` (5 s rule). Entries are `SearchHit`s, resolved only when
+  played (YouTube stream URLs expire). `just_audio`'s `play()` future completes only when
+  playback stops — never await it.
+- Never pause between songs. A finished song stays "playing" (just_audio keeps `playing` true in
+  the completed state) until the queue has started the next one, or calls
+  `PlayerController.stopAtEnd` at the end of the queue. audio_service holds the foreground service
+  and a partial wake lock only while the session says it plays; the old pause-on-completion
+  dropped both for the seconds the next YouTube song took to resolve, and with the screen off or
+  the app in the background the phone froze it there — music stopped after a few songs (5–15
+  min) until the app was opened again. Seen on the Pixel 7a (Android 17) in logcat: `Background
+  started FGS: Disallowed … ForegroundServiceStartNotAllowedException` at the next song, network
+  cut off (`UnknownHostException`), then `freezing <pid> com.shian1000.music_database_app`. The
+  Huawei (Android 10) never showed it — test background playback on Android 12+.
+- No connection while moving on by itself (`PlayOutcome.offline`, from `isNetworkError` in
+  `network_errors.dart`): the queue tries the same song again after 5, 15 and 30 s
+  (`PlaybackQueue.offlineRetries`) instead of skipping it — it used to race through dozens of
+  songs in a second, each "unplayable" — and then stops on it (`PlayerController.park`: shown
+  paused, "Odtwórz" tries again). Only real refusals (a video YouTube won't serve, N/A) skip.
+- Queue model: the context (`_context`, the playlist / results as listed), `_order` (positions in
+  play order — identity or shuffled) with `_pos`, plus `_added` ("Dodaj do kolejki") which always
+  plays first. `_generation` is bumped by every user action so an auto-advance started earlier
+  gives up; caching ahead has its own run counter (a queue edit restarts it in the new order
+  without cancelling playback). A queue holds `SearchHit`s as they were when it was filled, so
+  `TrackPlayer` re-checks `YouTubeLibrary.matchFor` before playing — otherwise a video found
+  while caching ahead would be searched again.
+- Restoring after a restart (`QueueSession`): the snapshot (`PlaybackQueue.snapshot`, songs as
+  `TrackRef` JSON) is saved on every queue/player change, every 10 s while playing and when the
+  app is hidden; restored once `local.db`, the YouTube matches and music.db are loaded. The
+  player only shows the song (`PlayerController.showRestored`) — nothing is loaded until play,
+  since a YouTube stream would need the network just to start the app; play goes through
+  `PlaybackQueue.playCurrent` and then seeks to the saved position.
+- Caching ahead (`TrackPlayer.prefetch`) resolves a stream with the switched-on stream methods
+  and downloads it with `YouTubeLibrary.download` (1 MB Range chunks, like the cache while
+  streaming). The cache limit used everywhere is `SourceSettings.cacheKeep` (≥ N + 2), so songs
+  cached ahead can't push out the playing one before they're played.
+- The NewPipe method-channel bridge is created once per Flutter engine (`MainActivity`
+  companion), not per activity: the engine outlives the activity while music plays in the
+  background, and the queue still needs NewPipe for the next song.
+- Background playback and the media notification come from `audio_service` directly, not
+  `just_audio_background` (which shows previous/next only for its own playlist sources, while
+  the queue resolves songs one by one): `MediaSession` (`player_controller.dart`, a
+  `BaseAudioHandler` owning the app's one `AudioPlayer`) is created by `AudioService.init` in
+  `main()`; it pipes just_audio's events into the notification state and sends previous/next
+  presses (`MediaSkip`) through `PlayerController.skips` to the queue. `JustAudioBackend.open`
+  sets the notification's `MediaItem` (re-sent with the duration once known, for its seek bar).
+  `MainActivity` extends `AudioServiceActivity`; the service/receiver/permissions are in
+  `AndroidManifest.xml`. If `AudioService.init` fails, music still plays without a
+  notification. While music plays, the
   foreground service keeps Android from killing the app (checked: still playing after 2+ minutes
   locked on the Huawei); when paused the service leaves the foreground, as Android expects.
   `android/app/src/main/res/raw/keep.xml` must stay: release resource shrinking otherwise

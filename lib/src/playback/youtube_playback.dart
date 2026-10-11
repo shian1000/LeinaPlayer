@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/incoming_links.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
 import '../data/youtube_library.dart';
@@ -21,15 +22,38 @@ enum YouTubePlayedVia {
 
 /// Why no switched-on method could play a video; [message] is shown to the user as is.
 class YouTubePlaybackException implements Exception {
-  const YouTubePlaybackException(this.message);
+  const YouTubePlaybackException(this.message, {this.offline = false});
 
   final String message;
+
+  /// A streaming method failed for want of a network connection, so trying again later may
+  /// work (unlike a video YouTube refuses).
+  final bool offline;
 
   @override
   String toString() => message;
 }
 
 typedef OpenExternalFn = Future<bool> Function(Uri uri);
+
+/// The video's page; with [listId], inside that playlist (YouTube then plays on through it).
+Uri youTubeWatchUri(String videoId, {String? listId}) =>
+    Uri.https('www.youtube.com', '/watch', {'v': videoId, 'list': ?listId});
+
+/// The YouTube app when it's installed, the browser otherwise.
+Future<bool> openInYouTube(Uri uri) async {
+  // On Android this app may handle YouTube links itself, so it names the YouTube app.
+  final opened = await openInYouTubeApp(uri);
+  if (opened != null) return opened;
+  try {
+    if (await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication)) {
+      return true;
+    }
+  } catch (_) {
+    // No app claims the link; fall through to the browser.
+  }
+  return launchUrl(uri, mode: LaunchMode.externalApplication);
+}
 
 /// Plays a YouTube video with the user's [YouTubePlaybackMethod]s, in their order, moving to the
 /// next one when a method fails.
@@ -40,7 +64,7 @@ class YouTubePlayback {
     required this.settings,
     required this.player,
     OpenExternalFn? openExternal,
-  }) : _openExternal = openExternal ?? _openInYouTube;
+  }) : _openExternal = openExternal ?? openInYouTube;
 
   final YouTubeAudio audio;
   final YouTubeLibrary library;
@@ -49,13 +73,19 @@ class YouTubePlayback {
   final OpenExternalFn _openExternal;
 
   /// [track] builds what the player shows for a given source (file path or stream URL);
-  /// [onConnecting] is called before the first attempt that goes over the network.
+  /// [onConnecting] is called before the first attempt that goes over the network. Without
+  /// [allowExternal] the YouTube app method is skipped — the queue moving on by itself, maybe
+  /// with the screen off, must not open another app. [externalUri] is what the YouTube app
+  /// opens (e.g. the song inside its playlist); the video's own page by default.
   Future<YouTubePlayedVia> play(
     String videoId,
     NowPlaying Function(String source) track, {
     void Function()? onConnecting,
+    bool allowExternal = true,
+    Uri? externalUri,
   }) async {
     final errors = <String>[];
+    var offline = false;
     var connecting = false;
     void connect() {
       if (connecting) return;
@@ -71,9 +101,9 @@ class YouTubePlayback {
             return YouTubePlayedVia.cache;
           }
         case YouTubePlaybackMethod.youtubeApp:
+          if (!allowExternal) continue;
           connect();
-          final uri = Uri.https('www.youtube.com', '/watch', {'v': videoId});
-          if (await _openExternal(uri)) {
+          if (await _openExternal(externalUri ?? youTubeWatchUri(videoId))) {
             // The video plays elsewhere now; don't play something else on top of it.
             if (player.playing) await player.togglePlay();
             return YouTubePlayedVia.youtubeApp;
@@ -83,26 +113,36 @@ class YouTubePlayback {
             YouTubePlaybackMethod.explode ||
             YouTubePlaybackMethod.ytDlpServer:
           connect();
-          try {
-            final stream = await audio.streamFrom(method, videoId);
-            if (await player.play(track(stream.url))) {
-              if (settings.playbackMethods.contains(
-                YouTubePlaybackMethod.cache,
-              )) {
-                unawaited(
-                  library.download(
-                    videoId,
-                    stream.url,
-                    stream.extension,
-                    settings.cacheLimit,
-                  ),
+          // YouTube sometimes refuses one stream address (HTTP 403) and accepts a freshly
+          // resolved one moments later, so a failed play gets one more try.
+          for (var attempt = 1; attempt <= 2; attempt++) {
+            try {
+              final stream = await audio.streamFrom(method, videoId);
+              if (await player.play(track(stream.url))) {
+                if (settings.playbackMethods.contains(
+                  YouTubePlaybackMethod.cache,
+                )) {
+                  unawaited(
+                    library.download(
+                      videoId,
+                      stream.url,
+                      stream.extension,
+                      settings.cacheKeep,
+                    ),
+                  );
+                }
+                return YouTubePlayedVia.stream;
+              }
+              if (attempt == 2) {
+                errors.add(
+                  player.lastError ?? '${method.label}: błąd odtwarzania',
                 );
               }
-              return YouTubePlayedVia.stream;
+            } on YouTubeAudioException catch (e) {
+              errors.add(e.message);
+              offline |= e.offline;
+              break;
             }
-            errors.add(player.lastError ?? '${method.label}: błąd odtwarzania');
-          } on YouTubeAudioException catch (e) {
-            errors.add(e.message);
           }
       }
     }
@@ -111,21 +151,7 @@ class YouTubePlayback {
           ? 'Brak włączonego sposobu odtwarzania z YouTube '
                 '(Ustawienia › Źródła muzyki › YouTube).'
           : 'Nie udało się odtworzyć z YouTube (${errors.join('; ')}).',
+      offline: offline,
     );
-  }
-
-  /// The YouTube app when it's installed (it handles youtube.com links), the browser otherwise.
-  static Future<bool> _openInYouTube(Uri uri) async {
-    try {
-      if (await launchUrl(
-        uri,
-        mode: LaunchMode.externalNonBrowserApplication,
-      )) {
-        return true;
-      }
-    } catch (_) {
-      // No app claims the link; fall through to the browser.
-    }
-    return launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

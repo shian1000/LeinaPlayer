@@ -13,19 +13,53 @@ twice on the same screen get a suffix in parentheses, e.g. `(ikona)` vs `(przyci
 
 Legend: **→** opens another screen/sheet (implemented), everything else is a dummy.
 
+## From outside the app (Android)
+
+The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package id unchanged).
+
+- "Udostępnij" → Leina Radio, or a YouTube link opened with the app (`incoming_links.dart`,
+  handled in `AppShell._onLink`): a playlist link (`playlist?list=`) is imported like Playlista ›
+  Importuj playlistę (or updated, if imported before) and opened in Biblioteka; a video link
+  (`watch?v=`, `youtu.be/`, `shorts/`, also with `&list=`) is recognised as a MusicDatabase song
+  where possible (`video_link.dart`: music.db's link, a phone match, then the video's title) and
+  played from the first source in "Kolejność odtwarzania", in the full player. Not a YouTube link →
+  a message. On Android 12+ YouTube links reach the app only after the user allows it (see
+  Informacje i pomoc).
+
 ## Player (`lib/src/screens/now_playing.dart`, `lib/src/playback/player_controller.dart`)
 
-- Media notification (and lock screen): title, artist, progress, pause/play and stop — the
-  system's media controls, from `just_audio_background`; headset buttons work too.
+- Media notification (and lock screen): title, artist, progress, previous / pause-play / next —
+  the system's media controls (`MediaSession`, an `audio_service` handler); previous/next go to
+  the queue like the full player's buttons. Headset and car buttons work too.
 - Mini player — appears above the bottom bar once something plays: cover, title, artist,
-  play/pause, thin progress line. Tapping it **→ full player** (slides up, covers the bottom bar):
+  play/pause, thin progress line. After the app restarts it shows the last song paused where it
+  was (like the reference app); play carries on from there, with the same queue
+  (`QueueSession`). Tapping it **→ full player** (slides up, covers the bottom bar):
   - Header: ⌄ (collapse), "Odtwarzanie z wyników wyszukiwania / „<query>” w wyszukiwarce",
     `Odtwarzacz › Menu (⋮)`.
-  - Big cover, title, artist, `Odtwarzacz › Dodaj (+)`.
+  - Big cover, title, artist, Otwórz w YouTube (**implemented**: YouTube icon left of (+); opens
+    the song in the YouTube app — inside its YouTube playlist when it plays from an imported
+    one, so YouTube then has the whole playlist; pauses this player; disabled when no video is
+    known), `Odtwarzacz › Dodaj (+)`.
   - Seek bar with elapsed/total time (**implemented**).
-  - `Odtwarzacz › Losowo`, previous (**implemented**: restarts the song — no queue yet),
-    play/pause (**implemented**), `Odtwarzacz › Następny`, `Odtwarzacz › Wyłącznik czasowy`.
-  - `Odtwarzacz › Urządzenia`, `Odtwarzacz › Udostępnij`, `Odtwarzacz › Kolejka`.
+  - Losowo (**implemented**: toggles shuffle, green while on — see the queue below), Poprzedni (**implemented**: within the first 5 s the previous song
+    in the queue, otherwise — or with nothing before it — the song from the start), play/pause
+    (**implemented**), Następny (**implemented**: the next song in the queue; disabled at its
+    end), `Odtwarzacz › Wyłącznik czasowy`.
+  - Play queue (`PlaybackQueue`): tapping a playlist track queues the whole playlist (the
+    "context") at that track; a search result queues just that song. Songs added with "Dodaj do
+    kolejki" (⋮ of a search result or playlist track) play next, before the rest of the context,
+    and stay queued when a new context starts; with nothing playing the added song starts at
+    once. Shuffle on: every other context song follows the current one in random order (also
+    those listed before it); off: back to the context's order after the current song. When a
+    song ends the next one plays, skipping songs that can't be played (without opening the
+    YouTube app). After each song starts, the next N songs in play order are cached (see
+    "Cachowanie kolejki" in Źródła muzyki).
+  - `Odtwarzacz › Urządzenia`, `Odtwarzacz › Udostępnij`, Kolejka **→ Kolejka**
+    (`queue_screen.dart`) — **implemented**: "Teraz odtwarzane", "Następne w kolejce" (added
+    songs, with "Wyczyść kolejkę"), "Następne z: <playlist / search>" (the rest in play order),
+    each row with "Usuń z kolejki" (⊖); tapping a row plays it (added songs before it are
+    dropped, context songs before it count as played). "Losowo: wł./wył." at the bottom.
 
 ## Bottom navigation (`lib/src/screens/app_shell.dart`)
 
@@ -44,7 +78,15 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 - `Menu profilu › Pokaż profil`
 - `Menu profilu › Dodaj konto`
 - `Menu profilu › Statystyki słuchania`
-- `Menu profilu › Ostatnie`
+- Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
+  app: 🗑 "Wyczyść historię" in the app bar (confirm dialog), `Ostatnie › Filtr: Muzyka` chip
+  (dummy), then the history by day ("Dzisiaj", "Wczoraj",
+  "5 października", with the year when not this year): the songs played that day, newest first,
+  each once per playlist it came from (song rows with the playing animation; ⋮ IDs `Ostatnie ›
+  Utwór › Menu (⋮) › <pozycja>`, the same entries as in search). A song played from a playlist
+  shows "<artist> • <playlist>" and tapping it opens that playlist scrolled to the song (third
+  row); one played on its own (search, "Dodaj do kolejki", a link) — or from a playlist deleted
+  since — plays when tapped.
 - `Menu profilu › Aktualności`
 - Ustawienia **→ Ustawienia**
 - `Menu profilu › Aktywność`
@@ -102,18 +144,31 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     "Korzystaj z NewPipeExtractor" (on; disabled with "Dostępne tylko na Androidzie"
     elsewhere), "Korzystaj z pakietu youtube_explode" (off — YouTube answers 403), "Korzystaj z
     yt-dlp przez serwer" (off, not implemented), "Otwórz w aplikacji YouTube" (on — the last
-    resort: opens the video in the YouTube app, or the browser without it, and pauses this
-    app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
+    resort: opens the video in the YouTube app — inside its YouTube playlist when the song plays
+    from an imported one — or the browser without it, and pauses this app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
 
     *Pamięć podręczna* — "Liczba utworów" (dialog, default 25; lowering it deletes the excess
-    at once), "Zajęte miejsce" ("N utworów, X MB"), "Wyczyść pamięć podręczną" (confirm dialog).
+    at once), "Zajęte miejsce" ("N utworów, X MB") **→ Pamięć podręczna** (`cache_contents_screen.dart`:
+    the cached songs, most recently played first, as song rows with their size — a MusicDatabase
+    song where the video is known, else the title the phone saw in a playlist, the history or a
+    match; tapping plays from there on through the list, all from the phone; ⊖ "Usuń z pamięci
+    podręcznej"), "Wyczyść pamięć podręczną" (confirm dialog).
   - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
     reorder the playback sources (default: 1. Telefon, 2. YouTube). When a song is playable
     from several, the first one in this order is used.
+  - "Twórz cache dla przyszłych utworów w kolejce" — switch (on by default) for queue caching;
+    its subtitle says when YouTube's "Pamięć podręczna" method is off (then nothing is cached).
+  - "Cachowanie kolejki" — dialog, 1–10 next songs (default 3): after each queue song starts,
+    the next N in play order (shuffled order when shuffle is on, songs added with "Dodaj do
+    kolejki" first) are downloaded to the YouTube cache one by one. Only songs that would play
+    from YouTube; a song without a known video is searched and matched first (the match is
+    remembered, so playing it later doesn't search again). The cache then keeps at least N + 2
+    songs, whatever "Liczba utworów" says (`SourceSettings.cacheKeep`).
 - Wygląd **→ Wygląd** (`appearance_screen.dart`) — **implemented**, everything applies at once
   and is remembered after restart:
   - Motyw jasny **→ list of light themes** (Dummify) — used while dark mode is off.
-  - Motyw ciemny **→ list of dark themes** (Dummify, Lain) — used while dark mode is on.
+  - Motyw ciemny **→ list of dark themes** (Dummify, Lain — the default) — used while dark mode
+    is on.
   - "Przełącz na tryb ciemny" — switch; off = light theme, on = dark theme. Greyed out (showing
     the system's current mode) while the next switch is on.
   - "Systemowe przełączanie trybu ciemnego" — switch; when on, light/dark follows the phone's
@@ -121,13 +176,22 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 
   Themes are defined in `lib/src/theme.dart` (see [`agent-notes/theming.md`](agent-notes/theming.md)).
 - `Ustawienia › Odtwarzanie`
+- Historia odtwarzania **→ Historia odtwarzania** (`history_settings_screen.dart`) —
+  **implemented**: "Przechowuj historię" (dialog: 7 / 30 / 90 — default / 180 dni, Rok, Bez
+  limitu; older plays are deleted on start and with each new play, `PlayHistory.keepDays`;
+  never more than 1000 kept), "Wyczyść historię" (confirm dialog, same as in Ostatnie).
 - `Ustawienia › Powiadomienia`
-- `Ustawienia › Oszczędzanie danych i tryb offline`
+- Oszczędzanie danych i tryb offline **→ Oszczędzanie danych i tryb offline**
+  (`data_saver_screen.dart`) — **implemented**: "Cache'uj przyszłe utwory w kolejce tylko przez
+  Wi-Fi" (off by default; Wi-Fi = the phone has a Wi-Fi IP address).
 - `Ustawienia › Jakość zawartości multimedialnej`
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: "Tylko do
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
+  Also "Linki z YouTube": what sharing a link to the app does, how to make YouTube links open in
+  it, and "Otwieraj linki w Leina Radio" (opens the phone's "Otwieraj domyślnie" settings for the
+  app — Android 12+; app info on older ones).
 - `Ustawienia › Wyloguj`
 
 ## Home (`home_screen.dart`)
@@ -163,7 +227,8 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     "Potencjalnie dostępne" (dimmed YouTube icon, not on the phone) or "Niedostępne"
     (`SongAvailability`). Tapping a result uses the first source in "Kolejność odtwarzania"
     that has it: phone → plays the file (**implemented**, `just_audio`, row highlighted with a
-    green title + equalizer icon); YouTube → streams the video's audio (**implemented on Android**
+    green title + `PlayingBars`, bars that bounce while it plays and stop while paused, like the
+    reference app's); YouTube → streams the video's audio (**implemented on Android**
     through NewPipeExtractor, `youtube_audio.dart` + `NewPipeBridge.kt`; Opus 251, else AAC 140;
     on iOS only from the cache or via youtube_explode).
     With no such source and a dimmed icon it searches YouTube for "main artists + title" (if
@@ -179,6 +244,9 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     searched only when it's tapped (never while typing); the results (up to 15: title, channel,
     duration) replace the button and are dropped when the query changes. Tapping one streams it
     like a song with a stored link.
+  - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
+    <pozycja>`: Dodaj do kolejki (**implemented**), `Dodaj do playlisty`, `Przejdź do albumu`,
+    `Przejdź do wykonawców`, `Udostępnij`.
 - `Wyszukaj › Odkryj coś nowego › <#tag>` (`#polskie indie`, `#mod rock`, `#dance rock`)
 - `Wyszukaj › Kategoria: <nazwa>` — grid "Przeglądaj wszystko"; full list in
   `searchCategories` in `lib/src/sample_content.dart`.
@@ -194,7 +262,6 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   - `Biblioteka › Sortuj wg › Alfabetycznie`
   - `Biblioteka › Sortuj wg › Twórca`
 - `Biblioteka › Widok siatki`
-- `Biblioteka › Importuj swoją muzykę`
 - Library items: the user's playlists (`PlaylistLibrary`, newest first; cover, name,
   "Playlista • <owner>") **→ Playlista**. No sample items any more; with no playlists the list
   shows "Brak playlist" and how to add one. Albums/artists don't exist yet.
@@ -207,19 +274,26 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   avatar + name (the YouTube channel), "N utworów • X godz. Y min" (sum of the known lengths).
 - Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: `Udostępnij`, **`Usuń z
   Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), `Dodaj do tej
-  playlisty`, `Edytuj playlistę`, `Dodaj do innej playlisty`, `Przenieś do folderu`, `Pokaż kod
+  playlisty`, `Edytuj playlistę`, **Wyświetl utwory, których nie ma w bazie danych**
+  (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
+  tracks not recognised as MusicDatabase songs, "Poza bazą danych: N z M", rows like the
+  playlist's — tapping plays on through the playlist from there; a note instead when music.db
+  isn't downloaded; later the place to ask MusicDatabase to add them), `Dodaj do innej playlisty`, `Przenieś do folderu`, `Pokaż kod
   playlisty`.
-- `Playlista › Pobierz (ikona)`, `Playlista › Udostępnij (ikona)`, `Playlista › Odtwarzanie
-  losowe`, `Playlista › Odtwórz playlistę` (dummy until there's a play queue),
+- `Playlista › Pobierz (ikona)`, `Playlista › Udostępnij (ikona)`, Odtwarzanie losowe
+  (**implemented**: queues the playlist shuffled, from a random track), Odtwórz playlistę
+  (**implemented**: queues the playlist from its first track, shuffle off),
   `Playlista › Dodaj (do tej playlisty)` / `Edytuj (playlistę)` / `Sortuj (playlistę)`.
 - Tracks: the same rows as song search (`SongTile`: cover, title highlighted while playing,
-  source icons) but with just the artist under the title, plus a ⋮. Tapping plays like in search
-  (phone file / YouTube in the user's order); the full player says "Odtwarzanie z playlisty
-  <name>". A recognised track is its MusicDatabase song (database icon, phone icon if the file is
-  on the phone); every track has its YouTube video, so the YouTube icon is full.
+  source icons) but with just the artist under the title, plus a ⋮. Tapping queues the whole
+  playlist at that track and plays it like in search (phone file / YouTube in the user's order);
+  the full player says "Odtwarzanie z playlisty <name>". A recognised track is its MusicDatabase song (database icon, phone icon if the file is
+  on the phone); every track has its YouTube video, so the YouTube icon is full. Opening the
+  playlist that's playing jumps to the song playing, third row under the app bar (as far as the
+  list can scroll; `PlaybackQueue.currentContextIndex`).
 - Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: `Udostępnij`, `Dodaj do
-  Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`, `Dodaj do kolejki`,
-  `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
+  Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`, Dodaj do kolejki
+  (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
 
 ## Utwórz sheet (`create_sheet.dart`)
 
@@ -243,5 +317,6 @@ Opened from the bottom-nav tab (prefix `Utwórz`) or the Library "+" (prefix
   "Prywatność i funkcje społecznościowe", "Wyświetlane treści", "Aplikacje i urządzenia", the
   "Darmowe konto" header with its Premium button, the camera icon on Wyszukaj and the whole
   Premium tab. Never built: ads and the reaction (emoji) button on tracks.
-- Deeper levels below the first settings screen; apart from "Wygląd" and "Źródła muzyki", each
-  settings entry is a single dummy.
+- Deeper levels below the first settings screen; apart from "Wygląd", "Źródła muzyki", "Historia
+  odtwarzania", "Oszczędzanie danych i tryb offline" and "Informacje i pomoc", each settings
+  entry is a single dummy.

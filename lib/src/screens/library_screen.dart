@@ -136,34 +136,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Material(
-                    color: context.palette.surface,
-                    shape: context.palette.boxShape(12),
-                    child: ListTile(
-                      shape: context.palette.boxShape(12),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      leading: const Icon(Icons.download, size: 32),
-                      title: const Text(
-                        'Importuj swoją muzykę z innych aplikacji',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: AppFontSize.body,
-                        ),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () =>
-                          showDummy(context, '$_id › Importuj swoją muzykę'),
-                    ),
-                  ),
-                ),
                 if (playlists.isEmpty)
                   const _EmptyLibrary()
                 else

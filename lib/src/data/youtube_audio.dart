@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import 'network_errors.dart';
 import 'newpipe.dart';
 import 'source_settings.dart';
 
@@ -37,9 +38,12 @@ class YouTubeAudioStream {
 
 /// Why a YouTube video can't be played; [message] is shown to the user as is.
 class YouTubeAudioException implements Exception {
-  const YouTubeAudioException(this.message);
+  const YouTubeAudioException(this.message, {this.offline = false});
 
   final String message;
+
+  /// The network couldn't be reached ([isNetworkError]) — worth trying again later.
+  final bool offline;
 
   @override
   String toString() => message;
@@ -126,6 +130,7 @@ class YouTubeAudio {
       debugPrint('YouTube audio (${method.name}) failed for $videoId: $e');
       throw YouTubeAudioException(
         '$name: ${e is PlatformException ? e.code : 'błąd'}',
+        offline: isNetworkError(e),
       );
     }
   }

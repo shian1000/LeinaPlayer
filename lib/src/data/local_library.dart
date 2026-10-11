@@ -235,7 +235,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -261,13 +261,33 @@ class LocalLibrary extends ChangeNotifier {
           )''');
           await _createYouTubeTables(db);
           await _createPlaylistTables(db);
+          await _createHistoryTable(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
           if (from < 3) await _createPlaylistTables(db);
+          if (from < 4) await _createHistoryTable(db);
         },
       ),
     );
+  }
+
+  /// Version 4: what was played ("Ostatnie", see `play_history.dart`). A song is kept by what
+  /// identifies it (MusicDatabase id, file, video) plus its title/artist as shown then.
+  static Future<void> _createHistoryTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE play_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        played_at INTEGER NOT NULL,
+        title VARCHAR NOT NULL,
+        artist VARCHAR,
+        main_db_id INTEGER,
+        file_path VARCHAR,
+        youtube_video_id VARCHAR,
+        -- Played as part of this playlist (playlists.id), else on its own.
+        playlist_id INTEGER,
+        playlist_name VARCHAR
+      )''');
   }
 
   /// Version 3: the user's playlists (see `playlist_library.dart`).
@@ -337,6 +357,10 @@ class LocalLibrary extends ChangeNotifier {
 
   List<LocalSong> _songs = const [];
   Map<int, List<LocalSong>> _byMainId = const {};
+
+  /// The phone song stored at [path], if it's still known.
+  LocalSong? fileAt(String path) =>
+      _songs.where((s) => s.filePath == path).firstOrNull;
 
   /// Files on the phone that are this MusicDatabase song (`main_db_id`).
   List<LocalSong> filesOf(int mainDbId) => _byMainId[mainDbId] ?? const [];

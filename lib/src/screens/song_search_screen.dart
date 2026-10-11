@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/local_library.dart';
+import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
@@ -231,6 +232,10 @@ class _Results extends StatelessWidget {
           : SongTile(
               hit: results[i - leading.length],
               searchQuery: query.trim(),
+              trailing: SongMenuButton(
+                hit: results[i - leading.length],
+                idPrefix: 'Wyszukaj › Utwór › Menu (⋮)',
+              ),
             ),
     );
   }
@@ -330,7 +335,17 @@ class _YouTubeTile extends StatelessWidget {
     final duration = video.duration;
     final isCurrent =
         PlayerScope.of(context).current?.youtubeVideoId == video.id;
+    final hit = SearchHit.youTubeOnly(
+      title: video.title,
+      artistLabel: video.channel,
+      videoId: video.id,
+    );
     return ListTile(
+      contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      trailing: SongMenuButton(
+        hit: hit,
+        idPrefix: 'Wyszukaj › Utwór › Menu (⋮)',
+      ),
       leading: CoverArt(seed: video.id, size: SongTile.coverSize),
       title: CurrentTitle(text: video.title, isCurrent: isCurrent),
       subtitle: Text(
@@ -343,13 +358,11 @@ class _YouTubeTile extends StatelessWidget {
       ),
       onTap: () {
         FocusScope.of(context).unfocus();
-        playYouTubeVideo(
+        final queue = PlaybackQueueScope.of(context);
+        runQueueAction(
           context,
-          videoId: video.id,
-          title: video.title,
-          artist: video.channel,
-          coverSeed: video.id,
-          searchQuery: query,
+          (onStatus) =>
+              queue.start([hit], 0, searchQuery: query, onStatus: onStatus),
         );
       },
     );

@@ -1,12 +1,26 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/incoming_links.dart';
+import '../data/local_library.dart';
+import '../data/song_catalog.dart';
+import '../data/source_settings.dart';
+import '../data/video_link.dart';
+import '../data/youtube_library.dart';
+import '../data/youtube_search.dart';
+import '../playback/playback_queue.dart';
 import '../theme.dart';
+import '../widgets/song_tile.dart';
 import 'create_sheet.dart';
 import 'home_screen.dart';
 import 'library_screen.dart';
 import 'now_playing.dart';
+import 'playlist_import.dart';
+import 'playlist_screen.dart';
 import 'profile_drawer.dart';
+import 'recents_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 
@@ -25,12 +39,16 @@ const _tabs = [
   _TabSpec('Utwórz', Icons.add, Icons.add),
 ];
 
+const _libraryTabIndex = 2;
 const _createTabIndex = 3;
 
 /// Root layout: bottom navigation, the profile drawer, and one nested navigator per tab so the
 /// bottom bar stays visible when drilling into e.g. a playlist (same as the reference app).
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.links});
+
+  /// YouTube links shared to the app or opened with it ([IncomingLinks]).
+  final Stream<String>? links;
 
   static AppShellState of(BuildContext context) =>
       context.findAncestorStateOfType<AppShellState>()!;
@@ -46,6 +64,79 @@ class AppShellState extends State<AppShell> {
     (_) => GlobalKey<NavigatorState>(),
   );
   int _currentTab = 0;
+  StreamSubscription<String>? _linksSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _linksSub = widget.links?.listen(_onLink);
+  }
+
+  @override
+  void dispose() {
+    _linksSub?.cancel();
+    super.dispose();
+  }
+
+  /// A playlist link is imported and opened in Biblioteka; a video link is played (recognised
+  /// as a MusicDatabase song where possible) in the full player.
+  Future<void> _onLink(String text) async {
+    final link = parseYouTubeLink(text);
+    // Whatever was open (a sheet, a dialog, the full player) gives way to the link.
+    Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    switch (link) {
+      case null:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('To nie jest link do filmu ani playlisty z YouTube.'),
+          ),
+        );
+      case YouTubePlaylistLink(:final listId):
+        final playlist = await runPlaylistImport(context, listId);
+        if (playlist == null || !mounted) return;
+        setState(() => _currentTab = _libraryTabIndex);
+        final library = _navigatorKeys[_libraryTabIndex].currentState!;
+        library.popUntil((r) => r.isFirst);
+        library.push(
+          MaterialPageRoute<void>(
+            builder: (_) => PlaylistScreen(playlist: playlist),
+          ),
+        );
+      case YouTubeVideoLink():
+        await _playVideo(link);
+    }
+  }
+
+  Future<void> _playVideo(YouTubeVideoLink link) async {
+    final catalog = SongCatalogScope.of(context);
+    final library = LocalLibraryScope.of(context);
+    final youTube = YouTubeLibraryScope.of(context);
+    final search = YouTubeScope.searchOf(context);
+    final settings = SourceSettingsScope.of(context);
+    final queue = PlaybackQueueScope.of(context);
+    await runQueueAction(context, (onStatus) async {
+      onStatus('Sprawdzam link z YouTube…');
+      final hit = await hitForVideoLink(
+        link,
+        catalog: catalog,
+        library: library,
+        youTube: youTube,
+        search: search,
+        settings: settings,
+      );
+      final outcome = await queue.start(
+        [hit],
+        0,
+        youTubeListId: link.listId,
+        onStatus: onStatus,
+      );
+      // Unless it went to the YouTube app after all.
+      if (outcome.played && !outcome.external && mounted) {
+        unawaited(NowPlayingScreen.open(context));
+      }
+      return outcome;
+    });
+  }
 
   static const _tabRoots = <Widget>[
     HomeScreen(),
@@ -59,6 +150,13 @@ class AppShellState extends State<AppShell> {
     _scaffoldKey.currentState!.closeDrawer();
     _navigatorKeys[_currentTab].currentState!.push(
       MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+    );
+  }
+
+  void _openRecents() {
+    _scaffoldKey.currentState!.closeDrawer();
+    _navigatorKeys[_currentTab].currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const RecentsScreen()),
     );
   }
 
@@ -99,7 +197,10 @@ class AppShellState extends State<AppShell> {
       },
       child: Scaffold(
         key: _scaffoldKey,
-        drawer: ProfileDrawer(onOpenSettings: _openSettings),
+        drawer: ProfileDrawer(
+          onOpenSettings: _openSettings,
+          onOpenRecents: _openRecents,
+        ),
         body: IndexedStack(
           index: _currentTab,
           children: [

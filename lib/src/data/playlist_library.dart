@@ -14,6 +14,7 @@ class PlaylistSummary {
     required this.trackCount,
     required this.duration,
     required this.updatedAt,
+    this.youTubeId,
   });
 
   final int id;
@@ -24,6 +25,9 @@ class PlaylistSummary {
   /// Sum of the known track lengths.
   final Duration duration;
   final DateTime updatedAt;
+
+  /// The YouTube playlist it was imported from (`list=` in its address).
+  final String? youTubeId;
 }
 
 /// One row of a playlist.
@@ -78,6 +82,7 @@ class PlaylistLibrary extends ChangeNotifier {
   Future<void> load() async {
     final rows = await (await _database()).rawQuery('''
       SELECT p.id, p.name, p.owner, p.updated_at,
+             CASE WHEN p.source = 'youtube' THEN p.source_id END AS youtube_id,
              COUNT(t.position) AS tracks, COALESCE(SUM(t.duration_s), 0) AS seconds
       FROM playlists p LEFT JOIN playlist_tracks t ON t.playlist_id = p.id
       GROUP BY p.id ORDER BY p.updated_at DESC''');
@@ -92,6 +97,7 @@ class PlaylistLibrary extends ChangeNotifier {
           updatedAt: DateTime.fromMillisecondsSinceEpoch(
             row['updated_at']! as int,
           ),
+          youTubeId: row['youtube_id'] as String?,
         ),
     ];
     notifyListeners();

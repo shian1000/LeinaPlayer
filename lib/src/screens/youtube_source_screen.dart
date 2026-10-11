@@ -5,6 +5,7 @@ import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
+import 'cache_contents_screen.dart';
 import '../widgets/common.dart';
 import 'youtube_playback_screen.dart';
 
@@ -45,7 +46,7 @@ class YouTubeSourceScreen extends StatelessWidget {
     if (limit == null || !context.mounted) return;
     await settings.setCacheLimit(limit);
     if (!context.mounted) return;
-    await YouTubeLibraryScope.of(context).trim(settings.cacheLimit);
+    await YouTubeLibraryScope.of(context).trim(settings.cacheKeep);
   }
 
   Future<void> _clearCache(BuildContext context) async {
@@ -171,6 +172,12 @@ class YouTubeSourceScreen extends StatelessWidget {
             subtitle: Text(
               '${library.cachedCount} ${_songs(library.cachedCount)}, '
               '${(library.cachedBytes / (1024 * 1024)).toStringAsFixed(1)} MB',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const CacheContentsScreen(),
+              ),
             ),
           ),
           ListTile(

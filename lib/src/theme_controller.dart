@@ -12,7 +12,7 @@ class ThemeController extends ChangeNotifier {
   static const _followSystemKey = 'appearance.follow_system';
 
   AppThemeDef _light = lightThemes.first;
-  AppThemeDef _dark = darkThemes.first;
+  AppThemeDef _dark = lainTheme;
   bool _darkMode = true;
   bool _followSystem = false;
 

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import 'network_errors.dart';
 import 'newpipe.dart';
 import 'source_settings.dart';
 import 'youtube_audio.dart';
@@ -15,15 +16,19 @@ export 'youtube_video.dart';
 
 /// Why no [YouTubeSearch] method returned results; [message] is shown to the user as is.
 class YouTubeSearchException implements Exception {
-  const YouTubeSearchException(this.message);
+  const YouTubeSearchException(this.message, {this.offline = false});
 
   final String message;
+
+  /// Every method failed for want of a network connection.
+  final bool offline;
 
   @override
   String toString() => message;
 }
 
 typedef YouTubeSearchFn = Future<List<YouTubeVideo>> Function(String query);
+typedef YouTubeVideoFn = Future<YouTubeVideo> Function(String videoId);
 typedef YouTubeApiSearchFn = Future<List<YouTubeVideo>> Function(
   String query,
   String apiKey,
@@ -36,10 +41,14 @@ class YouTubeSearch {
     YouTubeSearchFn? newPipe,
     YouTubeSearchFn? explode,
     YouTubeApiSearchFn? api,
+    YouTubeVideoFn? newPipeVideo,
+    YouTubeVideoFn? explodeVideo,
     bool? newPipeAvailable,
   }) : _newPipe = newPipe ?? newPipeSearch,
        _explode = explode ?? _searchWithExplode,
        _api = api ?? _searchWithApi,
+       _newPipeVideo = newPipeVideo ?? _newPipeVideoInfo,
+       _explodeVideo = explodeVideo ?? _videoWithExplode,
        newPipeAvailable = newPipeAvailable ?? (!kIsWeb && Platform.isAndroid);
 
   static const maxResults = 15;
@@ -47,6 +56,8 @@ class YouTubeSearch {
   final YouTubeSearchFn _newPipe;
   final YouTubeSearchFn _explode;
   final YouTubeApiSearchFn _api;
+  final YouTubeVideoFn _newPipeVideo;
+  final YouTubeVideoFn _explodeVideo;
 
   /// NewPipeExtractor is a Java library, so only the Android build has it.
   final bool newPipeAvailable;
@@ -69,6 +80,8 @@ class YouTubeSearch {
       );
     }
     final errors = <String>[];
+    var networkFailures = 0;
+    var otherFailures = 0;
     for (final method in methods) {
       try {
         switch (method) {
@@ -79,10 +92,13 @@ class YouTubeSearch {
           case YouTubeMethod.ytDlpServer:
             // Needs a search endpoint on MusicDatabase's server, which doesn't exist yet.
             errors.add('yt-dlp przez serwer: jeszcze niedostępne');
+            // Not available isn't "offline": leave that to the methods that tried.
+            continue;
           case YouTubeMethod.api:
             final key = settings.apiKey;
             if (key == null) {
               errors.add('API: brak kodu YouTube API');
+              continue;
             } else {
               return await _api(query, key);
             }
@@ -90,11 +106,55 @@ class YouTubeSearch {
       } catch (e) {
         debugPrint('YouTube search (${method.name}) failed: $e');
         errors.add('${_methodName(method)}: ${_describe(e)}');
+        isNetworkError(e) ? networkFailures++ : otherFailures++;
       }
     }
     throw YouTubeSearchException(
       'Nie udało się wyszukać na YouTube (${errors.join('; ')}).',
+      offline: networkFailures > 0 && otherFailures == 0,
     );
+  }
+
+  /// Title, channel and length of one video (to recognise a link opened with the app); NewPipe,
+  /// then youtube_explode, whichever are switched on. Throws [YouTubeSearchException].
+  Future<YouTubeVideo> video(String videoId, SourceSettings settings) async {
+    final errors = <String>[];
+    for (final method in [YouTubeMethod.newPipe, YouTubeMethod.explode]) {
+      if (!settings.methods.contains(method)) continue;
+      if (method == YouTubeMethod.newPipe && !newPipeAvailable) continue;
+      try {
+        return await (method == YouTubeMethod.newPipe
+            ? _newPipeVideo
+            : _explodeVideo)(videoId);
+      } catch (e) {
+        debugPrint('YouTube video info (${method.name}) failed: $e');
+        errors.add('${_methodName(method)}: ${_describe(e)}');
+      }
+    }
+    throw YouTubeSearchException(
+      'Nie udało się odczytać filmu z YouTube'
+      '${errors.isEmpty ? '' : ' (${errors.join('; ')})'}.',
+    );
+  }
+
+  // The constructor's `newPipeVideo` parameter hides newpipe.dart's function of that name.
+  static Future<YouTubeVideo> _newPipeVideoInfo(String videoId) =>
+      newPipeVideo(videoId);
+
+  static Future<YouTubeVideo> _videoWithExplode(String videoId) async {
+    final yt = YoutubeExplode();
+    try {
+      final v = await yt.videos.get(videoId);
+      return YouTubeVideo(
+        id: videoId,
+        title: v.title,
+        channel: v.author,
+        duration: v.duration,
+        viewCount: v.engagement.viewCount,
+      );
+    } finally {
+      yt.close();
+    }
   }
 
   static String _methodName(YouTubeMethod m) => switch (m) {

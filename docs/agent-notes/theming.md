@@ -22,10 +22,10 @@
 
 ## Themes
 
-- **Dummify** (dark, default) — modelled on the reference app (black/grey, green accent, rounded).
+- **Dummify** (dark) — modelled on the reference app (black/grey, green accent, rounded).
 - **Dummify** (light, `dummifyLightTheme`) — white/light grey with near-black text and a darker
   green accent (`#14A04A`, readable as text on white); the only light theme so far.
-- **Lain** — after Serial Experiments Lain fan desktops and retro terminal/HUD UIs (user's Pins
+- **Lain** (dark, the default dark theme — user's choice) — after Serial Experiments Lain fan desktops and retro terminal/HUD UIs (user's Pins
   folder): near-black navy, cyan accent, steel-blue window chrome (`outline`), square corners
   (`rounded: false`), section headings as window title bars with "×" (`panelHeaders: true`), and
   Android's built-in `monospace` font (nothing bundled).

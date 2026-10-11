@@ -2,7 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/source_settings.dart';
+import 'package:music_database_app/src/data/youtube_audio.dart';
+import 'package:music_database_app/src/data/youtube_library.dart';
+import 'package:music_database_app/src/data/youtube_search.dart';
+import 'package:music_database_app/src/playback/playback_queue.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
+import 'package:music_database_app/src/playback/track_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:music_database_app/src/screens/now_playing.dart';
 import 'package:music_database_app/src/theme.dart';
 
@@ -21,6 +28,8 @@ class FakeBackend implements AudioBackend {
   Stream<Duration?> get duration => _duration.stream;
   @override
   Stream<({bool playing, bool completed})> get state => _state.stream;
+  @override
+  Stream<MediaSkip> get skips => const Stream.empty();
 
   @override
   Future<void> open(NowPlaying track) async {
@@ -99,15 +108,31 @@ void main() {
   testWidgets('mini player opens the full player, which controls playback', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues({});
     final backend = FakeBackend();
     final player = PlayerController(backend: () => backend);
     addTearDown(player.dispose);
+    final queue = PlaybackQueue(
+      TrackPlayer(
+        player: player,
+        settings: SourceSettings(),
+        youTubeLibrary: YouTubeLibrary(
+          () => Future.error(StateError('unused')),
+        ),
+        youTubeAudio: YouTubeAudio(newPipeAvailable: false),
+        youTubeSearch: YouTubeSearch(),
+      ),
+    );
+    addTearDown(queue.dispose);
     await tester.pumpWidget(
       PlayerScope(
         notifier: player,
-        child: MaterialApp(
-          theme: buildAppTheme(dummifyTheme),
-          home: const Scaffold(bottomNavigationBar: MiniPlayer()),
+        child: PlaybackQueueScope(
+          notifier: queue,
+          child: MaterialApp(
+            theme: buildAppTheme(dummifyTheme),
+            home: const Scaffold(bottomNavigationBar: MiniPlayer()),
+          ),
         ),
       ),
     );
@@ -128,7 +153,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(player.playing, isFalse);
 
+    // Nothing queued before this song: "Poprzedni" restarts it.
     await tester.tap(find.byTooltip('Poprzedni'));
+    await tester.pump();
     expect(backend.lastSeek, Duration.zero);
 
     await tester.tap(find.byTooltip('Zwiń'));

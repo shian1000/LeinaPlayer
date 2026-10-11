@@ -22,18 +22,23 @@ enum SongAvailability {
 /// One row of the song search: a MusicDatabase song (possibly also on the phone) or a phone-only
 /// song that isn't in MusicDatabase yet.
 class SearchHit {
-  SearchHit.main(CatalogSong song, this.phoneFiles, {this.phoneMatch})
-    : mainSong = song,
-      title = song.title,
-      artistLabel = song.artistLabel,
-      album = song.album,
-      year = song.year;
+  SearchHit.main(
+    CatalogSong song,
+    this.phoneFiles, {
+    this.phoneMatch,
+    this.playlistVideoId,
+  }) : mainSong = song,
+       title = song.title,
+       artistLabel = song.artistLabel,
+       album = song.album,
+       year = song.year;
 
   /// A track known only as a YouTube video (e.g. from an imported playlist).
   SearchHit.youTubeOnly({
     required this.title,
     required this.artistLabel,
     required String videoId,
+    this.playlistVideoId,
   }) : mainSong = null,
        phoneFiles = const [],
        phoneMatch = videoId,
@@ -43,6 +48,7 @@ class SearchHit {
   SearchHit.phoneOnly(LocalSong file)
     : mainSong = null,
       phoneMatch = null,
+      playlistVideoId = null,
       phoneFiles = [file],
       title = file.title,
       artistLabel = file.artist ?? 'Nieznany wykonawca',
@@ -58,12 +64,31 @@ class SearchHit {
   /// music.db has no link for.
   final String? phoneMatch;
 
+  /// This row's video in the YouTube playlist it came from (may differ from music.db's video
+  /// of the song), so YouTube can open the song inside that playlist.
+  final String? playlistVideoId;
+
   final String title;
   final String artistLabel;
   final String? album;
   final int? year;
 
   bool get inMainDatabase => mainSong != null;
+
+  /// The same MusicDatabase song, now with a video the phone found for it.
+  SearchHit withPhoneMatch(String videoId) => SearchHit.main(
+    mainSong!,
+    phoneFiles,
+    phoneMatch: videoId,
+    playlistVideoId: playlistVideoId,
+  );
+
+  /// Seed for the placeholder cover, the same wherever the song is shown.
+  String get coverSeed => mainSong != null
+      ? '${mainSong!.id}'
+      : phoneFiles.isNotEmpty
+      ? phoneFiles.first.filePath
+      : youtubeVideoId ?? title;
 
   /// The video to play: music.db's link, else the one the phone found.
   String? get youtubeVideoId => mainSong?.youtubeVideoId ?? phoneMatch;
@@ -158,11 +183,13 @@ SearchHit playlistHit(
       phoneMatch: song.youtubeVideoId == null
           ? videoId ?? youTube.matchFor(song.id)
           : null,
+      playlistVideoId: videoId,
     );
   }
   return SearchHit.youTubeOnly(
     title: track.title,
     artistLabel: track.artist ?? 'Nieznany wykonawca',
     videoId: videoId ?? '',
+    playlistVideoId: videoId,
   );
 }

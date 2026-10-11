@@ -9,9 +9,14 @@ const _id = 'Menu profilu';
 
 /// Side menu opened from the avatar in the top-left corner of every tab.
 class ProfileDrawer extends StatelessWidget {
-  const ProfileDrawer({super.key, required this.onOpenSettings});
+  const ProfileDrawer({
+    super.key,
+    required this.onOpenSettings,
+    required this.onOpenRecents,
+  });
 
   final VoidCallback onOpenSettings;
+  final VoidCallback onOpenRecents;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +82,7 @@ class ProfileDrawer extends StatelessWidget {
             _DrawerItem(
               icon: Icons.history,
               label: 'Ostatnie',
-              onTap: () => dummy('Ostatnie'),
+              onTap: onOpenRecents,
             ),
             _DrawerItem(
               icon: Icons.campaign_outlined,

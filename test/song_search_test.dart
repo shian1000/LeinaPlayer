@@ -9,7 +9,9 @@ import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_search.dart';
+import 'package:music_database_app/src/playback/playback_queue.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
+import 'package:music_database_app/src/playback/track_player.dart';
 import 'package:music_database_app/src/screens/song_search_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +29,8 @@ class _FakeBackend implements AudioBackend {
   Stream<Duration?> get duration => const Stream.empty();
   @override
   Stream<({bool playing, bool completed})> get state => const Stream.empty();
+  @override
+  Stream<MediaSkip> get skips => const Stream.empty();
   @override
   Future<void> open(NowPlaying track) async => opened.add(track.source);
 
@@ -52,6 +56,7 @@ void main() {
   late PlayerController player;
   late List<String> searches;
   late _FakeBackend backend;
+  late PlaybackQueue queue;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -59,6 +64,7 @@ void main() {
   });
 
   tearDown(() async {
+    queue.dispose();
     player.dispose();
     youTubeLibrary.dispose();
     library.dispose();
@@ -105,6 +111,30 @@ void main() {
         ];
       },
     );
+    final audio = YouTubeAudio(
+      newPipeAvailable: true,
+      newPipe: (id) async => [
+        YouTubeAudioStream(
+          url: 'https://stream.test/$id/140',
+          itag: 140,
+          bitrate: 128,
+        ),
+        YouTubeAudioStream(
+          url: 'https://stream.test/$id/251',
+          itag: 251,
+          bitrate: 160,
+        ),
+      ],
+    );
+    queue = PlaybackQueue(
+      TrackPlayer(
+        player: player,
+        settings: settings,
+        youTubeLibrary: youTubeLibrary,
+        youTubeAudio: audio,
+        youTubeSearch: search,
+      ),
+    );
     await tester.pumpWidget(
       DatabaseSyncScope(
         notifier: sync,
@@ -116,29 +146,18 @@ void main() {
               notifier: youTubeLibrary,
               child: PlayerScope(
                 notifier: player,
-                child: SourceSettingsScope(
-                  notifier: settings,
-                  child: YouTubeScope(
-                    search: search,
-                    playlists: YouTubePlaylists(),
-                    audio: YouTubeAudio(
-                      newPipeAvailable: true,
-                      newPipe: (id) async => [
-                        YouTubeAudioStream(
-                          url: 'https://stream.test/$id/140',
-                          itag: 140,
-                          bitrate: 128,
-                        ),
-                        YouTubeAudioStream(
-                          url: 'https://stream.test/$id/251',
-                          itag: 251,
-                          bitrate: 160,
-                        ),
-                      ],
-                    ),
-                    child: MaterialApp(
-                      theme: buildAppTheme(dummifyTheme),
-                      home: const SongSearchScreen(),
+                child: PlaybackQueueScope(
+                  notifier: queue,
+                  child: SourceSettingsScope(
+                    notifier: settings,
+                    child: YouTubeScope(
+                      search: search,
+                      playlists: YouTubePlaylists(),
+                      audio: audio,
+                      child: MaterialApp(
+                        theme: buildAppTheme(dummifyTheme),
+                        home: const SongSearchScreen(),
+                      ),
                     ),
                   ),
                 ),
