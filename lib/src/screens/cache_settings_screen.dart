@@ -16,7 +16,8 @@ int cacheBytesOf(BuildContext context) =>
     (AlbumCoversScope.maybeOf(context)?.cachedBytes ?? 0);
 
 /// "Ustawienia › Oszczędzanie danych i tryb offline › Pamięć podręczna": every cache setting in
-/// one place — YouTube songs, the queue's songs downloaded ahead, album covers.
+/// one place — YouTube songs, the queue's songs downloaded ahead, what the phone found out on
+/// YouTube itself, album covers.
 class CacheSettingsScreen extends StatefulWidget {
   const CacheSettingsScreen({super.key});
 
@@ -27,7 +28,11 @@ class CacheSettingsScreen extends StatefulWidget {
 class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
   static const _coverLimits = [25, 50, 100, 200, 500];
 
-  Future<bool> _confirm(String title, String text) async =>
+  Future<bool> _confirm(
+    String title,
+    String text, {
+    String action = 'Wyczyść',
+  }) async =>
       await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -40,7 +45,7 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Wyczyść'),
+              child: Text(action),
             ),
           ],
         ),
@@ -83,6 +88,34 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
     }
     await library.clearCache();
     _done('Wyczyszczono utwory z YouTube.');
+  }
+
+  Future<void> _forgetMatches() async {
+    final library = YouTubeLibraryScope.of(context);
+    if (!await _confirm(
+      'Zapomnieć filmy dopasowane przez telefon?',
+      'Utwory, do których telefon sam znalazł film na YouTube, zostaną przy następnym '
+          'odtworzeniu wyszukane od nowa. Linki z bazy danych zostają.',
+      action: 'Zapomnij',
+    )) {
+      return;
+    }
+    await library.forgetPhoneMatches();
+    _done('Zapomniano filmy dopasowane przez telefon.');
+  }
+
+  Future<void> _forgetNotFound() async {
+    final library = YouTubeLibraryScope.of(context);
+    if (!await _confirm(
+      'Zapomnieć „nie znaleziono na YouTube”?',
+      'Telefon poszuka tych utworów na YouTube ponownie, także w kolejce. Oznaczenia N/A z '
+          'bazy danych zostają.',
+      action: 'Zapomnij',
+    )) {
+      return;
+    }
+    await library.forgetNotFound();
+    _done('Zapomniano utwory nieznalezione na YouTube.');
   }
 
   Future<void> _pickPrefetch(SourceSettings settings) async {
@@ -239,6 +272,37 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
             title: const Text('Ile następnych utworów'),
             subtitle: Text(_nextSongs(settings.queuePrefetch)),
             onTap: () => _pickPrefetch(settings),
+          ),
+          const SectionTitle('Dopasowania z YouTube'),
+          ListTile(
+            enabled: library.phoneMatchCount > 0,
+            leading: const Icon(Icons.youtube_searched_for),
+            title: const Text('Zapomnij filmy dopasowane przez telefon'),
+            subtitle: Text(
+              '${library.phoneMatchCount} ${_songs(library.phoneMatchCount)} — '
+              'zostaną wyszukane od nowa',
+            ),
+            onTap: _forgetMatches,
+          ),
+          ListTile(
+            enabled: library.notFoundCount > 0,
+            leading: const Icon(Icons.search_off),
+            title: const Text('Zapomnij „nie znaleziono na YouTube”'),
+            subtitle: Text(
+              '${library.notFoundCount} ${_songs(library.notFoundCount)} — '
+              'telefon poszuka ich ponownie',
+            ),
+            onTap: _forgetNotFound,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(
+              'Przydatne po zmianie sposobu wyszukiwania. Po każdym pobraniu bazy danych '
+              'telefon sam zapomina to, co baza już rozstrzyga (link do filmu albo N/A). '
+              '„Nie znaleziono” wygasa też samo po '
+              '${YouTubeLibrary.notFoundFor.inDays} dniach.',
+              style: hint,
+            ),
           ),
           if (covers != null) ...[
             const SectionTitle('Okładki'),

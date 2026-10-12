@@ -31,7 +31,7 @@ const _entries = [
   _SettingsEntry(
     Icons.library_music_outlined,
     'Źródła muzyki',
-    'Muzyka lokalna • YouTube • Kolejność odtwarzania',
+    'Muzyka lokalna • YouTube • Spotify • Kolejność odtwarzania',
     opens: _openMusicSources,
   ),
   _SettingsEntry(

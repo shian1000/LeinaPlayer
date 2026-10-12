@@ -5,10 +5,12 @@ import '../theme.dart';
 import 'database_source_screen.dart';
 import 'local_music_screen.dart';
 import 'playback_order_screen.dart';
+import 'spotify_source_screen.dart';
 import 'youtube_source_screen.dart';
 
 /// "Ustawienia › Źródła muzyki" — where the app gets music from: folders on the device and the
-/// MusicDatabase database downloaded from a server, YouTube, and which of them plays first.
+/// MusicDatabase database downloaded from a server, YouTube, Spotify (playlists only), and which
+/// of them plays first.
 /// (Caching the queue's next songs is in Oszczędzanie danych › Pamięć podręczna.)
 class MusicSourcesScreen extends StatelessWidget {
   const MusicSourcesScreen({super.key});
@@ -53,6 +55,17 @@ class MusicSourcesScreen extends StatelessWidget {
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const YouTubeSourceScreen(),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.graphic_eq),
+            title: const Text('Spotify'),
+            subtitle: const Text('Importowanie playlist ze Spotify'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SpotifySourceScreen(),
               ),
             ),
           ),

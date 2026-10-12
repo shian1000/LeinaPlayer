@@ -22,8 +22,10 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   Importuj playlistę (or updated, if imported before) and opened in Biblioteka; a video link
   (`watch?v=`, `youtu.be/`, `shorts/`, also with `&list=`) is recognised as a MusicDatabase song
   where possible (`video_link.dart`: music.db's link, a phone match, then the video's title) and
-  played from the first source in "Kolejność odtwarzania", in the full player. Not a YouTube link →
-  a message. On Android 12+ YouTube links reach the app only after the user allows it (see
+  played from the first source in "Kolejność odtwarzania", in the full player. A Spotify playlist
+  link (`open.spotify.com/playlist/…`, `spotify.link/…`) is imported and opened the same way; other
+  Spotify links (tracks, albums) and anything else → a message. Only YouTube links can be *opened*
+  with the app; Spotify ones arrive through "Udostępnij". On Android 12+ YouTube links reach the app only after the user allows it (see
   Informacje i pomoc).
 
 ## Player (`lib/src/screens/now_playing.dart`, `lib/src/playback/player_controller.dart`)
@@ -55,8 +57,10 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     song ends the next one plays, skipping songs that can't be played (without opening the
     YouTube app). After each song starts, the next N songs in play order are cached (see
     Oszczędzanie danych › Pamięć podręczna › Kolejka).
-  - `Odtwarzacz › Urządzenia`, `Odtwarzacz › Udostępnij`, Kolejka **→ Kolejka**
-    (`queue_screen.dart`) — **implemented**: "Teraz odtwarzane", "Następne w kolejce" (added
+  - `Odtwarzacz › Urządzenia`, Udostępnij (**→ Udostępnij utwór**, see below; IDs
+    `Odtwarzacz › Udostępnij › …`), Kolejka **→ Kolejka**
+    (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
+    e.g. by caching ahead): "Teraz odtwarzane", "Następne w kolejce" (added
     songs, with "Wyczyść kolejkę"), "Następne z: <playlist / search>" (the rest in play order),
     each row with "Usuń z kolejki" (⊖); tapping a row plays it (added songs before it are
     dropped, context songs before it count as played). "Losowo: wł./wył." at the bottom.
@@ -148,6 +152,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     from an imported one — or the browser without it, and pauses this app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
 
     The cache of played songs is in Oszczędzanie danych › Pamięć podręczna.
+  - Spotify **→ Spotify** (`spotify_source_screen.dart`) — section *Importowanie playlist*:
+    `Ustawienia › Źródła muzyki › Spotify › Spotify API` (dummy — the place for a Spotify app key,
+    to read whole playlists instead of the embed page's first 100 tracks), and a note on that
+    limit. Spotify is not a playback source.
   - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
     reorder the playback sources (default: 1. Telefon, 2. YouTube). When a song is playable
     from several, the first one in this order is used.
@@ -205,6 +213,12 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     would play from YouTube; a song without a known video is searched and matched first (the
     match is remembered, so playing it later doesn't search again). The cache then keeps at
     least N + 2 songs, whatever "Liczba utworów" says (`SourceSettings.cacheKeep`).
+  - *Dopasowania z YouTube* — "Zapomnij filmy dopasowane przez telefon" ("N utworów — zostaną
+    wyszukane od nowa"; `youtube_matches` + `youtube_track_matches`) and "Zapomnij „nie
+    znaleziono na YouTube”" (`youtube_not_found`), each with a confirm dialog ("Zapomnij") and
+    disabled at 0; links and N/A from the database stay. Meant for when a better search method
+    arrives. A note says the phone also forgets on its own what each new `music.db` settles,
+    and that "nie znaleziono" expires after 30 days.
   - *Okładki* — "Rozmiar" (dialog: 25 / 50 / 100 — default / 200 / 500 MB), "Wyczyść okładki"
     (MB used and image count; confirm dialog).
   - "Wyczyść wszystko" — YouTube songs and covers (confirm dialog; the downloaded database and
@@ -246,7 +260,8 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     it isn't in MusicDatabase yet), and YouTube: full when MusicDatabase stores the song's
     `youtube_video_id` or the phone found a video itself, dimmed when neither (phone-only songs
     too), none when it's
-    marked "N/A" (no video on YouTube). All use the theme's secondary text colour. Hidden icons
+    marked "N/A" (no video on YouTube) or the phone searched YouTube in the last 30 days and found
+    nothing (`youtube_not_found`; tapping the song searches again, the queue skips it). All use the theme's secondary text colour. Hidden icons
     keep their slot so the column lines up.
   - Results are "Dostępne" (a phone file, pending or not, or a stored YouTube video),
     "Potencjalnie dostępne" (dimmed YouTube icon, not on the phone) or "Niedostępne"
@@ -271,7 +286,15 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     like a song with a stored link.
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
     <pozycja>`: Dodaj do kolejki (**implemented**), `Dodaj do playlisty`, `Przejdź do albumu`,
-    `Przejdź do wykonawców`, `Udostępnij`.
+    `Przejdź do wykonawców`, Udostępnij (**→ Udostępnij utwór**, below). The same ⋮ is used in
+    Ostatnie (`Ostatnie › Utwór › Menu (⋮)`).
+  - **Udostępnij utwór** (`showSongShareSheet` in `share_sheet.dart`; also from the playlist
+    track ⋮ and the full player): a card with the song's cover, title and artist over four round
+    buttons — `<prefix> › Udostępnij › Leina Radio` (dummy), YouTube (**implemented**: the
+    song's video link — music.db's, else one the phone found or the playlist's — to the phone's
+    share sheet), Spotify (**implemented**: the track link — MusicDatabase's `spotify_url` when
+    it's a track page, else the Spotify playlist's track), `<prefix> › Udostępnij › MP3` (dummy).
+    YouTube/Spotify without a link are dimmed; tapping one says why.
 - `Wyszukaj › Odkryj coś nowego › <#tag>` (`#polskie indie`, `#mod rock`, `#dance rock`)
 - `Wyszukaj › Kategoria: <nazwa>` — grid "Przeglądaj wszystko"; full list in
   `searchCategories` in `lib/src/sample_content.dart`.
@@ -301,8 +324,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   through the whole playlist from it. Back (arrow or system) closes the search first — it's a
   local history entry of the route — and returns to the playlist where it was.
 - Header: 2×2 mosaic of the first four tracks' covers (one cover with fewer tracks), name, owner
-  avatar + name (the YouTube channel), "N utworów • X godz. Y min" (sum of the known lengths).
-- Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: `Udostępnij`, **`Usuń z
+  avatar + name (the YouTube channel / Spotify user; "YouTube"/"Spotify" when unknown), source icon
+  (YouTube / Spotify) + "N utworów • X godz. Y min" (sum of the known lengths).
+- Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: **Udostępnij** (implemented, the
+  same sheet as the icon below), **`Usuń z
   Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), `Dodaj do tej
   playlisty`, `Edytuj playlistę`, **Wyświetl utwory, których nie ma w bazie danych**
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
@@ -310,7 +335,11 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   playlist's — tapping plays on through the playlist from there; a note instead when music.db
   isn't downloaded; later the place to ask MusicDatabase to add them), `Dodaj do innej playlisty`, `Przenieś do folderu`, `Pokaż kod
   playlisty`.
-- `Playlista › Pobierz (ikona)`, `Playlista › Udostępnij (ikona)`, Odtwarzanie losowe
+- `Playlista › Pobierz (ikona)`, Udostępnij (ikona, **implemented → Udostępnij sheet**,
+  `share_sheet.dart`: a card with the playlist's mosaic, name and "Playlista • <owner>" over three
+  round buttons — Kopiuj link, Otwórz w YouTube/Spotify, Więcej (the phone's share sheet). The
+  link is the playlist's page where it was imported from: `youtube.com/playlist?list=…` or
+  `open.spotify.com/playlist/…`), Odtwarzanie losowe
   (**implemented**: queues the playlist shuffled, from a random track), Odtwórz playlistę
   (**implemented**: queues the playlist from its first track, shuffle off),
   `Playlista › Dodaj (do tej playlisty)` / `Edytuj (playlistę)` / `Sortuj (playlistę)`.
@@ -318,10 +347,13 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   source icons) but with just the artist under the title, plus a ⋮. Tapping queues the whole
   playlist at that track and plays it like in search (phone file / YouTube in the user's order);
   the full player says "Odtwarzanie z playlisty <name>". A recognised track is its MusicDatabase song (database icon, phone icon if the file is
-  on the phone); every track has its YouTube video, so the YouTube icon is full. Opening the
+  on the phone); every YouTube-imported track has its video, so the YouTube icon is full; an
+  unrecognised Spotify track has none (empty icon) and is searched on YouTube when played; the
+  video found is remembered (full icon from then on). Opening the
   playlist that's playing jumps to the song playing, third row under the app bar (as far as the
   list can scroll; `PlaybackQueue.currentContextIndex`).
-- Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: `Udostępnij`, `Dodaj do
+- Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: Udostępnij (**→
+  Udostępnij utwór**, see search), `Dodaj do
   Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`, Dodaj do kolejki
   (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
 
@@ -332,10 +364,14 @@ Opened from the bottom-nav tab (prefix `Utwórz`) or the Library "+" (prefix
 
 - Playlista **→ sheet** (`playlist_import.dart`):
   - `… › Playlista › Utwórz nową playlistę` (dummy)
-  - Importuj playlistę **→ dialog** for a YouTube playlist link (or bare id; anything without
-    `list=` is refused in the dialog), then "Importuję playlistę…" and a snackbar
+  - Importuj playlistę **→ dialog** for a YouTube playlist link (or bare id) or a Spotify one
+    (`open.spotify.com/playlist/…`, `spotify:playlist:…`, `spotify.link/…`; anything else is
+    refused in the dialog), then "Importuję playlistę…" and a snackbar
     "Zaimportowano/Zaktualizowano „<name>”: N utw., w bazie danych M." The playlist appears in
-    Biblioteka. Importing the same playlist again replaces its tracks.
+    Biblioteka. Importing the same playlist again replaces its tracks; YouTube tracks whose
+    video YouTube removed stay (dimmed YouTube icon, searched again when played), and the
+    snackbar adds "YouTube usunął N utw. — zostały na liście i zostaną wyszukane od nowa." Spotify: at most 100
+    tracks; the snackbar then adds "Spotify pokazuje bez logowania tylko pierwsze 100 z N."
 - `… › Współtworzone playlisty`
 - `… › Blend`
 

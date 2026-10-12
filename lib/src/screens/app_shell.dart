@@ -7,6 +7,7 @@ import '../data/incoming_links.dart';
 import '../data/local_library.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
+import '../data/spotify_playlist.dart';
 import '../data/video_link.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
@@ -47,7 +48,7 @@ const _createTabIndex = 3;
 class AppShell extends StatefulWidget {
   const AppShell({super.key, this.links});
 
-  /// YouTube links shared to the app or opened with it ([IncomingLinks]).
+  /// YouTube and Spotify links shared to the app or opened with it ([IncomingLinks]).
   final Stream<String>? links;
 
   static AppShellState of(BuildContext context) =>
@@ -78,33 +79,51 @@ class AppShellState extends State<AppShell> {
     super.dispose();
   }
 
-  /// A playlist link is imported and opened in Biblioteka; a video link is played (recognised
-  /// as a MusicDatabase song where possible) in the full player.
+  /// A playlist link (YouTube or Spotify) is imported and opened in Biblioteka; a YouTube video
+  /// link is played (recognised as a MusicDatabase song where possible) in the full player.
   Future<void> _onLink(String text) async {
-    final link = parseYouTubeLink(text);
     // Whatever was open (a sheet, a dialog, the full player) gives way to the link.
     Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    if (text.contains('spotify')) {
+      if (extractSpotifyPlaylistId(text) != null ||
+          findSpotifyShortLink(text) != null) {
+        return _importAndOpen(text);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ze Spotify można tu otworzyć tylko playlistę.'),
+        ),
+      );
+      return;
+    }
+    final link = parseYouTubeLink(text);
     switch (link) {
       case null:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('To nie jest link do filmu ani playlisty z YouTube.'),
+            content: Text(
+              'To nie jest link do filmu ani playlisty z YouTube ani do playlisty ze Spotify.',
+            ),
           ),
         );
       case YouTubePlaylistLink(:final listId):
-        final playlist = await runPlaylistImport(context, listId);
-        if (playlist == null || !mounted) return;
-        setState(() => _currentTab = _libraryTabIndex);
-        final library = _navigatorKeys[_libraryTabIndex].currentState!;
-        library.popUntil((r) => r.isFirst);
-        library.push(
-          MaterialPageRoute<void>(
-            builder: (_) => PlaylistScreen(playlist: playlist),
-          ),
-        );
+        await _importAndOpen(listId);
       case YouTubeVideoLink():
         await _playVideo(link);
     }
+  }
+
+  Future<void> _importAndOpen(String link) async {
+    final playlist = await runPlaylistImport(context, link);
+    if (playlist == null || !mounted) return;
+    setState(() => _currentTab = _libraryTabIndex);
+    final library = _navigatorKeys[_libraryTabIndex].currentState!;
+    library.popUntil((r) => r.isFirst);
+    library.push(
+      MaterialPageRoute<void>(
+        builder: (_) => PlaylistScreen(playlist: playlist),
+      ),
+    );
   }
 
   Future<void> _playVideo(YouTubeVideoLink link) async {

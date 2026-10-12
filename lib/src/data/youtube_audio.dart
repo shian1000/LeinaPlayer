@@ -38,16 +38,35 @@ class YouTubeAudioStream {
 
 /// Why a YouTube video can't be played; [message] is shown to the user as is.
 class YouTubeAudioException implements Exception {
-  const YouTubeAudioException(this.message, {this.offline = false});
+  const YouTubeAudioException(
+    this.message, {
+    this.offline = false,
+    this.gone = false,
+  });
 
   final String message;
 
   /// The network couldn't be reached ([isNetworkError]) — worth trying again later.
   final bool offline;
 
+  /// YouTube says the video isn't there any more ([isVideoGone]).
+  final bool gone;
+
   @override
   String toString() => message;
 }
+
+/// Whether [error] means YouTube no longer has the video — removed, made private, or its
+/// channel closed — rather than refusing it here (age, region, payment) or a failure.
+/// NewPipe errors arrive by Java class name (`NewPipeBridge.kt`).
+bool isVideoGone(Object error) => switch (error) {
+  PlatformException(:final code) => const {
+    'ContentNotAvailableException',
+    'PrivateContentException',
+    'AccountTerminatedException',
+  }.contains(code),
+  _ => '$error'.contains('VideoUnavailableException'),
+};
 
 typedef AudioStreamsFn = Future<List<YouTubeAudioStream>> Function(
   String videoId,
@@ -129,8 +148,11 @@ class YouTubeAudio {
     } catch (e) {
       debugPrint('YouTube audio (${method.name}) failed for $videoId: $e');
       throw YouTubeAudioException(
-        '$name: ${e is PlatformException ? e.code : 'błąd'}',
+        isVideoGone(e)
+            ? '$name: filmu nie ma już na YouTube'
+            : '$name: ${e is PlatformException ? e.code : 'błąd'}',
         offline: isNetworkError(e),
+        gone: isVideoGone(e),
       );
     }
   }

@@ -18,8 +18,9 @@ class PlayOutcome {
   const PlayOutcome.played([this.message])
     : played = true,
       external = false,
-      offline = false;
-  const PlayOutcome.failed(this.message, {this.offline = false})
+      offline = false,
+      goneVideo = null;
+  const PlayOutcome.failed(this.message, {this.offline = false, this.goneVideo})
     : played = false,
       external = false;
 
@@ -27,13 +28,17 @@ class PlayOutcome {
   const PlayOutcome.external(this.message)
     : played = true,
       external = true,
-      offline = false;
+      offline = false,
+      goneVideo = null;
 
   final bool played;
   final bool external;
 
   /// Failed for want of a network connection (the song itself may be fine).
   final bool offline;
+
+  /// Failed because YouTube no longer has this video.
+  final String? goneVideo;
   final String? message;
 }
 
@@ -89,6 +94,44 @@ class TrackPlayer {
     void Function(String status)? onStatus,
   }) async {
     hit = _withRememberedVideo(hit);
+    final outcome = await _playOnce(
+      hit,
+      searchQuery: searchQuery,
+      playlistName: playlistName,
+      youTubeListId: youTubeListId,
+      allowExternal: allowExternal,
+      onStatus: onStatus,
+    );
+    final gone = outcome.goneVideo;
+    if (gone == null) return outcome;
+    // MusicDatabase's own link: it's corrected there, the phone doesn't override it.
+    if (hit.mainSong?.youtubeVideoId == gone) {
+      return const PlayOutcome.failed(
+        'Filmu z bazy danych nie ma już na YouTube — popraw link w MusicDatabase.',
+      );
+    }
+    // A playlist's or the phone's own video: forget it and look for another one. Each round
+    // marks one more video, so this ends.
+    await youTubeLibrary.markVideoRemoved(gone);
+    onStatus?.call('Tego filmu nie ma już na YouTube — szukam innego…');
+    return play(
+      hit,
+      searchQuery: searchQuery,
+      playlistName: playlistName,
+      youTubeListId: youTubeListId,
+      allowExternal: allowExternal,
+      onStatus: onStatus,
+    );
+  }
+
+  Future<PlayOutcome> _playOnce(
+    SearchHit hit, {
+    String? searchQuery,
+    String? playlistName,
+    String? youTubeListId,
+    required bool allowExternal,
+    void Function(String status)? onStatus,
+  }) async {
     final source = settings.playbackOrder.where(hit.playableFrom).firstOrNull;
     switch (source) {
       case PlaybackSource.phone:
@@ -120,7 +163,14 @@ class TrackPlayer {
           externalUri: youTubeUri(hit, listId: youTubeListId),
         );
       case null:
-        if (hit.youTube != YouTubeLink.unknown) {
+        // Not found lately: the queue moves on, but a tap (allowExternal) searches again.
+        if (hit.youTube == YouTubeLink.notFound && !allowExternal) {
+          return const PlayOutcome.failed(
+            'Tego utworu nie znaleziono na YouTube — dotknij go, żeby poszukać jeszcze raz.',
+          );
+        }
+        if (hit.youTube != YouTubeLink.unknown &&
+            hit.youTube != YouTubeLink.notFound) {
           return const PlayOutcome.failed(
             'Ten utwór jest niedostępny — nie ma go na telefonie ani na YouTube.',
           );
@@ -175,28 +225,33 @@ class TrackPlayer {
   }
 
   /// The best video for [hit], remembered so the next play uses it (or its cached audio) without
-  /// searching again, and the icon turns full (ADR 0003: kept on the phone only).
+  /// searching again, and the icon turns full (ADR 0003: kept on the phone only). Finding none is
+  /// remembered too ([YouTubeLibrary.saveNotFound]).
   Future<YouTubeVideo?> _findVideo(SearchHit hit) async {
     final target = hit.youTubeTarget;
-    final video = pickYouTubeVideo(
-      target,
-      await youTubeSearch.search(target.query, settings),
-    );
+    final video = pickYouTubeVideo(target, [
+      for (final v in await youTubeSearch.search(target.query, settings))
+        if (!youTubeLibrary.isVideoRemoved(v.id)) v,
+    ]);
     final mainSong = hit.mainSong;
-    if (video != null && mainSong != null) {
-      await youTubeLibrary.saveMatch(mainSong.id, video);
+    if (video != null) {
+      await (mainSong != null
+          ? youTubeLibrary.saveMatch(mainSong.id, video)
+          : youTubeLibrary.saveTrackMatch(hit.artistLabel, hit.title, video));
+    } else {
+      await youTubeLibrary.saveNotFound(
+        mainDbId: mainSong?.id,
+        artist: hit.artistLabel,
+        title: hit.title,
+      );
     }
     return video;
   }
 
-  /// A queue holds its songs as they were when it was filled; a video found for one since then
+  /// A queue holds its songs as they were when it was filled; what was learned on YouTube since
   /// (e.g. while caching ahead) is used instead of searching again.
-  SearchHit _withRememberedVideo(SearchHit hit) {
-    final mainSong = hit.mainSong;
-    if (mainSong == null || hit.youTube != YouTubeLink.unknown) return hit;
-    final videoId = youTubeLibrary.matchFor(mainSong.id);
-    return videoId == null ? hit : hit.withPhoneMatch(videoId);
-  }
+  SearchHit _withRememberedVideo(SearchHit hit) =>
+      withPhoneYouTube(hit, youTubeLibrary);
 
   /// Downloads [hit]'s YouTube audio to the cache ahead of time (Pamięć podręczna › Kolejka), finding
   /// the video first when the phone doesn't know it yet. Does nothing for songs another source
@@ -239,6 +294,13 @@ class TrackPlayer {
         }
       } on YouTubeAudioException catch (e) {
         debugPrint('Caching ahead: ${method.name} for $videoId failed: $e');
+        if (e.gone) {
+          // Found out before it plays: the song is searched again when its turn comes.
+          if (hit.mainSong?.youtubeVideoId != videoId) {
+            await youTubeLibrary.markVideoRemoved(videoId);
+          }
+          return false;
+        }
       }
     }
     return false;
@@ -292,7 +354,11 @@ class TrackPlayer {
             : 'Z YouTube: „${foundVideo.title}” (${foundVideo.channel})',
       );
     } on YouTubePlaybackException catch (e) {
-      return PlayOutcome.failed(e.message, offline: e.offline);
+      return PlayOutcome.failed(
+        e.message,
+        offline: e.offline,
+        goneVideo: e.gone ? videoId : null,
+      );
     }
   }
 }

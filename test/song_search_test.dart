@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'data/fixtures.dart';
+import 'support/waiting.dart';
 
 /// Audio backend that only records what was opened.
 class _FakeBackend implements AudioBackend {
@@ -170,14 +171,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// Lets real file/SQLite work started by a tap (the YouTube cache) finish, then settles.
-  Future<void> settle(WidgetTester tester) async {
-    for (var i = 0; i < 20; i++) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
-      );
-      await tester.pumpAndSettle();
-    }
+  /// Lets real file/SQLite work started by a tap (searching, the YouTube cache) run until
+  /// [until] holds, then settles.
+  Future<void> settle(
+    WidgetTester tester, {
+    required bool Function() until,
+  }) async {
+    await pumpUntil(tester, until);
+    await tester.pumpAndSettle();
   }
 
   /// The result row titled [title] (the search field holds the same text).
@@ -223,7 +224,7 @@ void main() {
     expect(find.text('Kanał • 3:05'), findsOneWidget);
 
     await tester.tap(find.text('California (Official Video)'));
-    await settle(tester);
+    await settle(tester, until: () => backend.opened.isNotEmpty);
     expect(backend.opened, ['https://stream.test/vid1/251']);
 
     // A changed query drops the results that belonged to the old one.
@@ -247,7 +248,7 @@ void main() {
       await tester.showKeyboard(find.byType(TextField));
       expect(tester.testTextInput.isVisible, isTrue);
       await tester.tap(row('Małomiasteczkowy'));
-      await settle(tester);
+      await settle(tester, until: () => backend.opened.isNotEmpty);
       // Choosing a song hides the keyboard.
       expect(tester.testTextInput.isVisible, isFalse);
       // Stored link: plays the video's Opus stream (itag 251) found through NewPipe.
@@ -257,7 +258,10 @@ void main() {
 
       await type(tester, 'Going to California');
       await tester.tap(row('Going to California'));
-      await settle(tester);
+      await settle(
+        tester,
+        until: () => find.textContaining('Z YouTube:').evaluate().isNotEmpty,
+      );
       // No stored link: searched by main artist + title, the best-scoring result is played.
       expect(searches, ['Led Zeppelin Going to California']);
       expect(backend.opened.last, 'https://stream.test/vid1/251');
@@ -278,7 +282,11 @@ void main() {
       await type(tester, 'Going to California');
       expect(find.byTooltip('Do wyszukania na YouTube'), findsOneWidget);
       await tester.tap(row('Going to California'));
-      await settle(tester);
+      await settle(
+        tester,
+        until: () =>
+            youTubeLibrary.matchFor(2) != null && backend.opened.isNotEmpty,
+      );
       expect(searches, hasLength(1));
       expect(youTubeLibrary.matchFor(2), 'vid1');
       expect(
@@ -298,8 +306,9 @@ void main() {
       expect(youTubeLibrary.cachedCount, 1);
 
       // Second tap: no new search, played from the file.
+      final playedBefore = backend.opened.length;
       await tester.tap(row('Going to California'));
-      await settle(tester);
+      await settle(tester, until: () => backend.opened.length > playedBefore);
       expect(searches, hasLength(1));
       expect(backend.opened.last, saved);
     },

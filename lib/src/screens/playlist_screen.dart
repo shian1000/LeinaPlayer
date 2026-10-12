@@ -14,6 +14,7 @@ import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/share_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_tile.dart';
 import 'missing_tracks_screen.dart';
@@ -139,7 +140,35 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   }
 
   PlaylistSummary get _playlist => widget.playlist;
-  String get _owner => _playlist.owner ?? 'YouTube';
+  bool get _fromSpotify => _playlist.source == PlaylistSource.spotify;
+  String get _owner =>
+      _playlist.owner ?? (_fromSpotify ? 'Spotify' : 'YouTube');
+
+  /// Shares the playlist's own page where it was imported from — the phone's copy has no link.
+  void _share(List<SearchHit> hits) {
+    final link = _playlist.link;
+    if (link == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ta playlista jest tylko na telefonie — nie ma linku.'),
+        ),
+      );
+      return;
+    }
+    showLinkShareSheet(
+      context,
+      link: link,
+      target: _fromSpotify ? ShareTarget.spotify : ShareTarget.youtube,
+      title: _playlist.name,
+      subtitle: 'Playlista • $_owner',
+      cover: _Mosaic(
+        covers: [for (final hit in hits.take(4)) CoverRequest.of(hit)],
+        fallback: _playlist.name,
+        size: 160,
+      ),
+      tint: context.palette.colorForSeed(_playlist.name),
+    );
+  }
 
   Future<void> _delete() async {
     final library = PlaylistLibraryScope.of(context);
@@ -180,7 +209,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
-  void _showPlaylistMenu() {
+  void _showPlaylistMenu(List<SearchHit> hits) {
     showMenuSheet(
       context,
       idPrefix: '$_id › Menu (⋮)',
@@ -190,7 +219,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         subtitle: 'Playlista • $_owner',
       ),
       entries: [
-        const MenuSheetEntry(Icons.share_outlined, 'Udostępnij'),
+        MenuSheetEntry(
+          Icons.share_outlined,
+          'Udostępnij',
+          onTap: () => _share(hits),
+        ),
         MenuSheetEntry(Icons.check_circle, 'Usuń z Biblioteki', onTap: _delete),
         const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
         const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),
@@ -219,7 +252,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         subtitle: hit.artistLabel,
       ),
       entries: [
-        const MenuSheetEntry(Icons.share_outlined, 'Udostępnij'),
+        MenuSheetEntry(
+          Icons.share_outlined,
+          'Udostępnij',
+          onTap: () => showSongShareSheet(
+            context,
+            hit,
+            idPrefix: '$_id › Utwór › Menu (⋮)',
+          ),
+        ),
         const MenuSheetEntry(
           Icons.add_circle_outline,
           'Dodaj do Polubionych utworów',
@@ -371,7 +412,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 IconButton(
                   tooltip: 'Menu playlisty (⋮)',
                   icon: const Icon(Icons.more_vert),
-                  onPressed: _showPlaylistMenu,
+                  onPressed: () => _showPlaylistMenu(hits),
                 ),
               ],
             ),
@@ -445,7 +486,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     Row(
                       children: [
                         Icon(
-                          Icons.smart_display_outlined,
+                          _fromSpotify
+                              ? Icons.graphic_eq
+                              : Icons.smart_display_outlined,
                           size: 18,
                           color: palette.textSecondary,
                         ),
@@ -478,7 +521,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     IconButton(
                       tooltip: 'Udostępnij',
                       icon: const Icon(Icons.share_outlined, size: 28),
-                      onPressed: () => dummy('Udostępnij (ikona)'),
+                      onPressed: () => _share(hits),
                     ),
                     const Spacer(),
                     IconButton(

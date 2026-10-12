@@ -59,11 +59,34 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   after many requests for the same video from one IP) while a freshly resolved address works:
   `YouTubePlayback` resolves and tries once more before giving up. Test with varied videos.
 
-## What the phone remembers (`youtube_library.dart`, tables in `local.db` v2)
+## What the phone remembers (`youtube_library.dart`, tables in `local.db` v2, v6, v7)
 
 - `youtube_matches` (`main_db_id` → `video_id`): videos the phone matched itself. Kept after the
   file leaves the cache; `SearchHit.youtubeVideoId` prefers music.db's own link. Never sent back
   to MusicDatabase (ADR 0003).
+- `youtube_track_matches` (v6): the same for tracks that aren't MusicDatabase songs (Spotify
+  playlists), keyed by normalised artist + title — see [`playlists.md`](playlists.md).
+- `youtube_not_found` (v7): a search that found no sure match (`TrackPlayer._findVideo`; a failed
+  search — offline, errors — doesn't count). Gives `YouTubeLink.notFound`: no YouTube icon, the
+  queue and caching ahead skip the song without searching, but a **tap** (`allowExternal`)
+  searches again. Expires after `YouTubeLibrary.notFoundFor` (30 days — the video may be
+  uploaded later); a found video clears it. Keyed `db:<id>` or `track:<artist>\n<title>`.
+- `youtube_removed_videos` (v10): videos YouTube no longer has — see
+  [`playlists.md`](playlists.md) ("Videos YouTube removed"). `withPhoneYouTube` drops such a
+  video from a row unless it's music.db's own link.
+- **Server values win, phone values fill gaps** (user agreed): a music.db link or "N/A" always
+  beats anything the phone found. So after each new `music.db` is loaded,
+  `YouTubeLibrary.forgetSettled` (called from `main.dart`, `_forgetSettledMatches`, once per
+  download) deletes `youtube_matches` / `db:` not-found rows of songs music.db now settles — or no
+  longer has. Name-keyed track entries (Spotify) aren't touched: they have no song id.
+  Pamięć podręczna › *Dopasowania z YouTube* forgets all phone matches or all not-founds by hand
+  (`forgetPhoneMatches`, `forgetNotFound`), to re-search with a better method. Cached audio
+  isn't deleted with them. Expired not-found rows are deleted on load.
+- Rows are made once (a queue keeps its songs as they were, a playlist screen builds them on
+  load), so `withPhoneYouTube()` (`combined_search.dart`) re-applies all of the above wherever a
+  row is shown or played: `playlistHit`, `resolveTrack`, `searchEverywhere`, the Kolejka screen
+  and `TrackPlayer`. Showing a stored row without it gives stale icons (the Kolejka bug: videos
+  found by caching ahead didn't show there).
 - `youtube_cache` + files in `<support dir>/youtube_cache/<id>.webm|m4a`: up to
   `SourceSettings.cacheLimit` (default 25), least recently played deleted first. `.part` files
   left by interrupted downloads are deleted on start.

@@ -22,13 +22,20 @@ enum YouTubePlayedVia {
 
 /// Why no switched-on method could play a video; [message] is shown to the user as is.
 class YouTubePlaybackException implements Exception {
-  const YouTubePlaybackException(this.message, {this.offline = false});
+  const YouTubePlaybackException(
+    this.message, {
+    this.offline = false,
+    this.gone = false,
+  });
 
   final String message;
 
   /// A streaming method failed for want of a network connection, so trying again later may
   /// work (unlike a video YouTube refuses).
   final bool offline;
+
+  /// YouTube no longer has the video, so no method will play it.
+  final bool gone;
 
   @override
   String toString() => message;
@@ -139,6 +146,13 @@ class YouTubePlayback {
                 );
               }
             } on YouTubeAudioException catch (e) {
+              // Gone for every method — and not worth opening in the YouTube app either.
+              if (e.gone) {
+                throw const YouTubePlaybackException(
+                  'Tego filmu nie ma już na YouTube.',
+                  gone: true,
+                );
+              }
               errors.add(e.message);
               offline |= e.offline;
               break;

@@ -15,6 +15,8 @@ import 'package:music_database_app/src/widgets/song_cover.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../support/waiting.dart';
+
 void main() {
   sqfliteFfiInit();
 
@@ -91,16 +93,7 @@ void main() {
 
   /// Real decoding and the filter's isolate need real time.
   Future<void> waitForCover(WidgetTester tester) async {
-    for (
-      var i = 0;
-      i < 100 && find.byType(CoverArt).evaluate().isNotEmpty;
-      i++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 20)),
-      );
-      await tester.pump();
-    }
+    await pumpUntil(tester, () => find.byType(CoverArt).evaluate().isEmpty);
     expect(find.byType(CoverArt), findsNothing);
   }
 

@@ -8,6 +8,7 @@ import '../playback/track_player.dart';
 import '../theme.dart';
 import 'menu_sheet.dart';
 import 'playing_bars.dart';
+import 'share_sheet.dart';
 import '../data/album_covers.dart';
 import 'song_cover.dart';
 
@@ -258,10 +259,13 @@ class SourceIcons extends StatelessWidget {
               ],
             ),
           ),
-          // Full: MusicDatabase has the video. Dimmed: it doesn't, but searching YouTube may find
-          // it. None: marked in MusicDatabase as not on YouTube.
+          // Full: MusicDatabase (or the phone) has the video. Dimmed: it doesn't, but searching
+          // YouTube may find it. None: marked in MusicDatabase as not on YouTube, or the phone
+          // searched lately and found nothing.
           slot(
-            visible: hit.youTube != YouTubeLink.notOnYouTube,
+            visible:
+                hit.youTube != YouTubeLink.notOnYouTube &&
+                hit.youTube != YouTubeLink.notFound,
             tooltip: hit.youTube != YouTubeLink.linked
                 ? 'Do wyszukania na YouTube'
                 : hit.phoneMatch != null
@@ -313,7 +317,11 @@ class SongMenuButton extends StatelessWidget {
           const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
           const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
           const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
-          const MenuSheetEntry(Icons.share_outlined, 'Udostępnij'),
+          MenuSheetEntry(
+            Icons.share_outlined,
+            'Udostępnij',
+            onTap: () => showSongShareSheet(context, hit, idPrefix: idPrefix),
+          ),
         ],
       );
     },

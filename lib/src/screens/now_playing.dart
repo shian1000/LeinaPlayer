@@ -10,6 +10,7 @@ import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/share_sheet.dart';
 import '../widgets/song_cover.dart';
 import 'queue_screen.dart';
 
@@ -479,7 +480,13 @@ class NowPlayingScreen extends StatelessWidget {
                       IconButton(
                         tooltip: 'Udostępnij',
                         icon: const Icon(Icons.share_outlined),
-                        onPressed: () => dummy('Udostępnij'),
+                        onPressed: queue.current == null
+                            ? null
+                            : () => showSongShareSheet(
+                                context,
+                                queue.current!,
+                                idPrefix: _id,
+                              ),
                       ),
                       IconButton(
                         tooltip: 'Kolejka',

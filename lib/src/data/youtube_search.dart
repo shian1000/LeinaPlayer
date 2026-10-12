@@ -8,6 +8,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'network_errors.dart';
 import 'newpipe.dart';
 import 'source_settings.dart';
+import 'spotify_playlist.dart';
 import 'youtube_audio.dart';
 import 'youtube_playlist.dart';
 import 'youtube_video.dart';
@@ -135,6 +136,27 @@ class YouTubeSearch {
       'Nie udało się odczytać filmu z YouTube'
       '${errors.isEmpty ? '' : ' (${errors.join('; ')})'}.',
     );
+  }
+
+  /// Whether [videoId] is still on YouTube: `false` when a method says it's gone
+  /// ([isVideoGone]: removed, private), `null` when it couldn't be told (no connection, another
+  /// error, no method on).
+  Future<bool?> videoExists(String videoId, SourceSettings settings) async {
+    var answered = false;
+    for (final method in [YouTubeMethod.newPipe, YouTubeMethod.explode]) {
+      if (!settings.methods.contains(method)) continue;
+      if (method == YouTubeMethod.newPipe && !newPipeAvailable) continue;
+      try {
+        await (method == YouTubeMethod.newPipe ? _newPipeVideo : _explodeVideo)(
+          videoId,
+        );
+        return true;
+      } catch (e) {
+        debugPrint('Checking video $videoId (${method.name}): $e');
+        if (isVideoGone(e)) answered = true;
+      }
+    }
+    return answered ? false : null;
   }
 
   // The constructor's `newPipeVideo` parameter hides newpipe.dart's function of that name.
@@ -327,19 +349,26 @@ class YouTubePlaylists {
   }
 }
 
-/// Makes YouTube search and audio reachable from any screen; tests pass fakes.
+/// Makes YouTube search and audio — and fetching Spotify playlists, the other online source
+/// for imports — reachable from any screen; tests pass fakes.
 class YouTubeScope extends InheritedWidget {
   const YouTubeScope({
     super.key,
     required this.search,
     required this.audio,
     required this.playlists,
+    this.spotify,
     required super.child,
   });
 
   final YouTubeSearch search;
   final YouTubeAudio audio;
   final YouTubePlaylists playlists;
+
+  /// `null`: the real one.
+  final SpotifyPlaylists? spotify;
+
+  static final _spotify = SpotifyPlaylists();
 
   static YouTubeScope _of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<YouTubeScope>()!;
@@ -351,9 +380,13 @@ class YouTubeScope extends InheritedWidget {
   static YouTubePlaylists playlistsOf(BuildContext context) =>
       _of(context).playlists;
 
+  static SpotifyPlaylists spotifyOf(BuildContext context) =>
+      _of(context).spotify ?? _spotify;
+
   @override
   bool updateShouldNotify(YouTubeScope oldWidget) =>
       search != oldWidget.search ||
       audio != oldWidget.audio ||
-      playlists != oldWidget.playlists;
+      playlists != oldWidget.playlists ||
+      spotify != oldWidget.spotify;
 }

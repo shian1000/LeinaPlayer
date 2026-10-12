@@ -27,18 +27,23 @@ class SearchHit {
     this.phoneFiles, {
     this.phoneMatch,
     this.playlistVideoId,
+    this.spotifyTrackId,
+    this.notFoundOnYouTube = false,
   }) : mainSong = song,
        title = song.title,
        artistLabel = song.artistLabel,
        album = song.album,
        year = song.year;
 
-  /// A track known only as a YouTube video (e.g. from an imported playlist).
+  /// A track known only as a YouTube video (e.g. from an imported playlist), or with no
+  /// [videoId] only by its title and artist (a Spotify playlist's), to be found on YouTube.
   SearchHit.youTubeOnly({
     required this.title,
     required this.artistLabel,
-    required String videoId,
+    required String? videoId,
     this.playlistVideoId,
+    this.spotifyTrackId,
+    this.notFoundOnYouTube = false,
   }) : mainSong = null,
        phoneFiles = const [],
        phoneMatch = videoId,
@@ -49,6 +54,8 @@ class SearchHit {
     : mainSong = null,
       phoneMatch = null,
       playlistVideoId = null,
+      spotifyTrackId = null,
+      notFoundOnYouTube = false,
       phoneFiles = [file],
       title = file.title,
       artistLabel = file.artist ?? 'Nieznany wykonawca',
@@ -68,6 +75,12 @@ class SearchHit {
   /// of the song), so YouTube can open the song inside that playlist.
   final String? playlistVideoId;
 
+  /// The track on Spotify it came from (a Spotify playlist's), for sharing; see [spotifyUri].
+  final String? spotifyTrackId;
+
+  /// The phone searched YouTube for it lately and found nothing ([YouTubeLink.notFound]).
+  final bool notFoundOnYouTube;
+
   final String title;
   final String artistLabel;
   final String? album;
@@ -75,13 +88,42 @@ class SearchHit {
 
   bool get inMainDatabase => mainSong != null;
 
-  /// The same MusicDatabase song, now with a video the phone found for it.
-  SearchHit withPhoneMatch(String videoId) => SearchHit.main(
-    mainSong!,
-    phoneFiles,
-    phoneMatch: videoId,
-    playlistVideoId: playlistVideoId,
+  SearchHit._copy(
+    SearchHit hit, {
+    required this.phoneMatch,
+    required this.notFoundOnYouTube,
+    bool keepPlaylistVideo = true,
+  }) : mainSong = hit.mainSong,
+       phoneFiles = hit.phoneFiles,
+       playlistVideoId = keepPlaylistVideo ? hit.playlistVideoId : null,
+       spotifyTrackId = hit.spotifyTrackId,
+       title = hit.title,
+       artistLabel = hit.artistLabel,
+       album = hit.album,
+       year = hit.year;
+
+  /// The same song, marked as searched on YouTube without result (or, with `false`, not).
+  SearchHit withNotFoundOnYouTube([bool notFound = true]) =>
+      SearchHit._copy(this, phoneMatch: null, notFoundOnYouTube: notFound);
+
+  /// The same song without the phone's or the playlist's video (YouTube removed it); still
+  /// MusicDatabase's own link, if any.
+  SearchHit withoutVideo() => SearchHit._copy(
+    this,
+    phoneMatch: null,
+    notFoundOnYouTube: false,
+    keepPlaylistVideo: false,
   );
+
+  /// The same song, now with a video the phone found for it.
+  SearchHit withPhoneMatch(String videoId) =>
+      SearchHit._copy(this, phoneMatch: videoId, notFoundOnYouTube: false);
+
+  /// The song's page on Spotify: MusicDatabase's own link, else the Spotify playlist's track.
+  Uri? get spotifyUri {
+    final id = mainSong?.spotifyTrackId ?? spotifyTrackId;
+    return id == null ? null : Uri.https('open.spotify.com', '/track/$id');
+  }
 
   /// Seed for the placeholder cover, the same wherever the song is shown.
   String get coverSeed => mainSong != null
@@ -94,9 +136,13 @@ class SearchHit {
   String? get youtubeVideoId => mainSong?.youtubeVideoId ?? phoneMatch;
 
   /// Phone-only songs aren't in MusicDatabase, so nothing is known about them on YouTube.
-  YouTubeLink get youTube => youtubeVideoId != null
-      ? YouTubeLink.linked
-      : mainSong?.youTube ?? YouTubeLink.unknown;
+  YouTubeLink get youTube {
+    if (youtubeVideoId != null) return YouTubeLink.linked;
+    final stored = mainSong?.youTube ?? YouTubeLink.unknown;
+    return stored == YouTubeLink.unknown && notFoundOnYouTube
+        ? YouTubeLink.notFound
+        : stored;
+  }
 
   MatchTarget get youTubeTarget =>
       mainSong?.youTubeTarget ??
@@ -122,6 +168,36 @@ class SearchHit {
   }
 }
 
+/// [hit] with what the phone has learned about it on YouTube since the row was made: a video it
+/// found (`youtube_matches`, `youtube_track_matches`) or that it searched lately and found none
+/// (`youtube_not_found`), and dropping a playlist's or phone-found video YouTube removed
+/// (`youtube_removed_videos`). Queues and saved rows hold songs as they were, so they're shown and
+/// played through this.
+SearchHit withPhoneYouTube(SearchHit hit, YouTubeLibrary youTube) {
+  final video = hit.youtubeVideoId;
+  if (video != null) {
+    // MusicDatabase's own link wins even when it's dead: it's fixed there, not here.
+    if (hit.mainSong?.youtubeVideoId == video ||
+        !youTube.isVideoRemoved(video)) {
+      return hit;
+    }
+    hit = hit.withoutVideo();
+  }
+  final mainSong = hit.mainSong;
+  // A phone-only song stays one: it plays from its file.
+  if (mainSong == null && hit.onPhone) return hit;
+  if (mainSong != null && mainSong.youTube != YouTubeLink.unknown) return hit;
+  final videoId = mainSong != null
+      ? youTube.matchFor(mainSong.id)
+      : youTube.matchForTrack(hit.artistLabel, hit.title);
+  if (videoId != null) return hit.withPhoneMatch(videoId);
+  final notFound = mainSong != null
+      ? youTube.notFoundSong(mainSong.id)
+      : youTube.notFoundTrack(hit.artistLabel, hit.title);
+  if (notFound == hit.notFoundOnYouTube) return hit;
+  return hit.withNotFoundOnYouTube(notFound);
+}
+
 /// Song search over both databases: MusicDatabase's songs (each marked with the phone files that
 /// are that song) plus phone songs MusicDatabase doesn't have. Ordered like
 /// [SongCatalog.search]: best title matches first, alphabetical within a group.
@@ -129,21 +205,19 @@ List<SearchHit> searchEverywhere(
   String query,
   SongCatalog catalog,
   LocalLibrary library, {
-  String? Function(int mainDbId)? youTubeMatch,
+  YouTubeLibrary? youTube,
 }) {
   final normalizedQuery = normalizeForSearch(query);
   if (normalizedQuery.isEmpty) return const [];
   final hits = [
     for (final song in catalog.search(query))
-      SearchHit.main(
-        song,
-        library.filesOf(song.id),
-        phoneMatch:
-            song.youtubeVideoId == null &&
-                song.youTube != YouTubeLink.notOnYouTube
-            ? youTubeMatch?.call(song.id)
-            : null,
-      ),
+      if (youTube == null)
+        SearchHit.main(song, library.filesOf(song.id))
+      else
+        withPhoneYouTube(
+          SearchHit.main(song, library.filesOf(song.id)),
+          youTube,
+        ),
     for (final file in library.searchPending(query, catalog.searchFields))
       SearchHit.phoneOnly(file),
   ];
@@ -164,32 +238,39 @@ List<SearchHit> searchEverywhere(
 
 /// The row for a playlist track: the MusicDatabase song when it was recognised (by its
 /// `main_db_id`, or by the video if music.db has linked it since), with its phone files; otherwise
-/// just the playlist's YouTube video.
+/// just the playlist's YouTube video, or — with none (Spotify) — its title and artist; with what
+/// the phone learned on YouTube since ([withPhoneYouTube]).
 SearchHit playlistHit(
   PlaylistTrack track,
   SongCatalog catalog,
   LocalLibrary library,
   YouTubeLibrary youTube,
 ) {
-  final videoId = track.youtubeVideoId;
+  final videoId = track.playableVideoId;
   final song =
       (track.mainDbId == null ? null : catalog.byId(track.mainDbId!)) ??
       (videoId == null ? null : catalog.findByYouTubeId(videoId));
   if (song != null) {
-    return SearchHit.main(
-      song,
-      library.filesOf(song.id),
-      // The playlist's own video is the version the user listens to.
-      phoneMatch: song.youtubeVideoId == null
-          ? videoId ?? youTube.matchFor(song.id)
-          : null,
-      playlistVideoId: videoId,
+    return withPhoneYouTube(
+      SearchHit.main(
+        song,
+        library.filesOf(song.id),
+        // The playlist's own video is the version the user listens to.
+        phoneMatch: song.youtubeVideoId == null ? videoId : null,
+        playlistVideoId: videoId,
+        spotifyTrackId: track.spotifyTrackId,
+      ),
+      youTube,
     );
   }
-  return SearchHit.youTubeOnly(
-    title: track.title,
-    artistLabel: track.artist ?? 'Nieznany wykonawca',
-    videoId: videoId ?? '',
-    playlistVideoId: videoId,
+  return withPhoneYouTube(
+    SearchHit.youTubeOnly(
+      title: track.title,
+      artistLabel: track.artist ?? 'Nieznany wykonawca',
+      videoId: videoId,
+      playlistVideoId: videoId,
+      spotifyTrackId: track.spotifyTrackId,
+    ),
+    youTube,
   );
 }

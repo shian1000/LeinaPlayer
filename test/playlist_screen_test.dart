@@ -20,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'data/fixtures.dart';
+import 'support/waiting.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -52,16 +53,10 @@ void main() {
     await storage.delete(recursive: true);
   });
 
-  /// Lets real SQLite work finish — until [until] shows, when given (a fixed wait was too short
-  /// with the whole suite running in parallel); spinners never settle, so only pump.
-  Future<void> settle(WidgetTester tester, {Finder? until}) async {
-    for (var i = 0; i < (until == null ? 20 : 200); i++) {
-      if (until != null && i >= 5 && until.evaluate().isNotEmpty) break;
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+  /// Lets real SQLite work finish, until [until] shows (a fixed wait was too short with the whole
+  /// suite running in parallel); spinners never settle, so only pump meanwhile.
+  Future<void> settle(WidgetTester tester, {required Finder until}) async {
+    await pumpUntil(tester, () => until.evaluate().isNotEmpty);
     await tester.pumpAndSettle();
   }
 

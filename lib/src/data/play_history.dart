@@ -83,6 +83,7 @@ class PlayHistory extends ChangeNotifier {
       'main_db_id': track.mainDbId,
       'file_path': track.filePath,
       'youtube_video_id': track.videoId,
+      'spotify_track_id': track.spotifyTrackId,
       'playlist_id': playlistId,
       'playlist_name': playlistName,
     });
@@ -131,6 +132,7 @@ class PlayHistory extends ChangeNotifier {
       mainDbId: row['main_db_id'] as int?,
       filePath: row['file_path'] as String?,
       videoId: row['youtube_video_id'] as String?,
+      spotifyTrackId: row['spotify_track_id'] as String?,
     ),
     playedAt: DateTime.fromMillisecondsSinceEpoch(row['played_at'] as int),
     playlistId: row['playlist_id'] as int?,

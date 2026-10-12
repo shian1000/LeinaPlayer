@@ -44,10 +44,10 @@ exists on Android only. Phone-found matches and the audio cache are tables in `l
 (`youtube_library.dart`, `YouTubeLibraryScope`).
 
 Playlists ([`agent-notes/playlists.md`](agent-notes/playlists.md)): `PlaylistLibrary`
-(`playlist_library.dart`, `PlaylistLibraryScope`) keeps playlists imported from YouTube in
+(`playlist_library.dart`, `PlaylistLibraryScope`) keeps playlists imported from YouTube or Spotify in
 `local.db`; their tracks render with the same `SongTile` (`lib/src/widgets/song_tile.dart`) as
 search results. `local.db` schema versions live in `LocalLibrary._open` (v2 YouTube tables, v3
-playlists, v4 `play_history`, v5 cover lookups and cache).
+playlists, v4 `play_history`, v5 cover lookups and cache, v6 `youtube_track_matches`, v7 `youtube_not_found`, v8 `spotify_track_id` in `playlist_tracks` and `play_history`, v9 `playlist_tracks.youtube_removed`, v10 `youtube_removed_videos`).
 
 History and resuming: `PlayHistory` (`play_history.dart`, `PlayHistoryScope`) records every song
 the queue starts (`PlaybackQueue.played`) in `local.db`, shown by `recents_screen.dart`.
@@ -57,7 +57,7 @@ in `shared_preferences` and restores them on start. Both keep songs as `TrackRef
 `resolveTrack`.
 
 Links from outside (Android): `MainActivity.kt`'s `LinksBridge` passes YouTube links shared to the
-app or opened with it to `IncomingLinks` (`incoming_links.dart`); `AppShell` imports a playlist
+app or opened with it (and Spotify playlist links shared to it) to `IncomingLinks` (`incoming_links.dart`); `AppShell` imports a playlist
 or plays a video (`video_link.dart`). The same bridge opens the YouTube app by package
 (`openInYouTubeApp`) — the system's choice for youtube.com links may be this app itself.
 

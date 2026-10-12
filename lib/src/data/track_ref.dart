@@ -14,6 +14,7 @@ class TrackRef {
     this.filePath,
     this.videoId,
     this.playlistVideoId,
+    this.spotifyTrackId,
   });
 
   factory TrackRef.of(SearchHit hit) => TrackRef(
@@ -23,6 +24,7 @@ class TrackRef {
     filePath: hit.onPhone ? hit.phoneFiles.first.filePath : null,
     videoId: hit.youtubeVideoId,
     playlistVideoId: hit.playlistVideoId,
+    spotifyTrackId: hit.spotifyTrackId,
   );
 
   factory TrackRef.fromJson(Map<String, Object?> json) => TrackRef(
@@ -32,6 +34,7 @@ class TrackRef {
     filePath: json['file_path'] as String?,
     videoId: json['video_id'] as String?,
     playlistVideoId: json['playlist_video_id'] as String?,
+    spotifyTrackId: json['spotify_track_id'] as String?,
   );
 
   final String title;
@@ -43,6 +46,9 @@ class TrackRef {
   /// [SearchHit.playlistVideoId].
   final String? playlistVideoId;
 
+  /// [SearchHit.spotifyTrackId].
+  final String? spotifyTrackId;
+
   Map<String, Object?> toJson() => {
     'title': title,
     'artist': artist,
@@ -50,6 +56,7 @@ class TrackRef {
     'file_path': filePath,
     'video_id': videoId,
     if (playlistVideoId != null) 'playlist_video_id': playlistVideoId,
+    if (spotifyTrackId != null) 'spotify_track_id': spotifyTrackId,
   };
 
   /// Same song (for grouping the history).
@@ -69,30 +76,37 @@ SearchHit resolveTrack(
 ) {
   final song = ref.mainDbId == null ? null : catalog.byId(ref.mainDbId!);
   if (song != null) {
-    return SearchHit.main(
-      song,
-      library.filesOf(song.id),
-      phoneMatch: song.youtubeVideoId == null
-          ? ref.videoId ?? youTube.matchFor(song.id)
-          : null,
-      playlistVideoId: ref.playlistVideoId,
+    return withPhoneYouTube(
+      SearchHit.main(
+        song,
+        library.filesOf(song.id),
+        phoneMatch: song.youtubeVideoId == null ? ref.videoId : null,
+        playlistVideoId: ref.playlistVideoId,
+        spotifyTrackId: ref.spotifyTrackId,
+      ),
+      youTube,
     );
   }
   final file = ref.filePath == null ? null : library.fileAt(ref.filePath!);
   if (file != null) return SearchHit.phoneOnly(file);
-  if (ref.videoId != null) {
-    return SearchHit.youTubeOnly(
-      title: ref.title,
-      artistLabel: ref.artist ?? 'Nieznany wykonawca',
-      videoId: ref.videoId!,
-      playlistVideoId: ref.playlistVideoId,
+  // No file either: a video, or a track known only by name (from a Spotify playlist).
+  if (ref.videoId != null || ref.filePath == null) {
+    return withPhoneYouTube(
+      SearchHit.youTubeOnly(
+        title: ref.title,
+        artistLabel: ref.artist ?? 'Nieznany wykonawca',
+        videoId: ref.videoId,
+        playlistVideoId: ref.playlistVideoId,
+        spotifyTrackId: ref.spotifyTrackId,
+      ),
+      youTube,
     );
   }
   // The file is gone and nothing else knows the song: shown, but can't be played.
   return SearchHit.phoneOnly(
     LocalSong(
       id: 0,
-      filePath: ref.filePath ?? '',
+      filePath: ref.filePath!,
       title: ref.title,
       artist: ref.artist,
       pending: true,

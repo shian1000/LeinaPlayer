@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../data/playlist_library.dart';
 import '../data/source_settings.dart';
+import '../data/spotify_playlist.dart';
 import '../data/youtube_playlist.dart';
 import '../data/youtube_search.dart';
 import '../dummy.dart';
 import '../widgets/menu_sheet.dart';
 
-/// "Utwórz › Playlista": make a new playlist (not built yet) or import one from YouTube.
+/// "Utwórz › Playlista": make a new playlist (not built yet) or import one from YouTube or
+/// Spotify.
 Future<void> showPlaylistSheet(
   BuildContext context, {
   required String idPrefix,
@@ -26,33 +28,48 @@ Future<void> showPlaylistSheet(
       MenuSheetEntry(
         Icons.smart_display_outlined,
         'Importuj playlistę',
-        subtitle: 'Z linku do playlisty na YouTube',
-        onTap: () => importYouTubePlaylist(context),
+        subtitle: 'Z linku do playlisty na YouTube lub Spotify',
+        onTap: () => importPlaylist(context),
       ),
     ],
   );
 }
 
-/// Asks for a YouTube playlist link, fetches the playlist and saves it to Biblioteka.
-Future<void> importYouTubePlaylist(BuildContext context) async {
-  final playlistId = await showDialog<String>(
+/// A playlist to import: where from and its id there.
+typedef PlaylistRef = ({PlaylistSource source, String id});
+
+/// The playlist in a pasted or shared [text]: a Spotify link, else a YouTube link or bare
+/// YouTube id. A `spotify.link/…` short link isn't one yet ([runPlaylistImport] follows it).
+PlaylistRef? parsePlaylistLink(String text) {
+  final spotify = extractSpotifyPlaylistId(text);
+  if (spotify != null) return (source: PlaylistSource.spotify, id: spotify);
+  if (text.contains('spotify.')) return null;
+  final youTube = extractPlaylistId(text);
+  return youTube == null ? null : (source: PlaylistSource.youtube, id: youTube);
+}
+
+/// Asks for a playlist link, fetches the playlist and saves it to Biblioteka.
+Future<void> importPlaylist(BuildContext context) async {
+  final link = await showDialog<String>(
     context: context,
     builder: (_) => const _LinkDialog(),
   );
-  if (playlistId == null || !context.mounted) return;
-  await runPlaylistImport(context, playlistId);
+  if (link == null || !context.mounted) return;
+  await runPlaylistImport(context, link);
 }
 
-/// Fetches YouTube playlist [playlistId] and saves it to Biblioteka, with a progress dialog and
-/// a message about how it went; returns the playlist when it worked. Also used for a playlist
-/// shared to the app.
+/// Fetches the playlist [link] points at (YouTube or Spotify, see [parsePlaylistLink]) and saves
+/// it to Biblioteka, with a progress dialog and a message about how it went; returns the playlist
+/// when it worked. Also used for a playlist shared to the app.
 Future<PlaylistSummary?> runPlaylistImport(
   BuildContext context,
-  String playlistId,
+  String link,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
   final playlists = PlaylistLibraryScope.of(context);
   final fetcher = YouTubeScope.playlistsOf(context);
+  final youTubeSearch = YouTubeScope.searchOf(context);
+  final spotify = YouTubeScope.spotifyOf(context);
   final settings = SourceSettingsScope.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
 
@@ -81,16 +98,44 @@ Future<PlaylistSummary?> runPlaylistImport(
   String message;
   PlaylistSummary? imported;
   try {
-    final data = await fetcher.fetch(playlistId, settings);
-    final result = await playlists.importYouTube(data);
-    final p = imported = result.playlist;
-    message =
-        '${result.updated ? 'Zaktualizowano' : 'Zaimportowano'} „${p.name}”: '
-        '${p.trackCount} utw., w bazie danych ${result.recognised}.';
+    var ref = parsePlaylistLink(link);
+    final shortLink = ref == null ? findSpotifyShortLink(link) : null;
+    if (shortLink != null) {
+      final id = await spotify.resolveShortLink(shortLink);
+      if (id != null) ref = (source: PlaylistSource.spotify, id: id);
+    }
+    switch (ref?.source) {
+      case null:
+        message = 'To nie jest link do playlisty z YouTube ani Spotify.';
+      case PlaylistSource.youtube:
+        final result = await playlists.importYouTube(
+          await fetcher.fetch(ref!.id, settings),
+          videoExists: (id) => youTubeSearch.videoExists(id, settings),
+        );
+        imported = result.playlist;
+        final removed = result.removedVideos;
+        message = [
+          _summary(result),
+          if (removed > 0)
+            'YouTube usunął $removed utw. — zostały na liście i zostaną wyszukane od nowa.',
+        ].join(' ');
+      case PlaylistSource.spotify:
+        final data = await spotify.fetch(ref!.id);
+        final result = await playlists.importSpotify(data);
+        imported = result.playlist;
+        final total = data.totalTracks;
+        message = [
+          _summary(result),
+          if (total != null && total > data.tracks.length)
+            'Spotify pokazuje bez logowania tylko pierwsze ${data.tracks.length} z $total.',
+        ].join(' ');
+    }
   } on YouTubeSearchException catch (e) {
     message = e.message;
+  } on SpotifyException catch (e) {
+    message = e.message;
   } catch (e) {
-    debugPrint('Importing playlist $playlistId failed: $e');
+    debugPrint('Importing playlist $link failed: $e');
     message = 'Nie udało się zaimportować playlisty.';
   }
   if (progressOpen) navigator.pop();
@@ -100,7 +145,13 @@ Future<PlaylistSummary?> runPlaylistImport(
   return imported;
 }
 
-/// Link field; returns the playlist id, and won't close on a link without one.
+String _summary(PlaylistImportResult result) {
+  final p = result.playlist;
+  return '${result.updated ? 'Zaktualizowano' : 'Zaimportowano'} „${p.name}”: '
+      '${p.trackCount} utw., w bazie danych ${result.recognised}.';
+}
+
+/// Link field; returns the link, and won't close on text that isn't a playlist link.
 class _LinkDialog extends StatefulWidget {
   const _LinkDialog();
 
@@ -119,21 +170,22 @@ class _LinkDialogState extends State<_LinkDialog> {
   }
 
   void _submit() {
-    final id = extractPlaylistId(_controller.text);
-    if (id == null) {
+    final text = _controller.text.trim();
+    if (parsePlaylistLink(text) == null && findSpotifyShortLink(text) == null) {
       setState(
         () => _error =
-            'To nie jest link do playlisty (szukam „list=…” w adresie).',
+            'To nie jest link do playlisty z YouTube („list=…” w adresie) ani ze Spotify '
+            '(„open.spotify.com/playlist/…”).',
       );
       return;
     }
-    Navigator.of(context).pop(id);
+    Navigator.of(context).pop(text);
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Importuj playlistę z YouTube'),
+      title: const Text('Importuj playlistę'),
       content: TextField(
         controller: _controller,
         autofocus: true,
@@ -141,8 +193,10 @@ class _LinkDialogState extends State<_LinkDialog> {
         enableSuggestions: false,
         keyboardType: TextInputType.url,
         decoration: InputDecoration(
-          hintText: 'https://www.youtube.com/playlist?list=…',
-          helperText: 'Playlista musi być publiczna lub niepubliczna.',
+          hintText: 'Link z YouTube lub Spotify',
+          helperText:
+              'Playlista musi być publiczna (na YouTube może być niepubliczna). Ze Spotify '
+              'wczytuje się do 100 utworów.',
           helperMaxLines: 2,
           errorText: _error,
           errorMaxLines: 2,

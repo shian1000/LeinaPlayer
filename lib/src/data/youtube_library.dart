@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'text_normalizer.dart';
 import 'youtube_video.dart';
 
 /// One cached audio file.
@@ -26,6 +27,12 @@ class YouTubeCacheEntry {
 ///
 /// - `youtube_matches`: the video the phone found for a MusicDatabase song without
 ///   `youtube_video_id` (ADR 0003 — local and temporary; music.db's own link wins).
+/// - `youtube_track_matches`: the same for a track known only by artist and title (from a
+///   Spotify playlist), until it's recognised as a MusicDatabase song.
+/// - `youtube_not_found`: songs (either kind) the phone searched YouTube for without finding a
+///   sure match — remembered for [notFoundFor], so they aren't searched again on every play.
+/// - `youtube_removed_videos`: videos YouTube no longer has ([markVideoRemoved]); a playlist's
+///   or the phone's own video that's among them isn't used ([isVideoRemoved]).
 /// - `youtube_cache`: audio of played videos, in `<support dir>/youtube_cache/`, at most the
 ///   user's limit; the least recently played goes first.
 ///
@@ -45,6 +52,16 @@ class YouTubeLibrary extends ChangeNotifier {
   final DateTime Function() _now;
 
   Map<int, String> _matches = const {};
+  Map<String, String> _trackMatches = const {};
+  Map<String, DateTime> _notFound = const {};
+  Set<String> _removedVideos = const {};
+
+  /// Whether YouTube no longer has [videoId] (playing or re-importing found out).
+  bool isVideoRemoved(String videoId) => _removedVideos.contains(videoId);
+
+  /// How long "not found on YouTube" holds before the queue searches again — the video may have
+  /// been uploaded since. A tap on the song searches right away.
+  static const notFoundFor = Duration(days: 30);
   Map<String, YouTubeCacheEntry> _cache = const {};
   final _downloading = <String>{};
 
@@ -52,6 +69,35 @@ class YouTubeLibrary extends ChangeNotifier {
 
   /// The video the phone found for this MusicDatabase song, if any.
   String? matchFor(int mainDbId) => _matches[mainDbId];
+
+  /// The video the phone found for a track that isn't a MusicDatabase song, if any.
+  String? matchForTrack(String artist, String title) =>
+      _trackMatches[_trackKey(artist, title)];
+
+  static String _trackKey(String artist, String title) =>
+      '${normalizeForSearch(artist)}\n${normalizeForSearch(title)}';
+
+  static String _songNotFoundKey(int mainDbId) => 'db:$mainDbId';
+  static String _trackNotFoundKey(String artist, String title) =>
+      'track:${_trackKey(artist, title)}';
+
+  bool _isNotFound(String key) {
+    final checked = _notFound[key];
+    return checked != null && _now().difference(checked) < notFoundFor;
+  }
+
+  /// Whether the phone searched YouTube for this MusicDatabase song lately and found nothing.
+  bool notFoundSong(int mainDbId) => _isNotFound(_songNotFoundKey(mainDbId));
+
+  /// The same for a track that isn't a MusicDatabase song.
+  bool notFoundTrack(String artist, String title) =>
+      _isNotFound(_trackNotFoundKey(artist, title));
+
+  /// Videos the phone found itself (MusicDatabase songs and tracks known only by name).
+  int get phoneMatchCount => _matches.length + _trackMatches.length;
+
+  /// Songs searched on YouTube lately without result (not yet expired).
+  int get notFoundCount => _notFound.keys.where(_isNotFound).length;
 
   /// The MusicDatabase song the phone matched to this video, if any.
   int? songForVideo(String videoId) {
@@ -74,6 +120,25 @@ class YouTubeLibrary extends ChangeNotifier {
     _matches = {
       for (final row in await db.query('youtube_matches'))
         row['main_db_id']! as int: row['video_id']! as String,
+    };
+    _trackMatches = {
+      for (final row in await db.query('youtube_track_matches'))
+        row['track_key']! as String: row['video_id']! as String,
+    };
+    _removedVideos = {
+      for (final row in await db.query('youtube_removed_videos'))
+        row['video_id']! as String,
+    };
+    await db.delete(
+      'youtube_not_found',
+      where: 'checked_at <= ?',
+      whereArgs: [_now().subtract(notFoundFor).millisecondsSinceEpoch],
+    );
+    _notFound = {
+      for (final row in await db.query('youtube_not_found'))
+        row['not_found_key']! as String: DateTime.fromMillisecondsSinceEpoch(
+          row['checked_at']! as int,
+        ),
     };
     await _reloadCache(db);
     // Left over from plays that stopped before the download finished.
@@ -119,6 +184,164 @@ class YouTubeLibrary extends ChangeNotifier {
       'matched_at': _now().millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     _matches = {..._matches, mainDbId: video.id};
+    await _clearNotFound(_songNotFoundKey(mainDbId));
+    notifyListeners();
+  }
+
+  /// Remembers that searching YouTube for this song (MusicDatabase's [mainDbId], else [artist] +
+  /// [title]) found no sure match.
+  Future<void> saveNotFound({
+    int? mainDbId,
+    required String artist,
+    required String title,
+  }) async {
+    final key = mainDbId != null
+        ? _songNotFoundKey(mainDbId)
+        : _trackNotFoundKey(artist, title);
+    final now = _now();
+    await (await _database()).insert('youtube_not_found', {
+      'not_found_key': key,
+      'artist': artist,
+      'title': title,
+      'checked_at': now.millisecondsSinceEpoch,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    _notFound = {..._notFound, key: now};
+    notifyListeners();
+  }
+
+  /// YouTube no longer has [videoId]: remembered, the playlist tracks with it are marked
+  /// (`playlist_tracks.youtube_removed`), and the phone's own matches to it are dropped — so the
+  /// songs show a dimmed icon and are searched again.
+  Future<void> markVideoRemoved(String videoId) async {
+    final db = await _database();
+    await db.transaction((txn) async {
+      await txn.insert('youtube_removed_videos', {
+        'video_id': videoId,
+        'found_at': _now().millisecondsSinceEpoch,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.update(
+        'playlist_tracks',
+        {'youtube_removed': 1},
+        where: 'youtube_video_id = ?',
+        whereArgs: [videoId],
+      );
+      await txn.delete(
+        'youtube_matches',
+        where: 'video_id = ?',
+        whereArgs: [videoId],
+      );
+      await txn.delete(
+        'youtube_track_matches',
+        where: 'video_id = ?',
+        whereArgs: [videoId],
+      );
+    });
+    _removedVideos = {..._removedVideos, videoId};
+    _matches = {..._matches}..removeWhere((_, v) => v == videoId);
+    _trackMatches = {..._trackMatches}..removeWhere((_, v) => v == videoId);
+    notifyListeners();
+  }
+
+  /// These videos are on YouTube after all (back in a playlist).
+  Future<void> clearVideosRemoved(Iterable<String> videoIds) async {
+    final back = videoIds.where(_removedVideos.contains).toSet();
+    if (back.isEmpty) return;
+    final db = await _database();
+    for (final id in back) {
+      await db.delete(
+        'youtube_removed_videos',
+        where: 'video_id = ?',
+        whereArgs: [id],
+      );
+      await db.update(
+        'playlist_tracks',
+        {'youtube_removed': 0},
+        where: 'youtube_video_id = ?',
+        whereArgs: [id],
+      );
+    }
+    _removedVideos = {..._removedVideos}..removeAll(back);
+    notifyListeners();
+  }
+
+  /// After a new `music.db`: drops what the phone worked out for MusicDatabase songs that
+  /// MusicDatabase now settles itself — a video link or "N/A" ([settled]) — as its value wins
+  /// anyway. Returns how many entries went.
+  Future<int> forgetSettled(bool Function(int mainDbId) settled) async {
+    final songs = _matches.keys.where(settled).toList();
+    final notFound = [
+      for (final key in _notFound.keys)
+        if (key.startsWith('db:') && settled(int.parse(key.substring(3)))) key,
+    ];
+    if (songs.isEmpty && notFound.isEmpty) return 0;
+    final db = await _database();
+    await db.transaction((txn) async {
+      for (final id in songs) {
+        await txn.delete(
+          'youtube_matches',
+          where: 'main_db_id = ?',
+          whereArgs: [id],
+        );
+      }
+      for (final key in notFound) {
+        await txn.delete(
+          'youtube_not_found',
+          where: 'not_found_key = ?',
+          whereArgs: [key],
+        );
+      }
+    });
+    _matches = {..._matches}..removeWhere((id, _) => songs.contains(id));
+    _notFound = {..._notFound}..removeWhere((key, _) => notFound.contains(key));
+    notifyListeners();
+    return songs.length + notFound.length;
+  }
+
+  /// Forgets every video the phone found itself, so the songs are searched again (e.g. with a
+  /// better search method). Their cached audio stays until it's pushed out.
+  Future<void> forgetPhoneMatches() async {
+    final db = await _database();
+    await db.delete('youtube_matches');
+    await db.delete('youtube_track_matches');
+    _matches = const {};
+    _trackMatches = const {};
+    notifyListeners();
+  }
+
+  /// Forgets every "not found on YouTube", so those songs are searched again.
+  Future<void> forgetNotFound() async {
+    await (await _database()).delete('youtube_not_found');
+    _notFound = const {};
+    notifyListeners();
+  }
+
+  Future<void> _clearNotFound(String key) async {
+    if (!_notFound.containsKey(key)) return;
+    await (await _database()).delete(
+      'youtube_not_found',
+      where: 'not_found_key = ?',
+      whereArgs: [key],
+    );
+    _notFound = {..._notFound}..remove(key);
+  }
+
+  Future<void> saveTrackMatch(
+    String artist,
+    String title,
+    YouTubeVideo video,
+  ) async {
+    final key = _trackKey(artist, title);
+    await (await _database()).insert('youtube_track_matches', {
+      'track_key': key,
+      'artist': artist,
+      'title': title,
+      'video_id': video.id,
+      'video_title': video.title,
+      'channel': video.channel,
+      'matched_at': _now().millisecondsSinceEpoch,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    _trackMatches = {..._trackMatches, key: video.id};
+    await _clearNotFound(_trackNotFoundKey(artist, title));
     notifyListeners();
   }
 
@@ -276,6 +499,8 @@ class YouTubeLibrary extends ChangeNotifier {
           'WHERE youtube_video_id IN ($marks)',
       'SELECT youtube_video_id AS id, title, artist FROM play_history '
           'WHERE youtube_video_id IN ($marks)',
+      'SELECT video_id AS id, title, artist FROM youtube_track_matches '
+          'WHERE video_id IN ($marks)',
       'SELECT video_id AS id, video_title AS title, channel AS artist FROM youtube_matches '
           'WHERE video_id IN ($marks)',
     ]) {

@@ -146,6 +146,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   late final StreamSubscription<QueuePlay> _historySub;
   final _incomingLinks = IncomingLinks();
   late final AppLifecycleListener _lifecycle;
+  late final Future<void> _youTubeLoaded;
+
+  /// The `music.db` download whose settled songs were last cleaned out of the phone's matches.
+  DateTime? _settledFor;
 
   @override
   void initState() {
@@ -159,9 +163,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     final localLoaded = _localLibrary.load().catchError(
       (Object e) => debugPrint('Loading local library failed: $e'),
     );
-    final youTubeLoaded = _youTubeLibrary.load().catchError(
+    final youTubeLoaded = _youTubeLoaded = _youTubeLibrary.load().catchError(
       (Object e) => debugPrint('Loading YouTube library failed: $e'),
     );
+    _songCatalog.addListener(_forgetSettledMatches);
     _playHistory.load().catchError(
       (Object e) => debugPrint('Loading play history failed: $e'),
     );
@@ -191,6 +196,33 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     );
   }
 
+  /// Once a newly downloaded `music.db` is loaded, the phone's own YouTube findings for songs it
+  /// now settles (a link or "N/A") — or no longer has — are dropped: MusicDatabase's value wins
+  /// anyway.
+  Future<void> _forgetSettledMatches() async {
+    final catalog = _songCatalog;
+    final syncTime = catalog.loadedSyncTime;
+    if (catalog.status != CatalogStatus.ready ||
+        syncTime == null ||
+        syncTime == _settledFor) {
+      return;
+    }
+    _settledFor = syncTime;
+    try {
+      await _youTubeLoaded;
+      final forgotten = await _youTubeLibrary.forgetSettled(
+        (id) => catalog.byId(id)?.youTube != YouTubeLink.unknown,
+      );
+      if (forgotten > 0) {
+        debugPrint(
+          'Forgot $forgotten phone YouTube findings settled by music.db',
+        );
+      }
+    } catch (e) {
+      debugPrint('Forgetting settled YouTube findings failed: $e');
+    }
+  }
+
   /// The last song and queue come back once the songs they refer to can be found.
   Future<void> _restoreSession(Future<void> local, Future<void> youTube) async {
     try {
@@ -213,6 +245,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   @override
   void dispose() {
     _themeController.removeListener(_updateCoverLook);
+    _songCatalog.removeListener(_forgetSettledMatches);
     _coverLook.dispose();
     _lifecycle.dispose();
     _historySub.cancel();

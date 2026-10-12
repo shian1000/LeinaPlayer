@@ -198,7 +198,7 @@ class _Results extends StatelessWidget {
       query,
       catalog,
       library,
-      youTubeMatch: youTubeLibrary.matchFor,
+      youTube: youTubeLibrary,
     );
     final youTubeSection = youTubeEnabled
         ? _YouTubeSection(

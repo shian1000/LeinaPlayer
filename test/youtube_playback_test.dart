@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
@@ -16,6 +17,8 @@ import 'package:music_database_app/src/playback/track_player.dart';
 import 'package:music_database_app/src/playback/youtube_playback.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import 'support/waiting.dart';
 
 class _Backend implements AudioBackend {
   final opened = <String>[];
@@ -217,21 +220,23 @@ void main() {
         SearchHit.youTubeOnly(title: 'T$i', artistLabel: 'A', videoId: 'v$i'),
     ];
 
-    /// Waits for background downloads to settle.
-    Future<Set<String>> cached(int n) async {
-      for (var i = 0; i < 40; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      }
-      return {
-        for (var i = 0; i < n; i++)
-          if (library.isCached('v$i')) 'v$i',
-      };
+    Set<String> cachedNow(int n) => {
+      for (var i = 0; i < n; i++)
+        if (library.isCached('v$i')) 'v$i',
+    };
+
+    /// Exactly [expected] of the first [n] songs get cached: waits for the background downloads
+    /// to produce them, then a short quiet spell lets one that shouldn't happen show up.
+    Future<void> expectCached(int n, Set<String> expected) async {
+      await waitUntil(() => cachedNow(n).containsAll(expected));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(cachedNow(n), expected);
     }
 
     test('the next 3 songs (the default) after the tapped one', () async {
       final queue = queueOf();
       await queue.start(videos(8), 3);
-      expect(await cached(8), {'v3', 'v4', 'v5', 'v6'});
+      await expectCached(8, {'v3', 'v4', 'v5', 'v6'});
       queue.dispose();
     });
 
@@ -240,9 +245,9 @@ void main() {
       await settings.setQueuePrefetch(2);
       await queue.start(videos(8), 3, shuffle: true);
       final next = [
-        for (final e in queue.upcoming.take(2)) e.hit.youtubeVideoId,
+        for (final e in queue.upcoming.take(2)) e.hit.youtubeVideoId!,
       ];
-      expect(await cached(8), {'v3', ...next});
+      await expectCached(8, {'v3', ...next});
       queue.dispose();
     });
 
@@ -250,14 +255,14 @@ void main() {
       await settings.setQueuePrefetchEnabled(false);
       final off = queueOf();
       await off.start(videos(4), 0);
-      expect(await cached(4), {'v0'});
+      await expectCached(4, {'v0'});
       off.dispose();
 
       await settings.setQueuePrefetchEnabled(true);
       await settings.setQueuePrefetchWifiOnly(true);
       final mobile = queueOf(onWifi: false);
       await mobile.start(videos(4), 1);
-      expect(await cached(4), {'v0', 'v1'});
+      await expectCached(4, {'v0', 'v1'});
       mobile.dispose();
     });
 
@@ -325,6 +330,191 @@ void main() {
         Uri.parse('https://www.youtube.com/watch?v=pl&list=PL1'),
       ]);
       queue.dispose();
+    });
+  });
+
+  test('a video found for a track known only by name is remembered', () async {
+    await settings.setYouTubeSearchEnabled(true);
+    var searches = 0;
+    final tracks = TrackPlayer(
+      player: player,
+      settings: settings,
+      youTubeLibrary: library,
+      youTubeAudio: YouTubeAudio(
+        newPipeAvailable: true,
+        newPipe: (id) async => [
+          YouTubeAudioStream(url: 'https://s/$id', itag: 251),
+        ],
+      ),
+      youTubeSearch: YouTubeSearch(
+        newPipeAvailable: true,
+        newPipe: (query) async {
+          searches++;
+          return const [
+            YouTubeVideo(
+              id: 'tote1234567',
+              title: 'Bonnie Tyler - Total Eclipse of the Heart',
+              channel: 'Bonnie Tyler',
+            ),
+          ];
+        },
+      ),
+      openExternal: (uri) async => true,
+    );
+    // A Spotify playlist's track that isn't a MusicDatabase song.
+    SearchHit spotifyTrack() => SearchHit.youTubeOnly(
+      title: 'Total Eclipse of the Heart',
+      artistLabel: 'Bonnie Tyler',
+      videoId: null,
+    );
+
+    expect((await tracks.play(spotifyTrack())).played, isTrue);
+    expect(searches, 1);
+    expect(
+      library.matchForTrack('bonnie tyler', 'Total Eclipse of the Heart'),
+      'tote1234567',
+    );
+    expect((await tracks.play(spotifyTrack())).played, isTrue);
+    expect(searches, 1);
+    expect(backend.opened.last, 'https://s/tote1234567');
+  });
+
+  test('finding nothing on YouTube is remembered: the queue skips, a tap searches again', () async {
+    await settings.setYouTubeSearchEnabled(true);
+    var searches = 0;
+    final tracks = TrackPlayer(
+      player: player,
+      settings: settings,
+      youTubeLibrary: library,
+      youTubeAudio: YouTubeAudio(newPipeAvailable: true),
+      youTubeSearch: YouTubeSearch(
+        newPipeAvailable: true,
+        newPipe: (query) async {
+          searches++;
+          return const [
+            YouTubeVideo(id: 'other123456', title: 'Coś innego', channel: 'X'),
+          ];
+        },
+      ),
+      openExternal: (uri) async => true,
+    );
+    final hit = SearchHit.youTubeOnly(
+      title: 'Rzadki utwór',
+      artistLabel: 'Nieznany zespół',
+      videoId: null,
+    );
+
+    expect((await tracks.play(hit)).played, isFalse);
+    expect(searches, 1);
+    expect(library.notFoundTrack('Nieznany zespół', 'Rzadki utwór'), isTrue);
+
+    // When a song ends and this one is next, or caching ahead: no new search.
+    expect((await tracks.play(hit, allowExternal: false)).played, isFalse);
+    expect(await tracks.prefetch(hit), isFalse);
+    expect(searches, 1);
+
+    // Tapped: searched again.
+    await tracks.play(hit);
+    expect(searches, 2);
+  });
+
+  group('a video YouTube removed', () {
+    const dead = 'dead1234567';
+    late List<Uri> openedApp;
+    late int searches;
+
+    TrackPlayer tracksWith() {
+      openedApp = [];
+      searches = 0;
+      return TrackPlayer(
+        player: player,
+        settings: settings,
+        youTubeLibrary: library,
+        youTubeAudio: YouTubeAudio(
+          newPipeAvailable: true,
+          newPipe: (id) async {
+            if (id == dead) {
+              throw PlatformException(code: 'ContentNotAvailableException');
+            }
+            return [YouTubeAudioStream(url: 'https://s/$id', itag: 251)];
+          },
+        ),
+        youTubeSearch: YouTubeSearch(
+          newPipeAvailable: true,
+          newPipe: (query) async {
+            searches++;
+            return const [
+              // The removed one may still turn up in results; it's skipped.
+              YouTubeVideo(
+                id: dead,
+                title: 'Bonnie Tyler - Total Eclipse of the Heart',
+                channel: 'Bonnie Tyler',
+              ),
+              YouTubeVideo(
+                id: 'alive123456',
+                title: 'Bonnie Tyler - Total Eclipse of the Heart',
+                channel: 'Bonnie Tyler',
+              ),
+            ];
+          },
+        ),
+        openExternal: (uri) async {
+          openedApp.add(uri);
+          return true;
+        },
+      );
+    }
+
+    setUp(() => settings.setYouTubeSearchEnabled(true));
+
+    test(
+      'a playlist\'s video: marked, and another one is found and played',
+      () async {
+        final tracks = tracksWith();
+        final fromPlaylist = SearchHit.youTubeOnly(
+          title: 'Total Eclipse of the Heart',
+          artistLabel: 'Bonnie Tyler',
+          videoId: dead,
+          playlistVideoId: dead,
+        );
+        final outcome = await tracks.play(fromPlaylist);
+        expect(outcome.played, isTrue);
+        expect(searches, 1);
+        expect(backend.opened.last, 'https://s/alive123456');
+        expect(openedApp, isEmpty); // not handed to the YouTube app
+        expect(library.isVideoRemoved(dead), isTrue);
+        // Shown from now on with the new video.
+        expect(
+          withPhoneYouTube(fromPlaylist, library).youtubeVideoId,
+          'alive123456',
+        );
+      },
+    );
+
+    test('MusicDatabase\'s own link is not overridden', () async {
+      final tracks = tracksWith();
+      final song = CatalogSong(
+        id: 1,
+        title: 'Total Eclipse of the Heart',
+        artistLabel: 'Bonnie Tyler',
+        youtubeVideoId: dead,
+      );
+      final outcome = await tracks.play(SearchHit.main(song, const []));
+      expect(outcome.played, isFalse);
+      expect(outcome.message, contains('MusicDatabase'));
+      expect(searches, 0);
+      expect(library.isVideoRemoved(dead), isFalse);
+    });
+
+    test('found out while caching ahead: marked, nothing played', () async {
+      final tracks = tracksWith();
+      final hit = SearchHit.youTubeOnly(
+        title: 'T',
+        artistLabel: 'A',
+        videoId: dead,
+      );
+      expect(await tracks.prefetch(hit), isFalse);
+      expect(library.isVideoRemoved(dead), isTrue);
     });
   });
 }

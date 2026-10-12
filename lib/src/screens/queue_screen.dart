@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/song_tile.dart';
@@ -165,6 +166,8 @@ class _QueueRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final trailing = this.trailing;
+    // The queue holds songs as they were when it was filled; caching ahead finds videos later.
+    final hit = withPhoneYouTube(this.hit, YouTubeLibraryScope.of(context));
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
       leading: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),

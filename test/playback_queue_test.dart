@@ -62,6 +62,7 @@ void main() {
   late _Backend backend;
   late PlayerController player;
   late PlaybackQueue queue;
+  late YouTubeLibrary youTubeLibrary;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -69,13 +70,12 @@ void main() {
     await settings.load();
     backend = _Backend();
     player = PlayerController(backend: () => backend);
+    youTubeLibrary = YouTubeLibrary(() => Future.error(StateError('not used')));
     queue = PlaybackQueue(
       TrackPlayer(
         player: player,
         settings: settings,
-        youTubeLibrary: YouTubeLibrary(
-          () => Future.error(StateError('not used')),
-        ),
+        youTubeLibrary: youTubeLibrary,
         youTubeAudio: YouTubeAudio(newPipeAvailable: false),
         youTubeSearch: YouTubeSearch(),
       ),
@@ -275,9 +275,12 @@ void main() {
           notifier: player,
           child: PlaybackQueueScope(
             notifier: queue,
-            child: MaterialApp(
-              theme: buildAppTheme(dummifyTheme),
-              home: const QueueScreen(),
+            child: YouTubeLibraryScope(
+              notifier: youTubeLibrary,
+              child: MaterialApp(
+                theme: buildAppTheme(dummifyTheme),
+                home: const QueueScreen(),
+              ),
             ),
           ),
         ),

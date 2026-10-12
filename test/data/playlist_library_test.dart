@@ -1,10 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
+import 'package:music_database_app/src/data/spotify_playlist.dart';
+import 'package:music_database_app/src/data/track_ref.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_playlist.dart';
 import 'package:music_database_app/src/data/youtube_video.dart';
@@ -118,4 +121,200 @@ void main() {
     await playlists.delete(again.playlist.id);
     expect(playlists.playlists, isEmpty);
   });
+
+  test(
+    'imports a Spotify playlist, recognising songs by title and artist',
+    () async {
+      final result = await playlists.importSpotify(
+        const SpotifyPlaylistData(
+          id: '37i9dQZF1DX4UtSsGT1Sbe',
+          name: 'Ze Spotify',
+          owner: null,
+          tracks: [
+            SpotifyTrack(
+              id: 't1',
+              title: 'Going to California - Remaster',
+              artists: ['Led Zeppelin'],
+              duration: Duration(seconds: 211),
+            ),
+            // Any one of the artists will do.
+            SpotifyTrack(
+              id: 't2',
+              title: 'Pusty',
+              artists: ['Ktoś', 'Artur Rojek'],
+            ),
+            SpotifyTrack(
+              id: 't3',
+              title: 'Nowa - Radio Edit',
+              artists: ['A', 'B'],
+            ),
+          ],
+        ),
+      );
+      expect(result.recognised, 2);
+      final playlist = playlists.playlists.single;
+      expect(playlist.source, PlaylistSource.spotify);
+      expect(playlist.youTubeId, isNull);
+      expect(
+        playlist.link.toString(),
+        'https://open.spotify.com/playlist/37i9dQZF1DX4UtSsGT1Sbe',
+      );
+      final tracks = await playlists.tracks(playlist.id);
+      expect([for (final t in tracks) t.mainDbId], [2, 4, null]);
+      expect([for (final t in tracks) t.youtubeVideoId], [null, null, null]);
+      expect([for (final t in tracks) t.spotifyTrackId], ['t1', 't2', 't3']);
+      // Shared as the Spotify track, recognised or not.
+      final hit = playlistHit(tracks[2], catalog, local, youTube);
+      expect(hit.spotifyUri.toString(), 'https://open.spotify.com/track/t3');
+      expect(
+        playlistHit(tracks[0], catalog, local, youTube).spotifyUri.toString(),
+        'https://open.spotify.com/track/t1',
+      );
+      // A video found later keeps the Spotify track.
+      await youTube.saveTrackMatch(
+        'A, B',
+        'Nowa',
+        const YouTubeVideo(id: 'nowa', title: 't', channel: 'c'),
+      );
+      final found = playlistHit(tracks[2], catalog, local, youTube);
+      expect((found.youtubeVideoId, found.spotifyTrackId), ('nowa', 't3'));
+      final ref = TrackRef.fromJson(TrackRef.of(found).toJson());
+      expect(
+        resolveTrack(ref, catalog, local, youTube).spotifyUri.toString(),
+        'https://open.spotify.com/track/t3',
+      );
+      expect((tracks[2].artist, tracks[2].title), ('A, B', 'Nowa'));
+    },
+  );
+
+  test('a YouTube playlist links to its YouTube page', () async {
+    await playlists.importYouTube(data([v('a', 'A - 1', 'x')]));
+    expect(
+      playlists.playlists.single.link.toString(),
+      'https://www.youtube.com/playlist?list=PL1',
+    );
+  });
+
+  test(
+    're-importing keeps tracks whose video YouTube removed, marked',
+    () async {
+      await playlists.importYouTube(
+        data([
+          v('a', 'A - 1', 'x'),
+          v('b', 'B - 2', 'x'),
+          v('c', 'C - 3', 'x'),
+          v('d', 'D - 4', 'x'),
+        ]),
+      );
+      final checked = <String>[];
+      // b: gone from YouTube; d, e: still there, so the owner took them out of the playlist.
+      Future<bool?> exists(String id) async {
+        checked.add(id);
+        return id != 'b';
+      }
+
+      final again = await playlists.importYouTube(
+        data([
+          v('a', 'A - 1', 'x'),
+          v('zz', '[Deleted video]', ''),
+          v('c', 'C - 3', 'x'),
+          v('e', 'E - 5', 'x'),
+        ]),
+        videoExists: exists,
+      );
+      expect(checked, ['b', 'd']);
+      expect(again.removedVideos, 1);
+      var tracks = await playlists.tracks(again.playlist.id);
+      expect([for (final t in tracks) t.title], ['1', '2', '3', '5']);
+      expect(
+        [for (final t in tracks) t.videoRemoved],
+        [false, true, false, false],
+      );
+      expect(tracks[1].youtubeVideoId, 'b');
+      expect(tracks[1].playableVideoId, isNull);
+
+      // Shown with a dimmed icon: no video, to be searched.
+      final hit = playlistHit(tracks[1], catalog, local, youTube);
+      expect(hit.youtubeVideoId, isNull);
+      expect(hit.youTube, YouTubeLink.unknown);
+
+      // Still missing next time: not checked again, still kept.
+      checked.clear();
+      await playlists.importYouTube(
+        data([v('a', 'A - 1', 'x'), v('c', 'C - 3', 'x')]),
+        videoExists: exists,
+      );
+      tracks = await playlists.tracks(again.playlist.id);
+      expect(checked, ['e']);
+      expect([for (final t in tracks) t.title], ['1', '2', '3']);
+
+      // Back in the playlist: an ordinary track again.
+      await playlists.importYouTube(
+        data([
+          v('a', 'A - 1', 'x'),
+          v('b', 'B - 2', 'x'),
+          v('c', 'C - 3', 'x'),
+        ]),
+        videoExists: exists,
+      );
+      tracks = await playlists.tracks(again.playlist.id);
+      expect([for (final t in tracks) t.videoRemoved], [false, false, false]);
+    },
+  );
+
+  test(
+    'when a missing video can\'t be checked, its track stays as it was',
+    () async {
+      await playlists.importYouTube(
+        data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x')]),
+      );
+      final again = await playlists.importYouTube(
+        data([v('a', 'A - 1', 'x')]),
+        videoExists: (_) async => null,
+      );
+      expect(again.removedVideos, 0);
+      final tracks = await playlists.tracks(again.playlist.id);
+      expect(
+        [for (final t in tracks) (t.title, t.videoRemoved)],
+        [('1', false), ('2', false)],
+      );
+    },
+  );
+
+  test(
+    'a video found removed while playing marks its playlist tracks',
+    () async {
+      final result = await playlists.importYouTube(
+        data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x')]),
+      );
+      await youTube.markVideoRemoved('b');
+      var tracks = await playlists.tracks(result.playlist.id);
+      expect([for (final t in tracks) t.videoRemoved], [false, true]);
+      expect(
+        playlistHit(tracks[1], catalog, local, youTube).youtubeVideoId,
+        isNull,
+      );
+
+      // Missing from the playlist next time: kept without asking YouTube again.
+      final checked = <String>[];
+      await playlists.importYouTube(
+        data([v('a', 'A - 1', 'x')]),
+        videoExists: (id) async {
+          checked.add(id);
+          return true;
+        },
+      );
+      expect(checked, isEmpty);
+      expect((await playlists.tracks(result.playlist.id)).length, 2);
+
+      // Listed again: it's back.
+      await playlists.importYouTube(
+        data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x')]),
+        videoExists: (_) async => true,
+      );
+      tracks = await playlists.tracks(result.playlist.id);
+      expect([for (final t in tracks) t.videoRemoved], [false, false]);
+      expect(youTube.isVideoRemoved('b'), isFalse);
+    },
+  );
 }

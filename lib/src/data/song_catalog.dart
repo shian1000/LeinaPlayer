@@ -49,6 +49,10 @@ enum YouTubeLink {
 
   /// Marked by hand as not on YouTube at all (MusicDatabase's `NO_VIDEO_SENTINEL`, "N/A").
   notOnYouTube,
+
+  /// Not stored, and the phone searched YouTube lately without finding it
+  /// (`YouTubeLibrary.notFoundSong` / `notFoundTrack`); a tap searches again.
+  notFound,
 }
 
 /// One row of MusicDatabase's `songs` table, with its artists already joined in.
@@ -61,6 +65,7 @@ class CatalogSong {
     this.year,
     this.language,
     String? youtubeVideoId,
+    this.spotifyTrackId,
     MatchTarget? youTubeTarget,
     List<String> artistNames = const [],
     List<String> origins = const [],
@@ -109,6 +114,10 @@ class CatalogSong {
 
   /// Set only when [youTube] is [YouTubeLink.linked].
   final String? youtubeVideoId;
+
+  /// The song's Spotify track, when MusicDatabase's `spotify_url` (set by hand) is a track page —
+  /// it may also be an album page, which isn't the song.
+  final String? spotifyTrackId;
   final YouTubeLink youTube;
 
   /// What to look for when the phone searches YouTube for this song itself.
@@ -165,6 +174,9 @@ class SongCatalog extends ChangeNotifier {
   List<String>? _searchTexts;
 
   CatalogStatus get status => _status;
+
+  /// When the `music.db` now loaded was downloaded (`DatabaseSync.lastSync` at load time).
+  DateTime? get loadedSyncTime => _loadedSyncTime;
   int get songCount => _songs.length;
 
   /// Fields the search looks at; never empty.
@@ -255,12 +267,16 @@ class SongCatalog extends ChangeNotifier {
       options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
     );
     try {
-      // Older databases have no youtube_video_id column.
-      final hasYouTube = (await db.rawQuery('PRAGMA table_info(songs)'))
-          .any((c) => c['name'] == 'youtube_video_id');
+      // Older databases have no youtube_video_id / spotify_url column.
+      final columns = {
+        for (final c in await db.rawQuery('PRAGMA table_info(songs)'))
+          c['name'],
+      };
+      String column(String name) => columns.contains(name) ? 's.$name' : 'NULL';
       final rows = await db.rawQuery('''
         SELECT s.id, s.title, s.album, s.year, s.language,
-               ${hasYouTube ? 's.youtube_video_id' : 'NULL'} AS youtube_video_id,
+               ${column('youtube_video_id')} AS youtube_video_id,
+               ${column('spotify_url')} AS spotify_url,
                a.name AS artist, a.origin, a.synonyms
         FROM songs s JOIN artists a ON a.id = s.artist_id''');
       final extra = await _readAdditionalArtists(db);
@@ -282,6 +298,7 @@ class SongCatalog extends ChangeNotifier {
       year: row['year'] as int?,
       language: present(row['language'] as String?),
       youtubeVideoId: (row['youtube_video_id'] as String?)?.trim(),
+      spotifyTrackId: _spotifyTrackId(row['spotify_url'] as String?),
       youTubeTarget: MatchTarget(
         title: row['title']! as String,
         mainArtists: [
@@ -299,6 +316,12 @@ class SongCatalog extends ChangeNotifier {
       synonyms: [for (final a in artists) ?present(a.synonyms)],
     );
   }
+
+  static String? _spotifyTrackId(String? url) => url == null
+      ? null
+      : RegExp(r'open\.spotify\.com/(?:intl-[\w-]+/)?track/([A-Za-z0-9]{22})')
+            .firstMatch(url)
+            ?.group(1);
 
   static _Artist _artistOf(Map<String, Object?> row, String role) => (
     role: role,

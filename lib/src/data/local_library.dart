@@ -235,7 +235,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 5,
+        version: 10,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -263,15 +263,87 @@ class LocalLibrary extends ChangeNotifier {
           await _createPlaylistTables(db);
           await _createHistoryTable(db);
           await _createCoverTables(db);
+          await _createTrackMatchTable(db);
+          await _createNotFoundTable(db);
+          await _addSpotifyTrackColumn(db);
+          await _addVideoRemovedColumn(db);
+          await _createRemovedVideosTable(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
           if (from < 3) await _createPlaylistTables(db);
           if (from < 4) await _createHistoryTable(db);
           if (from < 5) await _createCoverTables(db);
+          if (from < 6) await _createTrackMatchTable(db);
+          if (from < 7) await _createNotFoundTable(db);
+          if (from < 8) await _addSpotifyTrackColumn(db);
+          if (from < 9) await _addVideoRemovedColumn(db);
+          if (from < 10) await _createRemovedVideosTable(db);
         },
       ),
     );
+  }
+
+  /// Version 10: videos YouTube no longer has (found out by playing them or re-importing a
+  /// playlist), so the phone doesn't offer them again (see `youtube_library.dart`).
+  static Future<void> _createRemovedVideosTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE youtube_removed_videos (
+        video_id VARCHAR PRIMARY KEY,
+        found_at INTEGER NOT NULL
+      )''');
+    // Playlist tracks marked by an import before this table existed.
+    await db.execute('''
+      INSERT OR IGNORE INTO youtube_removed_videos (video_id, found_at)
+      SELECT DISTINCT youtube_video_id, CAST(strftime('%s', 'now') AS INTEGER) * 1000
+      FROM playlist_tracks
+      WHERE youtube_removed = 1 AND youtube_video_id IS NOT NULL''');
+  }
+
+  /// Version 9: a playlist track whose video YouTube removed (it vanished from the playlist and
+  /// the video itself is gone) stays, marked, so it's searched again (see `playlist_library.dart`).
+  static Future<void> _addVideoRemovedColumn(Database db) => db.execute(
+    'ALTER TABLE playlist_tracks ADD COLUMN youtube_removed INTEGER NOT NULL DEFAULT 0',
+  );
+
+  /// Version 8: a Spotify playlist's track keeps its Spotify id (also in the history), for
+  /// sharing the song.
+  static Future<void> _addSpotifyTrackColumn(Database db) async {
+    await db.execute(
+      'ALTER TABLE playlist_tracks ADD COLUMN spotify_track_id VARCHAR',
+    );
+    await db.execute(
+      'ALTER TABLE play_history ADD COLUMN spotify_track_id VARCHAR',
+    );
+  }
+
+  /// Version 7: songs the phone searched YouTube for and found nothing (see
+  /// `youtube_library.dart`), so the queue doesn't search for them again every time.
+  static Future<void> _createNotFoundTable(Database db) async {
+    // not_found_key: 'db:<songs.id>' or 'track:<normalised artist>\n<normalised title>'.
+    await db.execute('''
+      CREATE TABLE youtube_not_found (
+        not_found_key VARCHAR PRIMARY KEY,
+        artist VARCHAR,
+        title VARCHAR NOT NULL,
+        checked_at INTEGER NOT NULL
+      )''');
+  }
+
+  /// Version 6: the video the phone found for a track known only by name — a Spotify playlist's
+  /// track that isn't a MusicDatabase song (see `youtube_library.dart`). Keyed by the normalised
+  /// artist + title, so it outlives re-importing the playlist and serves every playlist with it.
+  static Future<void> _createTrackMatchTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE youtube_track_matches (
+        track_key VARCHAR PRIMARY KEY,
+        artist VARCHAR,
+        title VARCHAR NOT NULL,
+        video_id VARCHAR NOT NULL,
+        video_title VARCHAR,
+        channel VARCHAR,
+        matched_at INTEGER NOT NULL
+      )''');
   }
 
   /// Version 5: album covers (see `album_covers.dart`).
@@ -322,7 +394,8 @@ class LocalLibrary extends ChangeNotifier {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name VARCHAR NOT NULL,
         owner VARCHAR,
-        -- Where it was imported from ('youtube' + the playlist id), for re-importing.
+        -- Where it was imported from ('youtube' or 'spotify' + the playlist id), for
+        -- re-importing and sharing.
         source VARCHAR,
         source_id VARCHAR,
         created_at INTEGER NOT NULL,

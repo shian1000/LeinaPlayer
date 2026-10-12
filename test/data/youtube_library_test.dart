@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
@@ -68,6 +69,77 @@ void main() {
     expect(again.matchFor(7), 'abc');
     expect(again.matchFor(8), isNull);
   });
+
+  test('a match for a track known only by name is remembered', () async {
+    final library = newLibrary();
+    await library.load();
+    await library.saveTrackMatch(
+      'Queen, David Bowie',
+      'Under Pressure',
+      const YouTubeVideo(id: 'up', title: 'T', channel: 'C'),
+    );
+    final again = newLibrary();
+    await again.load();
+    // Same normalisation as search: case and accents don't matter.
+    expect(again.matchForTrack('queen, david bowie', 'UNDER PRESSURE'), 'up');
+    expect(again.matchForTrack('Queen', 'Under Pressure'), isNull);
+  });
+
+  test(
+    '"not found on YouTube" is remembered for a while, until a video is found',
+    () async {
+      final library = newLibrary();
+      await library.load();
+      await library.saveNotFound(artist: 'Ktoś', title: 'Rzadki utwór');
+      await library.saveNotFound(mainDbId: 3, artist: 'A', title: 'T');
+
+      final again = newLibrary();
+      await again.load();
+      expect(again.notFoundTrack('ktos', 'Rzadki utwór'), isTrue);
+      expect(again.notFoundSong(3), isTrue);
+      expect(again.notFoundSong(4), isFalse);
+
+      now = now.add(YouTubeLibrary.notFoundFor);
+      expect(again.notFoundSong(3), isFalse);
+
+      now = DateTime(2026, 10, 11, 12);
+      await again.saveMatch(
+        3,
+        const YouTubeVideo(id: 'v3', title: 't', channel: 'c'),
+      );
+      expect(again.notFoundSong(3), isFalse);
+      final third = newLibrary();
+      await third.load();
+      expect(third.notFoundSong(3), isFalse);
+    },
+  );
+
+  test(
+    'rows show what the phone learned on YouTube since they were made',
+    () async {
+      final library = newLibrary();
+      await library.load();
+      // As a queue holds it: no video yet.
+      final queued = SearchHit.youTubeOnly(
+        title: 'Gypsy',
+        artistLabel: 'Fleetwood Mac',
+        videoId: null,
+      );
+      expect(withPhoneYouTube(queued, library).youTube, YouTubeLink.unknown);
+
+      await library.saveNotFound(artist: 'Fleetwood Mac', title: 'Gypsy');
+      expect(withPhoneYouTube(queued, library).youTube, YouTubeLink.notFound);
+
+      await library.saveTrackMatch(
+        'Fleetwood Mac',
+        'Gypsy',
+        const YouTubeVideo(id: 'gyp', title: 't', channel: 'c'),
+      );
+      final shown = withPhoneYouTube(queued, library);
+      expect(shown.youTube, YouTubeLink.linked);
+      expect(shown.youtubeVideoId, 'gyp');
+    },
+  );
 
   test('keeps at most the limit, dropping the least recently played', () async {
     final library = newLibrary();

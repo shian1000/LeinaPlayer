@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'fixtures.dart';
+import '../support/waiting.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -86,6 +87,26 @@ void main() {
       },
     );
 
+    test('reads a Spotify track link, not an album one', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN spotify_url VARCHAR');
+      await db.rawUpdate(
+        "UPDATE songs SET spotify_url = "
+        "'https://open.spotify.com/track/7lQ8MOhq6IN2w8EYcFNSUk' WHERE id = 2",
+      );
+      await db.rawUpdate(
+        "UPDATE songs SET spotify_url = "
+        "'https://open.spotify.com/album/1Ugdi2OTxKopVVqsprp5pb' WHERE id = 5",
+      );
+      await db.close();
+      await catalog.ensureLoaded();
+      expect(catalog.byId(2)!.spotifyTrackId, '7lQ8MOhq6IN2w8EYcFNSUk');
+      expect(catalog.byId(5)!.spotifyTrackId, isNull);
+      expect(catalog.byId(1)!.spotifyTrackId, isNull);
+    });
+
     test('puts titles starting with the query first', () async {
       await loadSample();
       expect(catalog.search('california').map((s) => s.id).toList(), [5, 2]);
@@ -113,9 +134,7 @@ void main() {
       });
       await sync.load();
       // The reload runs in the background and touches the real file system.
-      for (var i = 0; i < 100 && catalog.search('nowa').isEmpty; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
+      await waitUntil(() => catalog.search('nowa').isNotEmpty);
       expect(catalog.search('nowa').single.id, 6);
     });
 
@@ -176,9 +195,7 @@ void main() {
       await catalog.setSearchFields({SearchField.year, SearchField.title});
       final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
       addTearDown(again.dispose);
-      for (var i = 0; i < 50 && again.searchFields.length != 2; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-      }
+      await waitUntil(() => again.searchFields.length == 2);
       expect(again.searchFields, {SearchField.year, SearchField.title});
     });
 
