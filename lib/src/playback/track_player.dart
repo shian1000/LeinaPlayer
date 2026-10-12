@@ -10,6 +10,7 @@ import '../data/youtube_matcher.dart';
 import '../data/youtube_search.dart';
 import 'player_controller.dart';
 import 'youtube_playback.dart';
+import '../data/album_covers.dart';
 
 /// How playing one song went; [message] is for the user (what was found, or why it failed),
 /// `null` when there's nothing to say.
@@ -97,6 +98,7 @@ class TrackPlayer {
             artist: hit.artistLabel,
             source: hit.phoneFiles.first.filePath,
             coverSeed: hit.coverSeed,
+            cover: CoverRequest.of(hit),
             searchQuery: searchQuery,
             playlistName: playlistName,
           ),
@@ -110,6 +112,7 @@ class TrackPlayer {
           title: hit.title,
           artist: hit.artistLabel,
           coverSeed: hit.coverSeed,
+          cover: CoverRequest.of(hit),
           searchQuery: searchQuery,
           playlistName: playlistName,
           allowExternal: allowExternal,
@@ -162,6 +165,7 @@ class TrackPlayer {
       title: hit.title,
       artist: hit.artistLabel,
       coverSeed: hit.coverSeed,
+      cover: CoverRequest.of(hit),
       searchQuery: searchQuery,
       playlistName: playlistName,
       allowExternal: allowExternal,
@@ -194,7 +198,7 @@ class TrackPlayer {
     return videoId == null ? hit : hit.withPhoneMatch(videoId);
   }
 
-  /// Downloads [hit]'s YouTube audio to the cache ahead of time ("Cachowanie kolejki"), finding
+  /// Downloads [hit]'s YouTube audio to the cache ahead of time (Pamięć podręczna › Kolejka), finding
   /// the video first when the phone doesn't know it yet. Does nothing for songs another source
   /// plays first, while the cache is off, or off Wi-Fi when the user saves mobile data. Returns
   /// whether the song is ready in the cache.
@@ -246,6 +250,7 @@ class TrackPlayer {
     required String title,
     required String artist,
     required String coverSeed,
+    CoverRequest? cover,
     String? searchQuery,
     String? playlistName,
     bool allowExternal = true,
@@ -268,6 +273,7 @@ class TrackPlayer {
           artist: artist,
           source: source,
           coverSeed: coverSeed,
+          cover: cover?.withVideo(videoId),
           searchQuery: searchQuery,
           playlistName: playlistName,
           youtubeVideoId: videoId,

@@ -7,6 +7,7 @@ import '../data/combined_search.dart';
 import '../data/track_ref.dart';
 import 'player_controller.dart';
 import 'track_player.dart';
+import '../data/album_covers.dart';
 
 /// A song that started playing from the queue, for the history; [playlistId] / [playlistName]
 /// are set when it played as part of a playlist.
@@ -386,6 +387,7 @@ class PlaybackQueue extends ChangeNotifier {
       source: hit.onPhone ? hit.phoneFiles.first.filePath : '',
       youtubeVideoId: hit.onPhone ? null : hit.youtubeVideoId,
       coverSeed: hit.coverSeed,
+      cover: CoverRequest.of(hit),
       playlistName: entry.added ? null : _playlistName,
       searchQuery: entry.added ? null : _searchQuery,
     );

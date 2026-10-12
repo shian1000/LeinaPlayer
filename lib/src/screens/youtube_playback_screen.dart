@@ -28,7 +28,8 @@ class YouTubePlaybackScreen extends StatelessWidget {
 
     String note(YouTubePlaybackMethod m) => switch (m) {
       YouTubePlaybackMethod.cache =>
-        'Utwory odtworzone wcześniej grają z telefonu, także bez internetu',
+        'Utwory odtworzone wcześniej grają z telefonu, także bez internetu (ustawienia: '
+            'Oszczędzanie danych › Pamięć podręczna)',
       YouTubePlaybackMethod.newPipe =>
         newPipeAvailable
             ? 'Dźwięk prosto z YouTube, na telefonie'

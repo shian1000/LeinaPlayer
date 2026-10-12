@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../data/combined_search.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
-import '../widgets/cover_art.dart';
 import '../widgets/song_tile.dart';
+import '../data/album_covers.dart';
+import '../widgets/song_cover.dart';
 
 /// "Kolejka", opened from the full player: the song playing, the songs added with "Dodaj do
 /// kolejki", then the rest of the playlist / results in play order. Tapping a song plays it
@@ -166,7 +167,7 @@ class _QueueRow extends StatelessWidget {
     final trailing = this.trailing;
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
-      leading: CoverArt(seed: hit.coverSeed, size: SongTile.coverSize),
+      leading: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),
       title: CurrentTitle(text: hit.title, isCurrent: isCurrent),
       subtitle: Text(
         hit.artistLabel,

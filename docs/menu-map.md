@@ -54,7 +54,7 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     those listed before it); off: back to the context's order after the current song. When a
     song ends the next one plays, skipping songs that can't be played (without opening the
     YouTube app). After each song starts, the next N songs in play order are cached (see
-    "Cachowanie kolejki" in Źródła muzyki).
+    Oszczędzanie danych › Pamięć podręczna › Kolejka).
   - `Odtwarzacz › Urządzenia`, `Odtwarzacz › Udostępnij`, Kolejka **→ Kolejka**
     (`queue_screen.dart`) — **implemented**: "Teraz odtwarzane", "Następne w kolejce" (added
     songs, with "Wyczyść kolejkę"), "Następne z: <playlist / search>" (the rest in play order),
@@ -147,23 +147,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     resort: opens the video in the YouTube app — inside its YouTube playlist when the song plays
     from an imported one — or the browser without it, and pauses this app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
 
-    *Pamięć podręczna* — "Liczba utworów" (dialog, default 25; lowering it deletes the excess
-    at once), "Zajęte miejsce" ("N utworów, X MB") **→ Pamięć podręczna** (`cache_contents_screen.dart`:
-    the cached songs, most recently played first, as song rows with their size — a MusicDatabase
-    song where the video is known, else the title the phone saw in a playlist, the history or a
-    match; tapping plays from there on through the list, all from the phone; ⊖ "Usuń z pamięci
-    podręcznej"), "Wyczyść pamięć podręczną" (confirm dialog).
+    The cache of played songs is in Oszczędzanie danych › Pamięć podręczna.
   - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
     reorder the playback sources (default: 1. Telefon, 2. YouTube). When a song is playable
     from several, the first one in this order is used.
-  - "Twórz cache dla przyszłych utworów w kolejce" — switch (on by default) for queue caching;
-    its subtitle says when YouTube's "Pamięć podręczna" method is off (then nothing is cached).
-  - "Cachowanie kolejki" — dialog, 1–10 next songs (default 3): after each queue song starts,
-    the next N in play order (shuffled order when shuffle is on, songs added with "Dodaj do
-    kolejki" first) are downloaded to the YouTube cache one by one. Only songs that would play
-    from YouTube; a song without a known video is searched and matched first (the match is
-    remembered, so playing it later doesn't search again). The cache then keeps at least N + 2
-    songs, whatever "Liczba utworów" says (`SourceSettings.cacheKeep`).
 - Wygląd **→ Wygląd** (`appearance_screen.dart`) — **implemented**, everything applies at once
   and is remembered after restart:
   - Motyw jasny **→ list of light themes** (Dummify) — used while dark mode is off.
@@ -173,8 +160,23 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     the system's current mode) while the next switch is on.
   - "Systemowe przełączanie trybu ciemnego" — switch; when on, light/dark follows the phone's
     dark-mode setting.
+  - Filtry do albumów **→ Filtry do albumów** (`cover_filter_screen.dart`) — **implemented**: a
+    preview on the playing song's cover, then Brak / Lain / Monochromatic (radio); with a filter
+    on, "Intensywność" (slider 0–100 % in 5 % steps, default 100 %, kept per filter; the preview
+    follows the drag, it's saved on release); with Monochromatic two rows of round swatches:
+    "Kolor punktów" (Fosfor — default, Zielony, Bursztyn, Cyjan, Biały, Róż) and "Kolor tła"
+    ("A" = automatic, the dot colour dimmed — default; Czarny, Ciemna zieleń, Jasna zieleń
+    (Game Boy), Papier), each followed by the user's saved colours (long press forgets one) and
+    "+" (colour picker: saved colours, saturation/brightness square, hue bar, hex field —
+    `widgets/color_picker.dart`). A picked colour that isn't a preset is saved (newest first, at
+    most 8, shared by both rows). Applies to every `SongCover` and the player tint (see
+    [`agent-notes/covers.md`](agent-notes/covers.md)).
 
   Themes are defined in `lib/src/theme.dart` (see [`agent-notes/theming.md`](agent-notes/theming.md)).
+- Źródła okładek **→ Źródła okładek** (`cover_sources_screen.dart`) — **implemented**: the cover
+  sources with switches, drag to reorder (Serwer — dummy, always off; Plik na telefonie; iTunes;
+  Deezer; Miniatura z YouTube); the cover cache is in Oszczędzanie danych › Pamięć podręczna. See
+  [`agent-notes/covers.md`](agent-notes/covers.md).
 - `Ustawienia › Odtwarzanie`
 - Historia odtwarzania **→ Historia odtwarzania** (`history_settings_screen.dart`) —
   **implemented**: "Przechowuj historię" (dialog: 7 / 30 / 90 — default / 180 dni, Rok, Bez
@@ -182,8 +184,31 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   never more than 1000 kept), "Wyczyść historię" (confirm dialog, same as in Ostatnie).
 - `Ustawienia › Powiadomienia`
 - Oszczędzanie danych i tryb offline **→ Oszczędzanie danych i tryb offline**
-  (`data_saver_screen.dart`) — **implemented**: "Cache'uj przyszłe utwory w kolejce tylko przez
-  Wi-Fi" (off by default; Wi-Fi = the phone has a Wi-Fi IP address).
+  (`data_saver_screen.dart`) — **implemented**: "Zapisuj następne utwory z kolejki tylko przez
+  Wi-Fi" (off by default; Wi-Fi = the phone has a Wi-Fi IP address), "Pobieraj okładki tylko
+  przez Wi-Fi" (off by default; on cellular only cached covers and covers inside phone files show),
+  Pamięć podręczna **→ Pamięć podręczna** (`cache_settings_screen.dart`; subtitle: MB used in
+  total) — every cache setting, nowhere else ("Pamięć podręczna" is the one name used in the UI):
+  - "Zajęte razem: X MB".
+  - *Utwory z YouTube* — "Liczba utworów" (dialog, default 25; lowering it deletes the excess
+    at once; disabled with a note while YouTube's "Pamięć podręczna" playback method is off),
+    "Zajęte miejsce" ("N utworów, X MB") **→ Utwory z YouTube** (`cache_contents_screen.dart`:
+    the cached songs, most recently played first, as song rows with their size — a MusicDatabase
+    song where the video is known, else the title the phone saw in a playlist, the history or a
+    match; tapping plays from there on through the list, all from the phone; ⊖ "Usuń z pamięci
+    podręcznej"), "Wyczyść utwory z YouTube" (confirm dialog).
+  - *Kolejka* — "Zapisuj z wyprzedzeniem następne utwory z kolejki" — switch (on by default);
+    its subtitle says when YouTube's "Pamięć podręczna" method is off (then nothing is cached).
+    "Ile następnych utworów" — dialog, 1–10 next songs (default 3): after each queue song
+    starts, the next N in play order (shuffled order when shuffle is on, songs added with
+    "Dodaj do kolejki" first) are downloaded to the YouTube cache one by one. Only songs that
+    would play from YouTube; a song without a known video is searched and matched first (the
+    match is remembered, so playing it later doesn't search again). The cache then keeps at
+    least N + 2 songs, whatever "Liczba utworów" says (`SourceSettings.cacheKeep`).
+  - *Okładki* — "Rozmiar" (dialog: 25 / 50 / 100 — default / 200 / 500 MB), "Wyczyść okładki"
+    (MB used and image count; confirm dialog).
+  - "Wyczyść wszystko" — YouTube songs and covers (confirm dialog; the downloaded database and
+    phone music stay).
 - `Ustawienia › Jakość zawartości multimedialnej`
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: "Tylko do
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
@@ -270,6 +295,11 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 
 - Transparent app bar over the header; once the header scrolls away it turns solid and shows
   the playlist name (as in the reference app). Back arrow pops.
+- Szukaj w playliście (search icon next to ⋮, **implemented**): the app bar turns into a search
+  field and only the tracks whose title, artist or album contain every word of the query are
+  listed (normalised like song search; "Brak wyników dla „…”" otherwise). Tapping one plays on
+  through the whole playlist from it. Back (arrow or system) closes the search first — it's a
+  local history entry of the route — and returns to the playlist where it was.
 - Header: 2×2 mosaic of the first four tracks' covers (one cover with fewer tracks), name, owner
   avatar + name (the YouTube channel), "N utworów • X godz. Y min" (sum of the known lengths).
 - Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: `Udostępnij`, **`Usuń z

@@ -9,6 +9,7 @@ import 'youtube_source_screen.dart';
 
 /// "Ustawienia › Źródła muzyki" — where the app gets music from: folders on the device and the
 /// MusicDatabase database downloaded from a server, YouTube, and which of them plays first.
+/// (Caching the queue's next songs is in Oszczędzanie danych › Pamięć podręczna.)
 class MusicSourcesScreen extends StatelessWidget {
   const MusicSourcesScreen({super.key});
 
@@ -16,9 +17,6 @@ class MusicSourcesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = SourceSettingsScope.of(context);
     final order = settings.playbackOrder;
-    final cacheOn = settings.playbackMethods.contains(
-      YouTubePlaybackMethod.cache,
-    );
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.palette.surface,
@@ -74,56 +72,8 @@ class MusicSourcesScreen extends StatelessWidget {
               ),
             ),
           ),
-          SwitchListTile(
-            secondary: const Icon(Icons.download_outlined),
-            title: const Text('Twórz cache dla przyszłych utworów w kolejce'),
-            subtitle: Text(
-              cacheOn
-                  ? 'Następne utwory z YouTube są pobierane na telefon z wyprzedzeniem'
-                  : 'Wymaga pamięci podręcznej (YouTube › Sposoby odtwarzania)',
-            ),
-            value: settings.queuePrefetchEnabled,
-            onChanged: settings.setQueuePrefetchEnabled,
-          ),
-          ListTile(
-            enabled: settings.queuePrefetchEnabled,
-            leading: const Icon(Icons.queue_music),
-            title: const Text('Cachowanie kolejki'),
-            subtitle: Text(_songCount(settings.queuePrefetch)),
-            onTap: () => _pickQueuePrefetch(context, settings),
-          ),
         ],
       ),
     );
   }
-
-  Future<void> _pickQueuePrefetch(
-    BuildContext context,
-    SourceSettings settings,
-  ) async {
-    final count = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: const Text('Ile następnych utworów z kolejki pobierać?'),
-        children: [
-          for (var n = 1; n <= SourceSettings.maxQueuePrefetch; n++)
-            ListTile(
-              title: Text(_songCount(n)),
-              trailing: n == settings.queuePrefetch
-                  ? Icon(Icons.check, color: context.palette.accent)
-                  : null,
-              onTap: () => Navigator.of(dialogContext).pop(n),
-            ),
-        ],
-      ),
-    );
-    if (count != null) await settings.setQueuePrefetch(count);
-  }
-}
-
-/// "1 następny utwór", "3 następne utwory", "5 następnych utworów".
-String _songCount(int n) {
-  if (n == 1) return '1 następny utwór';
-  final few = n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
-  return few ? '$n następne utwory' : '$n następnych utworów';
 }

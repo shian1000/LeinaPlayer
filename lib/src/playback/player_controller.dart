@@ -4,6 +4,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../data/album_covers.dart';
+
 /// What's loaded in the player.
 class NowPlaying {
   const NowPlaying({
@@ -11,10 +13,11 @@ class NowPlaying {
     required this.artist,
     required this.source,
     required this.coverSeed,
+    CoverRequest? cover,
     this.searchQuery,
     this.playlistName,
     this.youtubeVideoId,
-  });
+  }) : _givenCover = cover;
 
   final String title;
   final String artist;
@@ -29,6 +32,18 @@ class NowPlaying {
 
   /// Seed for the placeholder cover, so the player shows the same art as the result list.
   final String coverSeed;
+
+  final CoverRequest? _givenCover;
+
+  /// The song's album cover; without one, just the placeholder.
+  CoverRequest get cover =>
+      _givenCover ??
+      CoverRequest(
+        artist: artist,
+        title: title,
+        seed: coverSeed,
+        searchable: false,
+      );
 
   /// The search the song was started from ("Odtwarzanie z wyników wyszukiwania").
   final String? searchQuery;
@@ -75,12 +90,13 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   Stream<MediaSkip> get skips => _skips.stream;
 
   /// What the notification shows.
-  void show(NowPlaying track, Duration? duration) => mediaItem.add(
+  void show(NowPlaying track, Duration? duration, Uri? art) => mediaItem.add(
     MediaItem(
       id: track.youtubeVideoId ?? track.source,
       title: track.title,
       artist: track.artist,
       duration: duration,
+      artUri: art,
     ),
   );
 
@@ -129,17 +145,31 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
 
 class JustAudioBackend implements AudioBackend {
   /// Without a [session] (it failed to start) music still plays, just with no notification.
-  JustAudioBackend([this._session]) {
+  /// [artFor] finds the cover file the notification shows; it's found again when [artChanged]
+  /// notifies (e.g. another cover filter).
+  JustAudioBackend([this._session, this._artFor, this._artChanged]) {
+    _artChanged?.addListener(_refreshArt);
     final session = _session;
     if (session != null) {
       _durationSub = _player.durationStream.listen((d) {
+        _duration = d;
         final track = _track;
-        if (track != null) session.show(track, d);
+        if (track != null) session.show(track, d, _art);
       });
     }
   }
 
   final MediaSession? _session;
+  final Future<Uri?> Function(NowPlaying track)? _artFor;
+  final Listenable? _artChanged;
+
+  void _refreshArt() {
+    final track = _track;
+    if (track != null) unawaited(_showArt(track));
+  }
+
+  Duration? _duration;
+  Uri? _art;
   late final AudioPlayer _player = _session?.player ?? AudioPlayer();
   StreamSubscription<Duration?>? _durationSub;
   NowPlaying? _track;
@@ -165,12 +195,31 @@ class JustAudioBackend implements AudioBackend {
   @override
   Future<void> open(NowPlaying track) async {
     _track = track;
-    _session?.show(track, null);
+    _art = null;
+    _duration = null;
+    _session?.show(track, null, null);
+    unawaited(_showArt(track));
     await _player.setAudioSource(
       track.isStream
           ? AudioSource.uri(Uri.parse(track.source))
           : AudioSource.file(track.source),
     );
+  }
+
+  /// The cover can take a while (a download), so the notification first shows the song without
+  /// it.
+  Future<void> _showArt(NowPlaying track) async {
+    final session = _session;
+    final artFor = _artFor;
+    if (session == null || artFor == null) return;
+    try {
+      final art = await artFor(track);
+      if (art == null || !identical(track, _track)) return;
+      _art = art;
+      session.show(track, _duration, art);
+    } catch (e) {
+      debugPrint('Cover for the notification failed: $e');
+    }
   }
 
   @override
@@ -187,6 +236,7 @@ class JustAudioBackend implements AudioBackend {
 
   @override
   Future<void> dispose() async {
+    _artChanged?.removeListener(_refreshArt);
     await _durationSub?.cancel();
     await _player.dispose();
   }

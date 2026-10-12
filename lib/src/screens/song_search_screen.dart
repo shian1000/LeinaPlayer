@@ -12,10 +12,11 @@ import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
-import '../widgets/cover_art.dart';
 import '../widgets/song_tile.dart';
 import 'database_source_screen.dart';
 import 'search_fields_sheet.dart';
+import '../data/album_covers.dart';
+import '../widgets/song_cover.dart';
 
 /// Song search over the downloaded MusicDatabase (`music.db`), opened from the
 /// "Czego chcesz posłuchać?" field on the Wyszukaj tab. Results update on every keystroke.
@@ -346,7 +347,16 @@ class _YouTubeTile extends StatelessWidget {
         hit: hit,
         idPrefix: 'Wyszukaj › Utwór › Menu (⋮)',
       ),
-      leading: CoverArt(seed: video.id, size: SongTile.coverSize),
+      leading: SongCover(
+        cover: CoverRequest(
+          artist: video.channel,
+          title: video.title,
+          videoId: video.id,
+          seed: video.id,
+          searchable: false,
+        ),
+        size: SongTile.coverSize,
+      ),
       title: CurrentTitle(text: video.title, isCurrent: isCurrent),
       subtitle: Text(
         [

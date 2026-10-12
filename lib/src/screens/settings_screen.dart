@@ -4,6 +4,7 @@ import '../dummy.dart';
 import '../theme.dart';
 import 'about_screen.dart';
 import 'appearance_screen.dart';
+import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
 import 'history_settings_screen.dart';
 import 'music_sources_screen.dart';
@@ -30,8 +31,14 @@ const _entries = [
   _SettingsEntry(
     Icons.library_music_outlined,
     'Źródła muzyki',
-    'Muzyka lokalna • YouTube • Cachowanie kolejki',
+    'Muzyka lokalna • YouTube • Kolejność odtwarzania',
     opens: _openMusicSources,
+  ),
+  _SettingsEntry(
+    Icons.album_outlined,
+    'Źródła okładek',
+    'Plik na telefonie • iTunes • Deezer • YouTube',
+    opens: _openCoverSources,
   ),
   _SettingsEntry(
     Icons.palette_outlined,
@@ -54,7 +61,7 @@ const _entries = [
   _SettingsEntry(
     Icons.download_for_offline_outlined,
     'Oszczędzanie danych i tryb offline',
-    'Cache kolejki tylko przez Wi-Fi',
+    'Tylko przez Wi-Fi • Pamięć podręczna',
     opens: _openDataSaver,
   ),
   _SettingsEntry(
@@ -73,6 +80,8 @@ const _entries = [
 Widget _openAppearance(BuildContext context) => const AppearanceScreen();
 
 Widget _openMusicSources(BuildContext context) => const MusicSourcesScreen();
+
+Widget _openCoverSources(BuildContext context) => const CoverSourcesScreen();
 
 Widget _openAbout(BuildContext context) => const AboutScreen();
 

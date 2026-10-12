@@ -6,9 +6,10 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/track_player.dart';
 import '../theme.dart';
-import 'cover_art.dart';
 import 'menu_sheet.dart';
 import 'playing_bars.dart';
+import '../data/album_covers.dart';
+import 'song_cover.dart';
 
 /// Result title; the song in the player is highlighted like in the reference app.
 class CurrentTitle extends StatelessWidget {
@@ -176,7 +177,7 @@ class SongTile extends StatelessWidget {
       contentPadding: trailing == null
           ? null
           : const EdgeInsets.only(left: 16, right: 4),
-      leading: CoverArt(seed: hit.coverSeed, size: SongTile.coverSize),
+      leading: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),
       title: CurrentTitle(text: hit.title, isCurrent: isCurrent),
       subtitle: Text(details, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: trailing == null
@@ -299,7 +300,7 @@ class SongMenuButton extends StatelessWidget {
         context,
         idPrefix: idPrefix,
         header: MenuSheetHeader(
-          cover: CoverArt(seed: hit.coverSeed, size: 56),
+          cover: SongCover(cover: CoverRequest.of(hit)),
           title: hit.title,
           subtitle: hit.artistLabel,
         ),

@@ -48,6 +48,30 @@ enum YouTubePlaybackMethod {
   bool get streams => this == newPipe || this == explode || this == ytDlpServer;
 }
 
+/// Where an album cover can come from; the user switches them on and orders them in
+/// "Ustawienia › Źródła okładek". The first one that has a cover wins.
+enum CoverSource {
+  /// MusicDatabase's server — it has no covers yet (dummy).
+  server('Serwer'),
+
+  /// The cover inside the music file on the phone.
+  file('Plik na telefonie'),
+  itunes('iTunes'),
+  deezer('Deezer'),
+
+  /// The YouTube video's thumbnail, cropped to a square.
+  youtube('Miniatura z YouTube');
+
+  const CoverSource(this.label);
+
+  final String label;
+
+  static const defaults = {file, itunes, deezer, youtube};
+
+  /// Not usable yet; shown switched off.
+  bool get available => this != server;
+}
+
 /// "Ustawienia › Źródła muzyki": the YouTube settings and the playback order. Saved in
 /// `shared_preferences`.
 class SourceSettings extends ChangeNotifier {
@@ -68,6 +92,12 @@ class SourceSettings extends ChangeNotifier {
   static const _queuePrefetchWifiOnlyKey =
       'data_saver.queue_prefetch_wifi_only';
 
+  static String _coverKey(CoverSource s) => 'covers.source.${s.name}';
+  static const _coverOrderKey = 'covers.order';
+  static const _coverCacheLimitKey = 'covers.cache_limit_mb';
+  static const defaultCoverCacheLimitMb = 100;
+  static const _coverWifiOnlyKey = 'data_saver.covers_wifi_only';
+
   bool _youTubeSearchEnabled = false;
   Set<YouTubeMethod> _methods = {YouTubeMethod.newPipe, YouTubeMethod.explode};
   String? _apiKey;
@@ -79,6 +109,10 @@ class SourceSettings extends ChangeNotifier {
   int _queuePrefetch = defaultQueuePrefetch;
   bool _queuePrefetchEnabled = true;
   bool _queuePrefetchWifiOnly = false;
+  List<CoverSource> _coverOrder = CoverSource.values;
+  Set<CoverSource> _coverSources = CoverSource.defaults;
+  int _coverCacheLimitMb = defaultCoverCacheLimitMb;
+  bool _coverWifiOnly = false;
 
   /// "Włącz szukanie w serwisie YouTube".
   bool get youTubeSearchEnabled => _youTubeSearchEnabled;
@@ -108,8 +142,8 @@ class SourceSettings extends ChangeNotifier {
   /// "Twórz cache dla przyszłych utworów w kolejce".
   bool get queuePrefetchEnabled => _queuePrefetchEnabled;
 
-  /// How many of the queue's next songs get downloaded to the cache ahead of time ("Cachowanie
-  /// kolejki").
+  /// How many of the queue's next songs get downloaded to the cache ahead of time (Pamięć
+  /// podręczna › Kolejka).
   int get queuePrefetch => _queuePrefetch;
 
   /// Songs to cache ahead right now; 0 = none (switched off).
@@ -117,6 +151,23 @@ class SourceSettings extends ChangeNotifier {
 
   /// Cache ahead only on Wi-Fi (Oszczędzanie danych i tryb offline).
   bool get queuePrefetchWifiOnly => _queuePrefetchWifiOnly;
+
+  /// Every [CoverSource], tried first to last (only the switched-on ones are used).
+  List<CoverSource> get coverOrder => _coverOrder;
+
+  Set<CoverSource> get coverSources => _coverSources;
+
+  /// The switched-on, usable cover sources in the user's order.
+  List<CoverSource> get activeCoverSources => [
+    for (final s in _coverOrder)
+      if (s.available && _coverSources.contains(s)) s,
+  ];
+
+  /// Size limit of the cover cache, in MB.
+  int get coverCacheLimitMb => _coverCacheLimitMb;
+
+  /// Download covers only on Wi-Fi (Oszczędzanie danych i tryb offline); cached ones still show.
+  bool get coverWifiOnly => _coverWifiOnly;
 
   /// How many files the cache really keeps: never so few that songs cached ahead for the queue
   /// push out the one playing (or each other) before they're played.
@@ -143,6 +194,17 @@ class SourceSettings extends ChangeNotifier {
         prefs.getBool(_queuePrefetchEnabledKey) ?? _queuePrefetchEnabled;
     _queuePrefetchWifiOnly =
         prefs.getBool(_queuePrefetchWifiOnlyKey) ?? _queuePrefetchWifiOnly;
+    _coverSources = {
+      for (final s in CoverSource.values)
+        if (prefs.getBool(_coverKey(s)) ?? _coverSources.contains(s)) s,
+    };
+    _coverOrder = _withAll(
+      CoverSource.values,
+      prefs.getStringList(_coverOrderKey),
+    );
+    _coverCacheLimitMb =
+        prefs.getInt(_coverCacheLimitKey) ?? _coverCacheLimitMb;
+    _coverWifiOnly = prefs.getBool(_coverWifiOnlyKey) ?? _coverWifiOnly;
     _playbackMethodOrder = _withAll(
       YouTubePlaybackMethod.values,
       prefs.getStringList(_playbackMethodOrderKey),
@@ -244,6 +306,44 @@ class SourceSettings extends ChangeNotifier {
     notifyListeners();
     await (await SharedPreferences.getInstance()).setBool(
       _queuePrefetchWifiOnlyKey,
+      value,
+    );
+  }
+
+  Future<void> setCoverSource(CoverSource source, bool enabled) async {
+    _coverSources = Set.unmodifiable(
+      enabled ? {..._coverSources, source} : _coverSources.difference({source}),
+    );
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _coverKey(source),
+      enabled,
+    );
+  }
+
+  Future<void> setCoverOrder(List<CoverSource> order) async {
+    _coverOrder = List.unmodifiable(order);
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setStringList(
+      _coverOrderKey,
+      [for (final s in order) s.name],
+    );
+  }
+
+  Future<void> setCoverCacheLimitMb(int mb) async {
+    _coverCacheLimitMb = mb < 1 ? 1 : mb;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setInt(
+      _coverCacheLimitKey,
+      _coverCacheLimitMb,
+    );
+  }
+
+  Future<void> setCoverWifiOnly(bool value) async {
+    _coverWifiOnly = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _coverWifiOnlyKey,
       value,
     );
   }

@@ -1,5 +1,7 @@
 # Agent notes
 
+- [`covers.md`](covers.md) — album covers: sources, matching, rate limits, the cover cache,
+  filters, avoiding placeholder flashes, the MusicDatabase hand-off.
 - [`local-library.md`](local-library.md) — phone library scan, matching, `local.db`, search
   availability, playback order, background playback.
 - [`playlists.md`](playlists.md) — Biblioteka playlists: tables, YouTube import, recognising songs.

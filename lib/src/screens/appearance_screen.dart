@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import '../theme_controller.dart';
+import 'cover_filter_screen.dart';
 
 /// "Ustawienia › Wygląd". A light and a dark theme are chosen separately; the two switches
 /// decide which of them is shown — by hand ("Przełącz na tryb ciemny") or following the phone's
@@ -43,6 +44,17 @@ class AppearanceScreen extends StatelessWidget {
             subtitle: Text(themes.dark.name),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, dark: true),
+          ),
+          ListTile(
+            leading: const Icon(Icons.filter_vintage_outlined),
+            title: const Text('Filtry do albumów'),
+            subtitle: Text(themes.coverFilter.label),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const CoverFilterScreen(),
+              ),
+            ),
           ),
           const Divider(height: 24),
           SwitchListTile(

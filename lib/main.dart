@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'src/app_name.dart';
+import 'src/data/album_covers.dart';
 import 'src/data/database_sync.dart';
 import 'src/data/incoming_links.dart';
 import 'src/data/local_library.dart';
@@ -93,9 +94,31 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   late final _localLibrary = LocalLibrary(_songCatalog);
   late final _youTubeLibrary = YouTubeLibrary(_localLibrary.database);
   late final _player = PlayerController(
-    backend: () => JustAudioBackend(widget.mediaSession),
+    backend: () => JustAudioBackend(
+      widget.mediaSession,
+      (track) => _albumCovers.artFile(
+        track.cover,
+        filter: _themeController.coverFilter,
+        color: _themeController.monochromeColor,
+        strength: _themeController.coverFilterStrength,
+        background: _themeController.monochromeBackground,
+      ),
+      _coverLook,
+    ),
   );
   final _sourceSettings = SourceSettings();
+
+  /// The cover filter and its colour: the notification's cover is made again when they change.
+  final _coverLook = ValueNotifier('');
+  void _updateCoverLook() => _coverLook.value =
+      '${_themeController.coverFilter.name}|'
+      '${_themeController.monochromeColor.toARGB32()}|'
+      '${_themeController.coverFilterStrength}|'
+      '${_themeController.monochromeBackground?.toARGB32()}';
+  late final _albumCovers = AlbumCovers(
+    _localLibrary.database,
+    _sourceSettings,
+  );
   late final _youTubeSearch = widget.youTubeSearch ?? YouTubeSearch();
   late final _youTubeAudio = widget.youTubeAudio ?? YouTubeAudio();
   late final _youTubePlaylists = widget.youTubePlaylists ?? YouTubePlaylists();
@@ -128,6 +151,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   void initState() {
     super.initState();
     _startDatabaseSync();
+    _updateCoverLook();
+    _themeController.addListener(_updateCoverLook);
     _sourceSettings.load().catchError(
       (Object e) => debugPrint('Loading music source settings failed: $e'),
     );
@@ -187,6 +212,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
 
   @override
   void dispose() {
+    _themeController.removeListener(_updateCoverLook);
+    _coverLook.dispose();
     _lifecycle.dispose();
     _historySub.cancel();
     _incomingLinks.dispose();
@@ -195,6 +222,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _playbackQueue.dispose();
     _player.dispose();
     _sourceSettings.dispose();
+    _albumCovers.dispose();
     _playlistLibrary.dispose();
     _youTubeLibrary.dispose();
     _localLibrary.dispose();
@@ -224,33 +252,36 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
                     notifier: _playbackQueue,
                     child: SourceSettingsScope(
                       notifier: _sourceSettings,
-                      child: YouTubeScope(
-                        search: _youTubeSearch,
-                        audio: _youTubeAudio,
-                        playlists: _youTubePlaylists,
-                        child: ThemeScope(
-                          notifier: _themeController,
-                          child: ListenableBuilder(
-                            listenable: _themeController,
-                            builder: (context, _) => MaterialApp(
-                              title: appName,
-                              debugShowCheckedModeBanner: false,
-                              theme: buildAppTheme(_themeController.light),
-                              darkTheme: buildAppTheme(_themeController.dark),
-                              themeMode: _themeController.themeMode,
-                              // Tab screens have no AppBar to set the status-bar icon colour, so
-                              // match it to the active theme here (dark icons on light themes and
-                              // vice versa).
-                              builder: (context, child) =>
-                                  AnnotatedRegion<SystemUiOverlayStyle>(
-                                    value:
-                                        Theme.of(context).brightness ==
-                                            Brightness.light
-                                        ? SystemUiOverlayStyle.dark
-                                        : SystemUiOverlayStyle.light,
-                                    child: child!,
-                                  ),
-                              home: AppShell(links: _incomingLinks.links),
+                      child: AlbumCoversScope(
+                        notifier: _albumCovers,
+                        child: YouTubeScope(
+                          search: _youTubeSearch,
+                          audio: _youTubeAudio,
+                          playlists: _youTubePlaylists,
+                          child: ThemeScope(
+                            notifier: _themeController,
+                            child: ListenableBuilder(
+                              listenable: _themeController,
+                              builder: (context, _) => MaterialApp(
+                                title: appName,
+                                debugShowCheckedModeBanner: false,
+                                theme: buildAppTheme(_themeController.light),
+                                darkTheme: buildAppTheme(_themeController.dark),
+                                themeMode: _themeController.themeMode,
+                                // Tab screens have no AppBar to set the status-bar icon colour, so
+                                // match it to the active theme here (dark icons on light themes and
+                                // vice versa).
+                                builder: (context, child) =>
+                                    AnnotatedRegion<SystemUiOverlayStyle>(
+                                      value:
+                                          Theme.of(context).brightness ==
+                                              Brightness.light
+                                          ? SystemUiOverlayStyle.dark
+                                          : SystemUiOverlayStyle.light,
+                                      child: child!,
+                                    ),
+                                home: AppShell(links: _incomingLinks.links),
+                              ),
                             ),
                           ),
                         ),

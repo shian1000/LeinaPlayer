@@ -24,7 +24,10 @@ folders on the phone into the phone's own `local.db`, song search over both data
 playing phone files with a mini/full player, a play queue (playlists, "Dodaj do kolejki",
 shuffle, the queue screen, caching the next songs ahead; remembered across restarts) and a
 media notification with previous/next (keeps playing in the background); play history in
-"Ostatnie" (profile menu). YouTube: searching it on request, showing which songs
+"Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
+thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów)
+([`covers.md`](docs/agent-notes/covers.md)). Every cache setting is in one screen, Oszczędzanie
+danych i tryb offline › Pamięć podręczna. YouTube: searching it on request, showing which songs
 MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
 audio on Android through NewPipeExtractor, with a cache of played songs — see
 [`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube links
@@ -67,13 +70,15 @@ flutter build apk            # build a release Android APK
   per-tab navigators.
 - `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers,
   `SongTile` — the song row with source icons used by search, playlists, the queue and history;
-  `PlayingBars` — the animated "playing" mark).
+  `PlayingBars` — the animated "playing" mark; `SongCover` — a song's album cover, with the cover
+  filters from `cover_filters.dart`; `color_picker.dart`; `TextInputDialog` in `common.dart`).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
   `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
   search over both (`combined_search.dart`), YouTube links given to the app
   (`incoming_links.dart`, `video_link.dart`), YouTube search / matching / audio
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
-  links and the audio cache (`youtube_library.dart`), play history (`play_history.dart`,
+  links and the audio cache (`youtube_library.dart`), album covers and their cache
+  (`album_covers.dart`), play history (`play_history.dart`,
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
   (`network_errors.dart`), and the port of MusicDatabase's `normalize()` (`text_normalizer.dart`).
@@ -107,6 +112,7 @@ flutter build apk            # build a release Android APK
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
   `LocalLibraryScope`, `YouTubeLibraryScope`, `PlaylistLibraryScope`, `PlayHistoryScope`,
+  `AlbumCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
   `YouTubeScope`, an `InheritedWidget` so tests can swap YouTube search, audio and playlist
@@ -118,6 +124,9 @@ flutter build apk            # build a release Android APK
   sub-screen can't hand a result back through `pop` — pass a callback instead. Keep Flutter's
   `PredictiveBackPageTransitionsBuilder` out of the theme: on Android 16+ it lets a hidden tab
   route take the back gesture from whatever covers it (full player, root sheets, drawer).
+- Anything new the phone stores to work offline (a cache) gets its settings in the
+  `cache_settings_screen.dart` ("Pamięć podręczna" — the only name for it in the UI, not
+  "cache"), not on the screen of the feature that fills it (user's decision).
 - No comments explaining *what* code does; only *why*, when non-obvious.
 
 ## Testing & verification
@@ -154,6 +163,8 @@ flutter build apk            # build a release Android APK
   (why it downloads in 1 MB ranges), what's not done.
 - [`playlists.md`](docs/agent-notes/playlists.md) — Biblioteka playlists: `local.db` tables,
   YouTube import (fetching, title parsing, recognising songs by video first), R8 rules.
+- [`covers.md`](docs/agent-notes/covers.md) — album covers: sources and their order, matching,
+  rate limits, the cover cache, the MusicDatabase hand-off.
 - [`ui-sizing.md`](docs/agent-notes/ui-sizing.md) — font sizes/spacing are calibrated against the
   reference app; why there's no screen-size scaling.
 

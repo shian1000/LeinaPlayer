@@ -235,7 +235,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -262,14 +262,39 @@ class LocalLibrary extends ChangeNotifier {
           await _createYouTubeTables(db);
           await _createPlaylistTables(db);
           await _createHistoryTable(db);
+          await _createCoverTables(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
           if (from < 3) await _createPlaylistTables(db);
           if (from < 4) await _createHistoryTable(db);
+          if (from < 5) await _createCoverTables(db);
         },
       ),
     );
+  }
+
+  /// Version 5: album covers (see `album_covers.dart`).
+  static Future<void> _createCoverTables(Database db) async {
+    // What a source (iTunes, Deezer) said about an album — or a song, when there's no album —
+    // so it's asked once. NULL urls: it has no cover.
+    await db.execute('''
+      CREATE TABLE cover_lookups (
+        cover_key VARCHAR NOT NULL,
+        source VARCHAR NOT NULL,
+        small_url VARCHAR,
+        large_url VARCHAR,
+        checked_at INTEGER NOT NULL,
+        PRIMARY KEY (cover_key, source)
+      )''');
+    // Downloaded cover images, up to the user's size limit (least recently shown goes first).
+    await db.execute('''
+      CREATE TABLE cover_cache (
+        url VARCHAR PRIMARY KEY,
+        file_name VARCHAR NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        last_used_at INTEGER NOT NULL
+      )''');
   }
 
   /// Version 4: what was played ("Ostatnie", see `play_history.dart`). A song is kept by what

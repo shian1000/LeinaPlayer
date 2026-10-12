@@ -204,6 +204,26 @@ void main() {
       findsOneWidget,
     );
 
+    // Search within the playlist: by title or artist, accents ignored; Back closes it first.
+    await tester.tap(find.byTooltip('Szukaj w playliście'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'malomiast');
+    await tester.pumpAndSettle();
+    expect(find.text('Małomiasteczkowy'), findsOneWidget);
+    expect(find.text('Utwór'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'nieznany');
+    await tester.pumpAndSettle();
+    expect(find.text('Utwór'), findsOneWidget);
+    expect(find.text('Małomiasteczkowy'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'xyz');
+    await tester.pumpAndSettle();
+    expect(find.text('Brak wyników dla „xyz”'), findsOneWidget);
+    await tester.tap(find.byTooltip('Zamknij wyszukiwanie'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Małomiasteczkowy'), findsOneWidget);
+    expect(find.text('Utwór'), findsOneWidget);
+
     // ⋮ › the tracks MusicDatabase doesn't have: only the unrecognised one.
     await tester.tap(find.byTooltip('Menu playlisty (⋮)'));
     await tester.pumpAndSettle();

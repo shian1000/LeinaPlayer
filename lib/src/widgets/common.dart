@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../sample_content.dart';
 import '../theme.dart';
@@ -179,6 +180,68 @@ class TabHeader extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A dialog asking for one line of text (or a number); pops it, or null on "Anuluj". Owns its
+/// text controller, so it's disposed only once the closing animation is over.
+class TextInputDialog extends StatefulWidget {
+  const TextInputDialog({
+    super.key,
+    required this.title,
+    required this.hint,
+    required this.initial,
+    this.number = false,
+  });
+
+  final String title;
+  final String hint;
+  final String initial;
+  final bool number;
+
+  @override
+  State<TextInputDialog> createState() => _TextInputDialogState();
+}
+
+class _TextInputDialogState extends State<TextInputDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        autocorrect: false,
+        enableSuggestions: false,
+        keyboardType: widget.number ? TextInputType.number : null,
+        inputFormatters: widget.number
+            ? [FilteringTextInputFormatter.digitsOnly]
+            : null,
+        decoration: InputDecoration(
+          hintText: widget.hint,
+          border: const OutlineInputBorder(),
+        ),
+        onSubmitted: (text) => Navigator.of(context).pop(text),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Anuluj'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Zapisz'),
+        ),
+      ],
     );
   }
 }

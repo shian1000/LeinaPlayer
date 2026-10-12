@@ -5,7 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../data/local_library.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/cover_art.dart';
+import '../data/album_covers.dart';
+import '../widgets/song_cover.dart';
 
 /// "Ustawienia › Źródła muzyki › Muzyka lokalna" — folders on the phone that hold music, the
 /// scan that records their files in the phone's `local.db`, and the files not yet in
@@ -232,7 +233,7 @@ class _PendingSongsScreenState extends State<PendingSongsScreen> {
             itemBuilder: (context, i) {
               final song = songs[i];
               return ListTile(
-                leading: CoverArt(seed: song.filePath, size: 48),
+                leading: SongCover(cover: CoverRequest.ofFile(song), size: 48),
                 title: Text(
                   song.title,
                   maxLines: 1,

@@ -47,7 +47,7 @@ Playlists ([`agent-notes/playlists.md`](agent-notes/playlists.md)): `PlaylistLib
 (`playlist_library.dart`, `PlaylistLibraryScope`) keeps playlists imported from YouTube in
 `local.db`; their tracks render with the same `SongTile` (`lib/src/widgets/song_tile.dart`) as
 search results. `local.db` schema versions live in `LocalLibrary._open` (v2 YouTube tables, v3
-playlists, v4 `play_history`).
+playlists, v4 `play_history`, v5 cover lookups and cache).
 
 History and resuming: `PlayHistory` (`play_history.dart`, `PlayHistoryScope`) records every song
 the queue starts (`PlaybackQueue.played`) in `local.db`, shown by `recents_screen.dart`.
@@ -61,8 +61,13 @@ app or opened with it to `IncomingLinks` (`incoming_links.dart`); `AppShell` imp
 or plays a video (`video_link.dart`). The same bridge opens the YouTube app by package
 (`openInYouTubeApp`) — the system's choice for youtube.com links may be this app itself.
 
-Artwork is drawn as gradient placeholders (`CoverArt`) rather than images, which keeps rendering
-cheap on the old Huawei test phone.
+Album covers ([`agent-notes/covers.md`](agent-notes/covers.md)): `AlbumCovers`
+(`album_covers.dart`, `AlbumCoversScope`) finds a song's cover from the user's ordered sources
+(phone file, iTunes, Deezer, YouTube thumbnail; MusicDatabase's server is a dummy) and keeps
+downloads in a size-limited cache in `local.db` (v5). `SongCover` (`widgets/song_cover.dart`) shows
+it wherever a song is drawn, decoded at the shown size and through the user's cover filter
+(`widgets/cover_filters.dart`); the gradient `CoverArt` is the placeholder until then. The player
+tint and the media notification take the cover too.
 
 Data: `lib/src/data/database_sync.dart` downloads MusicDatabase's `music.db` and `tag.db` from a
 user-set address once a day ([`decisions/0002-database-download.md`](decisions/0002-database-download.md)).

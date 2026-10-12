@@ -7,7 +7,7 @@ import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/song_tile.dart';
 
-/// "Zajęte miejsce" in the YouTube settings: the songs in the cache, most recently played first.
+/// "Pamięć podręczna › Zajęte miejsce": the songs in the cache, most recently played first.
 /// Tapping one plays it and then the rest of the list (all from the phone, so offline too); ⊖
 /// deletes that song's audio.
 class CacheContentsScreen extends StatefulWidget {
@@ -72,7 +72,7 @@ class _CacheContentsScreenState extends State<CacheContentsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Pamięć podręczna'),
+        title: const Text('Utwory z YouTube'),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),

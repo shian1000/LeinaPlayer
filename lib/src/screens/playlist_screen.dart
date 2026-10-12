@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
+import '../data/text_normalizer.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../dummy.dart';
@@ -12,6 +14,7 @@ import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/song_cover.dart';
 import '../widgets/song_tile.dart';
 import 'missing_tracks_screen.dart';
 
@@ -41,6 +44,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   final _firstRowKey = GlobalKey();
   bool _headerHidden = false;
 
+  /// Searching within this playlist: the app bar becomes a search field and only matching
+  /// tracks are listed. It's a local history entry, so Back (the arrow or the system one, which
+  /// `AppShell` turns into a plain `pop`) closes the search before leaving the playlist.
+  LocalHistoryEntry? _searchEntry;
+  final _query = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +62,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   @override
   void dispose() {
     _scroll.dispose();
+    _query.dispose();
     super.dispose();
   }
 
@@ -110,6 +120,22 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     return found >= 0
         ? found
         : tracks.indexWhere((t) => t.title == track.title);
+  }
+
+  bool get _searching => _searchEntry != null;
+
+  void _startSearch() {
+    final entry = LocalHistoryEntry(
+      onRemove: () {
+        if (!mounted) return;
+        setState(() {
+          _searchEntry = null;
+          _query.clear();
+        });
+      },
+    );
+    ModalRoute.of(context)!.addLocalHistoryEntry(entry);
+    setState(() => _searchEntry = entry);
   }
 
   PlaylistSummary get _playlist => widget.playlist;
@@ -188,7 +214,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       context,
       idPrefix: '$_id › Utwór › Menu (⋮)',
       header: MenuSheetHeader(
-        cover: CoverArt(seed: hit.youtubeVideoId ?? hit.title, size: 56),
+        cover: SongCover(cover: CoverRequest.of(hit)),
         title: hit.title,
         subtitle: hit.artistLabel,
       ),
@@ -215,6 +241,92 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
+  PreferredSizeWidget _searchBar(AppPalette palette, Color tint) => AppBar(
+    backgroundColor: Color.lerp(tint, palette.background, 0.4),
+    leading: IconButton(
+      tooltip: 'Zamknij wyszukiwanie',
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => Navigator.of(context).pop(),
+    ),
+    titleSpacing: 0,
+    title: TextField(
+      controller: _query,
+      autofocus: true,
+      textInputAction: TextInputAction.search,
+      onChanged: (_) => setState(() {}),
+      decoration: const InputDecoration(
+        hintText: 'Szukaj w playliście',
+        border: InputBorder.none,
+      ),
+    ),
+    actions: [
+      if (_query.text.isNotEmpty)
+        IconButton(
+          tooltip: 'Wyczyść',
+          icon: const Icon(Icons.close),
+          onPressed: () => setState(_query.clear),
+        ),
+    ],
+  );
+
+  /// The playlist's tracks whose title, artist or album contain every word of the query (both
+  /// normalised like song search); tapping one still plays on through the whole playlist.
+  Widget _searchResults(List<SearchHit> hits) {
+    final palette = context.palette;
+    final words = normalizeForSearch(_query.text)
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .toList();
+    final matches = [
+      for (final (i, hit) in hits.indexed)
+        if (words.every(
+          normalizeForSearch(
+            [hit.title, hit.artistLabel, hit.album ?? ''].join(' '),
+          ).contains,
+        ))
+          (i, hit),
+    ];
+    if (matches.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'Brak wyników dla „${_query.text.trim()}”',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: palette.textSecondary),
+          ),
+        ),
+      );
+    }
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.only(
+        top: MediaQuery.paddingOf(context).top + kToolbarHeight,
+        bottom: 24,
+      ),
+      children: [for (final (i, hit) in matches) _trackTile(hits, i, hit)],
+    );
+  }
+
+  Widget _trackTile(List<SearchHit> hits, int i, SearchHit hit, {Key? key}) =>
+      SongTile(
+        key: key,
+        hit: hit,
+        // Tapping a track queues the whole playlist, starting at that track.
+        queue: hits,
+        queueIndex: i,
+        playlistId: _playlist.id,
+        youTubeListId: _playlist.youTubeId,
+        playlistName: _playlist.name,
+        // Like the reference app's playlists: just the artist.
+        subtitle: hit.artistLabel,
+        trailing: IconButton(
+          tooltip: 'Menu utworu (⋮)',
+          icon: Icon(Icons.more_vert, color: context.palette.textSecondary),
+          onPressed: () => _showTrackMenu(hit),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     void dummy(String label) => showDummy(context, '$_id › $label');
@@ -231,233 +343,234 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: _headerHidden
-            ? Color.lerp(tint, palette.background, 0.4)
-            : Colors.transparent,
-        title: _headerHidden
-            ? Text(
-                _playlist.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              )
-            : null,
-        leading: IconButton(
-          tooltip: 'Wstecz',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Menu playlisty (⋮)',
-            icon: const Icon(Icons.more_vert),
-            onPressed: _showPlaylistMenu,
-          ),
-        ],
-      ),
-      body: ListView(
-        controller: _scroll,
-        padding: EdgeInsets.zero,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [tint, palette.background],
+      appBar: _searching
+          ? _searchBar(palette, tint)
+          : AppBar(
+              backgroundColor: _headerHidden
+                  ? Color.lerp(tint, palette.background, 0.4)
+                  : Colors.transparent,
+              title: _headerHidden
+                  ? Text(
+                      _playlist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    )
+                  : null,
+              leading: IconButton(
+                tooltip: 'Wstecz',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.of(context).pop(),
               ),
-            ),
-            padding: EdgeInsets.fromLTRB(
-              16,
-              MediaQuery.paddingOf(context).top + 56,
-              16,
-              0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: _Mosaic(
-                    seeds: [for (final hit in hits.take(4)) _seedOf(hit)],
-                    fallback: _playlist.name,
-                    size: 220,
-                  ),
+              actions: [
+                IconButton(
+                  tooltip: 'Szukaj w playliście',
+                  icon: const Icon(Icons.search),
+                  onPressed: tracks == null ? null : _startSearch,
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  _playlist.name,
-                  style: const TextStyle(
-                    fontSize: AppFontSize.largeTitle,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: palette.accent,
-                      child: Text(
-                        _owner.characters.first,
-                        style: TextStyle(
-                          color: palette.onAccent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _owner,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.smart_display_outlined,
-                      size: 18,
-                      color: palette.textSecondary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      [
-                        _trackCount(_playlist.trackCount),
-                        if (_playlist.duration > Duration.zero)
-                          _length(_playlist.duration),
-                      ].join(' • '),
-                      style: TextStyle(color: palette.textSecondary),
-                    ),
-                  ],
+                IconButton(
+                  tooltip: 'Menu playlisty (⋮)',
+                  icon: const Icon(Icons.more_vert),
+                  onPressed: _showPlaylistMenu,
                 ),
               ],
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: 'Pobierz',
-                  icon: const Icon(
-                    Icons.download_for_offline_outlined,
-                    size: 30,
+      // The playlist stays built under the search, so closing it returns to the same place.
+      body: IndexedStack(
+        index: _searching ? 1 : 0,
+        children: [
+          ListView(
+            controller: _scroll,
+            padding: EdgeInsets.zero,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [tint, palette.background],
                   ),
-                  onPressed: () => dummy('Pobierz (ikona)'),
                 ),
-                IconButton(
-                  tooltip: 'Udostępnij',
-                  icon: const Icon(Icons.share_outlined, size: 28),
-                  onPressed: () => dummy('Udostępnij (ikona)'),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  MediaQuery.paddingOf(context).top + 56,
+                  16,
+                  0,
                 ),
-                const Spacer(),
-                IconButton(
-                  tooltip: 'Odtwarzanie losowe',
-                  icon: Icon(Icons.shuffle, color: palette.accent, size: 30),
-                  onPressed: hits.isEmpty
-                      ? null
-                      : () => runQueueAction(
-                          context,
-                          (onStatus) =>
-                              PlaybackQueueScope.of(context).startShuffled(
-                                hits,
-                                playlistId: _playlist.id,
-                                youTubeListId: _playlist.youTubeId,
-                                playlistName: _playlist.name,
-                                onStatus: onStatus,
-                              ),
-                        ),
-                ),
-                const SizedBox(width: 4),
-                FloatingActionButton(
-                  heroTag: null,
-                  tooltip: 'Odtwórz playlistę',
-                  backgroundColor: palette.accent,
-                  foregroundColor: palette.onAccent,
-                  shape: palette.rounded
-                      ? const CircleBorder()
-                      : const RoundedRectangleBorder(),
-                  onPressed: hits.isEmpty
-                      ? null
-                      : () => runQueueAction(
-                          context,
-                          (onStatus) => PlaybackQueueScope.of(context).start(
-                            hits,
-                            0,
-                            playlistId: _playlist.id,
-                            youTubeListId: _playlist.youTubeId,
-                            playlistName: _playlist.name,
-                            shuffle: false,
-                            onStatus: onStatus,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: _Mosaic(
+                        covers: [
+                          for (final hit in hits.take(4)) CoverRequest.of(hit),
+                        ],
+                        fallback: _playlist.name,
+                        size: 220,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      _playlist.name,
+                      style: const TextStyle(
+                        fontSize: AppFontSize.largeTitle,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundColor: palette.accent,
+                          child: Text(
+                            _owner.characters.first,
+                            style: TextStyle(
+                              color: palette.onAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                  child: const Icon(Icons.play_arrow, size: 36),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                _ActionChip(
-                  icon: Icons.add,
-                  label: 'Dodaj',
-                  onTap: () => dummy('Dodaj (do tej playlisty)'),
-                ),
-                _ActionChip(
-                  icon: Icons.menu,
-                  label: 'Edytuj',
-                  onTap: () => dummy('Edytuj (playlistę)'),
-                ),
-                _ActionChip(
-                  icon: Icons.swap_vert,
-                  label: 'Sortuj',
-                  onTap: () => dummy('Sortuj (playlistę)'),
-                ),
-              ],
-            ),
-          ),
-          if (tracks == null)
-            const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            for (final (i, hit) in hits.indexed)
-              SongTile(
-                key: i == 0 ? _firstRowKey : null,
-                hit: hit,
-                // Tapping a track queues the whole playlist, starting at that track.
-                queue: hits,
-                queueIndex: i,
-                playlistId: _playlist.id,
-                youTubeListId: _playlist.youTubeId,
-                playlistName: _playlist.name,
-                // Like the reference app's playlists: just the artist.
-                subtitle: hit.artistLabel,
-                trailing: IconButton(
-                  tooltip: 'Menu utworu (⋮)',
-                  icon: Icon(Icons.more_vert, color: palette.textSecondary),
-                  onPressed: () => _showTrackMenu(hit),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _owner,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.smart_display_outlined,
+                          size: 18,
+                          color: palette.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          [
+                            _trackCount(_playlist.trackCount),
+                            if (_playlist.duration > Duration.zero)
+                              _length(_playlist.duration),
+                          ].join(' • '),
+                          style: TextStyle(color: palette.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-          const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Pobierz',
+                      icon: const Icon(
+                        Icons.download_for_offline_outlined,
+                        size: 30,
+                      ),
+                      onPressed: () => dummy('Pobierz (ikona)'),
+                    ),
+                    IconButton(
+                      tooltip: 'Udostępnij',
+                      icon: const Icon(Icons.share_outlined, size: 28),
+                      onPressed: () => dummy('Udostępnij (ikona)'),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Odtwarzanie losowe',
+                      icon: Icon(
+                        Icons.shuffle,
+                        color: palette.accent,
+                        size: 30,
+                      ),
+                      onPressed: hits.isEmpty
+                          ? null
+                          : () => runQueueAction(
+                              context,
+                              (onStatus) =>
+                                  PlaybackQueueScope.of(context).startShuffled(
+                                    hits,
+                                    playlistId: _playlist.id,
+                                    youTubeListId: _playlist.youTubeId,
+                                    playlistName: _playlist.name,
+                                    onStatus: onStatus,
+                                  ),
+                            ),
+                    ),
+                    const SizedBox(width: 4),
+                    FloatingActionButton(
+                      heroTag: null,
+                      tooltip: 'Odtwórz playlistę',
+                      backgroundColor: palette.accent,
+                      foregroundColor: palette.onAccent,
+                      shape: palette.rounded
+                          ? const CircleBorder()
+                          : const RoundedRectangleBorder(),
+                      onPressed: hits.isEmpty
+                          ? null
+                          : () => runQueueAction(
+                              context,
+                              (onStatus) =>
+                                  PlaybackQueueScope.of(context).start(
+                                    hits,
+                                    0,
+                                    playlistId: _playlist.id,
+                                    youTubeListId: _playlist.youTubeId,
+                                    playlistName: _playlist.name,
+                                    shuffle: false,
+                                    onStatus: onStatus,
+                                  ),
+                            ),
+                      child: const Icon(Icons.play_arrow, size: 36),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    _ActionChip(
+                      icon: Icons.add,
+                      label: 'Dodaj',
+                      onTap: () => dummy('Dodaj (do tej playlisty)'),
+                    ),
+                    _ActionChip(
+                      icon: Icons.menu,
+                      label: 'Edytuj',
+                      onTap: () => dummy('Edytuj (playlistę)'),
+                    ),
+                    _ActionChip(
+                      icon: Icons.swap_vert,
+                      label: 'Sortuj',
+                      onTap: () => dummy('Sortuj (playlistę)'),
+                    ),
+                  ],
+                ),
+              ),
+              if (tracks == null)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
+                for (final (i, hit) in hits.indexed)
+                  _trackTile(hits, i, hit, key: i == 0 ? _firstRowKey : null),
+              const SizedBox(height: 24),
+            ],
+          ),
+          if (_searching) _searchResults(hits),
         ],
       ),
     );
   }
 }
-
-String _seedOf(SearchHit hit) => hit.mainSong != null
-    ? '${hit.mainSong!.id}'
-    : hit.youtubeVideoId ?? hit.title;
 
 /// "1 utwór", "3 utwory", "12 utworów".
 String _trackCount(int n) {
@@ -479,19 +592,22 @@ String _length(Duration d) => d.inHours > 0
 /// playlists people make), or one cover when there are fewer.
 class _Mosaic extends StatelessWidget {
   const _Mosaic({
-    required this.seeds,
+    required this.covers,
     required this.fallback,
     required this.size,
   });
 
-  final List<String> seeds;
+  final List<CoverRequest> covers;
   final String fallback;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    if (seeds.length < 4) {
-      return CoverArt(seed: seeds.firstOrNull ?? fallback, size: size);
+    if (covers.length < 4) {
+      final first = covers.firstOrNull;
+      return first == null
+          ? CoverArt(seed: fallback, size: size)
+          : SongCover(cover: first, size: size);
     }
     final half = size / 2;
     return ClipRRect(
@@ -500,7 +616,7 @@ class _Mosaic extends StatelessWidget {
         dimension: size,
         child: Wrap(
           children: [
-            for (final seed in seeds) CoverArt(seed: seed, size: half),
+            for (final cover in covers) SongCover(cover: cover, size: half),
           ],
         ),
       ),
