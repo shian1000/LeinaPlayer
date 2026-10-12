@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'network_errors.dart';
+import 'playlist_library.dart';
+import 'playlist_search.dart';
 
 /// One track of a Spotify playlist, as the public embed page lists it.
 class SpotifyTrack {
@@ -169,14 +171,33 @@ final _junkSuffix = RegExp(
 
 typedef HttpGetText = Future<String> Function(Uri uri);
 
-/// Fetches Spotify playlists; [get] can be replaced in tests.
+/// A response to [HttpCall], whatever its status.
+typedef HttpReply = ({int status, String body});
+
+/// One HTTP request; `null` [body] is a GET.
+typedef HttpCall = Future<HttpReply> Function(
+  Uri uri, {
+  Map<String, String> headers,
+  String? body,
+});
+
+/// The user's own Spotify app (Ustawienia › Źródła muzyki › Spotify › Spotify API), from
+/// developer.spotify.com: the Web API with its client-credentials token, no user login.
+typedef SpotifyApiKey = ({String clientId, String clientSecret});
+
+/// Fetches and searches Spotify playlists; [get] and [call] can be replaced in tests.
 class SpotifyPlaylists {
-  SpotifyPlaylists({HttpGetText? get}) : _get = get ?? _httpGetText;
+  SpotifyPlaylists({HttpGetText? get, HttpCall? call})
+    : _get = get ?? _httpGetText,
+      _call = call ?? _httpCall;
 
   /// The embed page lists only the first 100 tracks.
   static const embedLimit = 100;
 
+  static const searchLimit = 20;
+
   final HttpGetText _get;
+  final HttpCall _call;
 
   /// Throws [SpotifyException] when the playlist couldn't be read.
   Future<SpotifyPlaylistData> fetch(String playlistId) async {
@@ -225,6 +246,316 @@ class SpotifyPlaylists {
       return null;
     }
   }
+
+  /// Playlists for [query]: through the Web API with the user's [apiKey] when there is one,
+  /// else (or when it fails) the way the web player searches without logging in (user's
+  /// decision: the key first, the anonymous way as the fallback). Throws [SpotifyException].
+  Future<List<FoundPlaylist>> search(
+    String query, {
+    SpotifyApiKey? apiKey,
+  }) async {
+    final errors = <String>[];
+    var offline = true;
+    if (apiKey != null) {
+      try {
+        return await _searchWithApi(query, apiKey);
+      } catch (e) {
+        debugPrint('Spotify API search failed: $e');
+        errors.add('API: ${_describe(e)}');
+        offline &= isNetworkError(e);
+      }
+    }
+    try {
+      return await _searchAnonymously(query);
+    } catch (e) {
+      debugPrint('Spotify search without a key failed: $e');
+      errors.add('${apiKey == null ? '' : 'bez klucza: '}${_describe(e)}');
+      offline &= isNetworkError(e);
+    }
+    throw SpotifyException(
+      offline
+          ? 'Brak połączenia ze Spotify.'
+          : 'Nie udało się wyszukać na Spotify (${errors.join('; ')}).',
+    );
+  }
+
+  static String _describe(Object e) => switch (e) {
+    SpotifyException(:final message) => message,
+    _ when isNetworkError(e) => 'brak połączenia',
+    _ => 'błąd',
+  };
+
+  ({String key, String token, DateTime expires})? _apiToken;
+
+  Future<List<FoundPlaylist>> _searchWithApi(
+    String query,
+    SpotifyApiKey apiKey,
+  ) async {
+    final token = await _apiAccessToken(apiKey);
+    final reply = await _call(
+      Uri.https('api.spotify.com', '/v1/search', {
+        'q': query,
+        'type': 'playlist',
+        'limit': '$searchLimit',
+      }),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (reply.status == HttpStatus.unauthorized) _apiToken = null;
+    if (reply.status != HttpStatus.ok) {
+      throw SpotifyException('odpowiedź HTTP ${reply.status}');
+    }
+    return parseSpotifyApiSearch(reply.body);
+  }
+
+  Future<String> _apiAccessToken(SpotifyApiKey apiKey) async {
+    final key = '${apiKey.clientId}:${apiKey.clientSecret}';
+    final cached = _apiToken;
+    if (cached != null &&
+        cached.key == key &&
+        DateTime.now().isBefore(cached.expires)) {
+      return cached.token;
+    }
+    final reply = await _call(
+      Uri.https('accounts.spotify.com', '/api/token'),
+      headers: {
+        'Authorization': 'Basic ${base64Encode(utf8.encode(key))}',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    );
+    if (reply.status != HttpStatus.ok) {
+      throw SpotifyException(
+        reply.status == HttpStatus.badRequest ||
+                reply.status == HttpStatus.unauthorized
+            ? 'odrzucony klucz Spotify API'
+            : 'odpowiedź HTTP ${reply.status}',
+      );
+    }
+    final json = jsonDecode(reply.body) as Map<String, Object?>;
+    final token = json['access_token']! as String;
+    final seconds = json['expires_in'] as int? ?? 3600;
+    _apiToken = (
+      key: key,
+      token: token,
+      expires: DateTime.now().add(Duration(seconds: seconds - 60)),
+    );
+    return token;
+  }
+
+  ({String token, DateTime expires})? _anonymousToken;
+
+  /// Last known hash of the web player's `searchPlaylists` query (seen 2026-10). Spotify
+  /// changes it with new web player versions; [findSpotifySearchHash] then reads the current one.
+  static const knownSearchHash =
+      'd520014e748f9ea44f7707d8df1819867ac1205e8b7f3e28f22fe5fc858921b1';
+  String _searchHash = knownSearchHash;
+
+  /// The web player's own search (`pathfinder` GraphQL with a persisted query) with the
+  /// anonymous token the public embed page carries. The Web API itself refuses that token
+  /// ("Too many requests"), the web player's search doesn't. Unofficial: it may break.
+  Future<List<FoundPlaylist>> _searchAnonymously(String query) async {
+    var renewedToken = false;
+    var renewedHash = false;
+    while (true) {
+      final reply = await _call(
+        Uri.https('api-partner.spotify.com', '/pathfinder/v2/query'),
+        headers: {
+          'Authorization': 'Bearer ${await _anonymousAccessToken()}',
+          'Content-Type': 'application/json;charset=UTF-8',
+          'app-platform': 'WebPlayer',
+        },
+        body: jsonEncode({
+          'variables': {
+            'searchTerm': query,
+            'offset': 0,
+            'limit': searchLimit,
+            'numberOfTopResults': 5,
+            'includeAudiobooks': false,
+            'includePreReleases': false,
+          },
+          'operationName': 'searchPlaylists',
+          'extensions': {
+            'persistedQuery': {'version': 1, 'sha256Hash': _searchHash},
+          },
+        }),
+      );
+      if (reply.status == HttpStatus.ok) {
+        return parseSpotifyWebSearch(reply.body);
+      }
+      if (reply.status == HttpStatus.unauthorized && !renewedToken) {
+        renewedToken = true;
+        _anonymousToken = null;
+        continue;
+      }
+      // 412 "Invalid query hash": a new web player version.
+      if ((reply.status == HttpStatus.preconditionFailed ||
+              reply.status == HttpStatus.badRequest) &&
+          !renewedHash) {
+        renewedHash = true;
+        final hash = await findSpotifySearchHash(_call);
+        if (hash != null && hash != _searchHash) {
+          _searchHash = hash;
+          continue;
+        }
+      }
+      throw SpotifyException(
+        reply.status == HttpStatus.tooManyRequests
+            ? 'Spotify chwilowo ogranicza wyszukiwanie bez klucza'
+            : 'odpowiedź HTTP ${reply.status}',
+      );
+    }
+  }
+
+  /// "Today's Top Hits": any public embed page carries an anonymous token, this one should
+  /// always exist.
+  static const _tokenPlaylist = '37i9dQZF1DXcBWIGoYBM5M';
+
+  Future<String> _anonymousAccessToken() async {
+    final cached = _anonymousToken;
+    if (cached != null && DateTime.now().isBefore(cached.expires)) {
+      return cached.token;
+    }
+    final html = await _get(
+      Uri.https('open.spotify.com', '/embed/playlist/$_tokenPlaylist'),
+    );
+    final token = RegExp(r'"accessToken":"([^"]+)"').firstMatch(html)?.group(1);
+    if (token == null) {
+      throw const SpotifyException('brak tokenu na stronie Spotify');
+    }
+    final expiresMs = int.tryParse(
+      RegExp(r'"accessTokenExpirationTimestampMs":(\d+)')
+              .firstMatch(html)
+              ?.group(1) ??
+          '',
+    );
+    final expires = expiresMs == null
+        ? DateTime.now().add(const Duration(minutes: 30))
+        : DateTime.fromMillisecondsSinceEpoch(expiresMs)
+              .subtract(const Duration(minutes: 1));
+    _anonymousToken = (token: token, expires: expires);
+    return token;
+  }
+}
+
+/// The current `searchPlaylists` hash from the web player's scripts: the main script, else its
+/// lazily loaded search-page chunk. Only a desktop browser is served the web player.
+Future<String?> findSpotifySearchHash(HttpCall call) async {
+  const desktop = {
+    'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0',
+  };
+  try {
+    final page = await call(
+      Uri.https('open.spotify.com', '/search'),
+      headers: desktop,
+    );
+    final script = RegExp(
+      r'https://open\.spotifycdn\.com/cdn/build/web-player/web-player\.[0-9a-f]+\.js',
+    ).firstMatch(page.body)?.group(0);
+    if (script == null) return null;
+    final main = (await call(Uri.parse(script), headers: desktop)).body;
+    final inMain = findPersistedQueryHash(main, 'searchPlaylists');
+    if (inMain != null) return inMain;
+    for (final chunk in searchChunkUrls(main, Uri.parse(script))) {
+      final reply = await call(chunk, headers: desktop);
+      if (reply.status != HttpStatus.ok) continue;
+      final hash = findPersistedQueryHash(reply.body, 'searchPlaylists');
+      if (hash != null) return hash;
+    }
+  } catch (e) {
+    debugPrint('Looking for Spotify search hash failed: $e');
+  }
+  return null;
+}
+
+/// `"searchPlaylists","query","<sha256>"` in a web player script.
+String? findPersistedQueryHash(String script, String operation) =>
+    RegExp('"$operation","query","([0-9a-f]{64})"')
+        .firstMatch(script)
+        ?.group(1);
+
+/// Where the web player's search-page chunk may be: its chunk number maps to the name
+/// `xpui-routes-search` and to a content hash (one map for scripts, one for styles — both are
+/// tried).
+List<Uri> searchChunkUrls(String mainScript, Uri mainUri) {
+  final number = RegExp(r'(\d+):"xpui-routes-search"')
+      .firstMatch(mainScript)
+      ?.group(1);
+  if (number == null) return const [];
+  return [
+    for (final hash in {
+      for (final m in RegExp(
+        '[{,]$number:"([0-9a-f]{8})"',
+      ).allMatches(mainScript))
+        m.group(1)!,
+    })
+      mainUri.resolve('xpui-routes-search.$hash.js'),
+  ];
+}
+
+/// Playlists in the Web API's `/v1/search?type=playlist` answer (its list may hold `null`s).
+List<FoundPlaylist> parseSpotifyApiSearch(String body) {
+  final items = switch (jsonDecode(body)) {
+    {'playlists': {'items': final List items}} => items,
+    _ => const [],
+  };
+  return [
+    for (final item in items)
+      if (item case {'id': final String id, 'name': final String name})
+        FoundPlaylist(
+          source: PlaylistSource.spotify,
+          id: id,
+          name: name,
+          owner: switch (item['owner']) {
+            {'display_name': final String owner} => owner,
+            _ => null,
+          },
+          trackCount: switch (item) {
+            {'tracks': {'total': final int n}} => n,
+            {'items': {'total': final int n}} => n,
+            _ => null,
+          },
+          thumbnail: switch (item['images']) {
+            [{'url': final String url}, ...] => Uri.tryParse(url),
+            _ => null,
+          },
+        ),
+  ];
+}
+
+/// Playlists in the web player's `searchPlaylists` answer (`data.searchV2.playlists.items`).
+List<FoundPlaylist> parseSpotifyWebSearch(String body) {
+  final items = switch (jsonDecode(body)) {
+    {'data': {'searchV2': {'playlists': {'items': final List items}}}} => items,
+    _ => throw const SpotifyException('Spotify zmienił odpowiedź wyszukiwania'),
+  };
+  return [
+    for (final item in items)
+      if (item
+          case {'data': {'uri': final String uri, 'name': final String name}}
+          when uri.startsWith('spotify:playlist:'))
+        FoundPlaylist(
+          source: PlaylistSource.spotify,
+          id: uri.substring('spotify:playlist:'.length),
+          name: name,
+          owner: switch (item) {
+            {'data': {'ownerV2': {'data': {'name': final String owner}}}} =>
+              owner,
+            _ => null,
+          },
+          thumbnail: switch (item) {
+            {
+              'data': {
+                'images': {
+                  'items': [{'sources': [{'url': final String url}, ...]}, ...],
+                },
+              },
+            } =>
+              Uri.tryParse(url),
+            _ => null,
+          },
+        ),
+  ];
 }
 
 /// The body of [uri]'s page; after redirects (short links), the final address comes first, so
@@ -257,6 +588,35 @@ Future<String> _httpGetText(Uri uri) async {
         .join()
         .timeout(const Duration(seconds: 15));
     return '$finalUri\n$body';
+  } finally {
+    client.close(force: true);
+  }
+}
+
+Future<HttpReply> _httpCall(
+  Uri uri, {
+  Map<String, String> headers = const {},
+  String? body,
+}) async {
+  final client = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 10)
+    ..userAgent =
+        'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/130.0 Mobile Safari/537.36';
+  try {
+    final request = body == null
+        ? await client.getUrl(uri)
+        : await client.postUrl(uri);
+    headers.forEach(request.headers.set);
+    if (body != null) request.add(utf8.encode(body));
+    final response = await request.close().timeout(const Duration(seconds: 15));
+    return (
+      status: response.statusCode,
+      body: await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(const Duration(seconds: 20)),
+    );
   } finally {
     client.close(force: true);
   }

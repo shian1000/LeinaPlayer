@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../data/song_catalog.dart';
+import '../data/source_settings.dart';
 import '../theme.dart';
 
 /// Filter icon that opens the "Szukaj w" sheet; shows a dot while the selection differs from
-/// the defaults (Tytuł, Wykonawca, Album).
+/// the defaults (Tytuł, Wykonawca, Album, playlists searched).
 class SearchFieldsButton extends StatelessWidget {
   const SearchFieldsButton({super.key});
 
@@ -13,7 +14,8 @@ class SearchFieldsButton extends StatelessWidget {
     final fields = SongCatalogScope.of(context).searchFields;
     final customised =
         fields.length != SearchField.defaults.length ||
-        !fields.containsAll(SearchField.defaults);
+        !fields.containsAll(SearchField.defaults) ||
+        !SourceSettingsScope.of(context).playlistSearch;
     return IconButton(
       tooltip: 'Filtry wyszukiwania',
       icon: Badge(
@@ -45,6 +47,7 @@ class _SearchFieldsSheet extends StatelessWidget {
     final palette = context.palette;
     final catalog = SongCatalogScope.of(context);
     final selected = catalog.searchFields;
+    final settings = SourceSettingsScope.of(context);
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -69,8 +72,10 @@ class _SearchFieldsSheet extends StatelessWidget {
                 ),
                 TextButton(
                   style: TextButton.styleFrom(foregroundColor: palette.accent),
-                  onPressed: () =>
-                      catalog.setSearchFields(SearchField.defaults),
+                  onPressed: () {
+                    catalog.setSearchFields(SearchField.defaults);
+                    settings.setPlaylistSearch(true);
+                  },
                   child: const Text('Przywróć domyślne'),
                 ),
               ],
@@ -104,6 +109,16 @@ class _SearchFieldsSheet extends StatelessWidget {
                           : ({...selected}..remove(field)),
                     ),
             ),
+          const Divider(),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            title: const Text('Wyszukuj playlisty'),
+            subtitle: const Text(
+              'W Bibliotece, a przyciskiem wyszukiwania także na YouTube i Spotify',
+            ),
+            value: settings.playlistSearch,
+            onChanged: settings.setPlaylistSearch,
+          ),
         ],
       ),
     );

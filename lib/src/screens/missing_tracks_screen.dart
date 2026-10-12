@@ -16,10 +16,15 @@ class MissingTracksScreen extends StatelessWidget {
     super.key,
     required this.playlist,
     required this.tracks,
+    this.saved = true,
   });
 
   final PlaylistSummary playlist;
   final List<PlaylistTrack> tracks;
+
+  /// `false`: a playlist found by search and not in Biblioteka ([PlaylistSummary.id] means
+  /// nothing).
+  final bool saved;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +95,7 @@ class MissingTracksScreen extends StatelessWidget {
                 hit: hits[i],
                 queue: hits,
                 queueIndex: i,
-                playlistId: playlist.id,
+                playlistId: saved ? playlist.id : null,
                 youTubeListId: playlist.youTubeId,
                 playlistName: playlist.name,
                 subtitle: hits[i].artistLabel,

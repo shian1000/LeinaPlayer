@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/playlist_library.dart';
+import 'package:music_database_app/src/data/playlist_search.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
+import 'package:music_database_app/src/data/spotify_playlist.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_search.dart';
@@ -18,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'data/fixtures.dart';
+import 'support/spotify_fakes.dart';
 import 'support/waiting.dart';
 
 /// Audio backend that only records what was opened.
@@ -54,6 +58,8 @@ void main() {
   late LocalLibrary library;
   late SourceSettings settings;
   late YouTubeLibrary youTubeLibrary;
+  late PlaylistLibrary playlists;
+  late FakeSpotify spotify;
   late PlayerController player;
   late List<String> searches;
   late _FakeBackend backend;
@@ -67,6 +73,7 @@ void main() {
   tearDown(() async {
     queue.dispose();
     player.dispose();
+    playlists.dispose();
     youTubeLibrary.dispose();
     library.dispose();
     catalog.dispose();
@@ -75,7 +82,11 @@ void main() {
     await storage.delete(recursive: true);
   });
 
-  Future<void> pumpSearch(WidgetTester tester, {bool youTube = true}) async {
+  Future<void> pumpSearch(
+    WidgetTester tester, {
+    bool youTube = true,
+    bool spotifyPlaylists = false,
+  }) async {
     await tester.runAsync(() async {
       storage = await Directory.systemTemp.createTemp('song_search_test');
       sync = DatabaseSync(storageRoot: () async => storage);
@@ -90,14 +101,18 @@ void main() {
         library.database,
         storageRoot: () async => storage,
       );
+      playlists = PlaylistLibrary(library.database, catalog, youTubeLibrary);
+      spotify = FakeSpotify();
       backend = _FakeBackend();
       player = PlayerController(backend: () => backend);
       await writeMusicDb((await sync.localFile('music.db')).path);
       await catalog.ensureLoaded();
       await library.load();
       await youTubeLibrary.load();
+      await playlists.load();
       await settings.load();
       await settings.setYouTubeSearchEnabled(youTube);
+      await settings.setSpotifyPlaylistSearch(spotifyPlaylists);
     });
     final search = YouTubeSearch(
       explode: (q) async {
@@ -108,6 +123,18 @@ void main() {
             title: '$q (Official Video)',
             channel: 'Kanał',
             duration: const Duration(minutes: 3, seconds: 5),
+          ),
+        ];
+      },
+      explodePlaylists: (q) async {
+        searches.add('playlists: $q');
+        return [
+          FoundPlaylist(
+            source: PlaylistSource.youtube,
+            id: 'PLrock',
+            name: '$q — składanka',
+            owner: 'Kanał',
+            trackCount: 12,
           ),
         ];
       },
@@ -145,19 +172,26 @@ void main() {
             notifier: library,
             child: YouTubeLibraryScope(
               notifier: youTubeLibrary,
-              child: PlayerScope(
-                notifier: player,
-                child: PlaybackQueueScope(
-                  notifier: queue,
-                  child: SourceSettingsScope(
-                    notifier: settings,
-                    child: YouTubeScope(
-                      search: search,
-                      playlists: YouTubePlaylists(),
-                      audio: audio,
-                      child: MaterialApp(
-                        theme: buildAppTheme(dummifyTheme),
-                        home: const SongSearchScreen(),
+              child: PlaylistLibraryScope(
+                notifier: playlists,
+                child: PlayerScope(
+                  notifier: player,
+                  child: PlaybackQueueScope(
+                    notifier: queue,
+                    child: SourceSettingsScope(
+                      notifier: settings,
+                      child: YouTubeScope(
+                        search: search,
+                        playlists: YouTubePlaylists(),
+                        spotify: SpotifyPlaylists(
+                          get: spotify.get,
+                          call: spotify.call,
+                        ),
+                        audio: audio,
+                        child: MaterialApp(
+                          theme: buildAppTheme(dummifyTheme),
+                          home: const SongSearchScreen(),
+                        ),
                       ),
                     ),
                   ),
@@ -218,8 +252,10 @@ void main() {
 
     await tester.tap(find.text('Wyszukaj na YouTubie'));
     await tester.pumpAndSettle();
-    expect(searches, ['California']);
+    expect(searches, ['California', 'playlists: California']);
     expect(find.text('YouTube: 1'), findsOneWidget);
+    expect(find.text('Playlisty na YouTube: 1'), findsOneWidget);
+    expect(find.text('California — składanka'), findsOneWidget);
     expect(find.text('California (Official Video)'), findsOneWidget);
     expect(find.text('Kanał • 3:05'), findsOneWidget);
 
@@ -311,6 +347,79 @@ void main() {
       await settle(tester, until: () => backend.opened.length > playedBefore);
       expect(searches, hasLength(1));
       expect(backend.opened.last, saved);
+    },
+  );
+
+  testWidgets(
+    'Biblioteka playlists show while typing, unless switched off in filters',
+    (tester) async {
+      await pumpSearch(tester);
+      await tester.runAsync(
+        () => playlists.importSpotify(
+          const SpotifyPlaylistData(
+            id: 'sp1',
+            name: 'Rockowe hity',
+            owner: 'Ja',
+            tracks: [
+              SpotifyTrack(
+                id: 't1',
+                title: 'Kashmir',
+                artists: ['Led Zeppelin'],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await type(tester, 'rockowe');
+      expect(find.text('Playlisty w Bibliotece: 1'), findsOneWidget);
+      expect(find.text('Rockowe hity'), findsOneWidget);
+
+      await tester.runAsync(() => settings.setPlaylistSearch(false));
+      await tester.pumpAndSettle();
+      expect(find.text('Rockowe hity'), findsNothing);
+      // Nor does the button look for playlists any more.
+      await tester.tap(find.text('Wyszukaj na YouTubie'));
+      await tester.pumpAndSettle();
+      expect(searches, ['rockowe']);
+      expect(find.textContaining('Playlisty na'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'the button also finds Spotify playlists; one opens as a preview and can be saved',
+    (tester) async {
+      await pumpSearch(tester, spotifyPlaylists: true);
+      spotify.playlists['a' * 22] = embedPage(owner: 'Spotify', [
+        track('t1', 'Going to California', 'Led Zeppelin'),
+        track('t2', 'Nieznany utwór', 'Ktoś'),
+      ]);
+
+      await type(tester, 'rock');
+      await tester.tap(find.text('Wyszukaj na YouTubie i Spotify'));
+      await settle(
+        tester,
+        until: () => find.text('Playlisty na Spotify: 2').evaluate().isNotEmpty,
+      );
+      expect(find.text('Rock Classics'), findsOneWidget);
+      expect(find.text('Playlisty na YouTube: 1'), findsOneWidget);
+
+      await tester.tap(find.text('Rock Classics'));
+      await settle(
+        tester,
+        until: () => find.text('Nieznany utwór').evaluate().isNotEmpty,
+      );
+      // The embed page's name, not the search's.
+      expect(find.text('All Out 80s'), findsOneWidget);
+      expect(find.text('Going to California'), findsOneWidget);
+      expect(playlists.playlists, isEmpty);
+
+      await tester.tap(find.text('Zapisz w Bibliotece'));
+      await settle(tester, until: () => playlists.playlists.isNotEmpty);
+      expect(playlists.playlists.single.sourceId, 'a' * 22);
+      expect(playlists.playlists.single.trackCount, 2);
+      expect(find.text('Zapisz w Bibliotece'), findsNothing);
+      expect(find.text('Edytuj'), findsOneWidget);
     },
   );
 }

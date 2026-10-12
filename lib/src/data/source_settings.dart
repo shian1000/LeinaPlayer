@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'spotify_playlist.dart';
+
 /// Where a song can be played from; the user orders them in "Ustawienia › Źródła muzyki ›
 /// Kolejność odtwarzania".
 enum PlaybackSource {
@@ -76,6 +78,11 @@ enum CoverSource {
 /// `shared_preferences`.
 class SourceSettings extends ChangeNotifier {
   static const _searchEnabledKey = 'youtube.search_enabled';
+  static const _playlistSearchKey = 'search.playlists';
+  static const _youTubePlaylistSearchKey = 'youtube.search_playlists';
+  static const _spotifyPlaylistSearchKey = 'spotify.search_playlists';
+  static const _spotifyClientIdKey = 'spotify.client_id';
+  static const _spotifyClientSecretKey = 'spotify.client_secret';
   static const _apiKeyKey = 'youtube.api_key';
   static const _playbackOrderKey = 'sources.playback_order';
   static const _cacheLimitKey = 'youtube.cache_limit';
@@ -99,6 +106,11 @@ class SourceSettings extends ChangeNotifier {
   static const _coverWifiOnlyKey = 'data_saver.covers_wifi_only';
 
   bool _youTubeSearchEnabled = false;
+  bool _playlistSearch = true;
+  bool _youTubePlaylistSearch = true;
+  bool _spotifyPlaylistSearch = true;
+  String? _spotifyClientId;
+  String? _spotifyClientSecret;
   Set<YouTubeMethod> _methods = {YouTubeMethod.newPipe, YouTubeMethod.explode};
   String? _apiKey;
   List<PlaybackSource> _playbackOrder = PlaybackSource.values;
@@ -116,6 +128,31 @@ class SourceSettings extends ChangeNotifier {
 
   /// "Włącz szukanie w serwisie YouTube".
   bool get youTubeSearchEnabled => _youTubeSearchEnabled;
+
+  /// "Wyszukuj playlisty" (search filters): Biblioteka playlists while typing, and YouTube /
+  /// Spotify ones with the online search, as their own switches allow.
+  bool get playlistSearch => _playlistSearch;
+
+  /// "Wyszukuj playlisty na YouTube" (YouTube settings).
+  bool get youTubePlaylistSearch => _youTubePlaylistSearch;
+
+  /// "Wyszukuj playlisty na Spotify" (Spotify settings).
+  bool get spotifyPlaylistSearch => _spotifyPlaylistSearch;
+
+  /// What the search button looks for on YouTube right now.
+  bool get searchesYouTubePlaylists =>
+      _youTubeSearchEnabled && _playlistSearch && _youTubePlaylistSearch;
+
+  bool get searchesSpotifyPlaylists =>
+      _playlistSearch && _spotifyPlaylistSearch;
+
+  /// The user's own Spotify app, `null` until both halves are set.
+  SpotifyApiKey? get spotifyApiKey =>
+      _spotifyClientId == null || _spotifyClientSecret == null
+      ? null
+      : (clientId: _spotifyClientId!, clientSecret: _spotifyClientSecret!);
+
+  String? get spotifyClientId => _spotifyClientId;
 
   Set<YouTubeMethod> get methods => _methods;
 
@@ -179,6 +216,13 @@ class SourceSettings extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _youTubeSearchEnabled =
         prefs.getBool(_searchEnabledKey) ?? _youTubeSearchEnabled;
+    _playlistSearch = prefs.getBool(_playlistSearchKey) ?? _playlistSearch;
+    _youTubePlaylistSearch =
+        prefs.getBool(_youTubePlaylistSearchKey) ?? _youTubePlaylistSearch;
+    _spotifyPlaylistSearch =
+        prefs.getBool(_spotifyPlaylistSearchKey) ?? _spotifyPlaylistSearch;
+    _spotifyClientId = prefs.getString(_spotifyClientIdKey);
+    _spotifyClientSecret = prefs.getString(_spotifyClientSecretKey);
     _methods = {
       for (final m in YouTubeMethod.values)
         if (prefs.getBool(_methodKey(m)) ?? _methods.contains(m)) m,
@@ -235,6 +279,51 @@ class SourceSettings extends ChangeNotifier {
       _searchEnabledKey,
       value,
     );
+  }
+
+  Future<void> setPlaylistSearch(bool value) async {
+    _playlistSearch = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _playlistSearchKey,
+      value,
+    );
+  }
+
+  Future<void> setYouTubePlaylistSearch(bool value) async {
+    _youTubePlaylistSearch = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _youTubePlaylistSearchKey,
+      value,
+    );
+  }
+
+  Future<void> setSpotifyPlaylistSearch(bool value) async {
+    _spotifyPlaylistSearch = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _spotifyPlaylistSearchKey,
+      value,
+    );
+  }
+
+  /// Saves the Spotify app's Client ID and Client Secret; blank text clears them.
+  Future<void> setSpotifyApiKey(String clientId, String clientSecret) async {
+    final id = clientId.trim();
+    final secret = clientSecret.trim();
+    _spotifyClientId = id.isEmpty ? null : id;
+    _spotifyClientSecret = secret.isEmpty ? null : secret;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    for (final (key, value) in [
+      (_spotifyClientIdKey, _spotifyClientId),
+      (_spotifyClientSecretKey, _spotifyClientSecret),
+    ]) {
+      value == null
+          ? await prefs.remove(key)
+          : await prefs.setString(key, value);
+    }
   }
 
   Future<void> setMethod(YouTubeMethod method, bool enabled) async {

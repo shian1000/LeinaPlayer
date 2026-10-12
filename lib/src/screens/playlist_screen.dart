@@ -5,10 +5,15 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
+import '../data/playlist_search.dart';
 import '../data/song_catalog.dart';
+import '../data/source_settings.dart';
+import '../data/spotify_playlist.dart';
 import '../data/text_normalizer.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../data/youtube_playlist.dart';
+import '../data/youtube_search.dart';
 import '../dummy.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
@@ -23,10 +28,22 @@ const _id = 'Playlista';
 
 /// One of the user's playlists (Biblioteka › playlist), laid out like a playlist in the
 /// reference app; its tracks are rows like the song search's, with the same source icons.
+///
+/// [PlaylistScreen.preview] shows a playlist found by search instead: fetched from YouTube or
+/// Spotify and playable, but not saved until "Zapisz w Bibliotece" (user's decision).
 class PlaylistScreen extends StatefulWidget {
-  const PlaylistScreen({super.key, required this.playlist, this.reveal});
+  const PlaylistScreen({
+    super.key,
+    required PlaylistSummary this.playlist,
+    this.reveal,
+  }) : found = null;
 
-  final PlaylistSummary playlist;
+  const PlaylistScreen.preview({super.key, required FoundPlaylist this.found})
+    : playlist = null,
+      reveal = null;
+
+  final PlaylistSummary? playlist;
+  final FoundPlaylist? found;
 
   /// A song to jump to (from "Ostatnie"); otherwise the song playing, if it's from here.
   final TrackRef? reveal;
@@ -38,6 +55,15 @@ class PlaylistScreen extends StatefulWidget {
 class _PlaylistScreenState extends State<PlaylistScreen> {
   List<PlaylistTrack>? _tracks;
   bool _loading = false;
+
+  /// The Biblioteka playlist shown; for a preview, `null` until it's saved.
+  late PlaylistSummary? _saved = widget.playlist;
+
+  /// A preview's playlist as fetched ([YouTubePlaylistData] or [SpotifyPlaylistData]), kept to
+  /// save it without fetching again.
+  Object? _fetched;
+  String? _fetchError;
+  bool _saving = false;
 
   /// Once the header has scrolled away the app bar turns solid and shows the name, as in the
   /// reference app (until then it's transparent over the cover).
@@ -78,11 +104,100 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   }
 
   Future<void> _load() async {
-    final tracks = await PlaylistLibraryScope.of(context)
-        .tracks(widget.playlist.id);
+    final saved = _saved;
+    if (saved == null) return _fetch();
+    final tracks = await PlaylistLibraryScope.of(context).tracks(saved.id);
     if (!mounted) return;
     setState(() => _tracks = tracks);
     WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+  }
+
+  /// Reads a preview's playlist from YouTube or Spotify.
+  Future<void> _fetch() async {
+    final found = widget.found!;
+    final library = PlaylistLibraryScope.of(context);
+    final settings = SourceSettingsScope.of(context);
+    final youTube = YouTubeScope.playlistsOf(context);
+    final spotify = YouTubeScope.spotifyOf(context);
+    // A retry: the first fetch starts from these already.
+    if (_fetchError != null) {
+      setState(() {
+        _tracks = null;
+        _fetchError = null;
+      });
+    }
+    try {
+      switch (found.source) {
+        case PlaylistSource.youtube:
+          final data = await youTube.fetch(found.id, settings);
+          final tracks = await library.previewYouTube(data);
+          if (!mounted) return;
+          setState(() {
+            _fetched = data;
+            _tracks = tracks;
+          });
+        case PlaylistSource.spotify:
+          final data = await spotify.fetch(found.id);
+          final tracks = await library.previewSpotify(data);
+          if (!mounted) return;
+          setState(() {
+            _fetched = data;
+            _tracks = tracks;
+          });
+      }
+    } on YouTubeSearchException catch (e) {
+      if (mounted) setState(() => _fetchError = e.message);
+    } on SpotifyException catch (e) {
+      if (mounted) setState(() => _fetchError = e.message);
+    } catch (e) {
+      debugPrint('Previewing playlist ${found.id} failed: $e');
+      if (mounted) {
+        setState(() => _fetchError = 'Nie udało się wczytać playlisty.');
+      }
+    }
+  }
+
+  /// Saves a preview to Biblioteka (or updates the copy already there) and goes on showing the
+  /// saved playlist.
+  Future<void> _saveToLibrary() async {
+    final fetched = _fetched;
+    if (fetched == null || _saving) return;
+    final library = PlaylistLibraryScope.of(context);
+    final settings = SourceSettingsScope.of(context);
+    final youTubeSearch = YouTubeScope.searchOf(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _saving = true);
+    try {
+      final result = switch (fetched) {
+        YouTubePlaylistData() => await library.importYouTube(
+          fetched,
+          videoExists: (id) => youTubeSearch.videoExists(id, settings),
+        ),
+        SpotifyPlaylistData() => await library.importSpotify(fetched),
+        _ => throw ArgumentError.value(fetched),
+      };
+      if (!mounted) return;
+      setState(() {
+        _saved = result.playlist;
+        _fetched = null;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${result.updated ? 'Zaktualizowano' : 'Zapisano'} „${result.playlist.name}” '
+            'w Bibliotece.',
+          ),
+        ),
+      );
+      await _load();
+    } catch (e) {
+      debugPrint('Saving playlist failed: $e');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Nie udało się zapisać playlisty.')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   /// Opening the playlist jumps to [PlaylistScreen.reveal] or else the song playing (when it
@@ -94,7 +209,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     final queue = PlaybackQueueScope.of(context);
     final index = wanted != null
         ? _indexOf(wanted, tracks)
-        : queue.playlistId == _playlist.id
+        : _savedId != null && queue.playlistId == _savedId
         ? queue.currentContextIndex
         : null;
     if (index == null || index < 0 || index >= tracks.length) return;
@@ -139,7 +254,45 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     setState(() => _searchEntry = entry);
   }
 
-  PlaylistSummary get _playlist => widget.playlist;
+  /// For a preview, built from what was found and fetched; its [PlaylistSummary.id] means
+  /// nothing — use [_savedId].
+  PlaylistSummary get _playlist {
+    final saved = _saved;
+    if (saved != null) return saved;
+    final found = widget.found!;
+    final (name, owner) = switch (_fetched) {
+      YouTubePlaylistData(:final name, :final owner) => (name, owner),
+      SpotifyPlaylistData(:final name, :final owner) => (name, owner),
+      _ => (found.name, found.owner),
+    };
+    final tracks = _tracks;
+    return PlaylistSummary(
+      id: -1,
+      name: name,
+      owner: owner,
+      trackCount: tracks?.length ?? found.trackCount ?? 0,
+      duration: (tracks ?? const <PlaylistTrack>[]).fold(
+        Duration.zero,
+        (sum, t) => sum + (t.duration ?? Duration.zero),
+      ),
+      updatedAt: DateTime.now(),
+      source: found.source,
+      sourceId: found.id,
+    );
+  }
+
+  int? get _savedId => _saved?.id;
+  bool get _preview => _saved == null;
+
+  /// "Zapisz w Bibliotece", or "Zaktualizuj…" when this playlist was imported before.
+  String _saveLabel(BuildContext context) {
+    final found = widget.found!;
+    return PlaylistLibraryScope.of(context).saved(found.source, found.id) ==
+            null
+        ? 'Zapisz w Bibliotece'
+        : 'Zaktualizuj w Bibliotece';
+  }
+
   bool get _fromSpotify => _playlist.source == PlaylistSource.spotify;
   String get _owner =>
       _playlist.owner ?? (_fromSpotify ? 'Spotify' : 'YouTube');
@@ -203,8 +356,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     if (tracks == null) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            MissingTracksScreen(playlist: _playlist, tracks: tracks),
+        builder: (_) => MissingTracksScreen(
+          playlist: _playlist,
+          tracks: tracks,
+          saved: !_preview,
+        ),
       ),
     );
   }
@@ -218,27 +374,54 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         title: _playlist.name,
         subtitle: 'Playlista • $_owner',
       ),
-      entries: [
-        MenuSheetEntry(
-          Icons.share_outlined,
-          'Udostępnij',
-          onTap: () => _share(hits),
-        ),
-        MenuSheetEntry(Icons.check_circle, 'Usuń z Biblioteki', onTap: _delete),
-        const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
-        const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),
-        MenuSheetEntry(
-          Icons.rule,
-          'Wyświetl utwory, których nie ma w bazie danych',
-          onTap: _showMissing,
-        ),
-        const MenuSheetEntry(Icons.playlist_add, 'Dodaj do innej playlisty'),
-        const MenuSheetEntry(
-          Icons.drive_file_move_outline,
-          'Przenieś do folderu',
-        ),
-        const MenuSheetEntry(Icons.qr_code, 'Pokaż kod playlisty'),
-      ],
+      entries: _preview
+          ? [
+              MenuSheetEntry(
+                Icons.share_outlined,
+                'Udostępnij',
+                onTap: () => _share(hits),
+              ),
+              if (_fetched != null)
+                MenuSheetEntry(
+                  Icons.add_circle_outline,
+                  _saveLabel(context),
+                  onTap: _saveToLibrary,
+                ),
+              if (_tracks != null)
+                MenuSheetEntry(
+                  Icons.rule,
+                  'Wyświetl utwory, których nie ma w bazie danych',
+                  onTap: _showMissing,
+                ),
+            ]
+          : [
+              MenuSheetEntry(
+                Icons.share_outlined,
+                'Udostępnij',
+                onTap: () => _share(hits),
+              ),
+              MenuSheetEntry(
+                Icons.check_circle,
+                'Usuń z Biblioteki',
+                onTap: _delete,
+              ),
+              const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
+              const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),
+              MenuSheetEntry(
+                Icons.rule,
+                'Wyświetl utwory, których nie ma w bazie danych',
+                onTap: _showMissing,
+              ),
+              const MenuSheetEntry(
+                Icons.playlist_add,
+                'Dodaj do innej playlisty',
+              ),
+              const MenuSheetEntry(
+                Icons.drive_file_move_outline,
+                'Przenieś do folderu',
+              ),
+              const MenuSheetEntry(Icons.qr_code, 'Pokaż kod playlisty'),
+            ],
     );
   }
 
@@ -356,7 +539,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         // Tapping a track queues the whole playlist, starting at that track.
         queue: hits,
         queueIndex: i,
-        playlistId: _playlist.id,
+        playlistId: _savedId,
         youTubeListId: _playlist.youTubeId,
         playlistName: _playlist.name,
         // Like the reference app's playlists: just the artist.
@@ -510,14 +693,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
                 child: Row(
                   children: [
-                    IconButton(
-                      tooltip: 'Pobierz',
-                      icon: const Icon(
-                        Icons.download_for_offline_outlined,
-                        size: 30,
+                    if (!_preview)
+                      IconButton(
+                        tooltip: 'Pobierz',
+                        icon: const Icon(
+                          Icons.download_for_offline_outlined,
+                          size: 30,
+                        ),
+                        onPressed: () => dummy('Pobierz (ikona)'),
                       ),
-                      onPressed: () => dummy('Pobierz (ikona)'),
-                    ),
                     IconButton(
                       tooltip: 'Udostępnij',
                       icon: const Icon(Icons.share_outlined, size: 28),
@@ -538,7 +722,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                               (onStatus) =>
                                   PlaybackQueueScope.of(context).startShuffled(
                                     hits,
-                                    playlistId: _playlist.id,
+                                    playlistId: _savedId,
                                     youTubeListId: _playlist.youTubeId,
                                     playlistName: _playlist.name,
                                     onStatus: onStatus,
@@ -562,7 +746,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                   PlaybackQueueScope.of(context).start(
                                     hits,
                                     0,
-                                    playlistId: _playlist.id,
+                                    playlistId: _savedId,
                                     youTubeListId: _playlist.youTubeId,
                                     playlistName: _playlist.name,
                                     shuffle: false,
@@ -578,26 +762,58 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Wrap(
                   spacing: 8,
-                  children: [
-                    _ActionChip(
-                      icon: Icons.add,
-                      label: 'Dodaj',
-                      onTap: () => dummy('Dodaj (do tej playlisty)'),
-                    ),
-                    _ActionChip(
-                      icon: Icons.menu,
-                      label: 'Edytuj',
-                      onTap: () => dummy('Edytuj (playlistę)'),
-                    ),
-                    _ActionChip(
-                      icon: Icons.swap_vert,
-                      label: 'Sortuj',
-                      onTap: () => dummy('Sortuj (playlistę)'),
-                    ),
-                  ],
+                  children: _preview
+                      ? [
+                          _ActionChip(
+                            icon: Icons.add,
+                            label: _saving ? 'Zapisuję…' : _saveLabel(context),
+                            onTap: _fetched == null || _saving
+                                ? null
+                                : _saveToLibrary,
+                          ),
+                        ]
+                      : [
+                          _ActionChip(
+                            icon: Icons.add,
+                            label: 'Dodaj',
+                            onTap: () => dummy('Dodaj (do tej playlisty)'),
+                          ),
+                          _ActionChip(
+                            icon: Icons.menu,
+                            label: 'Edytuj',
+                            onTap: () => dummy('Edytuj (playlistę)'),
+                          ),
+                          _ActionChip(
+                            icon: Icons.swap_vert,
+                            label: 'Sortuj',
+                            onTap: () => dummy('Sortuj (playlistę)'),
+                          ),
+                        ],
                 ),
               ),
-              if (tracks == null)
+              if (_fetchError != null)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Text(
+                        _fetchError!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: palette.textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: palette.textPrimary,
+                          shape: palette.pillShape,
+                        ),
+                        onPressed: _fetch,
+                        child: const Text('Spróbuj ponownie'),
+                      ),
+                    ],
+                  ),
+                )
+              else if (tracks == null)
                 const Padding(
                   padding: EdgeInsets.all(32),
                   child: Center(child: CircularProgressIndicator()),
@@ -676,7 +892,7 @@ class _ActionChip extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

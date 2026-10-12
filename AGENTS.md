@@ -32,7 +32,8 @@ MusicDatabase links to a video, matching songs without a link on the phone, and 
 audio on Android through NewPipeExtractor, with a cache of played songs — see
 [`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube or Spotify links
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
-a share sheet; songs can be shared as their YouTube or Spotify link
+a share sheet; song search also finds Biblioteka playlists, and its online button YouTube and
+Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)).
 YouTube links shared to the app or opened with it import the playlist / play the video; Spotify
 playlist links shared to it are imported.
@@ -84,7 +85,8 @@ flutter build apk            # build a release Android APK
   search over both (`combined_search.dart`), YouTube links given to the app
   (`incoming_links.dart`, `video_link.dart`), YouTube search / matching / audio
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
-  links and the audio cache (`youtube_library.dart`), Spotify playlists (`spotify_playlist.dart`),
+  links and the audio cache (`youtube_library.dart`), Spotify playlists — fetching and searching
+  (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`),
   album covers and their cache
   (`album_covers.dart`), play history (`play_history.dart`,
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and
@@ -179,7 +181,8 @@ flutter build apk            # build a release Android APK
   done.
 - [`playlists.md`](docs/agent-notes/playlists.md) — Biblioteka playlists: `local.db` tables,
   YouTube import (fetching, title parsing, recognising songs by video first), Spotify import (the
-  embed page, 100-track limit), sharing, R8 rules.
+  embed page, 100-track limit), searching playlists (Spotify key / anonymous web-player search
+  and its changing hash), previews, sharing, R8 rules.
 - [`covers.md`](docs/agent-notes/covers.md) — album covers: sources and their order, matching,
   rate limits, the cover cache, the MusicDatabase hand-off.
 - [`ui-sizing.md`](docs/agent-notes/ui-sizing.md) — font sizes/spacing are calibrated against the

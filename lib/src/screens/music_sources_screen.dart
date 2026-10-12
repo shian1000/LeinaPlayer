@@ -50,7 +50,9 @@ class MusicSourcesScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.smart_display_outlined),
             title: const Text('YouTube'),
-            subtitle: const Text('Wyszukiwanie utworów w serwisie YouTube'),
+            subtitle: const Text(
+              'Wyszukiwanie utworów i playlist w serwisie YouTube',
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -61,7 +63,9 @@ class MusicSourcesScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.graphic_eq),
             title: const Text('Spotify'),
-            subtitle: const Text('Importowanie playlist ze Spotify'),
+            subtitle: const Text(
+              'Wyszukiwanie i importowanie playlist ze Spotify',
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(

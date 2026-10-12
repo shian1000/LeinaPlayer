@@ -7,6 +7,8 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import 'network_errors.dart';
 import 'newpipe.dart';
+import 'playlist_library.dart';
+import 'playlist_search.dart';
 import 'source_settings.dart';
 import 'spotify_playlist.dart';
 import 'youtube_audio.dart';
@@ -34,6 +36,13 @@ typedef YouTubeApiSearchFn = Future<List<YouTubeVideo>> Function(
   String query,
   String apiKey,
 );
+typedef YouTubePlaylistSearchFn = Future<List<FoundPlaylist>> Function(
+  String query,
+);
+typedef YouTubeApiPlaylistSearchFn = Future<List<FoundPlaylist>> Function(
+  String query,
+  String apiKey,
+);
 
 /// Searches YouTube with the methods switched on in [SourceSettings], in [YouTubeMethod] order,
 /// moving to the next one when a method fails. The functions can be replaced in tests.
@@ -44,10 +53,16 @@ class YouTubeSearch {
     YouTubeApiSearchFn? api,
     YouTubeVideoFn? newPipeVideo,
     YouTubeVideoFn? explodeVideo,
+    YouTubePlaylistSearchFn? newPipePlaylists,
+    YouTubePlaylistSearchFn? explodePlaylists,
+    YouTubeApiPlaylistSearchFn? apiPlaylists,
     bool? newPipeAvailable,
   }) : _newPipe = newPipe ?? newPipeSearch,
        _explode = explode ?? _searchWithExplode,
        _api = api ?? _searchWithApi,
+       _newPipePlaylists = newPipePlaylists ?? newPipeSearchPlaylists,
+       _explodePlaylists = explodePlaylists ?? _searchPlaylistsWithExplode,
+       _apiPlaylists = apiPlaylists ?? _searchPlaylistsWithApi,
        _newPipeVideo = newPipeVideo ?? _newPipeVideoInfo,
        _explodeVideo = explodeVideo ?? _videoWithExplode,
        newPipeAvailable = newPipeAvailable ?? (!kIsWeb && Platform.isAndroid);
@@ -59,16 +74,42 @@ class YouTubeSearch {
   final YouTubeApiSearchFn _api;
   final YouTubeVideoFn _newPipeVideo;
   final YouTubeVideoFn _explodeVideo;
+  final YouTubePlaylistSearchFn _newPipePlaylists;
+  final YouTubePlaylistSearchFn _explodePlaylists;
+  final YouTubeApiPlaylistSearchFn _apiPlaylists;
 
   /// NewPipeExtractor is a Java library, so only the Android build has it.
   final bool newPipeAvailable;
 
   /// Videos for [query], best match first. Throws [YouTubeSearchException] when no method
   /// worked; an empty list means YouTube was searched and found nothing.
-  Future<List<YouTubeVideo>> search(
+  Future<List<YouTubeVideo>> search(String query, SourceSettings settings) =>
+      _firstWorking(
+        settings,
+        newPipe: () async => (await _newPipe(query)).take(maxResults).toList(),
+        explode: () => _explode(query),
+        api: (key) => _api(query, key),
+      );
+
+  /// Playlists for [query], like [search] (same methods, same errors).
+  Future<List<FoundPlaylist>> searchPlaylists(
     String query,
     SourceSettings settings,
-  ) async {
+  ) => _firstWorking(
+    settings,
+    newPipe: () async =>
+        (await _newPipePlaylists(query)).take(maxResults).toList(),
+    explode: () => _explodePlaylists(query),
+    api: (key) => _apiPlaylists(query, key),
+  );
+
+  /// The result of the first switched-on method that works, in [YouTubeMethod] order.
+  Future<T> _firstWorking<T>(
+    SourceSettings settings, {
+    required Future<T> Function() newPipe,
+    required Future<T> Function() explode,
+    required Future<T> Function(String apiKey) api,
+  }) async {
     final methods = [
       for (final m in YouTubeMethod.values)
         if (settings.methods.contains(m) &&
@@ -87,9 +128,9 @@ class YouTubeSearch {
       try {
         switch (method) {
           case YouTubeMethod.newPipe:
-            return (await _newPipe(query)).take(maxResults).toList();
+            return await newPipe();
           case YouTubeMethod.explode:
-            return await _explode(query);
+            return await explode();
           case YouTubeMethod.ytDlpServer:
             // Needs a search endpoint on MusicDatabase's server, which doesn't exist yet.
             errors.add('yt-dlp przez serwer: jeszcze niedostępne');
@@ -101,7 +142,7 @@ class YouTubeSearch {
               errors.add('API: brak kodu YouTube API');
               continue;
             } else {
-              return await _api(query, key);
+              return await api(key);
             }
         }
       } catch (e) {
@@ -213,13 +254,96 @@ class YouTubeSearch {
     }
   }
 
+  static Future<List<FoundPlaylist>> _searchPlaylistsWithExplode(
+    String query,
+  ) async {
+    final yt = YoutubeExplode();
+    try {
+      final results = await yt.search.searchContent(
+        query,
+        filter: TypeFilters.playlist,
+      );
+      return [
+        for (final p in results.whereType<SearchPlaylist>().take(maxResults))
+          FoundPlaylist(
+            source: PlaylistSource.youtube,
+            id: p.id.value,
+            name: p.title,
+            // youtube_explode doesn't read the channel; it caps the count at 50.
+            trackCount: p.videoCount > 0 && p.videoCount < 50
+                ? p.videoCount
+                : null,
+            thumbnail: p.thumbnails.lastOrNull?.url,
+          ),
+      ];
+    } finally {
+      yt.close();
+    }
+  }
+
+  static Future<List<FoundPlaylist>> _searchPlaylistsWithApi(
+    String query,
+    String apiKey,
+  ) async {
+    final items = await _apiSearch(query, apiKey, 'playlist');
+    return [
+      for (final item in items)
+        if (item case {
+          'id': {'playlistId': final String id},
+          'snippet': {
+            'title': final String title,
+            'channelTitle': final String channel,
+          },
+        })
+          FoundPlaylist(
+            source: PlaylistSource.youtube,
+            id: id,
+            name: _unescapeHtml(title),
+            owner: _unescapeHtml(channel),
+            thumbnail: switch (item) {
+              {
+                'snippet': {
+                  'thumbnails': {'medium': {'url': final String url}},
+                },
+              } =>
+                Uri.tryParse(url),
+              _ => null,
+            },
+          ),
+    ];
+  }
+
   static Future<List<YouTubeVideo>> _searchWithApi(
     String query,
     String apiKey,
   ) async {
+    final items = await _apiSearch(query, apiKey, 'video');
+    return [
+      for (final item in items)
+        if (item case {
+          'id': {'videoId': final String id},
+          'snippet': {
+            'title': final String title,
+            'channelTitle': final String channel,
+          },
+        })
+          YouTubeVideo(
+            id: id,
+            title: _unescapeHtml(title),
+            channel: _unescapeHtml(channel),
+          ),
+    ];
+  }
+
+  /// The Data API's `search` items of one [type] (`video`, `playlist`).
+  static Future<List<Object?>> _apiSearch(
+    String query,
+    String apiKey,
+    String type,
+  ) async {
     final uri = Uri.https('www.googleapis.com', '/youtube/v3/search', {
       'part': 'snippet',
-      'type': 'video',
+      'type': type,
       'maxResults': '$maxResults',
       'q': query,
       'key': apiKey,
@@ -241,21 +365,7 @@ class YouTubeSearch {
         );
       }
       final items = (jsonDecode(body) as Map<String, Object?>)['items'];
-      return [
-        for (final item in (items as List?) ?? const [])
-          if (item case {
-            'id': {'videoId': final String id},
-            'snippet': {
-              'title': final String title,
-              'channelTitle': final String channel,
-            },
-          })
-            YouTubeVideo(
-              id: id,
-              title: _unescapeHtml(title),
-              channel: _unescapeHtml(channel),
-            ),
-      ];
+      return (items as List?) ?? const [];
     } finally {
       client.close(force: true);
     }

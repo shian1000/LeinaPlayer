@@ -133,6 +133,9 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     sections — *Wyszukiwanie*:
     - "Włącz szukanie w serwisie YouTube" — turns on the "Wyszukaj na YouTubie" button and
       looking up songs on YouTube when tapped (see song search below).
+    - "Wyszukuj playlisty na YouTube" (on) — the button also searches YouTube playlists; only
+      selectable while search is on, and only acts while "Wyszukuj playlisty" (search filters)
+      is on (the subtitle says so otherwise).
     - "Korzystaj z NewPipeExtractor" (on; Android only), "Korzystaj z pakietu youtube_explode"
       (on), "Korzystaj z yt-dlp przez serwer", "Korzystaj z API" — the search methods, tried top
       to bottom, the next one only when the previous fails (`YouTubeSearch`). Only selectable while search is on. **yt-dlp przez
@@ -152,10 +155,14 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     from an imported one — or the browser without it, and pauses this app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
 
     The cache of played songs is in Oszczędzanie danych › Pamięć podręczna.
-  - Spotify **→ Spotify** (`spotify_source_screen.dart`) — section *Importowanie playlist*:
-    `Ustawienia › Źródła muzyki › Spotify › Spotify API` (dummy — the place for a Spotify app key,
-    to read whole playlists instead of the embed page's first 100 tracks), and a note on that
-    limit. Spotify is not a playback source.
+  - Spotify **→ Spotify** (`spotify_source_screen.dart`) — section *Wyszukiwanie*: "Wyszukuj
+    playlisty na Spotify" (on; the search button also searches Spotify playlists, while
+    "Wyszukuj playlisty" in the search filters is on), **Spotify API** (implemented: dialog for
+    the Client ID and Client Secret of the user's own Spotify app — with them playlists are
+    searched through the Web API, without them or when it fails the way the web player does;
+    blank clears; stored in plain `shared_preferences`; the tile shows the id's last four
+    characters) and a note on both ways. Section *Importowanie playlist*: a note on the embed
+    page's 100-track limit (the key doesn't lift it yet). Spotify is not a playback source.
   - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
     reorder the playback sources (default: 1. Telefon, 2. YouTube). When a song is playable
     from several, the first one in this order is used.
@@ -248,8 +255,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   fields song search looks at — Tytuł, Wykonawca (incl. additional artists and the artists'
   other names / `synonyms`), Album (these three are the default), Rok, Język, Pochodzenie
   wykonawcy — plus "Przywróć
-  domyślne". At least one stays ticked; the choice is remembered. A dot on the icon means the
-  selection differs from the default.
+  domyślne". At least one stays ticked; the choice is remembered. Below them the switch
+  "Wyszukuj playlisty" (on): Biblioteka playlists while typing, and with the button YouTube /
+  Spotify playlists as their own settings allow. A dot on the icon means the selection differs
+  from the default (playlists off counts).
 - "Czego chcesz posłuchać?" field **→ song search** (`song_search_screen.dart`) —
   **implemented**: searches as you type, over the fields chosen in "Szukaj w", in both the
   downloaded `music.db` and the phone's own `local.db` (`combined_search.dart`): MusicDatabase
@@ -280,10 +289,16 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
     above): from the cache, streamed (and downloaded to the cache meanwhile) or in the YouTube
     app ("Otwarto w aplikacji YouTube.").
     Otherwise "Ten utwór jest niedostępny".
-  - While YouTube search is on, the list starts with a "Wyszukaj na YouTubie" button. YouTube is
-    searched only when it's tapped (never while typing); the results (up to 15: title, channel,
-    duration) replace the button and are dropped when the query changes. Tapping one streams it
-    like a song with a stored link.
+  - While YouTube search or Spotify playlist search is on, the list starts with a button —
+    "Wyszukaj na YouTubie", "Wyszukaj na YouTubie i Spotify" or "Wyszukaj playlisty na Spotify".
+    Nothing online is searched while typing; the results replace the button and are dropped when
+    the query changes. All parts are searched at once, each with its own spinner / error with
+    retry: "Playlisty na YouTube: N" and "Playlisty na Spotify: N" (rows of covers scrolled
+    sideways — picture, name, owner, track count when known; tapping one opens its **preview**,
+    see Playlista) and "YouTube: N" (up to 15 videos: title, channel, duration; tapping one
+    streams it like a song with a stored link).
+  - "Playlisty w Bibliotece: N" (while "Wyszukuj playlisty" is on): Biblioteka playlists whose
+    name or owner contain every word, as you type, above the songs; tapping one opens it.
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
     <pozycja>`: Dodaj do kolejki (**implemented**), `Dodaj do playlisty`, `Przejdź do albumu`,
     `Przejdź do wykonawców`, Udostępnij (**→ Udostępnij utwór**, below). The same ⋮ is used in
@@ -315,6 +330,14 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   shows "Brak playlist" and how to add one. Albums/artists don't exist yet.
 
 ## Playlista (`playlist_screen.dart`) — **implemented** for imported playlists
+
+- **Preview** (`PlaylistScreen.preview`, from a YouTube/Spotify playlist found by search): the
+  same screen, fetched from YouTube or Spotify (tracks recognised like on import) but not saved —
+  playable, shareable. Instead of the Pobierz icon and the Dodaj/Edytuj/Sortuj chips there's one
+  chip **"Zapisz w Bibliotece"** ("Zaktualizuj w Bibliotece" when it was imported before): it
+  imports the fetched playlist and the screen becomes the saved one. Its ⋮ has only
+  Udostępnij, the same save entry and "Wyświetl utwory, których nie ma w bazie danych". A failed
+  fetch shows the error and "Spróbuj ponownie".
 
 - Transparent app bar over the header; once the header scrolls away it turns solid and shows
   the playlist name (as in the reference app). Back arrow pops.

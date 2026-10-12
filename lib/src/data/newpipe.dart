@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import 'playlist_library.dart';
+import 'playlist_search.dart';
 import 'youtube_audio.dart';
 import 'youtube_playlist.dart';
 import 'youtube_video.dart';
@@ -39,6 +41,28 @@ Future<List<YouTubeVideo>> newPipeSearch(String query) async {
     'query': query,
   });
   return [for (final v in raw ?? const <Map<Object?, Object?>>[]) _video(v)];
+}
+
+/// Playlists on the first page of YouTube's playlist search for [query].
+Future<List<FoundPlaylist>> newPipeSearchPlaylists(String query) async {
+  final raw = await _channel.invokeListMethod<Map<Object?, Object?>>(
+    'searchPlaylists',
+    {'query': query},
+  );
+  return [
+    for (final p in raw ?? const <Map<Object?, Object?>>[])
+      FoundPlaylist(
+        source: PlaylistSource.youtube,
+        id: p['id']! as String,
+        name: p['name']! as String,
+        owner: p['owner'] as String?,
+        trackCount: (p['count'] as int? ?? -1) < 0 ? null : p['count'] as int,
+        thumbnail: switch (p['thumbnail']) {
+          final String url => Uri.tryParse(url),
+          _ => null,
+        },
+      ),
+  ];
 }
 
 /// Name, owner and every video of a YouTube playlist.

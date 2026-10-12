@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/local_library.dart';
+import '../data/playlist_library.dart';
+import '../data/playlist_search.dart';
+import '../data/spotify_playlist.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../data/song_catalog.dart';
@@ -12,14 +15,18 @@ import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
+import '../widgets/cover_art.dart';
 import '../widgets/song_tile.dart';
 import 'database_source_screen.dart';
+import 'playlist_screen.dart';
 import 'search_fields_sheet.dart';
 import '../data/album_covers.dart';
 import '../widgets/song_cover.dart';
 
 /// Song search over the downloaded MusicDatabase (`music.db`), opened from the
-/// "Czego chcesz posłuchać?" field on the Wyszukaj tab. Results update on every keystroke.
+/// "Czego chcesz posłuchać?" field on the Wyszukaj tab. Results — songs and Biblioteka
+/// playlists — update on every keystroke; YouTube (videos, playlists) and Spotify (playlists)
+/// are searched only with the button.
 class SongSearchScreen extends StatefulWidget {
   const SongSearchScreen({super.key});
 
@@ -30,29 +37,58 @@ class SongSearchScreen extends StatefulWidget {
 class _SongSearchScreenState extends State<SongSearchScreen> {
   final _query = TextEditingController();
 
-  /// The last "Wyszukaj na YouTubie" search; dropped as soon as the query changes.
-  _YouTubeResults? _youTube;
+  /// The last online search (the button); dropped as soon as the query changes.
+  _OnlineResults? _online;
 
   void _onQueryChanged() {
     setState(() {
-      if (_youTube?.query != _query.text.trim()) _youTube = null;
+      if (_online?.query != _query.text.trim()) _online = null;
     });
   }
 
-  Future<void> _searchYouTube() async {
+  /// Searches whatever the settings switch on — YouTube videos, YouTube playlists, Spotify
+  /// playlists — all at once; each section shows its results as they come.
+  Future<void> _searchOnline() async {
     final query = _query.text.trim();
     if (query.isEmpty) return;
     FocusScope.of(context).unfocus();
     final search = YouTubeScope.searchOf(context);
+    final spotify = YouTubeScope.spotifyOf(context);
     final settings = SourceSettingsScope.of(context);
-    final pending = _YouTubeResults(query);
-    setState(() => _youTube = pending);
-    try {
-      pending.videos = await search.search(query, settings);
-    } on YouTubeSearchException catch (e) {
-      pending.error = e.message;
+    final pending = _OnlineResults(
+      query,
+      videos: settings.youTubeSearchEnabled ? _Pending() : null,
+      youTubePlaylists: settings.searchesYouTubePlaylists ? _Pending() : null,
+      spotifyPlaylists: settings.searchesSpotifyPlaylists ? _Pending() : null,
+    );
+    setState(() => _online = pending);
+
+    Future<void> run<T>(_Pending<T>? slot, Future<T> Function() work) async {
+      if (slot == null) return;
+      try {
+        slot.value = await work();
+      } on YouTubeSearchException catch (e) {
+        slot.error = e.message;
+      } on SpotifyException catch (e) {
+        slot.error = e.message;
+      } catch (e) {
+        debugPrint('Online search for "$query" failed: $e');
+        slot.error = 'Wyszukiwanie się nie udało.';
+      }
+      if (mounted && _online == pending) setState(() {});
     }
-    if (mounted && _youTube == pending) setState(() {});
+
+    await Future.wait([
+      run(pending.videos, () => search.search(query, settings)),
+      run(
+        pending.youTubePlaylists,
+        () => search.searchPlaylists(query, settings),
+      ),
+      run(
+        pending.spotifyPlaylists,
+        () => spotify.search(query, apiKey: settings.spotifyApiKey),
+      ),
+    ]);
   }
 
   @override
@@ -110,41 +146,53 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
       ),
       body: _Results(
         query: _query.text,
-        youTube: _youTube,
-        onSearchYouTube: _searchYouTube,
+        online: _online,
+        onSearchOnline: _searchOnline,
       ),
     );
   }
 }
 
-/// State of one "Wyszukaj na YouTubie" search: loading until [videos] or [error] is set.
-class _YouTubeResults {
-  _YouTubeResults(this.query);
-
-  final String query;
-  List<YouTubeVideo>? videos;
+/// One part of an online search: loading until [value] or [error] is set.
+class _Pending<T> {
+  T? value;
   String? error;
 
-  bool get loading => videos == null && error == null;
+  bool get loading => value == null && error == null;
+}
+
+/// One press of the online search button; a part is `null` when it wasn't searched.
+class _OnlineResults {
+  _OnlineResults(
+    this.query, {
+    this.videos,
+    this.youTubePlaylists,
+    this.spotifyPlaylists,
+  });
+
+  final String query;
+  final _Pending<List<YouTubeVideo>>? videos;
+  final _Pending<List<FoundPlaylist>>? youTubePlaylists;
+  final _Pending<List<FoundPlaylist>>? spotifyPlaylists;
 }
 
 class _Results extends StatelessWidget {
   const _Results({
     required this.query,
-    required this.youTube,
-    required this.onSearchYouTube,
+    required this.online,
+    required this.onSearchOnline,
   });
 
   final String query;
-  final _YouTubeResults? youTube;
-  final VoidCallback onSearchYouTube;
+  final _OnlineResults? online;
+  final VoidCallback onSearchOnline;
 
   @override
   Widget build(BuildContext context) {
     final catalog = SongCatalogScope.of(context);
     final library = LocalLibraryScope.of(context);
     final sync = DatabaseSyncScope.of(context);
-    final youTubeEnabled = SourceSettingsScope.of(context).youTubeSearchEnabled;
+    final settings = SourceSettingsScope.of(context);
     final mainReady = catalog.status == CatalogStatus.ready;
 
     // Without MusicDatabase's file, phone songs can still be searched; only explain the missing
@@ -200,14 +248,24 @@ class _Results extends StatelessWidget {
       library,
       youTube: youTubeLibrary,
     );
-    final youTubeSection = youTubeEnabled
-        ? _YouTubeSection(
-            results: youTube,
+    final youTube = settings.youTubeSearchEnabled;
+    final spotify = settings.searchesSpotifyPlaylists;
+    final onlineSection = youTube || spotify
+        ? _OnlineSection(
+            results: online,
             query: query.trim(),
-            onSearch: onSearchYouTube,
+            youTube: youTube,
+            spotify: spotify,
+            onSearch: onSearchOnline,
           )
         : null;
-    if (results.isEmpty && youTubeSection == null) {
+    final playlists = settings.playlistSearch
+        ? searchSavedPlaylists(
+            query,
+            PlaylistLibraryScope.of(context).playlists,
+          )
+        : const <PlaylistSummary>[];
+    if (results.isEmpty && playlists.isEmpty && onlineSection == null) {
       return _Message(
         icon: Icons.search_off,
         title: 'Brak wyników dla „${query.trim()}”',
@@ -225,7 +283,14 @@ class _Results extends StatelessWidget {
         ),
       ),
     );
-    final leading = [?youTubeSection, header];
+    final leading = [
+      ?onlineSection,
+      if (playlists.isNotEmpty) ...[
+        _SectionLabel('Playlisty w Bibliotece: ${playlists.length}'),
+        for (final playlist in playlists) _SavedPlaylistTile(playlist),
+      ],
+      header,
+    ];
     return ListView.builder(
       itemCount: results.length + leading.length,
       itemBuilder: (context, i) => i < leading.length
@@ -242,17 +307,24 @@ class _Results extends StatelessWidget {
   }
 }
 
-/// Top of the results while YouTube search is on: the "Wyszukaj na YouTubie" button, then what
-/// it found. YouTube is only searched on request, never while typing.
-class _YouTubeSection extends StatelessWidget {
-  const _YouTubeSection({
+/// Top of the results while YouTube search or Spotify playlist search is on: the button, then
+/// what it found — YouTube and Spotify playlists, then YouTube videos. Nothing online is
+/// searched while typing.
+class _OnlineSection extends StatelessWidget {
+  const _OnlineSection({
     required this.results,
     required this.query,
+    required this.youTube,
+    required this.spotify,
     required this.onSearch,
   });
 
-  final _YouTubeResults? results;
+  final _OnlineResults? results;
   final String query;
+
+  /// What the button searches: YouTube (videos, maybe playlists), Spotify playlists.
+  final bool youTube;
+  final bool spotify;
   final VoidCallback onSearch;
 
   @override
@@ -269,58 +341,252 @@ class _YouTubeSection extends StatelessWidget {
             side: BorderSide(color: palette.outline ?? palette.textSecondary),
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
-          icon: const Icon(Icons.smart_display_outlined),
-          label: const Text('Wyszukaj na YouTubie'),
+          icon: Icon(
+            youTube && spotify
+                ? Icons.travel_explore
+                : youTube
+                ? Icons.smart_display_outlined
+                : Icons.queue_music,
+          ),
+          label: Text(
+            youTube && spotify
+                ? 'Wyszukaj na YouTubie i Spotify'
+                : youTube
+                ? 'Wyszukaj na YouTubie'
+                : 'Wyszukaj playlisty na Spotify',
+          ),
           onPressed: onSearch,
         ),
       );
     }
-    final videos = results.videos;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text(
-            videos == null ? 'YouTube' : 'YouTube: ${videos.length}',
-            style: TextStyle(
-              color: palette.textSecondary,
-              fontSize: AppFontSize.small,
-            ),
+        if (results.youTubePlaylists case final part?)
+          ..._part(
+            context,
+            part,
+            label: 'Playlisty na YouTube',
+            empty: 'Brak playlist na YouTube dla „$query”',
+            found: (playlists) => [_PlaylistRow(playlists)],
           ),
-        ),
-        if (results.loading)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(
-              child: SizedBox.square(
-                dimension: 28,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              ),
-            ),
-          )
-        else if (results.error != null)
-          ListTile(
-            leading: Icon(
-              Icons.error_outline,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            title: Text(results.error!),
-            trailing: IconButton(
-              tooltip: 'Spróbuj ponownie',
-              icon: const Icon(Icons.refresh),
-              onPressed: onSearch,
-            ),
-          )
-        else if (videos!.isEmpty)
-          ListTile(
-            leading: const Icon(Icons.search_off),
-            title: Text('Brak wyników na YouTube dla „$query”'),
-          )
-        else
-          for (final video in videos) _YouTubeTile(video: video, query: query),
+        if (results.spotifyPlaylists case final part?)
+          ..._part(
+            context,
+            part,
+            label: 'Playlisty na Spotify',
+            empty: 'Brak playlist na Spotify dla „$query”',
+            found: (playlists) => [_PlaylistRow(playlists)],
+          ),
+        if (results.videos case final part?)
+          ..._part(
+            context,
+            part,
+            label: 'YouTube',
+            empty: 'Brak wyników na YouTube dla „$query”',
+            found: (videos) => [
+              for (final video in videos)
+                _YouTubeTile(video: video, query: query),
+            ],
+          ),
         const Divider(height: 16),
       ],
+    );
+  }
+
+  /// A labelled part: spinner, error with retry, "nothing found", or [found]'s widgets.
+  List<Widget> _part<T extends List<Object>>(
+    BuildContext context,
+    _Pending<T> part, {
+    required String label,
+    required String empty,
+    required List<Widget> Function(T) found,
+  }) {
+    final value = part.value;
+    return [
+      _SectionLabel(value == null ? label : '$label: ${value.length}'),
+      if (part.loading)
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(
+            child: SizedBox.square(
+              dimension: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+          ),
+        )
+      else if (part.error != null)
+        ListTile(
+          leading: Icon(
+            Icons.error_outline,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          title: Text(part.error!),
+          trailing: IconButton(
+            tooltip: 'Spróbuj ponownie',
+            icon: const Icon(Icons.refresh),
+            onPressed: onSearch,
+          ),
+        )
+      else if (value!.isEmpty)
+        ListTile(leading: const Icon(Icons.search_off), title: Text(empty))
+      else
+        ...found(value),
+    ];
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: context.palette.textSecondary,
+          fontSize: AppFontSize.small,
+        ),
+      ),
+    );
+  }
+}
+
+/// Playlists found online, as a row of covers scrolled sideways (they'd push the songs far
+/// down as a list). A tap opens the playlist's preview.
+class _PlaylistRow extends StatelessWidget {
+  const _PlaylistRow(this.playlists);
+
+  final List<FoundPlaylist> playlists;
+
+  static const _cover = 132.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return SizedBox(
+      height: _cover + 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: playlists.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final playlist = playlists[i];
+          final count = playlist.trackCount;
+          return InkWell(
+            borderRadius: palette.radius(4),
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PlaylistScreen.preview(found: playlist),
+                ),
+              );
+            },
+            child: SizedBox(
+              width: _cover,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Thumbnail(playlist: playlist, size: _cover),
+                  const SizedBox(height: 6),
+                  Text(
+                    playlist.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.small,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    [
+                      ?playlist.owner,
+                      ?(count == null ? null : '$count utw.'),
+                    ].join(' • '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: AppFontSize.small,
+                      color: palette.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The playlist's picture from YouTube / Spotify (a video thumbnail is cropped square), or the
+/// usual placeholder.
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({required this.playlist, required this.size});
+
+  final FoundPlaylist playlist;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = CoverArt(
+      seed: playlist.name,
+      size: size,
+      icon: Icons.queue_music,
+    );
+    final url = playlist.thumbnail;
+    if (url == null) return placeholder;
+    return ClipRRect(
+      borderRadius: context.palette.radius(4),
+      child: Image.network(
+        url.toString(),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+        frameBuilder: (_, child, frame, loaded) =>
+            loaded || frame != null ? child : placeholder,
+      ),
+    );
+  }
+}
+
+/// A Biblioteka playlist matching the query, like the rows in Biblioteka.
+class _SavedPlaylistTile extends StatelessWidget {
+  const _SavedPlaylistTile(this.playlist);
+
+  final PlaylistSummary playlist;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      leading: CoverArt(
+        seed: playlist.name,
+        size: SongTile.coverSize,
+        icon: Icons.queue_music,
+      ),
+      title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        ['Playlista', ?playlist.owner].join(' • '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () {
+        FocusScope.of(context).unfocus();
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PlaylistScreen(playlist: playlist),
+          ),
+        );
+      },
     );
   }
 }

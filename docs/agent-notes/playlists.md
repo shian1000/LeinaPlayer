@@ -4,7 +4,7 @@ Code: `lib/src/data/playlist_library.dart` (`PlaylistLibrary`, scope `PlaylistLi
 `youtube_playlist.dart` (link parsing, video title → artist/title), `newpipe.dart` /
 `youtube_search.dart` (`YouTubePlaylists`: fetching), `spotify_playlist.dart` (Spotify links,
 fetching, title cleanup), `screens/playlist_import.dart`, `screens/playlist_screen.dart`,
-`widgets/share_sheet.dart`.
+`widgets/share_sheet.dart`, `playlist_search.dart` (`FoundPlaylist`, Biblioteka search).
 
 ## Storage (`local.db` v3, created/migrated by `LocalLibrary`)
 
@@ -70,10 +70,8 @@ that lists the video again clears it (`clearVideosRemoved`).
   `spotify_fetcher.py`, which scrapes the public web player. Unofficial: it may break.
 - **At most 100 tracks**: the embed lists no more. When it's full, the playlist's own page is
   fetched for `<meta name="music:song_count">` and the snackbar says how many were left out.
-  Reading the rest would need Spotify's API with a token (the embed page carries an anonymous
-  one); not done — not agreed with the user, and the auto-mode classifier refused even trying it.
-  Ustawienia › Źródła muzyki › Spotify › "Spotify API" is a dummy reserved for the user's own
-  Spotify app key (user's decision).
+  Reading the rest would need Spotify's API with a token; not done yet. The user's own app key
+  ("Spotify API", below) is meant for it, but so far it's only used for search.
 - `spotify.link/…` short links are followed (redirects, then the playlist id is looked for in
   the final address and page).
 - Recognising (`PlaylistLibrary.matchSpotifyTrack`): no video, so exact title + artist only —
@@ -91,6 +89,38 @@ that lists the video again clears it (`clearVideosRemoved`).
   Downloading audio from Spotify is not supported (user's decision).
 - The Spotify fetcher sits in `YouTubeScope` (`spotifyOf`, optional `spotify:` for tests) — the
   scope holding the online sources, rather than one more scope.
+
+## Searching playlists (song search)
+
+Biblioteka playlists are matched while typing (`searchSavedPlaylists`). YouTube and Spotify
+playlists only with the online button, all parts at once (`_searchOnline` in
+`song_search_screen.dart`); switches in `SourceSettings`: `playlistSearch` (search filters,
+master), `youTubePlaylistSearch` (also needs YouTube search on), `spotifyPlaylistSearch`.
+
+- **YouTube** (`YouTubeSearch.searchPlaylists`): the same methods and order as video search
+  (`_firstWorking`): NewPipe's `PLAYLISTS` search filter (`searchPlaylists` on the method
+  channel), youtube_explode `searchContent(filter: TypeFilters.playlist)` (no channel name; video
+  count capped at 50, so 50 is treated as unknown), Data API `type=playlist`.
+- **Spotify** (`SpotifyPlaylists.search`) — user's decision: the user's own app key first, the
+  anonymous way as the fallback.
+  - Key: client-credentials token from `accounts.spotify.com/api/token`, then
+    `/v1/search?type=playlist` (its `items` may contain `null`s).
+  - Without a key: the public Web API **refuses** the embed page's anonymous token (429
+    "QUOTA_EXCEEDED" — it's shared by everyone). The web player's own search accepts it: POST
+    `api-partner.spotify.com/pathfinder/v2/query`, operation `searchPlaylists`, a persisted-query
+    sha256 hash. The hash changes with web player versions; on 412 "Invalid query hash"
+    `findSpotifySearchHash` reads the current one: `open.spotify.com/search` (only a **desktop**
+    user agent gets the web player script) → `web-player.<hash>.js` → the chunk number of
+    `xpui-routes-search` and its content hash → `xpui-routes-search.<hash>.js` →
+    `"searchPlaylists","query","<sha256>"`. `knownSearchHash` is the last one seen. The token is
+    read from a Spotify-owned playlist's embed page ("Today's Top Hits"). Unofficial; may break.
+  - Web search (DuckDuckGo/Bing `site:open.spotify.com/playlist`) was tried and returns nothing
+    to a script.
+- Tapping a found playlist opens `PlaylistScreen.preview` (user's decision: preview, not an
+  instant import): fetched like an import, tracks recognised with `PlaylistLibrary.previewYouTube`
+  / `previewSpotify` (same matching, nothing saved; `id` -1 — the screen passes `_savedId`, null,
+  to the queue and history). "Zapisz w Bibliotece" imports the already-fetched data
+  (`importYouTube` / `importSpotify`), then the screen shows the saved playlist.
 
 ## Sharing
 

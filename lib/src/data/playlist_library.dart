@@ -178,6 +178,41 @@ class PlaylistLibrary extends ChangeNotifier {
     ];
   }
 
+  /// The Biblioteka playlist imported from [source]'s playlist [sourceId], if there is one.
+  PlaylistSummary? saved(PlaylistSource source, String sourceId) => _playlists
+      .where((p) => p.source == source && p.sourceId == sourceId)
+      .firstOrNull;
+
+  /// [data]'s tracks as [importYouTube] would save them (recognised the same way), for showing
+  /// a playlist found by search without saving it.
+  Future<List<PlaylistTrack>> previewYouTube(YouTubePlaylistData data) async {
+    await _catalog.ensureLoaded();
+    return [
+      for (final (i, video)
+          in data.videos.where((v) => !_isUnavailableEntry(v)).indexed)
+        _unsaved(i, _youTubeTrack(video)),
+    ];
+  }
+
+  /// Like [previewYouTube], for [importSpotify].
+  Future<List<PlaylistTrack>> previewSpotify(SpotifyPlaylistData data) async {
+    await _catalog.ensureLoaded();
+    return [
+      for (final (i, track) in data.tracks.indexed)
+        _unsaved(i, _spotifyTrack(track)),
+    ];
+  }
+
+  static PlaylistTrack _unsaved(int position, _NewTrack track) => PlaylistTrack(
+    position: position,
+    title: track.song?.title ?? track.title,
+    artist: track.song?.artistLabel ?? track.artist,
+    mainDbId: track.song?.id,
+    youtubeVideoId: track.videoId,
+    spotifyTrackId: track.spotifyTrackId,
+    duration: track.duration,
+  );
+
   /// Saves [data] as a playlist (or replaces the tracks of the one imported from it before),
   /// recognising each video as a MusicDatabase song where possible ([matchSong]).
   ///
@@ -285,19 +320,18 @@ class PlaylistLibrary extends ChangeNotifier {
       sourceId: data.id,
       name: data.name,
       owner: data.owner,
-      tracks: [
-        for (final track in data.tracks)
-          (
-            artist: track.artists.isEmpty ? null : track.artists.join(', '),
-            title: cleanSpotifyTitle(track.title),
-            song: matchSpotifyTrack(track),
-            videoId: null,
-            spotifyTrackId: track.id,
-            duration: track.duration,
-          ),
-      ],
+      tracks: [for (final track in data.tracks) _spotifyTrack(track)],
     );
   }
+
+  _NewTrack _spotifyTrack(SpotifyTrack track) => (
+    artist: track.artists.isEmpty ? null : track.artists.join(', '),
+    title: cleanSpotifyTitle(track.title),
+    song: matchSpotifyTrack(track),
+    videoId: null,
+    spotifyTrackId: track.id,
+    duration: track.duration,
+  );
 
   Future<PlaylistImportResult> _save({
     required PlaylistSource source,

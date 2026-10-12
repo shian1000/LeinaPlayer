@@ -11,11 +11,13 @@ import java.util.concurrent.Executors
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
+import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
 import org.schabi.newpipe.extractor.search.SearchInfo
+import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubePlaylistLinkHandlerFactory
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeStreamLinkHandlerFactory
 import org.schabi.newpipe.extractor.stream.StreamInfo
@@ -60,6 +62,14 @@ class NewPipeBridge(val messenger: BinaryMessenger) : MethodChannel.MethodCallHa
                     return
                 }
                 runInBackground(result) { search(query) }
+            }
+            "searchPlaylists" -> {
+                val query = call.argument<String>("query")
+                if (query == null) {
+                    result.error("bad_args", "query missing", null)
+                    return
+                }
+                runInBackground(result) { searchPlaylists(query) }
             }
             "playlist" -> {
                 val playlistId = call.argument<String>("playlistId")
@@ -142,6 +152,29 @@ class NewPipeBridge(val messenger: BinaryMessenger) : MethodChannel.MethodCallHa
                     // -1 when unknown, e.g. live streams.
                     "duration" to it.duration,
                     "views" to it.viewCount,
+                )
+            }
+    }
+
+    /** Playlists only, first results page. */
+    private fun searchPlaylists(query: String): List<Map<String, Any?>> {
+        val youtube = ServiceList.YouTube
+        val handler = youtube.searchQHFactory.fromQuery(
+            query,
+            listOf(YoutubeSearchQueryHandlerFactory.PLAYLISTS),
+            "",
+        )
+        val links = YoutubePlaylistLinkHandlerFactory.getInstance()
+        return SearchInfo.getInfo(youtube, handler).relatedItems
+            .filterIsInstance<PlaylistInfoItem>()
+            .map {
+                mapOf(
+                    "id" to links.getId(it.url),
+                    "name" to it.name,
+                    "owner" to it.uploaderName,
+                    // -1 when unknown.
+                    "count" to it.streamCount,
+                    "thumbnail" to it.thumbnails.maxByOrNull { t -> t.width }?.url,
                 )
             }
     }

@@ -65,6 +65,17 @@ class YouTubeSourceScreen extends StatelessWidget {
             value: enabled,
             onChanged: settings.setYouTubeSearchEnabled,
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.playlist_play),
+            title: const Text('Wyszukuj playlisty na YouTube'),
+            subtitle: settings.playlistSearch
+                ? null
+                : const Text(
+                    'Wyłączone w filtrach wyszukiwania („Wyszukuj playlisty”)',
+                  ),
+            value: settings.youTubePlaylistSearch,
+            onChanged: enabled ? settings.setYouTubePlaylistSearch : null,
+          ),
           for (final method in YouTubeMethod.values)
             SwitchListTile(
               secondary: Icon(switch (method) {

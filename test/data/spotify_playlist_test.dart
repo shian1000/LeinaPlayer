@@ -1,39 +1,11 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/spotify_playlist.dart';
 
-/// The embed page as Spotify serves it, cut down to what is read.
-String embedPage(List<Map<String, Object?>> tracks, {String? owner}) {
-  final data = {
-    'props': {
-      'pageProps': {
-        'state': {
-          'data': {
-            'entity': {
-              'type': 'playlist',
-              'name': 'All Out 80s',
-              'subtitle': ?owner,
-              'trackList': tracks,
-            },
-          },
-        },
-      },
-    },
-  };
-  return '<html><script id="__NEXT_DATA__" type="application/json">'
-      '${jsonEncode(data)}</script></html>';
-}
-
-Map<String, Object?> track(String id, String title, String artists) => {
-  'uri': 'spotify:track:$id',
-  'title': title,
-  'subtitle': artists,
-  'duration': 198840,
-  'entityType': 'track',
-};
+import '../support/spotify_fakes.dart';
 
 void main() {
+  _searchTests();
+
   test('finds the playlist id in Spotify links', () {
     const id = '37i9dQZF1DX4UtSsGT1Sbe';
     for (final text in [
@@ -110,6 +82,74 @@ void main() {
     expect(
       SpotifyPlaylists(get: (_) async => '<html></html>').fetch('PL'),
       throwsA(isA<SpotifyException>()),
+    );
+  });
+}
+
+void _searchTests() {
+  test(
+    'searches playlists without a key the way the web player does',
+    () async {
+      final fake = FakeSpotify();
+      final spotify = SpotifyPlaylists(get: fake.get, call: fake.call);
+      final found = await spotify.search('rock');
+      expect([for (final p in found) p.name], ['Rock Classics', 'Polski rock']);
+      expect(found.first.id, 'a' * 22);
+      expect(found.first.owner, 'Spotify');
+      expect(
+        found.first.thumbnail,
+        Uri.parse('https://image.test/${'a' * 22}'),
+      );
+
+      // The token is read once.
+      await spotify.search('pop');
+      expect(fake.calls.where((c) => c.startsWith('GET /embed')), hasLength(1));
+    },
+  );
+
+  test('a key searches through the Web API, falling back without it', () async {
+    final fake = FakeSpotify();
+    final spotify = SpotifyPlaylists(get: fake.get, call: fake.call);
+    const key = (clientId: 'id', clientSecret: 'secret');
+    final found = await spotify.search('rock', apiKey: key);
+    expect([for (final p in found) p.name], ['Z API']);
+    expect(found.single.trackCount, 42);
+    expect(fake.calls, isNot(contains(startsWith('POST api-partner'))));
+
+    fake.apiStatus = 400;
+    final fresh = SpotifyPlaylists(get: fake.get, call: fake.call);
+    expect(
+      [for (final p in await fresh.search('rock', apiKey: key)) p.name],
+      ['Rock Classics', 'Polski rock'],
+    );
+  });
+
+  test('a changed search hash is read from the web player again', () async {
+    final fake = FakeSpotify()..acceptedHashes = {'f' * 64};
+    final spotify = SpotifyPlaylists(get: fake.get, call: fake.call);
+    expect(await spotify.search('rock'), hasLength(2));
+    expect(
+      fake.calls,
+      contains(
+        'GET open.spotifycdn.com/cdn/build/web-player/xpui-routes-search.26bd4c1e.js',
+      ),
+    );
+  });
+
+  test('failures are reported with every way tried', () async {
+    final fake = FakeSpotify()
+      ..searchStatus = 429
+      ..apiStatus = 401;
+    final spotify = SpotifyPlaylists(get: fake.get, call: fake.call);
+    await expectLater(
+      spotify.search('rock', apiKey: (clientId: 'id', clientSecret: 'x')),
+      throwsA(
+        isA<SpotifyException>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('odrzucony klucz'), contains('ogranicza')),
+        ),
+      ),
     );
   });
 }
