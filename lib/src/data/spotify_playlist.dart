@@ -23,7 +23,7 @@ class SpotifyTrack {
   final Duration? duration;
 }
 
-/// A Spotify playlist as fetched for import.
+/// A Spotify playlist (or album, imported like one) as fetched for import.
 class SpotifyPlaylistData {
   const SpotifyPlaylistData({
     required this.id,
@@ -31,16 +31,22 @@ class SpotifyPlaylistData {
     required this.owner,
     required this.tracks,
     this.totalTracks,
+    this.album = false,
   });
 
   final String id;
   final String name;
+
+  /// The playlist's owner; an album's artist.
   final String? owner;
   final List<SpotifyTrack> tracks;
 
   /// How many tracks the playlist really has, when known — the embed page lists at most
   /// [SpotifyPlaylists.embedLimit].
   final int? totalTracks;
+
+  /// An album, not a playlist.
+  final bool album;
 }
 
 /// Why a Spotify playlist couldn't be read; [message] is shown to the user as is.
@@ -53,16 +59,41 @@ class SpotifyException implements Exception {
   String toString() => message;
 }
 
+/// What a Spotify link points at.
+enum SpotifyLinkKind { playlist, album, track }
+
+typedef SpotifyLink = ({SpotifyLinkKind kind, String id});
+
 final _playlistPath = RegExp(
   r'open\.spotify\.com/(?:intl-[\w-]+/)?(?:embed/)?playlist/([A-Za-z0-9]{22})',
 );
 final _playlistUri = RegExp(r'spotify:playlist:([A-Za-z0-9]{22})');
+final _linkPath = RegExp(
+  r'open\.spotify\.com/(?:intl-[\w-]+/)?(?:embed/)?(playlist|album|track)/([A-Za-z0-9]{22})',
+);
+final _linkUri = RegExp(r'spotify:(playlist|album|track):([A-Za-z0-9]{22})');
 final _shortLink = RegExp(r'https?://(?:spotify\.link|spotify\.app\.link)/\S+');
 
 /// The playlist id from a pasted or shared Spotify link (`open.spotify.com/playlist/<id>`, also
 /// with `intl-pl/` or `embed/`, or `spotify:playlist:<id>`); `null` when there's none.
 String? extractSpotifyPlaylistId(String text) =>
     (_playlistPath.firstMatch(text) ?? _playlistUri.firstMatch(text))?.group(1);
+
+/// The playlist, album or track the first Spotify link in [text] points at (the forms of
+/// [extractSpotifyPlaylistId]); `null` when there's none. The first one, because a followed
+/// short link's text starts with the address it led to, before the page's own links.
+SpotifyLink? parseSpotifyLink(String text) {
+  final matches = [
+    _linkPath.firstMatch(text),
+    _linkUri.firstMatch(text),
+  ].nonNulls.toList()..sort((a, b) => a.start.compareTo(b.start));
+  final match = matches.firstOrNull;
+  if (match == null) return null;
+  return (
+    kind: SpotifyLinkKind.values.byName(match.group(1)!),
+    id: match.group(2)!,
+  );
+}
 
 /// A `spotify.link/…` short link in [text] (the Spotify app shares these too); it has to be
 /// followed ([SpotifyPlaylists.resolveShortLink]) to learn what it points at.
@@ -75,21 +106,22 @@ Uri? findSpotifyShortLink(String text) {
 Uri spotifyPlaylistUri(String playlistId) =>
     Uri.https('open.spotify.com', '/playlist/$playlistId');
 
-/// Reads a playlist from the embed page at `open.spotify.com/embed/playlist/<id>` — public, no
-/// account or app registration, the same choice MusicDatabase made for `spotify_fetcher.py`
-/// (it scrapes the public web player rather than the Web API). The page carries the playlist in
-/// its `__NEXT_DATA__` JSON, which is unofficial and may change.
-SpotifyPlaylistData parseSpotifyEmbed(String html, String playlistId) {
+/// The album's own page.
+Uri spotifyAlbumUri(String albumId) =>
+    Uri.https('open.spotify.com', '/album/$albumId');
+
+/// The `entity` in an embed page's `__NEXT_DATA__` JSON.
+Map<String, Object?> _embedEntity(String html) {
   final json = RegExp(
     r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
     dotAll: true,
   ).firstMatch(html)?.group(1);
   if (json == null) {
     throw const SpotifyException(
-      'Spotify zmienił stronę playlisty — aplikacja nie umie jej już odczytać.',
+      'Spotify zmienił swoją stronę — aplikacja nie umie jej już odczytać.',
     );
   }
-  final entity = switch (jsonDecode(json)) {
+  return switch (jsonDecode(json)) {
     {
       'props': {
         'pageProps': {
@@ -99,15 +131,29 @@ SpotifyPlaylistData parseSpotifyEmbed(String html, String playlistId) {
     } =>
       entity,
     _ => throw const SpotifyException(
-      'Nie ma takiej playlisty na Spotify albo nie jest publiczna.',
+      'Nie ma tego na Spotify albo nie jest publiczne.',
     ),
   };
+}
+
+/// Reads a playlist from the embed page at `open.spotify.com/embed/playlist/<id>` — public, no
+/// account or app registration, the same choice MusicDatabase made for `spotify_fetcher.py`
+/// (it scrapes the public web player rather than the Web API). The page carries the playlist in
+/// its `__NEXT_DATA__` JSON, which is unofficial and may change. An album's page
+/// (`embed/album/<id>`, [album]) is the same, with the artist as the owner.
+SpotifyPlaylistData parseSpotifyEmbed(
+  String html,
+  String playlistId, {
+  bool album = false,
+}) {
+  final entity = _embedEntity(html);
   final owner = entity['subtitle'] as String?;
   return SpotifyPlaylistData(
     id: playlistId,
+    album: album,
     name:
         (entity['name'] ?? entity['title']) as String? ??
-        'Playlista ze Spotify',
+        (album ? 'Album ze Spotify' : 'Playlista ze Spotify'),
     owner: owner == null || owner.isEmpty ? null : owner,
     tracks: [
       for (final item in (entity['trackList'] as List?) ?? const [])
@@ -136,6 +182,28 @@ List<String> splitSpotifyArtists(String subtitle) => [
   for (final part in subtitle.split(RegExp(r',\s+')))
     if (part.trim().isNotEmpty) part.trim(),
 ];
+
+/// A track from its embed page, `open.spotify.com/embed/track/<id>` (like
+/// [parseSpotifyEmbed]; artists come as a list there).
+SpotifyTrack parseSpotifyTrackEmbed(String html, String trackId) {
+  final entity = _embedEntity(html);
+  final title = (entity['name'] ?? entity['title']) as String?;
+  if (title == null || title.isEmpty) {
+    throw const SpotifyException('Nie ma takiego utworu na Spotify.');
+  }
+  return SpotifyTrack(
+    id: trackId,
+    title: title,
+    artists: [
+      for (final artist in (entity['artists'] as List?) ?? const [])
+        if (artist case {'name': final String name} when name.isNotEmpty) name,
+    ],
+    duration: switch (entity['duration']) {
+      final int ms when ms > 0 => Duration(milliseconds: ms),
+      _ => null,
+    },
+  );
+}
 
 /// `<meta name="music:song_count" content="150"/>` on the playlist's own page.
 int? parseSpotifySongCount(String html) => int.tryParse(
@@ -201,22 +269,10 @@ class SpotifyPlaylists {
 
   /// Throws [SpotifyException] when the playlist couldn't be read.
   Future<SpotifyPlaylistData> fetch(String playlistId) async {
-    final String html;
-    try {
-      html = await _get(
-        Uri.https('open.spotify.com', '/embed/playlist/$playlistId'),
-      );
-    } on SpotifyException {
-      rethrow;
-    } catch (e) {
-      debugPrint('Spotify playlist $playlistId failed: $e');
-      throw SpotifyException(
-        isNetworkError(e)
-            ? 'Brak połączenia ze Spotify.'
-            : 'Nie udało się odczytać playlisty ze Spotify.',
-      );
-    }
-    final data = parseSpotifyEmbed(html, playlistId);
+    final data = parseSpotifyEmbed(
+      await _embed('playlist', playlistId, 'playlisty'),
+      playlistId,
+    );
     if (data.tracks.isEmpty) {
       throw const SpotifyException('Ta playlista na Spotify jest pusta.');
     }
@@ -237,10 +293,44 @@ class SpotifyPlaylists {
     );
   }
 
-  /// The playlist a `spotify.link/…` short link leads to, `null` when it isn't a playlist.
-  Future<String?> resolveShortLink(Uri link) async {
+  /// An album, read like a playlist ([fetch]). Throws [SpotifyException].
+  Future<SpotifyPlaylistData> fetchAlbum(String albumId) async {
+    final data = parseSpotifyEmbed(
+      await _embed('album', albumId, 'albumu'),
+      albumId,
+      album: true,
+    );
+    if (data.tracks.isEmpty) {
+      throw const SpotifyException('Ten album na Spotify nie ma utworów.');
+    }
+    return data;
+  }
+
+  /// One track: its title, artists and length. Throws [SpotifyException].
+  Future<SpotifyTrack> fetchTrack(String trackId) async =>
+      parseSpotifyTrackEmbed(await _embed('track', trackId, 'utworu'), trackId);
+
+  /// The embed page of [kind] [id]; [what] names it in an error ("playlisty").
+  Future<String> _embed(String kind, String id, String what) async {
     try {
-      return extractSpotifyPlaylistId(await _get(link));
+      return await _get(Uri.https('open.spotify.com', '/embed/$kind/$id'));
+    } on SpotifyException {
+      rethrow;
+    } catch (e) {
+      debugPrint('Spotify $kind $id failed: $e');
+      throw SpotifyException(
+        isNetworkError(e)
+            ? 'Brak połączenia ze Spotify.'
+            : 'Nie udało się odczytać $what ze Spotify.',
+      );
+    }
+  }
+
+  /// What a `spotify.link/…` short link leads to, `null` when it isn't a playlist, album or
+  /// track (or couldn't be followed).
+  Future<SpotifyLink?> resolveShortLink(Uri link) async {
+    try {
+      return parseSpotifyLink(await _get(link));
     } catch (e) {
       debugPrint('Resolving $link failed: $e');
       return null;
@@ -559,7 +649,7 @@ List<FoundPlaylist> parseSpotifyWebSearch(String body) {
 }
 
 /// The body of [uri]'s page; after redirects (short links), the final address comes first, so
-/// [extractSpotifyPlaylistId] can find the playlist in it as well as in the page.
+/// [parseSpotifyLink] can find what it points at in it as well as in the page.
 Future<String> _httpGetText(Uri uri) async {
   final client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 10)
@@ -572,7 +662,7 @@ Future<String> _httpGetText(Uri uri) async {
     final response = await request.close().timeout(const Duration(seconds: 15));
     if (response.statusCode == HttpStatus.notFound) {
       throw const SpotifyException(
-        'Nie ma takiej playlisty na Spotify albo nie jest publiczna.',
+        'Nie ma tego na Spotify albo nie jest publiczne.',
       );
     }
     if (response.statusCode != HttpStatus.ok) {

@@ -72,8 +72,15 @@ that lists the video again clears it (`clearVideosRemoved`).
   fetched for `<meta name="music:song_count">` and the snackbar says how many were left out.
   Reading the rest would need Spotify's API with a token; not done yet. The user's own app key
   ("Spotify API", below) is meant for it, but so far it's only used for search.
-- `spotify.link/…` short links are followed (redirects, then the playlist id is looked for in
-  the final address and page).
+- `spotify.link/…` short links are followed (redirects; `parseSpotifyLink` takes the first
+  playlist/album/track address in the final address + page).
+- **Albums** (`open.spotify.com/album/<id>`, from a link only): the embed page `embed/album/<id>`
+  has the same `trackList`, with the artist as `subtitle`; imported as a playlist with
+  `PlaylistSource.spotifyAlbum` (`source` 'spotifyAlbum'; shown as "Album • artist", link to the
+  album page). No song count check — albums stay under 100 tracks.
+- **Tracks** (a link shared/opened, user's decision: play at once): `embed/track/<id>` gives
+  `name`, `artists[].name`, `duration` (`fetchTrack`); `hitForSpotifyTrack` (`video_link.dart`)
+  recognises it like a playlist track, else it plays through a YouTube search.
 - Recognising (`PlaylistLibrary.matchSpotifyTrack`): no video, so exact title + artist only —
   the title as is, then without Spotify's version suffix (`cleanSpotifyTitle`: "- 2011
   Remaster", "- Radio Edit", "- From …"; Live/Remix/Acoustic stay), with all artists joined or

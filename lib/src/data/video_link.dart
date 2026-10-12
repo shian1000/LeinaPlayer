@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'combined_search.dart';
 import 'incoming_links.dart';
 import 'local_library.dart';
+import 'playlist_library.dart';
 import 'song_catalog.dart';
 import 'source_settings.dart';
+import 'spotify_playlist.dart';
 import 'youtube_library.dart';
 import 'youtube_playlist.dart';
 import 'youtube_search.dart';
@@ -65,5 +67,36 @@ Future<SearchHit> hitForVideoLink(
     artistLabel: parsed.artist,
     videoId: videoId,
     playlistVideoId: playlistVideoId,
+  );
+}
+
+/// The song a Spotify track link is, the way a Spotify playlist's track is recognised
+/// ([PlaylistLibrary.matchSpotifyTrack]: exact title and artist). Not recognised: the track by
+/// its title and artist, found on YouTube when played (and remembered like a playlist's).
+Future<SearchHit> hitForSpotifyTrack(
+  SpotifyTrack track, {
+  required SongCatalog catalog,
+  required PlaylistLibrary playlists,
+  required LocalLibrary library,
+  required YouTubeLibrary youTube,
+}) async {
+  await catalog.ensureLoaded();
+  final song = playlists.matchSpotifyTrack(track);
+  return withPhoneYouTube(
+    song != null
+        ? SearchHit.main(
+            song,
+            library.filesOf(song.id),
+            spotifyTrackId: track.id,
+          )
+        : SearchHit.youTubeOnly(
+            title: cleanSpotifyTitle(track.title),
+            artistLabel: track.artists.isEmpty
+                ? 'Nieznany wykonawca'
+                : track.artists.join(', '),
+            videoId: null,
+            spotifyTrackId: track.id,
+          ),
+    youTube,
   );
 }

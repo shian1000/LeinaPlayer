@@ -115,6 +115,32 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       '${_themeController.monochromeColor.toARGB32()}|'
       '${_themeController.coverFilterStrength}|'
       '${_themeController.monochromeBackground?.toARGB32()}';
+
+  /// The native link chooser takes the theme's colours; sent again only when they change.
+  String? _chooserLook;
+  void _updateChooserLook() {
+    Map<String, Object?> colours(AppThemeDef def) {
+      final p = def.palette;
+      return {
+        'surface': p.surface.toARGB32(),
+        'surfaceHigh': p.surfaceHigh.toARGB32(),
+        'textPrimary': p.textPrimary.toARGB32(),
+        'textSecondary': p.textSecondary.toARGB32(),
+        'accent': p.accent.toARGB32(),
+        'divider': p.divider.toARGB32(),
+        'fontFamily': def.fontFamily,
+      };
+    }
+
+    final mode = _themeController.themeMode.name;
+    final light = colours(_themeController.light);
+    final dark = colours(_themeController.dark);
+    final key = '$mode|$light|$dark';
+    if (key == _chooserLook) return;
+    _chooserLook = key;
+    setLinkChooserLook(mode: mode, light: light, dark: dark);
+  }
+
   late final _albumCovers = AlbumCovers(
     _localLibrary.database,
     _sourceSettings,
@@ -157,6 +183,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _startDatabaseSync();
     _updateCoverLook();
     _themeController.addListener(_updateCoverLook);
+    _updateChooserLook();
+    _themeController.addListener(_updateChooserLook);
     _sourceSettings.load().catchError(
       (Object e) => debugPrint('Loading music source settings failed: $e'),
     );
@@ -245,6 +273,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   @override
   void dispose() {
     _themeController.removeListener(_updateCoverLook);
+    _themeController.removeListener(_updateChooserLook);
     _songCatalog.removeListener(_forgetSettledMatches);
     _coverLook.dispose();
     _lifecycle.dispose();

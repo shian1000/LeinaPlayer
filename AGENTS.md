@@ -35,8 +35,9 @@ audio on Android through NewPipeExtractor, with a cache of played songs — see
 a share sheet; song search also finds Biblioteka playlists, and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)).
-YouTube links shared to the app or opened with it import the playlist / play the video; Spotify
-playlist links shared to it are imported.
+YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
+the video / track; a tapped link first shows a native sheet asking where to open it (Leina Radio,
+the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków).
 
 ## Read order
 
@@ -82,10 +83,10 @@ flutter build apk            # build a release Android APK
   `showShareSheet` in `share_sheet.dart`).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
   `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
-  search over both (`combined_search.dart`), YouTube links given to the app
+  search over both (`combined_search.dart`), YouTube and Spotify links given to the app
   (`incoming_links.dart`, `video_link.dart`), YouTube search / matching / audio
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
-  links and the audio cache (`youtube_library.dart`), Spotify playlists — fetching and searching
+  links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`),
   album covers and their cache
   (`album_covers.dart`), play history (`play_history.dart`,
@@ -107,7 +108,8 @@ flutter build apk            # build a release Android APK
   generated platform files unless a specific platform integration requires it. Hand-written:
   `android/app/src/main/kotlin/.../NewPipeBridge.kt` (NewPipeExtractor behind a method channel),
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
-  incoming YouTube links and opening the YouTube app by package),
+  incoming YouTube/Spotify links and opening the YouTube app by package),
+  `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links), `LinkTargets.kt`,
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `docs/` — documentation for humans and AI agents (see [`docs/index.md`](docs/index.md)).
 
@@ -177,11 +179,11 @@ flutter build apk            # build a release Android APK
   links), playback order, playback limits.
 - [`youtube.md`](docs/agent-notes/youtube.md) — YouTube search methods, the lite matcher and its
   benchmark, NewPipe playback (build requirements, 403s), remembered matches, "not found" and
-  removed videos, server-wins rule, the audio cache (why it downloads in 1 MB ranges), what's not
-  done.
+  removed videos, server-wins rule, the audio cache (why it downloads in 1 MB ranges), links
+  given to the app and the native "Otwórz w…" sheet, what's not done.
 - [`playlists.md`](docs/agent-notes/playlists.md) — Biblioteka playlists: `local.db` tables,
   YouTube import (fetching, title parsing, recognising songs by video first), Spotify import (the
-  embed page, 100-track limit), searching playlists (Spotify key / anonymous web-player search
+  embed page, 100-track limit, albums, track links), searching playlists (Spotify key / anonymous web-player search
   and its changing hash), previews, sharing, R8 rules.
 - [`covers.md`](docs/agent-notes/covers.md) — album covers: sources and their order, matching,
   rate limits, the cover cache, the MusicDatabase hand-off.

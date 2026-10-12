@@ -3,19 +3,21 @@ import 'dart:convert';
 import 'package:music_database_app/src/data/spotify_playlist.dart';
 
 /// The embed page as Spotify serves it, cut down to what is read.
-String embedPage(List<Map<String, Object?>> tracks, {String? owner}) {
+String embedPage(List<Map<String, Object?>> tracks, {String? owner}) =>
+    embedEntity({
+      'type': 'playlist',
+      'name': 'All Out 80s',
+      'subtitle': ?owner,
+      'trackList': tracks,
+    });
+
+/// An embed page (playlist, album or track) carrying [entity].
+String embedEntity(Map<String, Object?> entity) {
   final data = {
     'props': {
       'pageProps': {
         'state': {
-          'data': {
-            'entity': {
-              'type': 'playlist',
-              'name': 'All Out 80s',
-              'subtitle': ?owner,
-              'trackList': tracks,
-            },
-          },
+          'data': {'entity': entity},
         },
       },
     },

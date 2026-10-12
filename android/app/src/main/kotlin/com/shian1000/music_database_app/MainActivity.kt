@@ -3,7 +3,6 @@ package com.shian1000.music_database_app
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -52,8 +51,9 @@ class MainActivity : AudioServiceActivity() {
 }
 
 /**
- * YouTube links coming in ("Udostępnij" to this app, or a link opened with it) and going out to
- * the YouTube app, on the `music_database_app/links` channel (`lib/src/data/incoming_links.dart`).
+ * YouTube and Spotify links coming in ("Udostępnij" to this app, or a link opened with it —
+ * through [LinkChooserActivity]) and going out to the YouTube app, plus the chooser's settings,
+ * on the `music_database_app/links` channel (`lib/src/data/incoming_links.dart`).
  */
 private class LinksBridge(val messenger: BinaryMessenger, private val context: Context) :
     MethodChannel.MethodCallHandler {
@@ -91,10 +91,39 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
                 if (url == null) {
                     result.error("bad_args", "url missing", null)
                 } else {
-                    result.success(openYouTube(Uri.parse(url)))
+                    result.success(
+                        LinkTargets.openInApp(
+                            context,
+                            Uri.parse(url),
+                            LinkService.YOUTUBE.appPackage,
+                        ),
+                    )
                 }
             }
             "openLinkSettings" -> result.success(openLinkSettings())
+            "linkChoices" -> result.success(
+                LinkService.entries.associate { it.key to LinkTargets.choice(context, it).key },
+            )
+            "setLinkChoice" -> {
+                val service = LinkService.entries
+                    .firstOrNull { it.key == call.argument<String>("service") }
+                if (service == null) {
+                    result.error("bad_args", "unknown service", null)
+                } else {
+                    LinkTargets.setChoice(
+                        context,
+                        service,
+                        LinkChoice.of(call.argument<String>("choice")),
+                    )
+                    result.success(null)
+                }
+            }
+            "setChooserLook" -> {
+                LinkTargets.prefs(context).edit()
+                    .putString(LinkTargets.LOOK_KEY, call.arguments as String?)
+                    .apply()
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
@@ -121,44 +150,7 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
         return false
     }
 
-    /**
-     * The YouTube app, else a browser — never through the system's choice for YouTube links,
-     * which may be this app now (the last-resort fallback would open itself).
-     */
-    private fun openYouTube(uri: Uri): Boolean {
-        val view = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        try {
-            context.startActivity(Intent(view).setPackage(YOUTUBE_PACKAGE))
-            return true
-        } catch (e: ActivityNotFoundException) {
-            // Not installed: a browser instead.
-        }
-        val browser = browserPackage() ?: return false
-        return try {
-            context.startActivity(Intent(view).setPackage(browser))
-            true
-        } catch (e: ActivityNotFoundException) {
-            false
-        }
-    }
-
-    private fun browserPackage(): String? {
-        val probe = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com"))
-        val pm = context.packageManager
-        val preferred = pm.resolveActivity(probe, PackageManager.MATCH_DEFAULT_ONLY)
-            ?.activityInfo?.packageName
-        // "android" is the chooser, shown when no browser is the default.
-        if (preferred != null && preferred != "android" && preferred != context.packageName) {
-            return preferred
-        }
-        return pm.queryIntentActivities(probe, 0)
-            .map { it.activityInfo.packageName }
-            .firstOrNull { it != context.packageName }
-    }
-
     companion object {
-        const val YOUTUBE_PACKAGE = "com.google.android.youtube"
-
         /** The shared text or the opened address; nothing for a launch from the app list. */
         fun linkOf(intent: Intent?): String? {
             if (intent == null) return null

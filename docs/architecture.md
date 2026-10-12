@@ -56,10 +56,13 @@ in `shared_preferences` and restores them on start. Both keep songs as `TrackRef
 (`track_ref.dart`: MusicDatabase id / file / video + title), turned back into rows with
 `resolveTrack`.
 
-Links from outside (Android): `MainActivity.kt`'s `LinksBridge` passes YouTube links shared to the
-app or opened with it (and Spotify playlist links shared to it) to `IncomingLinks` (`incoming_links.dart`); `AppShell` imports a playlist
-or plays a video (`video_link.dart`). The same bridge opens the YouTube app by package
-(`openInYouTubeApp`) — the system's choice for youtube.com links may be this app itself.
+Links from outside (Android): a tapped YouTube/Spotify link opens the native
+`LinkChooserActivity.kt` sheet (Leina Radio / the service's app / a browser, or a remembered
+choice); links shared to the app and links the sheet hands on reach `MainActivity.kt`'s
+`LinksBridge`, which passes them to `IncomingLinks` (`incoming_links.dart`); `AppShell` imports a
+playlist or album, or plays a video or Spotify track (`video_link.dart`). Opening outside the app
+always names the package (`LinkTargets.kt`) — the system's choice for these links may be this app
+itself.
 
 Album covers ([`agent-notes/covers.md`](agent-notes/covers.md)): `AlbumCovers`
 (`album_covers.dart`, `AlbumCoversScope`) finds a song's cover from the user's ordered sources

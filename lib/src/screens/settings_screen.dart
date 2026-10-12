@@ -7,6 +7,7 @@ import 'appearance_screen.dart';
 import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
 import 'history_settings_screen.dart';
+import 'link_settings_screen.dart';
 import 'music_sources_screen.dart';
 
 const _id = 'Ustawienia';
@@ -39,6 +40,12 @@ const _entries = [
     'Źródła okładek',
     'Plik na telefonie • iTunes • Deezer • YouTube',
     opens: _openCoverSources,
+  ),
+  _SettingsEntry(
+    Icons.link,
+    'Otwieranie linków',
+    'YouTube • Spotify • Pytaj, czym otworzyć',
+    opens: _openLinks,
   ),
   _SettingsEntry(
     Icons.palette_outlined,
@@ -88,6 +95,8 @@ Widget _openAbout(BuildContext context) => const AboutScreen();
 Widget _openDataSaver(BuildContext context) => const DataSaverScreen();
 
 Widget _openHistory(BuildContext context) => const HistorySettingsScreen();
+
+Widget _openLinks(BuildContext context) => const LinkSettingsScreen();
 
 /// "Ustawienia", opened from the profile drawer.
 class SettingsScreen extends StatelessWidget {

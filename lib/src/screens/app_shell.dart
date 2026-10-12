@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../data/incoming_links.dart';
 import '../data/local_library.dart';
+import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../data/spotify_playlist.dart';
@@ -12,6 +13,7 @@ import '../data/video_link.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../playback/playback_queue.dart';
+import '../playback/track_player.dart';
 import '../theme.dart';
 import '../widgets/song_tile.dart';
 import 'create_sheet.dart';
@@ -79,32 +81,21 @@ class AppShellState extends State<AppShell> {
     super.dispose();
   }
 
-  /// A playlist link (YouTube or Spotify) is imported and opened in Biblioteka; a YouTube video
-  /// link is played (recognised as a MusicDatabase song where possible) in the full player.
+  /// A playlist link (YouTube or Spotify, or a Spotify album) is imported and opened in
+  /// Biblioteka; a YouTube video or Spotify track link is played (recognised as a MusicDatabase
+  /// song where possible) in the full player.
   Future<void> _onLink(String text) async {
     // Whatever was open (a sheet, a dialog, the full player) gives way to the link.
     Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
-    if (text.contains('spotify')) {
-      if (extractSpotifyPlaylistId(text) != null ||
-          findSpotifyShortLink(text) != null) {
-        return _importAndOpen(text);
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ze Spotify można tu otworzyć tylko playlistę.'),
-        ),
-      );
-      return;
+    if (text.contains('spotify.') || text.contains('spotify:')) {
+      return _onSpotifyLink(text);
     }
     final link = parseYouTubeLink(text);
     switch (link) {
       case null:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'To nie jest link do filmu ani playlisty z YouTube ani do playlisty ze Spotify.',
-            ),
-          ),
+        _tell(
+          'To nie jest link do filmu ani playlisty z YouTube ani do utworu, albumu lub '
+          'playlisty ze Spotify.',
         );
       case YouTubePlaylistLink(:final listId):
         await _importAndOpen(listId);
@@ -112,6 +103,62 @@ class AppShellState extends State<AppShell> {
         await _playVideo(link);
     }
   }
+
+  Future<void> _onSpotifyLink(String text) async {
+    final direct = parseSpotifyLink(text);
+    if (direct != null && direct.kind != SpotifyLinkKind.track) {
+      return _importAndOpen(text);
+    }
+    if (direct == null && findSpotifyShortLink(text) == null) {
+      return _tell('Ze Spotify można tu otworzyć utwór, album albo playlistę.');
+    }
+    final spotify = YouTubeScope.spotifyOf(context);
+    final catalog = SongCatalogScope.of(context);
+    final playlists = PlaylistLibraryScope.of(context);
+    final library = LocalLibraryScope.of(context);
+    final youTube = YouTubeLibraryScope.of(context);
+    final queue = PlaybackQueueScope.of(context);
+    String? playlist;
+    await runQueueAction(context, (onStatus) async {
+      onStatus('Sprawdzam link ze Spotify…');
+      final SpotifyTrack track;
+      try {
+        var link = direct;
+        if (link == null) {
+          link = await spotify.resolveShortLink(findSpotifyShortLink(text)!);
+          if (link == null) {
+            return const PlayOutcome.failed(
+              'Ten link ze Spotify nie prowadzi do utworu, albumu ani playlisty.',
+            );
+          }
+          if (link.kind != SpotifyLinkKind.track) {
+            playlist = 'spotify:${link.kind.name}:${link.id}';
+            return null;
+          }
+        }
+        track = await spotify.fetchTrack(link.id);
+      } on SpotifyException catch (e) {
+        return PlayOutcome.failed(e.message);
+      }
+      final hit = await hitForSpotifyTrack(
+        track,
+        catalog: catalog,
+        playlists: playlists,
+        library: library,
+        youTube: youTube,
+      );
+      final outcome = await queue.start([hit], 0, onStatus: onStatus);
+      if (outcome.played && !outcome.external && mounted) {
+        unawaited(NowPlayingScreen.open(context));
+      }
+      return outcome;
+    });
+    if (playlist != null && mounted) await _importAndOpen(playlist!);
+  }
+
+  void _tell(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _importAndOpen(String link) async {
     final playlist = await runPlaylistImport(context, link);

@@ -134,6 +134,34 @@ void main() {
     },
   );
 
+  testWidgets('Otwieranie linków: ask each time, or a remembered choice', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ustawienia'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Otwieranie linków'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Linki z YouTube'), findsOneWidget);
+    expect(find.text('Linki ze Spotify'), findsOneWidget);
+    expect(find.text('Pytaj za każdym razem'), findsNWidgets(2));
+    await tester.tap(find.text('Linki ze Spotify'));
+    await tester.pumpAndSettle();
+    expect(find.text('Aplikacja Spotify'), findsOneWidget);
+    await tester.tap(find.text('Przeglądarka'));
+    await tester.pumpAndSettle();
+    expect(find.text('Przeglądarka'), findsOneWidget);
+    expect(find.text('Pytaj za każdym razem'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Otwieraj linki w Leina Radio'),
+      200,
+    );
+    expect(find.text('Otwieraj linki w Leina Radio'), findsOneWidget);
+  });
+
   testWidgets('Informacje i pomoc: private use, licence and source link', (
     tester,
   ) async {
@@ -150,7 +178,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
-    expect(find.text('Linki z YouTube'), findsOneWidget);
+    expect(find.text('Linki z YouTube i Spotify'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('https://github.com/shian1000/MusicDatabaseApp'),
       200,

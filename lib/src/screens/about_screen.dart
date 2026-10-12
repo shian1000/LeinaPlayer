@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_name.dart';
-import '../data/incoming_links.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -73,33 +72,10 @@ class AboutScreen extends StatelessWidget {
             'Odtwarzanie i wyszukiwanie w YouTube może przestać działać po zmianach po '
             'stronie YouTube. Naprawa wymaga wtedy nowej wersji aplikacji.',
           ),
-          const SectionTitle('Linki z YouTube'),
+          const SectionTitle('Linki z YouTube i Spotify'),
           paragraph(
-            'Link do filmu albo playlisty możesz wysłać do $appName przez „Udostępnij” '
-            '(np. w aplikacji YouTube): playlista trafia do Biblioteki, a film od razu gra — '
-            'z telefonu albo z bazy danych, jeśli jest tam ten utwór.',
-          ),
-          paragraph(
-            'Żeby linki YouTube same otwierały się w $appName, w ustawieniach telefonu: '
-            'Aplikacje › YouTube › Otwieraj domyślnie — wyłącz „Otwieraj obsługiwane linki”; '
-            'potem Aplikacje › $appName › Otwieraj domyślnie — włącz je i zaznacz linki '
-            'YouTube. Na starszych telefonach system sam zapyta, czym otworzyć link. '
-            'Gdy $appName odsyła utwór do YouTube, zawsze otwiera aplikację YouTube.',
-          ),
-          ListTile(
-            leading: const Icon(Icons.open_in_new),
-            title: Text('Otwieraj linki w $appName'),
-            subtitle: const Text('Ustawienia telefonu › Otwieraj domyślnie'),
-            onTap: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              if (!await openLinkSettings()) {
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Nie udało się otworzyć ustawień telefonu.'),
-                  ),
-                );
-              }
-            },
+            'Co robi kliknięty albo udostępniony link i jak sprawić, żeby trafiał do '
+            '$appName: Ustawienia › Otwieranie linków.',
           ),
           const SectionTitle('Licencja'),
           paragraph(

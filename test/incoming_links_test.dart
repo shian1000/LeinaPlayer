@@ -5,8 +5,10 @@ import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/incoming_links.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
+import 'package:music_database_app/src/data/spotify_playlist.dart';
 import 'package:music_database_app/src/data/video_link.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_search.dart';
@@ -147,6 +149,28 @@ void main() {
       expect(h.mainSong, isNull);
       expect((h.title, h.artistLabel), ('Piosenka', 'Nieznany Zespół'));
       expect(h.playlistVideoId, 'bbbbbbbbbbb');
+    });
+
+    test('a Spotify track: recognised by title and artist, else found on YouTube later', () async {
+      final playlists = PlaylistLibrary(library.database, catalog, youTube);
+      Future<SearchHit> spotifyHit(String title, List<String> artists) =>
+          hitForSpotifyTrack(
+            SpotifyTrack(id: 'sp1', title: title, artists: artists),
+            catalog: catalog,
+            playlists: playlists,
+            library: library,
+            youTube: youTube,
+          );
+      final known = await spotifyHit('Going to California - Remaster', [
+        'Led Zeppelin',
+      ]);
+      expect(known.mainSong?.title, 'Going to California');
+      expect(known.spotifyUri.toString(), 'https://open.spotify.com/track/sp1');
+      final unknown = await spotifyHit('Nowa - Radio Edit', ['A', 'B']);
+      expect(unknown.mainSong, isNull);
+      expect((unknown.title, unknown.artistLabel), ('Nowa', 'A, B'));
+      expect(unknown.youtubeVideoId, isNull);
+      expect(unknown.availability, SongAvailability.potentiallyAvailable);
     });
   });
 }

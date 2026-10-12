@@ -166,7 +166,12 @@ class _PlaylistTile extends StatelessWidget {
       leading: CoverArt(seed: playlist.name, size: 64),
       title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        ['Playlista', ?playlist.owner].join(' • '),
+        [
+          playlist.source == PlaylistSource.spotifyAlbum
+              ? 'Album'
+              : 'Playlista',
+          ?playlist.owner,
+        ].join(' • '),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

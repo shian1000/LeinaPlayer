@@ -28,7 +28,7 @@ Future<void> showPlaylistSheet(
       MenuSheetEntry(
         Icons.smart_display_outlined,
         'Importuj playlistę',
-        subtitle: 'Z linku do playlisty na YouTube lub Spotify',
+        subtitle: 'Z linku do playlisty na YouTube lub Spotify albo albumu',
         onTap: () => importPlaylist(context),
       ),
     ],
@@ -38,15 +38,23 @@ Future<void> showPlaylistSheet(
 /// A playlist to import: where from and its id there.
 typedef PlaylistRef = ({PlaylistSource source, String id});
 
-/// The playlist in a pasted or shared [text]: a Spotify link, else a YouTube link or bare
-/// YouTube id. A `spotify.link/…` short link isn't one yet ([runPlaylistImport] follows it).
+/// The playlist in a pasted or shared [text]: a Spotify playlist or album link, else a YouTube
+/// link or bare YouTube id. A `spotify.link/…` short link isn't one yet ([runPlaylistImport]
+/// follows it).
 PlaylistRef? parsePlaylistLink(String text) {
-  final spotify = extractSpotifyPlaylistId(text);
-  if (spotify != null) return (source: PlaylistSource.spotify, id: spotify);
-  if (text.contains('spotify.')) return null;
+  if (text.contains('spotify.') || text.contains('spotify:')) {
+    return spotifyPlaylistRef(parseSpotifyLink(text));
+  }
   final youTube = extractPlaylistId(text);
   return youTube == null ? null : (source: PlaylistSource.youtube, id: youTube);
 }
+
+/// The Biblioteka playlist a Spotify [link] imports as — none for a track.
+PlaylistRef? spotifyPlaylistRef(SpotifyLink? link) => switch (link?.kind) {
+  SpotifyLinkKind.playlist => (source: PlaylistSource.spotify, id: link!.id),
+  SpotifyLinkKind.album => (source: PlaylistSource.spotifyAlbum, id: link!.id),
+  SpotifyLinkKind.track || null => null,
+};
 
 /// Asks for a playlist link, fetches the playlist and saves it to Biblioteka.
 Future<void> importPlaylist(BuildContext context) async {
@@ -101,12 +109,11 @@ Future<PlaylistSummary?> runPlaylistImport(
     var ref = parsePlaylistLink(link);
     final shortLink = ref == null ? findSpotifyShortLink(link) : null;
     if (shortLink != null) {
-      final id = await spotify.resolveShortLink(shortLink);
-      if (id != null) ref = (source: PlaylistSource.spotify, id: id);
+      ref = spotifyPlaylistRef(await spotify.resolveShortLink(shortLink));
     }
     switch (ref?.source) {
       case null:
-        message = 'To nie jest link do playlisty z YouTube ani Spotify.';
+        message = 'To nie jest link do playlisty z YouTube ani playlisty lub albumu ze Spotify.';
       case PlaylistSource.youtube:
         final result = await playlists.importYouTube(
           await fetcher.fetch(ref!.id, settings),
@@ -119,8 +126,10 @@ Future<PlaylistSummary?> runPlaylistImport(
           if (removed > 0)
             'YouTube usunął $removed utw. — zostały na liście i zostaną wyszukane od nowa.',
         ].join(' ');
-      case PlaylistSource.spotify:
-        final data = await spotify.fetch(ref!.id);
+      case PlaylistSource.spotify || PlaylistSource.spotifyAlbum:
+        final data = ref!.source == PlaylistSource.spotifyAlbum
+            ? await spotify.fetchAlbum(ref.id)
+            : await spotify.fetch(ref.id);
         final result = await playlists.importSpotify(data);
         imported = result.playlist;
         final total = data.totalTracks;
@@ -174,8 +183,8 @@ class _LinkDialogState extends State<_LinkDialog> {
     if (parsePlaylistLink(text) == null && findSpotifyShortLink(text) == null) {
       setState(
         () => _error =
-            'To nie jest link do playlisty z YouTube („list=…” w adresie) ani ze Spotify '
-            '(„open.spotify.com/playlist/…”).',
+            'To nie jest link do playlisty z YouTube („list=…” w adresie) ani do playlisty '
+            'lub albumu ze Spotify („open.spotify.com/playlist/…”, „…/album/…”).',
       );
       return;
     }

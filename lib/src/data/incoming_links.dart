@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -64,8 +65,9 @@ YouTubeLinkTarget? parseYouTubeLink(String text) {
 /// Native side: `MainActivity.kt` (`LinksBridge`).
 const _channel = MethodChannel('music_database_app/links');
 
-/// Links given to the app on Android: shared to it ("Udostępnij") or opened with it. The one
-/// that started the app comes first, once [start] is called.
+/// Links given to the app on Android: shared to it ("Udostępnij") or opened with it (after the
+/// native chooser, `LinkChooserActivity.kt`). The one that started the app comes first, once
+/// [start] is called.
 class IncomingLinks {
   final _links = StreamController<String>.broadcast();
 
@@ -105,4 +107,61 @@ Future<bool?> openInYouTubeApp(Uri uri) async {
 Future<bool> openLinkSettings() async {
   if (kIsWeb || !Platform.isAndroid) return false;
   return await _channel.invokeMethod<bool>('openLinkSettings') ?? false;
+}
+
+/// A service whose tapped links the app takes over.
+enum LinkService {
+  youtube('YouTube'),
+  spotify('Spotify');
+
+  const LinkService(this.label);
+
+  final String label;
+}
+
+/// What a tapped link of a [LinkService] does; the native chooser keeps it
+/// (`LinkTargets.kt`), its `key`s are these names.
+enum LinkChoice { ask, leina, app, browser }
+
+/// The remembered choice for each service — [LinkChoice.ask] off Android or when unknown.
+Future<Map<LinkService, LinkChoice>> readLinkChoices() async {
+  final ask = {for (final s in LinkService.values) s: LinkChoice.ask};
+  if (kIsWeb || !Platform.isAndroid) return ask;
+  try {
+    final raw = await _channel.invokeMapMethod<String, String>('linkChoices');
+    return {
+      for (final s in LinkService.values)
+        s: LinkChoice.values.asNameMap()[raw?[s.name]] ?? LinkChoice.ask,
+    };
+  } on PlatformException catch (e) {
+    debugPrint('Reading link choices failed: $e');
+    return ask;
+  }
+}
+
+Future<void> saveLinkChoice(LinkService service, LinkChoice choice) async {
+  if (kIsWeb || !Platform.isAndroid) return;
+  await _channel.invokeMethod<void>('setLinkChoice', {
+    'service': service.name,
+    'choice': choice.name,
+  });
+}
+
+/// Colours of the app's light and dark theme and which one shows ('system', 'light', 'dark'),
+/// for the native chooser to look like the app; each theme as colour name → ARGB, plus
+/// `fontFamily`.
+Future<void> setLinkChooserLook({
+  required String mode,
+  required Map<String, Object?> light,
+  required Map<String, Object?> dark,
+}) async {
+  if (kIsWeb || !Platform.isAndroid) return;
+  try {
+    await _channel.invokeMethod<void>(
+      'setChooserLook',
+      jsonEncode({'mode': mode, 'light': light, 'dark': dark}),
+    );
+  } on PlatformException catch (e) {
+    debugPrint('Saving the link chooser look failed: $e');
+  }
 }

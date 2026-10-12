@@ -136,8 +136,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
             _fetched = data;
             _tracks = tracks;
           });
-        case PlaylistSource.spotify:
-          final data = await spotify.fetch(found.id);
+        case PlaylistSource.spotify || PlaylistSource.spotifyAlbum:
+          final data = found.source == PlaylistSource.spotifyAlbum
+              ? await spotify.fetchAlbum(found.id)
+              : await spotify.fetch(found.id);
           final tracks = await library.previewSpotify(data);
           if (!mounted) return;
           setState(() {
@@ -293,7 +295,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         : 'Zaktualizuj w Bibliotece';
   }
 
-  bool get _fromSpotify => _playlist.source == PlaylistSource.spotify;
+  bool get _fromSpotify => _playlist.source?.isSpotify ?? false;
+  String get _kind =>
+      _playlist.source == PlaylistSource.spotifyAlbum ? 'Album' : 'Playlista';
   String get _owner =>
       _playlist.owner ?? (_fromSpotify ? 'Spotify' : 'YouTube');
 
@@ -313,7 +317,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       link: link,
       target: _fromSpotify ? ShareTarget.spotify : ShareTarget.youtube,
       title: _playlist.name,
-      subtitle: 'Playlista • $_owner',
+      subtitle: '$_kind • $_owner',
       cover: _Mosaic(
         covers: [for (final hit in hits.take(4)) CoverRequest.of(hit)],
         fallback: _playlist.name,
@@ -372,7 +376,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       header: MenuSheetHeader(
         cover: CoverArt(seed: _playlist.name, size: 56),
         title: _playlist.name,
-        subtitle: 'Playlista • $_owner',
+        subtitle: '$_kind • $_owner',
       ),
       entries: _preview
           ? [

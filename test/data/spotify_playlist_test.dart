@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/spotify_playlist.dart';
+import 'package:music_database_app/src/screens/playlist_import.dart';
 
 import '../support/spotify_fakes.dart';
 
@@ -24,6 +26,60 @@ void main() {
       findSpotifyShortLink('Zobacz https://spotify.link/AbCdEf12 teraz'),
       Uri.parse('https://spotify.link/AbCdEf12'),
     );
+  });
+
+  test('tells tracks, albums and playlists apart', () {
+    const id = '4uLU6hMCjMI75M1A2tKUQC';
+    String? kind(String text) => switch (parseSpotifyLink(text)) {
+      (:final kind, id: final found) => '${kind.name} $found',
+      null => null,
+    };
+    expect(kind('https://open.spotify.com/track/$id?si=x'), 'track $id');
+    expect(kind('https://open.spotify.com/intl-pl/album/$id'), 'album $id');
+    expect(kind('spotify:playlist:$id'), 'playlist $id');
+    expect(kind('https://open.spotify.com/artist/$id'), null);
+    // A followed short link: the address it led to comes before the page's own links.
+    expect(
+      kind(
+        'https://open.spotify.com/track/$id\n'
+        '<a href="https://open.spotify.com/playlist/37i9dQZF1DX4UtSsGT1Sbe">',
+      ),
+      'track $id',
+    );
+    expect(parsePlaylistLink('https://open.spotify.com/album/$id'), (
+      source: PlaylistSource.spotifyAlbum,
+      id: id,
+    ));
+    expect(parsePlaylistLink('https://open.spotify.com/track/$id'), null);
+  });
+
+  test('reads a track and an album from their embed pages', () async {
+    final asked = <String>[];
+    final spotify = SpotifyPlaylists(
+      get: (uri) async {
+        asked.add(uri.path);
+        return uri.path.contains('/track/')
+            ? embedEntity({
+                'type': 'track',
+                'name': 'Heroes - 2017 Remaster',
+                'artists': [
+                  {'name': 'David Bowie'},
+                  {'name': 'Brian Eno'},
+                ],
+                'duration': 371000,
+              })
+            : embedPage([track('a', 'Run Away With Me', 'Carly Rae Jepsen')]);
+      },
+    );
+    final heroes = await spotify.fetchTrack('T1');
+    expect(heroes.id, 'T1');
+    expect(heroes.title, 'Heroes - 2017 Remaster');
+    expect(heroes.artists, ['David Bowie', 'Brian Eno']);
+    expect(heroes.duration, const Duration(seconds: 371));
+    final album = await spotify.fetchAlbum('AL');
+    expect(album.album, isTrue);
+    expect(album.tracks.single.title, 'Run Away With Me');
+    expect(asked, ['/embed/track/T1', '/embed/album/AL']);
   });
 
   test('reads the playlist from the embed page', () {

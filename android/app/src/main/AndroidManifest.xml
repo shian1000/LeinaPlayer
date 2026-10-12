@@ -50,17 +50,27 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- "Udostępnij" from YouTube (or anything sharing a link as text): a playlist link
-                 is imported to Biblioteka, a video link played (MainActivity → Dart's
-                 incoming_links.dart). -->
+            <!-- "Udostępnij" from YouTube or Spotify (or anything sharing a link as text): a
+                 playlist or album link is imported to Biblioteka, a video or track link played
+                 (MainActivity → Dart's incoming_links.dart). Tapped links come through
+                 LinkChooserActivity below. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="text/plain"/>
             </intent-filter>
-            <!-- Opening YouTube links with this app. Not autoVerify: only YouTube can verify its
-                 domains, so on Android 12+ the user has to allow these links for this app by
-                 hand (explained in Ustawienia › Informacje i pomoc). -->
+        </activity>
+        <!-- Opening YouTube and Spotify links with this app: a sheet asks whether to open them
+             here, in the service's app or in a browser. Not autoVerify: only YouTube and Spotify
+             can verify their domains, so on Android 12+ the user has to allow these links for
+             this app by hand (explained in Ustawienia › Otwieranie linków). -->
+        <activity
+            android:name=".LinkChooserActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/LinkChooserTheme">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -72,6 +82,9 @@
                 <data android:host="m.youtube.com"/>
                 <data android:host="music.youtube.com"/>
                 <data android:host="youtu.be"/>
+                <data android:host="open.spotify.com"/>
+                <data android:host="spotify.link"/>
+                <data android:host="spotify.app.link"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
@@ -109,8 +122,9 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
         </intent>
-        <!-- Opening a video in the YouTube app itself (not this app, which handles YouTube links
-             too): MainActivity.openYouTube. -->
+        <!-- Opening a link in the YouTube or Spotify app itself (not this app, which handles
+             their links too): LinkTargets. -->
         <package android:name="com.google.android.youtube"/>
+        <package android:name="com.spotify.music"/>
     </queries>
 </manifest>

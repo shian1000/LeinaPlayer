@@ -7,8 +7,14 @@ import 'youtube_library.dart';
 import 'youtube_playlist.dart';
 import 'youtube_video.dart';
 
-/// Where a playlist was imported from.
-enum PlaylistSource { youtube, spotify }
+/// Where a playlist was imported from: a YouTube or Spotify playlist, or a Spotify album.
+enum PlaylistSource {
+  youtube,
+  spotify,
+  spotifyAlbum;
+
+  bool get isSpotify => this != youtube;
+}
 
 /// One playlist in Biblioteka.
 class PlaylistSummary {
@@ -46,6 +52,7 @@ class PlaylistSummary {
       'list': sourceId,
     }),
     PlaylistSource.spotify => spotifyPlaylistUri(sourceId!),
+    PlaylistSource.spotifyAlbum => spotifyAlbumUri(sourceId!),
     null => null,
   };
 }
@@ -313,10 +320,11 @@ class PlaylistLibrary extends ChangeNotifier {
 
   /// Saves [data] like [importYouTube]. Spotify tracks have no video, so they're recognised by
   /// title and artist only ([matchSpotifyTrack]); the rest are found on YouTube when played.
+  /// An album becomes a playlist of its own.
   Future<PlaylistImportResult> importSpotify(SpotifyPlaylistData data) async {
     await _catalog.ensureLoaded();
     return _save(
-      source: PlaylistSource.spotify,
+      source: data.album ? PlaylistSource.spotifyAlbum : PlaylistSource.spotify,
       sourceId: data.id,
       name: data.name,
       owner: data.owner,

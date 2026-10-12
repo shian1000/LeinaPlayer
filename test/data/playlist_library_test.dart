@@ -123,6 +123,33 @@ void main() {
   });
 
   test(
+    'a Spotify album is a playlist of its own, linking to the album',
+    () async {
+      await playlists.importSpotify(
+        const SpotifyPlaylistData(
+          id: '1DFixLWuPkv3KT3TnV35m3',
+          name: 'Emotion',
+          owner: 'Carly Rae Jepsen',
+          album: true,
+          tracks: [
+            SpotifyTrack(id: 't1', title: 'Run Away With Me', artists: ['X']),
+          ],
+        ),
+      );
+      final album = playlists.playlists.single;
+      expect(album.source, PlaylistSource.spotifyAlbum);
+      expect(
+        album.link.toString(),
+        'https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3',
+      );
+      expect(
+        playlists.saved(PlaylistSource.spotify, '1DFixLWuPkv3KT3TnV35m3'),
+        isNull,
+      );
+    },
+  );
+
+  test(
     'imports a Spotify playlist, recognising songs by title and artist',
     () async {
       final result = await playlists.importSpotify(

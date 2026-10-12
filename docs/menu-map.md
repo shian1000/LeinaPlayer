@@ -192,6 +192,13 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   sources with switches, drag to reorder (Serwer — dummy, always off; Plik na telefonie; iTunes;
   Deezer; Miniatura z YouTube); the cover cache is in Oszczędzanie danych › Pamięć podręczna. See
   [`agent-notes/covers.md`](agent-notes/covers.md).
+- Otwieranie linków **→ Otwieranie linków** (`link_settings_screen.dart`) — **implemented**:
+  "Linki z YouTube" / "Linki ze Spotify" (dialog: Pytaj za każdym razem — default, Leina Radio,
+  Aplikacja YouTube/Spotify, Przeglądarka; the same choice "Zapamiętaj wybór" in the link sheet
+  sets), what a link does in the app, how to give the links to the app in the phone settings,
+  "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
+  app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
+  [`agent-notes/youtube.md`](agent-notes/youtube.md)).
 - `Ustawienia › Odtwarzanie`
 - Historia odtwarzania **→ Historia odtwarzania** (`history_settings_screen.dart`) —
   **implemented**: "Przechowuj historię" (dialog: 7 / 30 / 90 — default / 180 dni, Rok, Bez
@@ -235,9 +242,7 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
-  Also "Linki z YouTube": what sharing a link to the app does, how to make YouTube links open in
-  it, and "Otwieraj linki w Leina Radio" (opens the phone's "Otwieraj domyślnie" settings for the
-  app — Android 12+; app info on older ones).
+  Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków.
 - `Ustawienia › Wyloguj`
 
 ## Home (`home_screen.dart`)
