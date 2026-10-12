@@ -208,11 +208,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     final tracks = _tracks;
     if (tracks == null || !_scroll.hasClients) return;
     final wanted = widget.reveal;
-    final queue = PlaybackQueueScope.of(context);
+    final playing = PlaybackQueueScope.of(context).currentEntry;
     final index = wanted != null
         ? _indexOf(wanted, tracks)
-        : _savedId != null && queue.playlistId == _savedId
-        ? queue.currentContextIndex
+        : _savedId != null && playing?.origin?.playlistId == _savedId
+        ? playing!.index
         : null;
     if (index == null || index < 0 || index >= tracks.length) return;
     // Rows all have the first one's height; rows far down aren't built yet to measure.
@@ -369,6 +369,28 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
+  /// The whole playlist into the queue, remembered as played from it.
+  List<MenuSheetEntry> _queueEntries(List<SearchHit> hits) {
+    if (hits.isEmpty) return const [];
+    QueueOrigin origin() => QueueOrigin(
+      playlistId: _savedId,
+      youTubeListId: _playlist.youTubeId,
+      playlistName: _playlist.name,
+    );
+    return [
+      MenuSheetEntry(
+        Icons.queue_music,
+        'Dodaj do kolejki',
+        onTap: () => queueSongs(context, hits, next: false, origin: origin()),
+      ),
+      MenuSheetEntry(
+        Icons.playlist_play,
+        'Odtwórz jako następną',
+        onTap: () => queueSongs(context, hits, next: true, origin: origin()),
+      ),
+    ];
+  }
+
   void _showPlaylistMenu(List<SearchHit> hits) {
     showMenuSheet(
       context,
@@ -385,6 +407,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 'Udostępnij',
                 onTap: () => _share(hits),
               ),
+              ..._queueEntries(hits),
               if (_fetched != null)
                 MenuSheetEntry(
                   Icons.add_circle_outline,
@@ -404,6 +427,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 'Udostępnij',
                 onTap: () => _share(hits),
               ),
+              ..._queueEntries(hits),
               MenuSheetEntry(
                 Icons.check_circle,
                 'Usuń z Biblioteki',
@@ -461,6 +485,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           Icons.queue_music,
           'Dodaj do kolejki',
           onTap: () => addToQueue(context, hit),
+        ),
+        MenuSheetEntry(
+          Icons.playlist_play,
+          'Odtwórz jako następny',
+          onTap: () => playNextInQueue(context, hit),
         ),
         const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
         const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),

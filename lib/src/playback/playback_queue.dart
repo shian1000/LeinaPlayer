@@ -13,26 +13,73 @@ import '../data/album_covers.dart';
 /// are set when it played as part of a playlist.
 typedef QueuePlay = ({SearchHit hit, int? playlistId, String? playlistName});
 
-/// One song waiting in the queue; [key] tells apart the same song queued twice.
+/// Where songs in the queue were queued from as a whole: a playlist (played, or added with
+/// "Odtwórz jako następny" / "Dodaj do kolejki") or a search. Entries queued together share
+/// one origin; a single song added from its ⋮ has none, even when it's on a playlist.
+class QueueOrigin {
+  QueueOrigin({
+    this.playlistId,
+    this.youTubeListId,
+    this.playlistName,
+    this.searchQuery,
+  });
+
+  factory QueueOrigin.fromJson(Map<String, Object?> json) => QueueOrigin(
+    playlistId: json['playlist_id'] as int?,
+    youTubeListId: json['youtube_list_id'] as String?,
+    playlistName: json['playlist_name'] as String?,
+    searchQuery: json['search_query'] as String?,
+  );
+
+  /// The Biblioteka playlist (`playlists.id`), for the history.
+  final int? playlistId;
+
+  /// The YouTube playlist, so "Otwórz w YouTube" opens the video inside it.
+  final String? youTubeListId;
+  final String? playlistName;
+  final String? searchQuery;
+
+  Map<String, Object?> toJson() => {
+    'playlist_id': playlistId,
+    'youtube_list_id': youTubeListId,
+    'playlist_name': playlistName,
+    'search_query': searchQuery,
+  };
+}
+
+/// One song in the queue; [key] tells apart the same song queued twice.
 class QueueEntry {
-  QueueEntry._(this.hit, {required this.added}) : key = _nextKey++;
+  QueueEntry._(this.hit, {this.origin, this.index, this.pinned = false})
+    : key = _nextKey++;
+
+  QueueEntry._pinnedFrom(QueueEntry entry)
+    : hit = entry.hit,
+      origin = entry.origin,
+      index = entry.index,
+      pinned = true,
+      key = entry.key;
 
   static int _nextKey = 0;
 
   final SearchHit hit;
+  final QueueOrigin? origin;
 
-  /// Added with "Dodaj do kolejki" — plays before the rest of the playlist / results.
-  final bool added;
+  /// Where the song is in its [origin]'s playlist / results.
+  final int? index;
+
+  /// Moved by hand: shuffle leaves it where the user put it.
+  final bool pinned;
   final int key;
 }
 
-/// What's playing and what comes next — not a playlist: tapping a playlist track fills the
-/// queue with that playlist (the "context"), tapping a search result with just that song. Like
-/// the reference app, songs added with "Dodaj do kolejki" play next, before the rest of the
-/// context; shuffle mixes the context's songs that haven't played yet.
+/// What's played, what's playing and what comes next. Tapping a song in a playlist / results
+/// replaces the whole queue with them (the "main" songs, the only ones shuffle mixes); songs and
+/// whole playlists added with "Odtwórz jako następny" (right after the current song) or "Dodaj do
+/// kolejki" (after the ones added before, ahead of the rest of the main songs) keep where they
+/// were queued from, for the player, the history and "Otwórz w YouTube".
 /// When a song ends the next one starts; "Poprzedni" restarts the song, or within its first
-/// [restartThreshold] goes back to the previous one. After each song starts, the next
-/// [SourceSettings.activeQueuePrefetch] songs are downloaded to the cache ("Cachowanie kolejki").
+/// [restartThreshold] goes back to the previous one in the queue. After each song starts, the
+/// next [SourceSettings.activeQueuePrefetch] songs are downloaded to the cache.
 class PlaybackQueue extends ChangeNotifier {
   PlaybackQueue(
     this._tracks, {
@@ -64,25 +111,14 @@ class PlaybackQueue extends ChangeNotifier {
   late final StreamSubscription<MediaSkip> _skips;
   final _played = StreamController<QueuePlay>.broadcast();
 
-  /// The playlist / results the queue was filled from, in their own order.
-  List<QueueEntry> _context = const [];
-
-  /// [_context] positions in play order: as listed, or shuffled.
-  List<int> _order = const [];
-
-  /// Where in [_order] the context has got to; -1 before the first song.
-  int _pos = -1;
-
-  /// [_context] positions taken out of the queue, so turning shuffle off doesn't bring them back.
-  final Set<int> _removed = {};
-
-  final List<QueueEntry> _added = [];
+  /// Played songs, oldest first.
+  final List<QueueEntry> _history = [];
   QueueEntry? _current;
+  final List<QueueEntry> _upcoming = [];
+
+  /// What the queue was last filled with by a tap ([start]).
+  QueueOrigin? _mainOrigin;
   bool _shuffle = false;
-  int? _playlistId;
-  String? _youTubeListId;
-  String? _playlistName;
-  String? _searchQuery;
 
   /// Bumped by every user action, so an automatic move (or caching ahead) started earlier gives
   /// up.
@@ -90,51 +126,38 @@ class PlaybackQueue extends ChangeNotifier {
   int _prefetchRun = 0;
 
   SearchHit? get current => _current?.hit;
-
-  /// Where the song playing is in the playlist / results the queue was filled from (their own
-  /// order, not the shuffled one); `null` for a song added with "Dodaj do kolejki".
-  int? get currentContextIndex =>
-      _current == null || _current!.added || _pos < 0 ? null : _order[_pos];
+  QueueEntry? get currentEntry => _current;
 
   /// Each song that starts playing (for the history).
   Stream<QueuePlay> get played => _played.stream;
-  int? get playlistId => _playlistId;
+
+  /// What the queue was filled with by tapping a song or "Odtwórz"; the songs after the ones
+  /// added by hand.
+  QueueOrigin? get mainOrigin => _mainOrigin;
+
+  /// One of the songs the queue was filled with, rather than added to it.
+  bool isMain(QueueEntry entry) =>
+      entry.origin != null && identical(entry.origin, _mainOrigin);
 
   /// "Otwórz w YouTube" for the current song: inside its YouTube playlist when it's playing as
   /// part of one; `null` when no video is known.
   Uri? get currentYouTubeUri {
     final entry = _current;
     if (entry == null) return null;
-    return _tracks.youTubeUri(
-      entry.hit,
-      listId: entry.added ? null : _youTubeListId,
-    );
+    return _tracks.youTubeUri(entry.hit, listId: entry.origin?.youTubeListId);
   }
 
   bool get shuffle => _shuffle;
-  String? get playlistName => _playlistName;
-  String? get searchQuery => _searchQuery;
-
-  /// Songs added with "Dodaj do kolejki", in the order they'll play.
-  List<QueueEntry> get added => List.unmodifiable(_added);
-
-  /// The rest of the context, in play order.
-  List<QueueEntry> get contextUpcoming => [
-    for (final i in _order.skip(_pos + 1)) _context[i],
-  ];
 
   /// Everything that plays after the current song, in order.
-  List<QueueEntry> get upcoming => [..._added, ...contextUpcoming];
+  List<QueueEntry> get upcoming => List.unmodifiable(_upcoming);
 
-  bool get hasNext => _added.isNotEmpty || _pos + 1 < _order.length;
+  bool get hasNext => _upcoming.isNotEmpty;
+  bool get hasPrevious => _history.isNotEmpty;
 
-  /// The current song was added by the user, so "previous" is the context song before it.
-  bool get _playingAdded => _current != null && _current!.added;
-  bool get hasPrevious => _playingAdded ? _pos >= 0 : _pos > 0;
-
-  /// Replaces the queue with [entries] and plays the one at [index] (with [shuffle] on, the rest
-  /// follow in random order). Only a user's tap gets here, so the YouTube app may be the last
-  /// resort. Songs added with "Dodaj do kolejki" stay queued.
+  /// Replaces the whole queue with [entries] and plays the one at [index] (with [shuffle] on,
+  /// the rest follow in random order). Only a user's tap gets here, so the YouTube app may be
+  /// the last resort.
   Future<PlayOutcome> start(
     List<SearchHit> entries,
     int index, {
@@ -146,18 +169,28 @@ class PlaybackQueue extends ChangeNotifier {
     void Function(String status)? onStatus,
   }) {
     _generation++;
-    _context = [for (final hit in entries) QueueEntry._(hit, added: false)];
-    _removed.clear();
-    _playlistId = playlistId;
-    _youTubeListId = youTubeListId;
-    _playlistName = playlistName;
-    _searchQuery = searchQuery;
+    final origin = QueueOrigin(
+      playlistId: playlistId,
+      youTubeListId: youTubeListId,
+      playlistName: playlistName,
+      searchQuery: searchQuery,
+    );
+    _mainOrigin = origin;
     if (shuffle != null) _shuffle = shuffle;
-    _order = _shuffle
-        ? _shuffledFrom(index)
-        : List.generate(entries.length, (i) => i);
-    _pos = _order.indexOf(index);
-    return _play(_context[index], allowExternal: true, onStatus: onStatus);
+    final all = [
+      for (final (i, hit) in entries.indexed)
+        QueueEntry._(hit, origin: origin, index: i),
+    ];
+    _history.clear();
+    _upcoming.clear();
+    if (_shuffle) {
+      _upcoming.addAll([...all]..removeAt(index));
+      _upcoming.shuffle(_random);
+    } else {
+      _history.addAll(all.take(index));
+      _upcoming.addAll(all.skip(index + 1));
+    }
+    return _play(all[index], allowExternal: true, onStatus: onStatus);
   }
 
   /// Starts [entries] shuffled, from a random song ("Odtwarzanie losowe").
@@ -177,96 +210,158 @@ class PlaybackQueue extends ChangeNotifier {
     onStatus: onStatus,
   );
 
-  /// [first], then every other context song in random order.
-  List<int> _shuffledFrom(int first) => [
-    first,
-    ...(List.generate(_context.length, (i) => i)..remove(first))
-      ..shuffle(_random),
-  ];
-
-  /// Shuffle on: every other song of the context follows the current one in random order (like
-  /// the reference app, also the ones listed before the tapped song). Off: back to the context's
-  /// own order, continuing after the current song.
+  /// Shuffle on: the main songs not played yet — like the reference app, also the ones listed
+  /// before the tapped song — take the main songs' places after the current one in random
+  /// order. Off: back to their own order, continuing after the main song played last. Songs
+  /// added or moved by hand stay where they are.
   void setShuffle(bool value) {
     if (value == _shuffle) return;
     _shuffle = value;
-    if (_context.isNotEmpty) {
-      final at = _pos >= 0 ? _order[_pos] : null;
-      final kept = [
-        for (var i = 0; i < _context.length; i++)
-          if (!_removed.contains(i) || i == at) i,
+    bool mixed(QueueEntry e) => isMain(e) && !e.pinned;
+    final current = _current;
+    final List<QueueEntry> next;
+    if (value) {
+      next = [..._history.where(mixed), ..._upcoming.where(mixed)]
+        ..shuffle(_random);
+      _history.removeWhere(mixed);
+    } else {
+      final played = _history.where(isMain);
+      final at = current != null && isMain(current)
+          ? current.index!
+          : played.isEmpty
+          ? -1
+          : played.last.index!;
+      final pool = [..._history.where(mixed), ..._upcoming.where(mixed)]
+        ..sort((a, b) => a.index!.compareTo(b.index!));
+      _history
+        ..removeWhere(mixed)
+        ..addAll(pool.where((e) => e.index! < at));
+      next = [
+        for (final e in pool)
+          if (e.index! > at) e,
       ];
-      if (value) {
-        final rest = [...kept]
-          ..remove(at)
-          ..shuffle(_random);
-        _order = [?at, ...rest];
-        _pos = at == null ? -1 : 0;
-      } else {
-        _order = kept;
-        _pos = at == null ? -1 : _order.indexOf(at);
-      }
     }
+    _refill(next);
     notifyListeners();
     _prefetchAhead();
   }
 
-  /// "Dodaj do kolejki": plays after the current song and anything added before it. With nothing
-  /// playing it starts right away.
+  /// Puts [mainSongs] in the places of the main songs in [_upcoming], in order; the rest go at
+  /// the end.
+  void _refill(List<QueueEntry> mainSongs) {
+    final songs = mainSongs.iterator;
+    final refilled = <QueueEntry>[];
+    for (final e in _upcoming) {
+      if (!isMain(e) || e.pinned) {
+        refilled.add(e);
+      } else if (songs.moveNext()) {
+        refilled.add(songs.current);
+      }
+    }
+    while (songs.moveNext()) {
+      refilled.add(songs.current);
+    }
+    _upcoming
+      ..clear()
+      ..addAll(refilled);
+  }
+
+  /// "Dodaj do kolejki": [hits] play after the current song and the songs added (or moved)
+  /// before them, ahead of the rest of the main songs. [origin]: the playlist they were added from as a
+  /// whole. With nothing playing the first one starts right away.
   Future<PlayOutcome?> add(
-    SearchHit hit, {
+    List<SearchHit> hits, {
+    QueueOrigin? origin,
+    void Function(String status)? onStatus,
+  }) {
+    final at = _upcoming.indexWhere((e) => isMain(e) && !e.pinned);
+    return _insert(
+      at < 0 ? _upcoming.length : at,
+      hits,
+      origin: origin,
+      onStatus: onStatus,
+    );
+  }
+
+  /// "Odtwórz jako następny": [hits] play right after the current song.
+  Future<PlayOutcome?> playNext(
+    List<SearchHit> hits, {
+    QueueOrigin? origin,
+    void Function(String status)? onStatus,
+  }) => _insert(0, hits, origin: origin, onStatus: onStatus);
+
+  Future<PlayOutcome?> _insert(
+    int at,
+    List<SearchHit> hits, {
+    QueueOrigin? origin,
     void Function(String status)? onStatus,
   }) async {
-    final entry = QueueEntry._(hit, added: true);
+    if (hits.isEmpty) return null;
+    final entries = [
+      for (final (i, hit) in hits.indexed)
+        QueueEntry._(hit, origin: origin, index: origin == null ? null : i),
+    ];
     if (_current == null) {
       _generation++;
-      return _play(entry, allowExternal: true, onStatus: onStatus);
+      _upcoming.insertAll(0, entries.skip(1));
+      return _play(entries.first, allowExternal: true, onStatus: onStatus);
     }
-    _added.add(entry);
+    _upcoming.insertAll(at, entries);
     notifyListeners();
     _prefetchAhead();
     return null;
   }
 
-  /// Plays [entry] from [upcoming]; the songs before it are skipped (added ones dropped, the
-  /// context ones count as played).
+  /// Plays [entry] from [upcoming]; the songs before it are skipped: added ones dropped, the
+  /// main ones count as played.
   Future<PlayOutcome?> jumpTo(
     QueueEntry entry, {
     void Function(String status)? onStatus,
   }) async {
-    final addedAt = _added.indexOf(entry);
-    if (addedAt >= 0) {
-      _added.removeRange(0, addedAt + 1);
-    } else {
-      final at = _order.indexWhere(
-        (i) => identical(_context[i], entry),
-        _pos + 1,
-      );
-      if (at < 0) return null;
-      _pos = at;
-    }
+    final at = _upcoming.indexOf(entry);
+    if (at < 0) return null;
+    final skipped = _upcoming.sublist(0, at);
+    _upcoming.removeRange(0, at + 1);
+    final current = _current;
+    if (current != null) _history.add(current);
+    _history.addAll(skipped.where(isMain));
     _generation++;
     return _play(entry, allowExternal: true, onStatus: onStatus);
   }
 
-  /// Takes [entry] out of [upcoming].
-  void remove(QueueEntry entry) {
-    if (!_added.remove(entry)) {
-      final at = _order.indexWhere(
-        (i) => identical(_context[i], entry),
-        _pos + 1,
-      );
-      if (at < 0) return;
-      _removed.add(_order[at]);
-      _order = [..._order]..removeAt(at);
-    }
+  /// Takes [entry] out of [upcoming]; returns where it was, for [reinsert].
+  int remove(QueueEntry entry) {
+    final at = _upcoming.indexOf(entry);
+    if (at < 0) return -1;
+    _upcoming.removeAt(at);
+    notifyListeners();
+    _prefetchAhead();
+    return at;
+  }
+
+  /// Puts back an entry taken out with [remove] ("Cofnij").
+  void reinsert(QueueEntry entry, int at) {
+    if (_upcoming.contains(entry)) return;
+    _upcoming.insert(at.clamp(0, _upcoming.length), entry);
     notifyListeners();
     _prefetchAhead();
   }
 
-  /// "Wyczyść kolejkę": drops every song added with "Dodaj do kolejki".
+  /// Moves [entry] to [to] in [upcoming] (an index after it's taken out). It keeps where it was
+  /// queued from, and shuffle no longer moves it.
+  void move(QueueEntry entry, int to) {
+    final at = _upcoming.indexOf(entry);
+    if (at < 0) return;
+    _upcoming
+      ..removeAt(at)
+      ..insert(to.clamp(0, _upcoming.length), QueueEntry._pinnedFrom(entry));
+    notifyListeners();
+    _prefetchAhead();
+  }
+
+  /// "Wyczyść kolejkę": drops every song added by hand.
   void clearAdded() {
-    _added.clear();
+    _upcoming.removeWhere((e) => !isMain(e));
     notifyListeners();
     _prefetchAhead();
   }
@@ -280,26 +375,30 @@ class PlaybackQueue extends ChangeNotifier {
   }
 
   QueueEntry? _moveNext() {
-    if (_added.isNotEmpty) return _added.removeAt(0);
-    if (_pos + 1 >= _order.length) return null;
-    return _context[_order[++_pos]];
+    if (_upcoming.isEmpty) return null;
+    final current = _current;
+    if (current != null) _history.add(current);
+    return _upcoming.removeAt(0);
   }
 
   /// Restarts the song, or — within its first [restartThreshold], when there is one — plays the
-  /// previous song. `null` when it only restarted.
+  /// previous song in the queue. `null` when it only restarted. [restart] false (swiping the
+  /// mini player) always goes back when there's a song to go back to.
   Future<PlayOutcome?> previous({
+    bool restart = true,
     void Function(String status)? onStatus,
   }) async {
     final player = _tracks.player;
-    if (!hasPrevious || player.currentPosition > restartThreshold) {
+    if (!hasPrevious ||
+        (restart && player.currentPosition > restartThreshold)) {
       await player.seek(Duration.zero);
       return null;
     }
-    // From an added song, back to the context song that played before it.
-    if (!_playingAdded) _pos--;
+    final current = _current;
+    if (current != null) _upcoming.insert(0, current);
     _generation++;
     return _play(
-      _context[_order[_pos]],
+      _history.removeLast(),
       allowExternal: true,
       onStatus: onStatus,
     );
@@ -315,17 +414,17 @@ class PlaybackQueue extends ChangeNotifier {
     final generation = _generation;
     final outcome = await _tracks.play(
       entry.hit,
-      playlistName: _playlistName,
-      youTubeListId: entry.added ? null : _youTubeListId,
-      searchQuery: _searchQuery,
+      playlistName: entry.origin?.playlistName,
+      youTubeListId: entry.origin?.youTubeListId,
+      searchQuery: entry.origin?.searchQuery,
       allowExternal: allowExternal,
       onStatus: onStatus,
     );
     if (outcome.played) {
       _played.add((
         hit: entry.hit,
-        playlistId: entry.added ? null : _playlistId,
-        playlistName: entry.added ? null : _playlistName,
+        playlistId: entry.origin?.playlistId,
+        playlistName: entry.origin?.playlistName,
       ));
       if (generation == _generation) _prefetchAhead();
     }
@@ -388,8 +487,8 @@ class PlaybackQueue extends ChangeNotifier {
       youtubeVideoId: hit.onPhone ? null : hit.youtubeVideoId,
       coverSeed: hit.coverSeed,
       cover: CoverRequest.of(hit),
-      playlistName: entry.added ? null : _playlistName,
-      searchQuery: entry.added ? null : _searchQuery,
+      playlistName: entry.origin?.playlistName,
+      searchQuery: entry.origin?.searchQuery,
     );
   }
 
@@ -408,22 +507,30 @@ class PlaybackQueue extends ChangeNotifier {
   Map<String, Object?>? snapshot() {
     final current = _current;
     if (current == null) return null;
-    List<Map<String, Object?>> refs(Iterable<QueueEntry> entries) => [
-      for (final e in entries) TrackRef.of(e.hit).toJson(),
-    ];
+    final origins = <QueueOrigin>[];
+    int? originAt(QueueOrigin? origin) {
+      if (origin == null) return null;
+      final at = origins.indexWhere((o) => identical(o, origin));
+      if (at >= 0) return at;
+      origins.add(origin);
+      return origins.length - 1;
+    }
+
+    Map<String, Object?> json(QueueEntry e) => {
+      'track': TrackRef.of(e.hit).toJson(),
+      'origin': originAt(e.origin),
+      'index': e.index,
+      if (e.pinned) 'pinned': true,
+    };
+    final mainOrigin = _mainOrigin;
     return {
-      'context': refs(_context),
-      'order': _order,
-      'pos': _pos,
-      'removed': _removed.toList(),
-      'added': refs(_added),
-      'current': TrackRef.of(current.hit).toJson(),
-      'current_added': current.added,
+      'version': 2,
+      'main_origin': mainOrigin == null ? null : originAt(mainOrigin),
+      'history': [for (final e in _history) json(e)],
+      'current': json(current),
+      'upcoming': [for (final e in _upcoming) json(e)],
       'shuffle': _shuffle,
-      'playlist_id': _playlistId,
-      'youtube_list_id': _youTubeListId,
-      'playlist_name': _playlistName,
-      'search_query': _searchQuery,
+      'origins': [for (final o in origins) o.toJson()],
     };
   }
 
@@ -432,32 +539,70 @@ class PlaybackQueue extends ChangeNotifier {
     Map<String, Object?> json,
     SearchHit Function(TrackRef) resolve,
   ) {
-    List<QueueEntry> entries(Object? list, {required bool added}) => [
-      for (final item in list as List)
-        QueueEntry._(
-          resolve(TrackRef.fromJson((item as Map).cast())),
-          added: added,
-        ),
+    if (json['version'] != 2) json = _upgradedSnapshot(json);
+    final origins = [
+      for (final o in json['origins'] as List)
+        QueueOrigin.fromJson((o as Map).cast()),
     ];
+    QueueEntry entry(Object? item) {
+      final map = (item as Map).cast<String, Object?>();
+      final origin = map['origin'] as int?;
+      return QueueEntry._(
+        resolve(TrackRef.fromJson((map['track'] as Map).cast())),
+        origin: origin == null ? null : origins[origin],
+        index: map['index'] as int?,
+        pinned: map['pinned'] as bool? ?? false,
+      );
+    }
+
     _generation++;
-    _context = entries(json['context'], added: false);
-    _order = (json['order'] as List).cast<int>();
-    _pos = json['pos'] as int;
-    _removed
+    final mainOrigin = json['main_origin'] as int?;
+    _mainOrigin = mainOrigin == null ? null : origins[mainOrigin];
+    _history
       ..clear()
-      ..addAll((json['removed'] as List).cast<int>());
-    _added
+      ..addAll((json['history'] as List).map(entry));
+    _current = entry(json['current']);
+    _upcoming
       ..clear()
-      ..addAll(entries(json['added'], added: true));
+      ..addAll((json['upcoming'] as List).map(entry));
     _shuffle = json['shuffle'] as bool;
-    _playlistId = json['playlist_id'] as int?;
-    _youTubeListId = json['youtube_list_id'] as String?;
-    _playlistName = json['playlist_name'] as String?;
-    _searchQuery = json['search_query'] as String?;
-    _current = json['current_added'] as bool || _pos < 0
-        ? entries([json['current']], added: true).single
-        : _context[_order[_pos]];
     notifyListeners();
+  }
+
+  /// A queue saved before songs remembered where they were queued from: one playlist / results
+  /// ("context") played in `order` up to `pos`, with the songs added by hand in front.
+  static Map<String, Object?> _upgradedSnapshot(Map<String, Object?> old) {
+    final context = old['context'] as List;
+    final order = (old['order'] as List).cast<int>();
+    final pos = old['pos'] as int;
+    final currentAdded = old['current_added'] as bool || pos < 0;
+    Map<String, Object?> main(int i) => {
+      'track': context[i],
+      'origin': 0,
+      'index': i,
+    };
+    Map<String, Object?> added(Object? track) => {'track': track};
+    return {
+      'version': 2,
+      'main_origin': 0,
+      'history': [
+        for (final i in order.take(currentAdded ? pos + 1 : pos)) main(i),
+      ],
+      'current': currentAdded ? added(old['current']) : main(order[pos]),
+      'upcoming': [
+        for (final track in old['added'] as List) added(track),
+        for (final i in order.skip(pos + 1)) main(i),
+      ],
+      'shuffle': old['shuffle'],
+      'origins': [
+        {
+          'playlist_id': old['playlist_id'],
+          'youtube_list_id': old['youtube_list_id'],
+          'playlist_name': old['playlist_name'],
+          'search_query': old['search_query'],
+        },
+      ],
+    };
   }
 
   @override

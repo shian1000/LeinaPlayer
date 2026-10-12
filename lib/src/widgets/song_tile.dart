@@ -8,9 +8,12 @@ import '../playback/track_player.dart';
 import '../theme.dart';
 import 'menu_sheet.dart';
 import 'playing_bars.dart';
+import 'queue_toast.dart';
+import '../screens/queue_screen.dart';
 import 'share_sheet.dart';
 import '../data/album_covers.dart';
 import 'song_cover.dart';
+import 'swipe_actions.dart';
 
 /// Result title; the song in the player is highlighted like in the reference app.
 class CurrentTitle extends StatelessWidget {
@@ -80,17 +83,52 @@ Future<void> runQueueAction(
 
 /// "Dodaj do kolejki" from a song's ⋮ menu: plays after the current song and the ones added
 /// before it (right away when nothing plays).
-Future<void> addToQueue(BuildContext context, SearchHit hit) async {
+Future<void> addToQueue(BuildContext context, SearchHit hit) =>
+    queueSongs(context, [hit], next: false);
+
+/// "Odtwórz jako następny" from a song's ⋮ menu: plays right after the current song.
+Future<void> playNextInQueue(BuildContext context, SearchHit hit) =>
+    queueSongs(context, [hit], next: true);
+
+/// Adds [hits] to the queue — right after the current song ([next]) or after the songs added
+/// before them — saying so; [origin] is the playlist they're added from as a whole.
+Future<void> queueSongs(
+  BuildContext context,
+  List<SearchHit> hits, {
+  required bool next,
+  QueueOrigin? origin,
+}) async {
+  if (hits.isEmpty) return;
   final messenger = ScaffoldMessenger.of(context);
   final queue = PlaybackQueueScope.of(context);
+  final toast = QueueToastScope.maybeOf(context);
   await runQueueAction(context, (onStatus) async {
-    final outcome = await queue.add(hit, onStatus: onStatus);
+    final outcome = next
+        ? await queue.playNext(hits, origin: origin, onStatus: onStatus)
+        : await queue.add(hits, origin: origin, onStatus: onStatus);
     if (outcome == null) {
-      messenger
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(content: Text('Dodano do kolejki: „${hit.title}”')),
+      // Short like the reference app's; the sheet or row just touched says what it was.
+      final text = !next
+          ? 'Dodano do kolejki'
+          : origin == null
+          ? 'Zagra jako następny'
+          : 'Zagra jako następna';
+      if (toast != null && context.mounted) {
+        messenger.clearSnackBars();
+        toast.show(
+          text,
+          actionLabel: 'Otwórz',
+          onAction: () {
+            if (context.mounted) QueueScreen.open(context);
+          },
         );
+      } else {
+        messenger
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(duration: const Duration(seconds: 2), content: Text(text)),
+          );
+      }
     }
     return outcome;
   });
@@ -174,7 +212,7 @@ class SongTile extends StatelessWidget {
           if (hit.year != null) '${hit.year}',
         ].join(' • ');
     final trailing = this.trailing;
-    return ListTile(
+    final tile = ListTile(
       contentPadding: trailing == null
           ? null
           : const EdgeInsets.only(left: 16, right: 4),
@@ -191,6 +229,15 @@ class SongTile extends StatelessWidget {
               ],
             ),
       onTap: onTap ?? () => _onTap(context),
+    );
+    // Like the reference app: dragging a song to the right queues it.
+    return SwipeActions(
+      right: SwipeAction(
+        icon: Icons.queue_music,
+        label: 'Dodaj do kolejki',
+        onTriggered: () => addToQueue(context, hit),
+      ),
+      child: tile,
     );
   }
 }
@@ -285,7 +332,7 @@ class SourceIcons extends StatelessWidget {
   }
 }
 
-/// A song's ⋮ (search, Ostatnie): "Dodaj do kolejki", the rest are dummies like in the reference app.
+/// A song's ⋮ (search, Ostatnie): "Dodaj do kolejki", "Odtwórz jako następny", the rest are dummies like in the reference app.
 class SongMenuButton extends StatelessWidget {
   const SongMenuButton({super.key, required this.hit, required this.idPrefix});
 
@@ -313,6 +360,11 @@ class SongMenuButton extends StatelessWidget {
             Icons.queue_music,
             'Dodaj do kolejki',
             onTap: () => addToQueue(context, hit),
+          ),
+          MenuSheetEntry(
+            Icons.playlist_play,
+            'Odtwórz jako następny',
+            onTap: () => playNextInQueue(context, hit),
           ),
           const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
           const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),

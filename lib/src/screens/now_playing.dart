@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
+import '../widgets/queue_toast.dart';
 import '../theme_controller.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/share_sheet.dart';
@@ -178,31 +180,40 @@ class MiniPlayer extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(8, 8, 4, 6),
                     child: Row(
                       children: [
-                        SongCover(cover: track.cover, size: 40),
-                        const SizedBox(width: 10),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                track.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: AppFontSize.body,
-                                  fontWeight: FontWeight.bold,
+                          child: _SwipeTracks(
+                            child: Row(
+                              children: [
+                                SongCover(cover: track.cover, size: 40),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        track.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: AppFontSize.body,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        track.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.small,
+                                          color: palette.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.small,
-                                  color: palette.textSecondary,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                         IconButton(
@@ -223,6 +234,95 @@ class MiniPlayer extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The mini player's song: dragged sideways like in the reference app — left for the next song,
+/// right for the previous one (always that song, not the start of this one). Past a quarter of
+/// its width it slides out and the new song slides in from the other side; without a song to
+/// go to it only gives a little and springs back.
+class _SwipeTracks extends StatefulWidget {
+  const _SwipeTracks({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SwipeTracks> createState() => _SwipeTracksState();
+}
+
+class _SwipeTracksState extends State<_SwipeTracks>
+    with SingleTickerProviderStateMixin {
+  late final _offset = AnimationController.unbounded(vsync: this);
+  double _drag = 0;
+  double _width = 0;
+
+  static const _slide = Duration(milliseconds: 160);
+
+  bool _can(double drag, PlaybackQueue queue) =>
+      drag < 0 ? queue.hasNext : queue.hasPrevious;
+
+  void _update(DragUpdateDetails details, PlaybackQueue queue) {
+    _drag += details.primaryDelta!;
+    // Nowhere to go that way: it only gives a little.
+    _offset.value = _can(_drag, queue) ? _drag : _drag * 0.2;
+  }
+
+  Future<void> _end(PlaybackQueue queue) async {
+    final drag = _drag;
+    _drag = 0;
+    if (drag.abs() < _width / 4 || !_can(drag, queue)) {
+      await _offset.animateTo(0, duration: _slide, curve: Curves.easeOut);
+      return;
+    }
+    final next = drag < 0;
+    await _offset.animateTo(
+      next ? -_width : _width,
+      duration: _slide,
+      curve: Curves.easeIn,
+    );
+    if (!mounted) return;
+    unawaited(
+      runQueueAction(
+        context,
+        (onStatus) => next
+            ? queue.next(onStatus: onStatus)
+            : queue.previous(restart: false, onStatus: onStatus),
+      ),
+    );
+    _offset.value = next ? _width : -_width;
+    await _offset.animateTo(0, duration: _slide, curve: Curves.easeOut);
+  }
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final queue = PlaybackQueueScope.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _width = constraints.maxWidth;
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragUpdate: (d) => _update(d, queue),
+          onHorizontalDragEnd: (_) => _end(queue),
+          onHorizontalDragCancel: () => _end(queue),
+          child: ClipRect(
+            child: AnimatedBuilder(
+              animation: _offset,
+              child: widget.child,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(_offset.value, 0),
+                child: child,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -258,6 +358,7 @@ class NowPlayingScreen extends StatelessWidget {
 
   /// Opens on the root navigator, so it covers the bottom bar like in the reference app.
   static Future<void> open(BuildContext context) {
+    QueueToastScope.maybeOf(context)?.hide();
     return Navigator.of(context, rootNavigator: true).push(
       PageRouteBuilder<void>(
         pageBuilder: (_, _, _) => const NowPlayingScreen(),

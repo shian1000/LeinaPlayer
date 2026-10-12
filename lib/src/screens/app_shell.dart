@@ -15,6 +15,7 @@ import '../data/youtube_search.dart';
 import '../playback/playback_queue.dart';
 import '../playback/track_player.dart';
 import '../theme.dart';
+import '../widgets/queue_toast.dart';
 import '../widgets/song_tile.dart';
 import 'create_sheet.dart';
 import 'home_screen.dart';
@@ -68,6 +69,7 @@ class AppShellState extends State<AppShell> {
   );
   int _currentTab = 0;
   StreamSubscription<String>? _linksSub;
+  final _toast = QueueToast();
 
   @override
   void initState() {
@@ -78,6 +80,7 @@ class AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _linksSub?.cancel();
+    _toast.dispose();
     super.dispose();
   }
 
@@ -261,29 +264,47 @@ class AppShellState extends State<AppShell> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBack();
       },
-      child: Scaffold(
-        key: _scaffoldKey,
-        drawer: ProfileDrawer(
-          onOpenSettings: _openSettings,
-          onOpenRecents: _openRecents,
-        ),
-        body: IndexedStack(
-          index: _currentTab,
-          children: [
-            for (var i = 0; i < _tabRoots.length; i++)
-              Navigator(
-                key: _navigatorKeys[i],
-                onGenerateRoute: (_) =>
-                    MaterialPageRoute<void>(builder: (_) => _tabRoots[i]),
+      child: QueueToastScope(
+        notifier: _toast,
+        child: Scaffold(
+          key: _scaffoldKey,
+          drawer: ProfileDrawer(
+            onOpenSettings: _openSettings,
+            onOpenRecents: _openRecents,
+          ),
+          body: Stack(
+            children: [
+              IndexedStack(
+                index: _currentTab,
+                children: [
+                  for (var i = 0; i < _tabRoots.length; i++)
+                    Navigator(
+                      key: _navigatorKeys[i],
+                      onGenerateRoute: (_) =>
+                          MaterialPageRoute<void>(builder: (_) => _tabRoots[i]),
+                    ),
+                ],
               ),
-          ],
-        ),
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const MiniPlayer(),
-            _BottomBar(currentIndex: _currentTab, onTap: _onTabTapped),
-          ],
+              // Right above the mini player, over the screen.
+              const Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: QueueToastView(),
+              ),
+            ],
+          ),
+          // Like the reference app: touching the mini player (or the tabs) clears the note.
+          bottomNavigationBar: Listener(
+            onPointerDown: (_) => _toast.hide(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MiniPlayer(),
+                _BottomBar(currentIndex: _currentTab, onTap: _onTabTapped),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -28,8 +28,10 @@ phone files and streams with `just_audio`, behind a small `AudioBackend` interfa
 fake; the backend is created on first play. `MediaSession` (an `audio_service` handler created in
 `main()`) adds the media notification with previous/next and the foreground service that keeps
 music playing in the background. `PlaybackQueue` (`playback_queue.dart`, via
-`PlaybackQueueScope`) holds what plays next (context, shuffle, added songs; shown by
-`queue_screen.dart`), plays each song through `TrackPlayer` (`track_player.dart`) and caches the
+`PlaybackQueueScope`) is one list — played, current, upcoming — whose entries each carry the
+`QueueOrigin` they were queued from (a playlist or search; none for a single song added by hand),
+which the player, history and "Otwórz w YouTube" read; tapping Play replaces all of it, shuffle
+only mixes the "main" songs (shown and reordered by `queue_screen.dart`), plays each song through `TrackPlayer` (`track_player.dart`) and caches the
 next few ahead. Which source plays a song is the
 user's order
 (`SourceSettings.playbackOrder`, `lib/src/data/source_settings.dart`, via `SourceSettingsScope`).

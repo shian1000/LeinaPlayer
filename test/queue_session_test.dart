@@ -96,7 +96,7 @@ void main() {
         playlistId: 7,
         playlistName: 'Do auta',
       );
-      await before.queue.add(_file('x'));
+      await before.queue.add([_file('x')]);
       before.backend.at(const Duration(seconds: 42));
       await flush();
       await before.player.togglePlay(); // pause: saved
@@ -120,7 +120,8 @@ void main() {
         reason: 'nothing loaded until play',
       );
       expect([for (final e in after.queue.upcoming) e.hit.title], ['x', 'c']);
-      expect(after.queue.playlistId, 7);
+      expect(after.queue.currentEntry?.origin?.playlistId, 7);
+      expect(after.queue.hasPrevious, isTrue, reason: 'a played before b');
 
       await after.player.togglePlay();
       expect(after.backend.opened, ['/music/b.mp3']);
@@ -139,7 +140,7 @@ void main() {
       playlistId: 3,
       playlistName: 'P',
     );
-    await a.queue.add(_file('x'));
+    await a.queue.add([_file('x')]);
     await a.queue.next();
     await flush();
     expect(

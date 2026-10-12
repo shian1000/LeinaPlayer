@@ -34,7 +34,11 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   the system's media controls (`MediaSession`, an `audio_service` handler); previous/next go to
   the queue like the full player's buttons. Headset and car buttons work too.
 - Mini player — appears above the bottom bar once something plays: cover, title, artist,
-  play/pause, thin progress line. After the app restarts it shows the last song paused where it
+  play/pause, thin progress line. Dragging the song (cover and titles) sideways, like the
+  reference app (**implemented**): left — the next song, right — the previous one (always that
+  song, not the start of this one, unlike "Poprzedni"); past a quarter of its width it slides
+  out and the new one slides in; with nothing that way it only gives a little and springs back.
+  After the app restarts it shows the last song paused where it
   was (like the reference app); play carries on from there, with the same queue
   (`QueueSession`). Tapping it **→ full player** (slides up, covers the bottom bar):
   - Header: ⌄ (collapse), "Odtwarzanie z wyników wyszukiwania / „<query>” w wyszukiwarce",
@@ -47,23 +51,37 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   - Losowo (**implemented**: toggles shuffle, green while on — see the queue below), Poprzedni (**implemented**: within the first 5 s the previous song
     in the queue, otherwise — or with nothing before it — the song from the start), play/pause
     (**implemented**), Następny (**implemented**: the next song in the queue; disabled at its
-    end), `Odtwarzacz › Wyłącznik czasowy`.
-  - Play queue (`PlaybackQueue`): tapping a playlist track queues the whole playlist (the
-    "context") at that track; a search result queues just that song. Songs added with "Dodaj do
-    kolejki" (⋮ of a search result or playlist track) play next, before the rest of the context,
-    and stay queued when a new context starts; with nothing playing the added song starts at
-    once. Shuffle on: every other context song follows the current one in random order (also
-    those listed before it); off: back to the context's order after the current song. When a
-    song ends the next one plays, skipping songs that can't be played (without opening the
-    YouTube app). After each song starts, the next N songs in play order are cached (see
-    Oszczędzanie danych › Pamięć podręczna › Kolejka).
+    end), `Odtwarzacz › Wyłącznik czasowy`. "Poprzedni" walks back through the queue (what
+    played before), whatever playlist each song was queued from.
+  - Play queue (`PlaybackQueue`): one list — what played, the song playing, what comes next.
+    Tapping a playlist track (or Odtwórz) replaces the **whole** queue, songs added by hand
+    too, with that playlist at that track (its "main" songs); a search result with just that
+    song. Each queue entry remembers where it was queued from (`QueueOrigin`: a playlist, with
+    its YouTube list, or a search) — so the full player's "Odtwarzanie z…", the history and
+    "Otwórz w YouTube" follow the song playing. A whole playlist added from its ⋮ keeps its
+    origin; a single song added from its ⋮ has none, even if it's on a playlist (user's
+    decision). "Odtwórz jako następny" puts songs right after the current one; "Dodaj do
+    kolejki" after the songs added (or moved) before, ahead of the rest of the main songs; with
+    nothing playing the first one starts at once. Shuffle on: the main songs not played yet
+    (also those listed before the tapped one) take the main songs' places in random order;
+    off: back to the playlist order after the main song played last; songs added or moved by
+    hand stay where they are. When a song ends the next one plays, skipping songs that can't
+    be played (without opening the YouTube app). After each song starts, the next N songs are
+    cached (see Oszczędzanie danych › Pamięć podręczna › Kolejka). A queue saved by an older
+    version is converted on start.
   - `Odtwarzacz › Urządzenia`, Udostępnij (**→ Udostępnij utwór**, see below; IDs
     `Odtwarzacz › Udostępnij › …`), Kolejka **→ Kolejka**
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
-    e.g. by caching ahead): "Teraz odtwarzane", "Następne w kolejce" (added
-    songs, with "Wyczyść kolejkę"), "Następne z: <playlist / search>" (the rest in play order),
-    each row with "Usuń z kolejki" (⊖); tapping a row plays it (added songs before it are
-    dropped, context songs before it count as played). "Losowo: wł./wył." at the bottom.
+    e.g. by caching ahead): "Teraz odtwarzane", then everything after it with a heading over
+    each run of songs queued from the same place: "Następne w kolejce" (single songs added by
+    hand), "Z playlisty: <name>" (a playlist added as a whole), "Następne z: <playlist /
+    „query” w wyszukiwarce>" (the main songs). "Wyczyść kolejkę" on the first heading of added
+    songs drops everything added by hand. Each row has a drag handle (≡) to move it anywhere —
+    it keeps its origin, and shuffle no longer moves it. Dragging a row left takes it out
+    ("Usunięto z kolejki" with Cofnij — the reference app does the same), right makes it play
+    next ("Usunięto z kolejki" is the screen's own SnackBar — it goes after 4 s, even with
+    Cofnij, and with the screen). Tapping a row plays it (added songs before it are dropped, main songs before it
+    count as played). "Losowo: wł./wył." at the bottom.
 
 ## Bottom navigation (`lib/src/screens/app_shell.dart`)
 
@@ -305,9 +323,22 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   - "Playlisty w Bibliotece: N" (while "Wyszukuj playlisty" is on): Biblioteka playlists whose
     name or owner contain every word, as you type, above the songs; tapping one opens it.
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
-    <pozycja>`: Dodaj do kolejki (**implemented**), `Dodaj do playlisty`, `Przejdź do albumu`,
+    <pozycja>`: Dodaj do kolejki (**implemented**), Odtwórz jako następny (**implemented**),
+    `Dodaj do playlisty`, `Przejdź do albumu`,
     `Przejdź do wykonawców`, Udostępnij (**→ Udostępnij utwór**, below). The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`).
+  - Gestures on song rows (search results — YouTube ones too —, playlists, Ostatnie, every
+    `SongTile`; `SwipeActions` in `swipe_actions.dart`): dragging a row right adds the song to
+    the queue, like the reference app — past a quarter of the row (at most 120 px) the strip
+    under it fills with the accent colour and the phone ticks; letting go there adds it, the
+    row slides back either way. Dragging left does nothing yet (the reference app adds the
+    song to Polubione utwory, which the app doesn't have).
+  - Adding to the queue (gesture, ⋮ of a song or playlist) says so in a note right above the
+    mini player, like the reference app's (`QueueToast` in `queue_toast.dart`, not a
+    SnackBar): just "Dodano do kolejki" / "Zagra jako następny" (a playlist: "następna"),
+    no title, short like the reference app (user's wish), with **Otwórz**
+    (→ Kolejka). It goes after 3 s, or at once when the mini player or the bottom bar is
+    touched, or the full player / Kolejka opens — it never stays over the full player.
   - **Udostępnij utwór** (`showSongShareSheet` in `share_sheet.dart`; also from the playlist
     track ⋮ and the full player): a card with the song's cover, title and artist over four round
     buttons — `<prefix> › Udostępnij › Leina Radio` (dummy), YouTube (**implemented**: the
@@ -341,7 +372,7 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   playable, shareable. Instead of the Pobierz icon and the Dodaj/Edytuj/Sortuj chips there's one
   chip **"Zapisz w Bibliotece"** ("Zaktualizuj w Bibliotece" when it was imported before): it
   imports the fetched playlist and the screen becomes the saved one. Its ⋮ has only
-  Udostępnij, the same save entry and "Wyświetl utwory, których nie ma w bazie danych". A failed
+  Udostępnij, Dodaj do kolejki / Odtwórz jako następną, the same save entry and "Wyświetl utwory, których nie ma w bazie danych". A failed
   fetch shows the error and "Spróbuj ponownie".
 
 - Transparent app bar over the header; once the header scrolls away it turns solid and shows
@@ -355,7 +386,9 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   avatar + name (the YouTube channel / Spotify user; "YouTube"/"Spotify" when unknown), source icon
   (YouTube / Spotify) + "N utworów • X godz. Y min" (sum of the known lengths).
 - Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: **Udostępnij** (implemented, the
-  same sheet as the icon below), **`Usuń z
+  same sheet as the icon below), **Dodaj do kolejki** / **Odtwórz jako następną** (implemented:
+  the whole playlist into the queue, remembered as played from it; also in a preview's ⋮),
+  **`Usuń z
   Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), `Dodaj do tej
   playlisty`, `Edytuj playlistę`, **Wyświetl utwory, których nie ma w bazie danych**
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
@@ -379,11 +412,11 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   unrecognised Spotify track has none (empty icon) and is searched on YouTube when played; the
   video found is remembered (full icon from then on). Opening the
   playlist that's playing jumps to the song playing, third row under the app bar (as far as the
-  list can scroll; `PlaybackQueue.currentContextIndex`).
+  list can scroll; the entry playing, when queued from this playlist, knows its place in it).
 - Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: Udostępnij (**→
   Udostępnij utwór**, see search), `Dodaj do
-  Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`, Dodaj do kolejki
-  (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
+  Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`, Dodaj do kolejki and
+  Odtwórz jako następny (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
 
 ## Utwórz sheet (`create_sheet.dart`)
 

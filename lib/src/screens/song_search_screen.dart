@@ -17,6 +17,7 @@ import '../data/youtube_search.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/swipe_actions.dart';
 import 'database_source_screen.dart';
 import 'playlist_screen.dart';
 import 'search_fields_sheet.dart';
@@ -607,7 +608,7 @@ class _YouTubeTile extends StatelessWidget {
       artistLabel: video.channel,
       videoId: video.id,
     );
-    return ListTile(
+    final tile = ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
       trailing: SongMenuButton(
         hit: hit,
@@ -641,6 +642,14 @@ class _YouTubeTile extends StatelessWidget {
               queue.start([hit], 0, searchQuery: query, onStatus: onStatus),
         );
       },
+    );
+    return SwipeActions(
+      right: SwipeAction(
+        icon: Icons.queue_music,
+        label: 'Dodaj do kolejki',
+        onTriggered: () => addToQueue(context, hit),
+      ),
+      child: tile,
     );
   }
 }

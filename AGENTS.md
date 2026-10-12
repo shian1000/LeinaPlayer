@@ -21,8 +21,10 @@ are still dummies that show `Atrapa: <ID>`, and Home shows static placeholder da
 far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `tag.db` from a remote
 or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)), scanning music
 folders on the phone into the phone's own `local.db`, song search over both databases, and
-playing phone files with a mini/full player, a play queue (playlists, "Dodaj do kolejki",
-shuffle, the queue screen, caching the next songs ahead; remembered across restarts) and a
+playing phone files with a mini/full player, a play queue (playlists, "Dodaj do kolejki" /
+"Odtwórz jako następny" for songs and whole playlists, each entry remembering the playlist it
+was queued from, shuffle, the queue screen with reordering and swipe-to-remove, caching the next
+songs ahead; remembered across restarts), dragging a song row right to queue it and a
 media notification with previous/next (keeps playing in the background); play history in
 "Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów)
@@ -78,7 +80,9 @@ flutter build apk            # build a release Android APK
   per-tab navigators.
 - `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers,
   `SongTile` — the song row with source icons used by search, playlists, the queue and history;
-  `PlayingBars` — the animated "playing" mark; `SongCover` — a song's album cover, with the cover
+  `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
+  queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
+  adding to the queue; `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `color_picker.dart`; `TextInputDialog` in `common.dart`;
   `showShareSheet` in `share_sheet.dart`).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
@@ -139,6 +143,9 @@ flutter build apk            # build a release Android APK
 - Anything new the phone stores to work offline (a cache) gets its settings in the
   `cache_settings_screen.dart` ("Pamięć podręczna" — the only name for it in the UI, not
   "cache"), not on the screen of the feature that fills it (user's decision).
+- A `SnackBar` with an `action` stays until closed by hand in this Flutter version (`persist`
+  defaults to true) and floats over whatever is pushed on top — pass `persist: false`. Notes about
+  the queue use `QueueToast` above the mini player instead (Spotify-like, user's choice).
 - No comments explaining *what* code does; only *why*, when non-obvious.
 
 ## Testing & verification
@@ -151,7 +158,9 @@ flutter build apk            # build a release Android APK
 - For UI changes, actually run the app and look at it — a green test suite does not confirm the
   screen looks right. Use the `run-on-physical-phone` skill (release build on the USB Huawei, with
   the Gradle memory precautions) or `share-build-tailscale` for the user's Pixel 7a; check screens
-  with `adb exec-out screencap`. `uiautomator dump` hangs on screens with running animations
+  with `adb exec-out screencap`. To check a gesture mid-way, hold it with
+  `input motionevent DOWN/MOVE … ` and screenshot before `UP` (each adb call takes ~0.2 s, so
+  apps with long-press menus — Spotify — read it as a long press). `uiautomator dump` hangs on screens with running animations
   (e.g. while music plays) — use screenshots there. The Huawei runs Android 10, so background
   restrictions of Android 12+ (foreground-service starts, app freezing) only show on the Pixel;
   it can be reached remotely over Tailscale with wireless debugging (the user pairs; the pairing
