@@ -10,13 +10,33 @@ import '../widgets/queue_toast.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/swipe_actions.dart';
 
-/// "Kolejka", opened from the full player: the song playing, then everything after it, under
+/// "Kolejka", opened from the full player: the last few songs before the current one (above,
+/// scrolled to; tapping one goes back to it), the song playing, then everything after it, under
 /// a heading for each run of songs queued from the same place — songs added one by one, a
 /// playlist added as a whole, the playlist / results the queue was filled with. Tapping a song
 /// plays it (skipping the ones before it); the handle moves it; dragging a row left takes it out,
 /// right makes it play next.
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
+
+  /// How many of the songs before the current one are shown (user's choice).
+  static const previousShown = 5;
+
+  static const _nowPlayingKey = ValueKey('now playing');
+
+  /// A row being moved by its handle, lifted like in [ReorderableListView].
+  static Widget _liftedRow(
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) => AnimatedBuilder(
+    animation: animation,
+    builder: (context, child) => Material(
+      elevation: 6 * Curves.easeInOut.transform(animation.value),
+      child: child,
+    ),
+    child: child,
+  );
 
   static Future<void> open(BuildContext context) {
     QueueToastScope.maybeOf(context)?.hide();
@@ -78,48 +98,65 @@ class QueueScreen extends StatelessWidget {
           backgroundColor: palette.surface,
           title: const Text('Kolejka'),
         ),
-        body: ReorderableListView.builder(
-          buildDefaultDragHandles: false,
-          padding: const EdgeInsets.only(bottom: 24),
-          header: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _Heading('Teraz odtwarzane'),
-              if (current != null)
-                _QueueRow(hit: current, isCurrent: true)
-              else
-                const _Empty('Nic nie jest odtwarzane'),
-              if (upcoming.isEmpty)
-                const _Empty(
-                  'Po tym utworze nic więcej nie zagra. Dodaj coś przez '
-                  '„Dodaj do kolejki” w menu utworu albo przeciągając utwór '
-                  'w prawo.',
-                ),
-            ],
-          ),
-          itemCount: items.length,
-          onReorderItem: reorder,
-          itemBuilder: (context, i) {
-            final item = items[i];
-            if (item is QueueEntry) {
-              return _UpcomingRow(
-                key: ValueKey(item.key),
-                entry: item,
-                index: i,
-              );
-            }
-            final heading = item as ({String text, bool clear, int at});
-            return _Heading(
-              key: ValueKey('heading ${heading.at}'),
-              heading.text,
-              action: heading.clear
-                  ? TextButton(
-                      onPressed: queue.clearAdded,
-                      child: const Text('Wyczyść kolejkę'),
-                    )
-                  : null,
-            );
-          },
+        body: CustomScrollView(
+          // Opens at the song playing; the songs before it are above, scrolled to.
+          center: _nowPlayingKey,
+          slivers: [
+            // Before the centre the list grows upwards: the newest song is first.
+            SliverList.list(
+              children: [
+                for (final entry in queue.history.reversed.take(previousShown))
+                  _PreviousRow(key: ValueKey(entry.key), entry: entry),
+                if (queue.hasPrevious) const _Heading('Poprzednie'),
+              ],
+            ),
+            SliverToBoxAdapter(
+              key: _nowPlayingKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _Heading('Teraz odtwarzane'),
+                  if (current != null)
+                    _QueueRow(hit: current, isCurrent: true)
+                  else
+                    const _Empty('Nic nie jest odtwarzane'),
+                  if (upcoming.isEmpty)
+                    const _Empty(
+                      'Po tym utworze nic więcej nie zagra. Dodaj coś przez '
+                      '„Dodaj do kolejki” w menu utworu albo przeciągając utwór '
+                      'w prawo.',
+                    ),
+                ],
+              ),
+            ),
+            SliverReorderableList(
+              itemCount: items.length,
+              onReorderItem: reorder,
+              proxyDecorator: _liftedRow,
+              itemBuilder: (context, i) {
+                final item = items[i];
+                if (item is QueueEntry) {
+                  return _UpcomingRow(
+                    key: ValueKey(item.key),
+                    entry: item,
+                    index: i,
+                  );
+                }
+                final heading = item as ({String text, bool clear, int at});
+                return _Heading(
+                  key: ValueKey('heading ${heading.at}'),
+                  heading.text,
+                  action: heading.clear
+                      ? TextButton(
+                          onPressed: queue.clearAdded,
+                          child: const Text('Wyczyść kolejkę'),
+                        )
+                      : null,
+                );
+              },
+            ),
+            const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+          ],
         ),
         bottomNavigationBar: SafeArea(
           child: Padding(
@@ -189,6 +226,27 @@ class _Empty extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     child: Text(text, style: TextStyle(color: context.palette.textSecondary)),
   );
+}
+
+class _PreviousRow extends StatelessWidget {
+  const _PreviousRow({super.key, required this.entry});
+
+  final QueueEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final queue = PlaybackQueueScope.of(context);
+    return Opacity(
+      opacity: 0.6,
+      child: _QueueRow(
+        hit: entry.hit,
+        onTap: () => runQueueAction(
+          context,
+          (onStatus) => queue.jumpBack(entry, onStatus: onStatus),
+        ),
+      ),
+    );
+  }
 }
 
 class _UpcomingRow extends StatelessWidget {

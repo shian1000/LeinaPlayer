@@ -72,7 +72,12 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   - `Odtwarzacz › Urządzenia`, Udostępnij (**→ Udostępnij utwór**, see below; IDs
     `Odtwarzacz › Udostępnij › …`), Kolejka **→ Kolejka**
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
-    e.g. by caching ahead): "Teraz odtwarzane", then everything after it with a heading over
+    e.g. by caching ahead): opens at "Teraz odtwarzane"; scrolled up, "Poprzednie" — the last
+    5 songs before it in the queue (what "Poprzedni" goes back through, so with a playlist
+    started mid-way also the songs listed before the tapped one; more than the reference app,
+    which shows none — user's choice; only the view is limited — trimming the queue's history
+    would cut "Poprzedni" short and lose songs when shuffle is turned off), dimmed, oldest first; tapping one plays it and puts the
+    songs after it, the current one too, back at the front of the queue. Then everything after it with a heading over
     each run of songs queued from the same place: "Następne w kolejce" (single songs added by
     hand), "Z playlisty: <name>" (a playlist added as a whole), "Następne z: <playlist /
     „query” w wyszukiwarce>" (the main songs). "Wyczyść kolejkę" on the first heading of added

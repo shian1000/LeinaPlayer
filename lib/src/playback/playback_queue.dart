@@ -152,6 +152,10 @@ class PlaybackQueue extends ChangeNotifier {
   /// Everything that plays after the current song, in order.
   List<QueueEntry> get upcoming => List.unmodifiable(_upcoming);
 
+  /// What "Poprzedni" goes back through, oldest first: the songs played before the current one,
+  /// and the main songs listed before the tapped one.
+  List<QueueEntry> get history => List.unmodifiable(_history);
+
   bool get hasNext => _upcoming.isNotEmpty;
   bool get hasPrevious => _history.isNotEmpty;
 
@@ -325,6 +329,21 @@ class PlaybackQueue extends ChangeNotifier {
     final current = _current;
     if (current != null) _history.add(current);
     _history.addAll(skipped.where(isMain));
+    _generation++;
+    return _play(entry, allowExternal: true, onStatus: onStatus);
+  }
+
+  /// Plays [entry] from [history] again; the songs after it, the current one too, go back to
+  /// the front of [upcoming] — as if "Poprzedni" was pressed that many times.
+  Future<PlayOutcome?> jumpBack(
+    QueueEntry entry, {
+    void Function(String status)? onStatus,
+  }) async {
+    final at = _history.indexOf(entry);
+    if (at < 0) return null;
+    final later = _history.sublist(at + 1);
+    _history.removeRange(at, _history.length);
+    _upcoming.insertAll(0, [...later, ?_current]);
     _generation++;
     return _play(entry, allowExternal: true, onStatus: onStatus);
   }

@@ -272,6 +272,18 @@ void main() {
     expect(titles(queue.upcoming), ['d']);
   });
 
+  test('going back to a song played before', () async {
+    await queue.start([_file('a'), _file('b'), _file('c'), _file('d')], 2);
+    await queue.add([_file('x')]);
+    await queue.next();
+    expect(titles(queue.history), ['a', 'b', 'c']);
+
+    await queue.jumpBack(queue.history[1]);
+    expect(backend.opened.last, '/music/b.mp3');
+    expect(titles(queue.history), ['a']);
+    expect(titles(queue.upcoming), ['c', 'x', 'd']);
+  });
+
   test('moving songs; a moved song keeps where it came from', () async {
     await queue.start(
       [_file('a'), _file('b'), _file('c'), _file('d')],
@@ -505,6 +517,38 @@ void main() {
       expect(find.text('Cofnij'), findsNothing);
     },
   );
+
+  testWidgets('"Kolejka": the last 5 songs before the current one, above it; '
+      'tapping one goes back to it', (tester) async {
+    await tester.runAsync(() async {
+      await queue.start([for (var i = 0; i < 8; i++) _file('$i')], 7);
+    });
+    await showQueue(tester);
+    // Opens at the song playing; the earlier songs are above, out of sight.
+    expect(
+      tester.getTopLeft(find.text('Teraz odtwarzane')).dy,
+      lessThan(tester.getTopLeft(find.byType(AppBar)).dy + 150),
+    );
+    expect(find.text('Poprzednie').hitTestable(), findsNothing);
+
+    await tester.drag(find.text('Teraz odtwarzane'), const Offset(0, 1500));
+    await settle(tester);
+    expect(find.text('Poprzednie'), findsOneWidget);
+    for (final shown in ['2', '3', '4', '5', '6']) {
+      expect(find.text(shown), findsOneWidget);
+    }
+    expect(find.text('1'), findsNothing);
+    expect(
+      tester.getCenter(find.text('2')).dy,
+      lessThan(tester.getCenter(find.text('6')).dy),
+      reason: 'oldest first',
+    );
+
+    await tester.tap(find.text('5'));
+    await tester.pump();
+    expect(backend.opened.last, '/music/5.mp3');
+    expect(titles(queue.upcoming), ['6', '7']);
+  });
 
   testWidgets('"Kolejka": the handle moves a song', (tester) async {
     await tester.runAsync(() async {
