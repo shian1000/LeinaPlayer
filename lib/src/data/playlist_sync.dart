@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+
+import 'custom_covers.dart';
 
 /// A new playlist id shared with MusicDatabase (`playlists.uid` on both sides): a random UUID v4.
 String newPlaylistUid() {
@@ -64,6 +67,45 @@ class PlaylistSyncClient {
         }),
       );
 
+  Uri _coverUri(String hash) =>
+      server.resolve('/users/${Uri.encodeComponent(userName)}/covers/$hash');
+
+  /// Uploads a cover picture ([ADR 0009](../../../docs/decisions/0009-cover-sync.md)); 200 or
+  /// 201 when MusicDatabase has it.
+  Future<int> putCover(
+    String hash,
+    List<int> bytes, {
+    required bool jpeg,
+  }) async {
+    final request = await _client
+        .openUrl('PUT', _coverUri(hash))
+        .timeout(connectTimeout);
+    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+    request.headers.contentType = ContentType('image', jpeg ? 'jpeg' : 'png');
+    request.contentLength = bytes.length;
+    request.add(bytes);
+    final response = await request.close().timeout(answerTimeout);
+    await response.drain<void>().timeout(answerTimeout);
+    return response.statusCode;
+  }
+
+  /// Downloads a cover picture: its bytes when MusicDatabase has it (200), else `null`.
+  Future<({List<int> bytes, bool jpeg})?> getCover(String hash) async {
+    final request = await _client
+        .openUrl('GET', _coverUri(hash))
+        .timeout(connectTimeout);
+    request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+    final response = await request.close().timeout(answerTimeout);
+    final bytes = await response
+        .fold(BytesBuilder(copy: false), (b, chunk) => b..add(chunk))
+        .timeout(answerTimeout);
+    if (response.statusCode != HttpStatus.ok) return null;
+    return (
+      bytes: bytes.takeBytes(),
+      jpeg: response.headers.contentType?.subType == 'jpeg',
+    );
+  }
+
   /// The user as MusicDatabase sees them now: `{"username", "permissions": [...]}`.
   Future<SyncAnswer> user() =>
       _call('GET', server.resolve('/users/${Uri.encodeComponent(userName)}'));
@@ -102,6 +144,58 @@ class PlaylistSyncClient {
   }
 
   void close() => _client.close(force: true);
+}
+
+/// MusicDatabase refused a PUT naming a cover it has no picture of yet.
+bool isCoverMissing(SyncAnswer answer) =>
+    answer.status == HttpStatus.badRequest &&
+    answer.body is Map &&
+    (answer.body! as Map)['error'] == 'cover_missing';
+
+/// PUTs [body] (a playlist, mood or global mood cover with its `cover` hash) as [id]. The
+/// picture is uploaded only when MusicDatabase says it hasn't got it, then the PUT goes once
+/// more — most PUTs keep a cover sent before. A picture lost on the phone isn't named, so the
+/// stored cover stays — unless the key is [required] (a global mood's cover), which stays refused.
+Future<SyncAnswer> putWithCover(
+  PlaylistSyncClient client,
+  CustomCovers? covers,
+  String id,
+  Map<String, Object?> body, {
+  bool required = false,
+}) async {
+  final answer = await client.put(id, body);
+  final hash = body['cover'];
+  if (!isCoverMissing(answer) || hash is! String) return answer;
+  final picture = await covers?.read(hash);
+  if (picture == null) {
+    return required ? answer : client.put(id, {...body}..remove('cover'));
+  }
+  final status = await client.putCover(hash, picture.bytes, jpeg: picture.jpeg);
+  if (status != HttpStatus.ok && status != HttpStatus.created) {
+    debugPrint('Uploading cover $hash: HTTP $status');
+    return answer;
+  }
+  return client.put(id, body);
+}
+
+/// Downloads the covers among [hashes] the phone hasn't got; one that fails waits for the
+/// next sync.
+Future<void> fetchCovers(
+  PlaylistSyncClient client,
+  CustomCovers? covers,
+  Iterable<String> hashes,
+) async {
+  if (covers == null) return;
+  for (final hash in hashes.toSet()) {
+    if (covers.fileFor(hash) != null) continue;
+    try {
+      final picture = await client.getCover(hash);
+      if (picture == null) continue;
+      await covers.store(hash, picture.bytes, jpeg: picture.jpeg);
+    } catch (e) {
+      debugPrint('Downloading cover $hash failed: $e');
+    }
+  }
 }
 
 /// How the last [PlaylistLibrary.sync] went.

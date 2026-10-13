@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/custom_covers.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
@@ -12,6 +13,7 @@ import 'package:music_database_app/src/data/youtube_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../support/fake_covers.dart';
 import 'fixtures.dart';
 
 /// MusicDatabase's playlist endpoints, with its rules (its `playlist_sync.py`) cut down to
@@ -20,6 +22,7 @@ class FakePlaylistServer {
   late HttpServer _server;
   final playlists = <String, Map<String, Object?>>{};
   final requests = <String>[];
+  final covers = FakeCoverBlobs();
   int counter = 0;
   String token = 'tok';
   String user = 'owner';
@@ -39,6 +42,7 @@ class FakePlaylistServer {
       'source': null,
       'source_id': null,
       'source_owner': null,
+      'cover': null,
       'created_at': playlist['updated_at'],
       ...playlist,
       'revision': ++counter,
@@ -50,7 +54,7 @@ class FakePlaylistServer {
 
   Future<void> _handle(HttpRequest request) async {
     requests.add('${request.method} ${request.uri.path}');
-    final body = await utf8.decodeStream(request);
+    final raw = await readBody(request);
     final response = request.response;
     void reply(int status, [Object? json]) {
       response.statusCode = status;
@@ -68,6 +72,8 @@ class FakePlaylistServer {
         'Bearer $token') {
       return reply(HttpStatus.unauthorized);
     }
+    if (covers.handle(request, raw)) return;
+    final body = textOf(raw);
     final parts = request.uri.pathSegments;
     if (parts.length < 3 || parts[0] != 'users' || parts[2] != 'playlists') {
       return reply(HttpStatus.notFound);
@@ -93,6 +99,9 @@ class FakePlaylistServer {
     final uid = parts[3];
     if (request.method == 'PUT') {
       final sent = jsonDecode(body) as Map<String, Object?>;
+      if (covers.missing(sent) case final missing?) {
+        return reply(HttpStatus.badRequest, missing);
+      }
       var stored = playlists[uid];
       if (stored == null &&
           sent['source'] != null &&
@@ -113,6 +122,7 @@ class FakePlaylistServer {
       }
       final keptUid = stored?['uid'] ?? uid;
       final saved = {
+        'cover': stored?['cover'],
         ...sent..remove('base_revision'),
         'uid': keptUid,
         'revision': ++counter,
@@ -170,6 +180,7 @@ void main() {
   late LocalLibrary local;
   late YouTubeLibrary youTube;
   late PlaylistLibrary playlists;
+  late CustomCovers covers;
   late FakePlaylistServer server;
   String? userName;
   String? token;
@@ -193,6 +204,8 @@ void main() {
     );
     youTube = YouTubeLibrary(local.database, storageRoot: () async => root);
     await youTube.load();
+    covers = CustomCovers(directory: () async => Directory('${root.path}/c'));
+    await covers.load();
     playlists = PlaylistLibrary(
       local.database,
       catalog,
@@ -200,6 +213,7 @@ void main() {
       now: () => clock,
       userName: () => userName,
       authToken: () => token,
+      covers: covers,
     )..onUnauthorized = () => unauthorized++;
     await playlists.load();
     server = FakePlaylistServer();
@@ -209,6 +223,7 @@ void main() {
   tearDown(() async {
     await server.close();
     playlists.dispose();
+    covers.dispose();
     youTube.dispose();
     local.dispose();
     catalog.dispose();
@@ -257,6 +272,61 @@ void main() {
     server.requests.clear();
     await syncNow();
     expect(server.requests, ['GET /users/owner/playlists']);
+  });
+
+  test('a picked cover goes with its playlist; the picture only when the server lacks it', () async {
+    final picture = [1, 2, 3, 4];
+    final hash = CustomCovers.hashOf(picture);
+    await covers.store(hash, picture, jpeg: false);
+    final id = (await playlists.importYouTube(data(['a']))).playlist.id;
+    await syncNow();
+
+    clock = clock.add(const Duration(minutes: 1));
+    await playlists.setCover(id, hash);
+    expect(playlists.byId(id)!.cover, hash);
+    server.requests.clear();
+    await syncNow();
+    expect(playlists.lastSync!.problem, isNull);
+    expect(server.playlists.values.single['cover'], hash);
+    expect(server.covers.blobs[hash], picture);
+    expect(server.requests, [
+      'GET /users/owner/playlists',
+      'PUT /users/owner/playlists/${server.playlists.keys.single}',
+      'PUT /users/owner/covers/$hash',
+      'PUT /users/owner/playlists/${server.playlists.keys.single}',
+    ]);
+
+    // Another change sends the same cover without its picture.
+    clock = clock.add(const Duration(minutes: 1));
+    await playlists.importYouTube(data(['a', 'b']));
+    server.requests.clear();
+    await syncNow();
+    expect(server.requests.where((r) => r.contains('/covers/')), isEmpty);
+    expect(server.playlists.values.single['cover'], hash);
+
+    clock = clock.add(const Duration(minutes: 1));
+    await playlists.setCover(id, null);
+    await syncNow();
+    expect(server.playlists.values.single['cover'], isNull);
+    expect(await playlists.usedCovers(), isEmpty);
+  });
+
+  test('a cover picked on another phone is downloaded', () async {
+    final picture = [9, 8, 7];
+    final hash = CustomCovers.hashOf(picture);
+    server.covers.blobs[hash] = picture;
+    server.add({
+      'uid': 'other-0001',
+      'name': 'Z drugiego telefonu',
+      'cover': hash,
+      'updated_at': 1000,
+      'tracks': const [],
+    });
+    await syncNow();
+
+    expect(playlists.playlists.single.cover, hash);
+    expect(await covers.fileFor(hash)!.readAsBytes(), picture);
+    expect(await playlists.usedCovers(), {hash});
   });
 
   test('receives the server\'s playlists, and their deletion', () async {

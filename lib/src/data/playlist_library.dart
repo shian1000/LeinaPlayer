@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'custom_covers.dart';
 import 'playlist_sync.dart';
 import 'song_catalog.dart';
 import 'spotify_playlist.dart';
@@ -35,6 +36,7 @@ class PlaylistSummary {
     this.source,
     this.sourceId,
     this.account,
+    this.cover,
   });
 
   final int id;
@@ -52,6 +54,9 @@ class PlaylistSummary {
 
   /// The MusicDatabase user whose playlists it's synced with; `null` = only on this phone.
   final String? account;
+
+  /// The picked cover's hash ([CustomCovers]); `null`: a collage of its tracks' covers.
+  final String? cover;
 
   /// The YouTube playlist it was imported from (`list=` in its address).
   String? get youTubeId => source == PlaylistSource.youtube ? sourceId : null;
@@ -143,12 +148,16 @@ class PlaylistLibrary extends ChangeNotifier {
     DateTime Function()? now,
     String? Function()? userName,
     String? Function()? authToken,
+    this.covers,
   }) : _now = now ?? DateTime.now,
        _userName = userName ?? (() => null),
        _authToken = authToken ?? (() => null);
 
   final Future<Database> Function() _database;
   final SongCatalog _catalog;
+
+  /// Where cover pictures are kept, sent from and downloaded to; `null` in tests without them.
+  final CustomCovers? covers;
   final YouTubeLibrary _youTube;
   final DateTime Function() _now;
 
@@ -182,6 +191,7 @@ class PlaylistLibrary extends ChangeNotifier {
     final scope = _scope('p.');
     final rows = await (await _database()).rawQuery('''
       SELECT p.id, p.name, p.owner, p.updated_at, p.source, p.source_id, p.account,
+             p.cover_sha256,
              COUNT(t.position) AS tracks, COALESCE(SUM(t.duration_s), 0) AS seconds
       FROM playlists p LEFT JOIN playlist_tracks t ON t.playlist_id = p.id
       WHERE p.deleted_at IS NULL AND ${scope.where}
@@ -200,6 +210,7 @@ class PlaylistLibrary extends ChangeNotifier {
           source: PlaylistSource.values.asNameMap()[row['source']],
           sourceId: row['source_id'] as String?,
           account: row['account'] as String?,
+          cover: row['cover_sha256'] as String?,
         ),
     ];
     final lead = <int, List<PlaylistTrack>>{};
@@ -249,6 +260,36 @@ class PlaylistLibrary extends ChangeNotifier {
   /// without reading the whole playlist.
   List<PlaylistTrack> leadTracks(int playlistId) =>
       _leadTracks[playlistId] ?? const [];
+
+  /// The Biblioteka playlist [id] as now loaded, if it's still there.
+  PlaylistSummary? byId(int id) =>
+      _playlists.where((p) => p.id == id).firstOrNull;
+
+  /// Gives the playlist the picked cover [hash] (`null`: back to the collage); synced like a
+  /// rename.
+  Future<void> setCover(int playlistId, String? hash) async {
+    await (await _database()).update(
+      'playlists',
+      {
+        'cover_sha256': hash,
+        'updated_at': _now().millisecondsSinceEpoch,
+        'dirty': 1,
+      },
+      where: 'id = ?',
+      whereArgs: [playlistId],
+    );
+    await load();
+    onChanged?.call();
+  }
+
+  /// Every cover hash a playlist on the phone refers to (any account's), so [CustomCovers.prune]
+  /// keeps them.
+  Future<Set<String>> usedCovers() async => {
+    for (final row in await (await _database()).rawQuery(
+      'SELECT DISTINCT cover_sha256 FROM playlists WHERE cover_sha256 IS NOT NULL',
+    ))
+      row['cover_sha256']! as String,
+  };
 
   /// The Biblioteka playlist imported from [source]'s playlist [sourceId], if there is one.
   PlaylistSummary? saved(PlaylistSource source, String sourceId) => _playlists
@@ -554,7 +595,7 @@ class PlaylistLibrary extends ChangeNotifier {
         whereArgs: [playlistId],
       );
       await txn.rawUpdate(
-        'UPDATE playlists SET deleted_at = ?, dirty = 0 '
+        'UPDATE playlists SET deleted_at = ?, dirty = 0, cover_sha256 = NULL '
         'WHERE id = ? AND account IS NOT NULL',
         [_now().millisecondsSinceEpoch, playlistId],
       );
@@ -724,7 +765,9 @@ class PlaylistLibrary extends ChangeNotifier {
       whereArgs: [user],
     )) {
       final id = row['id']! as int;
-      final answer = await client.put(
+      final answer = await putWithCover(
+        client,
+        covers,
         row['uid']! as String,
         await _toJson(db, row),
       );
@@ -754,6 +797,15 @@ class PlaylistLibrary extends ChangeNotifier {
         await _applyRemote(txn, remote, user, intoId: id);
       });
     }
+    await fetchCovers(client, covers, [
+      for (final row in await db.query(
+        'playlists',
+        columns: ['cover_sha256'],
+        where: 'account = ? AND cover_sha256 IS NOT NULL',
+        whereArgs: [user],
+      ))
+        row['cover_sha256']! as String,
+    ]);
     return problem;
   }
 
@@ -794,6 +846,7 @@ class PlaylistLibrary extends ChangeNotifier {
     'source': row['source'],
     'source_id': row['source_id'],
     'source_owner': row['owner'],
+    'cover': row['cover_sha256'],
     'created_at': row['created_at'],
     'updated_at': row['updated_at'],
     'tracks': [
@@ -863,6 +916,8 @@ class PlaylistLibrary extends ChangeNotifier {
       'source_id': remote['source_id'],
       'created_at': remote['created_at'],
       'updated_at': remote['updated_at'],
+      // A server from before covers says nothing about them.
+      if (remote.containsKey('cover')) 'cover_sha256': remote['cover'],
     };
     if (id != null) {
       await txn.update('playlists', values, where: 'id = ?', whereArgs: [id]);

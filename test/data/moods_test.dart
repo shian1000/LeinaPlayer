@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/custom_covers.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/moods.dart';
@@ -9,6 +10,7 @@ import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../support/fake_covers.dart';
 import 'fixtures.dart';
 
 /// MusicDatabase's mood endpoints (its `mood_sync.py`, `global_mood_log.py`), cut down to what
@@ -17,6 +19,11 @@ class FakeMoodServer {
   late HttpServer _server;
   final moods = <String, Map<String, Object?>>{};
   final requests = <String>[];
+  final covers = FakeCoverBlobs();
+
+  /// The user's own covers of global moods, by mood id, with their own counter.
+  final globalCovers = <int, Map<String, Object?>>{};
+  int coverCounter = 0;
 
   /// What `PUT/DELETE /global-moods/…` recorded: (mood id, song id, added).
   final globalChanges = <(int, int, bool)>[];
@@ -37,6 +44,7 @@ class FakeMoodServer {
 
   Map<String, Object?> add(Map<String, Object?> mood) {
     final stored = {
+      'cover': null,
       'created_at': mood['updated_at'],
       ...mood,
       'revision': ++counter,
@@ -58,7 +66,7 @@ class FakeMoodServer {
 
   Future<void> _handle(HttpRequest request) async {
     requests.add('${request.method} ${request.uri.path}');
-    final body = await utf8.decodeStream(request);
+    final raw = await readBody(request);
     final response = request.response;
     void reply(int status, [Object? json]) {
       response.statusCode = status;
@@ -73,7 +81,39 @@ class FakeMoodServer {
         'Bearer $token') {
       return reply(HttpStatus.unauthorized);
     }
+    if (covers.handle(request, raw)) return;
+    final body = textOf(raw);
     final parts = request.uri.pathSegments;
+    if (parts.length >= 3 && parts[2] == 'global-mood-covers') {
+      if (request.method == 'GET') {
+        final since = int.parse(request.uri.queryParameters['since'] ?? '0');
+        return reply(HttpStatus.ok, {
+          'revision': coverCounter,
+          'covers': [
+            for (final row in globalCovers.values)
+              if ((row['revision']! as int) > since) row,
+          ],
+        });
+      }
+      final sent = jsonDecode(body) as Map<String, Object?>;
+      if (covers.missing(sent) case final missing?) {
+        return reply(HttpStatus.badRequest, missing);
+      }
+      final moodId = int.parse(parts[3]);
+      final stored = globalCovers[moodId];
+      if (stored != null &&
+          sent['base_revision'] != stored['revision'] &&
+          (sent['updated_at']! as int) <= (stored['updated_at']! as int)) {
+        return reply(HttpStatus.conflict, stored);
+      }
+      globalCovers[moodId] = {
+        'mood_id': moodId,
+        'revision': ++coverCounter,
+        'cover': sent['cover'],
+        'updated_at': sent['updated_at'],
+      };
+      return reply(HttpStatus.ok, globalCovers[moodId]);
+    }
     if (parts.length == 4 && parts[0] == 'global-moods') {
       final moodId = int.parse(parts[1]);
       final songId = int.parse(parts[3]);
@@ -112,6 +152,9 @@ class FakeMoodServer {
     final uid = parts[3];
     if (request.method == 'PUT') {
       final sent = jsonDecode(body) as Map<String, Object?>;
+      if (covers.missing(sent) case final missing?) {
+        return reply(HttpStatus.badRequest, missing);
+      }
       var stored = moods[uid];
       if (stored != null && stored['deleted'] == true) {
         if (stored['promoted_to'] != null) {
@@ -142,6 +185,7 @@ class FakeMoodServer {
         return reply(HttpStatus.conflict, stored);
       }
       final saved = {
+        'cover': stored?['cover'],
         ...sent..remove('base_revision'),
         'uid': uid,
         'revision': ++counter,
@@ -179,7 +223,7 @@ void main() {
   var clock = DateTime(2026, 10, 13, 12);
   final revoked = <String>[];
 
-  MoodLibrary newLibrary() => MoodLibrary(
+  MoodLibrary newLibrary({CustomCovers? covers}) => MoodLibrary(
     local.database,
     sync,
     factoryOverride: databaseFactoryFfi,
@@ -187,6 +231,7 @@ void main() {
     userName: () => userName,
     authToken: () => token,
     canEditGlobal: () => permitted,
+    covers: covers,
   )..onPermissionRevoked = revoked.add;
 
   Future<void> writeTags(Map<int, (String, String, List<int>)> tags) async =>
@@ -261,7 +306,10 @@ void main() {
 
       server.requests.clear();
       await syncNow();
-      expect(server.requests, ['GET /users/owner/moods']);
+      expect(server.requests, [
+        'GET /users/owner/moods',
+        'GET /users/owner/global-mood-covers',
+      ]);
 
       await moods.setSong(moods.userMoods.single, 2, false);
       await syncNow();
@@ -416,6 +464,84 @@ void main() {
     moods.removeListener(catalog.moodsChanged);
   });
 
+  test('a mood\'s cover goes with it, the picture only when needed', () async {
+    final covers = CustomCovers(
+      directory: () async => Directory('${root.path}/c'),
+    );
+    final library = newLibrary(covers: covers);
+    await library.load();
+    final picture = [5, 6, 7];
+    final hash = CustomCovers.hashOf(picture);
+    await covers.store(hash, picture, jpeg: false);
+    await library.create('Chill');
+    await library.setCover(library.userMoods.single, hash);
+    expect(library.userMoods.single.cover, hash);
+    await library.sync([server.address]);
+
+    expect(library.lastSync!.problem, isNull);
+    expect(server.moods.values.single['cover'], hash);
+    expect(server.covers.blobs[hash], picture);
+
+    // Set on another phone: the new picture is downloaded.
+    final other = [1, 1, 2, 3];
+    final otherHash = CustomCovers.hashOf(other);
+    server.covers.blobs[otherHash] = other;
+    final uid = server.moods.keys.single;
+    server.moods[uid] = {
+      ...server.moods[uid]!,
+      'cover': otherHash,
+      'updated_at': 99999999999999,
+      'revision': ++server.counter,
+    };
+    await library.sync([server.address]);
+    expect(library.userMoods.single.cover, otherHash);
+    expect(await covers.fileFor(otherHash)!.readAsBytes(), other);
+    library.dispose();
+    covers.dispose();
+  });
+
+  test('a global mood\'s cover is the user\'s own: phone-only logged out, then synced', () async {
+    final covers = CustomCovers(
+      directory: () async => Directory('${root.path}/c'),
+    );
+    final picture = [4, 2];
+    final hash = CustomCovers.hashOf(picture);
+    await covers.store(hash, picture, jpeg: false);
+    userName = null;
+    final library = newLibrary(covers: covers);
+    await library.load();
+    await library.setCover(library.globalMoods.single, hash);
+    expect(library.globalMoods.single.cover, hash);
+
+    userName = 'owner';
+    await library.load();
+    // Not the account's until the phone-only things are added to it.
+    expect(library.globalMoods.single.cover, hash);
+    await library.addPhoneOnlyToAccount();
+    await library.sync([server.address]);
+    expect(library.lastSync!.problem, isNull);
+    expect(server.globalCovers[1]!['cover'], hash);
+    expect(server.covers.blobs[hash], picture);
+
+    // Removed on another phone, later.
+    server.globalCovers[1] = {
+      'mood_id': 1,
+      'revision': ++server.coverCounter,
+      'cover': null,
+      'updated_at': 99999999999999,
+    };
+    await library.sync([server.address]);
+    expect(library.globalMoods.single.cover, isNull);
+    expect(await library.usedCovers(), isEmpty);
+
+    // Logged out again: the account's (removed) cover isn't shown, nor is any other.
+    userName = null;
+    await library.load();
+    expect(library.globalMoods.single.cover, isNull);
+    library.dispose();
+    covers.dispose();
+  });
+
   test(
     'version 12 phones keep their moods, now allowed without an account',
     () async {
@@ -428,6 +554,8 @@ void main() {
         account VARCHAR NOT NULL, name VARCHAR NOT NULL, created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL, revision INTEGER NOT NULL DEFAULT 0,
         dirty INTEGER NOT NULL DEFAULT 0, deleted_at INTEGER)''');
+      // Only what the later upgrades touch.
+      await db.execute('CREATE TABLE playlists (id INTEGER PRIMARY KEY)');
       await db.insert('moods', {
         'uid': 'u',
         'account': 'owner',
@@ -445,6 +573,9 @@ void main() {
       );
       db = await upgraded.database();
       expect([for (final r in await db.query('moods')) r['name']], ['Stary']);
+      // Version 14 on top: covers.
+      expect(await db.query('global_mood_covers'), isEmpty);
+      expect((await db.query('moods')).single['cover_sha256'], isNull);
       await db.insert('moods', {
         'uid': 'v',
         'name': 'Bez konta',

@@ -2,24 +2,29 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'moods.dart';
-import 'playlist_library.dart';
-
-/// Covers the user picked for their playlists and moods ("Dodaj okładkę"), kept only on this
-/// phone: MusicDatabase's playlist and mood JSON has no place for a picture (ADR 0007/0008), so
-/// they aren't synced. Without one, a playlist or mood shows a collage of its songs' covers.
+/// The pictures of covers picked for playlists and moods ("Dodaj okładkę"), by the SHA-256 of
+/// their bytes, as MusicDatabase keeps them ([ADR 0009](../../../docs/decisions/0009-cover-sync.md)).
+/// Which playlist or mood has which cover is in `local.db` (`cover_sha256`), synced with the
+/// account like the rest of the playlist or mood; this only holds the files, picked here or
+/// downloaded from MusicDatabase. Without a cover a playlist or mood shows a collage of its
+/// songs' covers.
 ///
-/// Each cover is one square PNG in its own folder, named `<key>.<millis>.png`: a new name for
-/// every change, so a cover replaced under the same key isn't served from the image cache.
+/// A hash never changes its content, so a changed cover is a new file and Flutter's image
+/// cache never shows an old one.
 class CustomCovers extends ChangeNotifier {
   CustomCovers({Future<Directory> Function()? directory})
     : _directory = directory ?? _defaultDirectory;
 
-  /// Sides of the saved square: sharp in the playlist header (220 dp) on a 3× screen.
+  /// Sides of a picked cover: sharp in the playlist header (220 dp) on a 3× screen.
   static const side = 660;
+
+  /// A file nothing refers to stays this long: it may be about to be referred to (picked, not
+  /// saved yet) — and MusicDatabase keeps its own unreferenced blobs a day too.
+  static const unusedKept = Duration(days: 1);
 
   final Future<Directory> Function() _directory;
   Map<String, File> _files = const {};
@@ -28,64 +33,94 @@ class CustomCovers extends ChangeNotifier {
     '${(await getApplicationSupportDirectory()).path}/custom_covers',
   );
 
-  static String playlistKey(PlaylistSummary playlist) =>
-      'playlist-${playlist.id}';
-  static String moodKey(Mood mood) => 'mood-${mood.key}';
+  static final _name = RegExp(r'^([0-9a-f]{64})\.(png|jpg)$');
 
-  /// The cover picked for [key], if any.
-  File? fileFor(String key) => _files[key];
+  /// MusicDatabase's form of a cover's id: lowercase hex SHA-256 of the bytes.
+  static String hashOf(List<int> bytes) => sha256.convert(bytes).toString();
+
+  /// The picture of [hash], if it's on the phone.
+  File? fileFor(String? hash) => hash == null ? null : _files[hash];
 
   Future<void> load() async {
     final dir = await _directory();
     final files = <String, File>{};
-    final stamps = <String, int>{};
     if (await dir.exists()) {
       await for (final entity in dir.list()) {
         if (entity is! File) continue;
-        final match = RegExp(r'^(.+)\.(\d+)\.png$')
-            .firstMatch(entity.uri.pathSegments.last);
-        if (match == null) continue;
-        final key = match[1]!;
-        final stamp = int.parse(match[2]!);
-        if (stamp < (stamps[key] ?? -1)) continue;
-        stamps[key] = stamp;
-        files[key] = entity;
+        final match = _name.firstMatch(entity.uri.pathSegments.last);
+        if (match != null) files[match[1]!] = entity;
       }
     }
     _files = files;
     notifyListeners();
   }
 
-  /// Saves [image] (any format Flutter decodes) as [key]'s cover: its middle square, scaled
-  /// down to [side]. Throws when [image] isn't a picture.
-  Future<void> set(String key, List<int> image) async {
+  /// Keeps [image] (any format Flutter decodes) as a cover — its middle square, scaled down to
+  /// [side], as PNG — and returns its hash. Throws when [image] isn't a picture.
+  Future<String> add(List<int> image) async {
     final png = await _squarePng(image);
+    final hash = hashOf(png);
+    await _write(hash, png, 'png');
+    return hash;
+  }
+
+  /// Keeps a cover downloaded from MusicDatabase; refused unless [bytes] are [hash]'s.
+  Future<void> store(String hash, List<int> bytes, {required bool jpeg}) async {
+    if (hashOf(bytes) != hash) {
+      throw ArgumentError.value(hash, 'hash', 'not the hash of these bytes');
+    }
+    await _write(hash, bytes, jpeg ? 'jpg' : 'png');
+  }
+
+  /// [hash]'s bytes and whether they're a JPEG (else PNG), for sending them to MusicDatabase.
+  Future<({List<int> bytes, bool jpeg})?> read(String hash) async {
+    final file = _files[hash];
+    if (file == null) return null;
+    try {
+      return (
+        bytes: await file.readAsBytes(),
+        jpeg: file.path.endsWith('.jpg'),
+      );
+    } on FileSystemException catch (e) {
+      debugPrint('Reading cover $hash failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> _write(String hash, List<int> bytes, String extension) async {
+    final known = _files[hash];
+    if (known != null) {
+      // Picked again: counts as new for [prune].
+      await known.setLastModified(DateTime.now());
+      return;
+    }
     final dir = await _directory();
     await dir.create(recursive: true);
-    final file = File(
-      '${dir.path}/$key.${DateTime.now().millisecondsSinceEpoch}.png',
-    );
-    await file.writeAsBytes(png, flush: true);
-    final old = _files[key];
-    _files = {..._files, key: file};
+    final file = File('${dir.path}/$hash.$extension');
+    final part = File('${file.path}.part');
+    await part.writeAsBytes(bytes, flush: true);
+    await part.rename(file.path);
+    _files = {..._files, hash: file};
     notifyListeners();
-    if (old != null && old.path != file.path) await _deleteQuietly(old);
   }
 
-  /// Back to the collage.
-  Future<void> remove(String key) async {
-    final old = _files[key];
-    if (old == null) return;
-    _files = {..._files}..remove(key);
-    notifyListeners();
-    await _deleteQuietly(old);
-  }
-
-  static Future<void> _deleteQuietly(File file) async {
-    try {
-      await file.delete();
-    } catch (e) {
-      debugPrint('Deleting cover ${file.path} failed: $e');
+  /// Deletes the pictures none of [used] refers to, once they're [unusedKept] old.
+  Future<void> prune(Set<String> used, {DateTime? now}) async {
+    final keepAfter = (now ?? DateTime.now()).subtract(unusedKept);
+    final kept = {..._files};
+    for (final MapEntry(key: hash, value: file) in _files.entries) {
+      if (used.contains(hash)) continue;
+      try {
+        if ((await file.lastModified()).isAfter(keepAfter)) continue;
+        await file.delete();
+        kept.remove(hash);
+      } on FileSystemException catch (e) {
+        debugPrint('Deleting cover $hash failed: $e');
+      }
+    }
+    if (kept.length != _files.length) {
+      _files = kept;
+      notifyListeners();
     }
   }
 

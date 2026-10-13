@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
-import '../data/custom_covers.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/song_catalog.dart';
@@ -193,7 +192,11 @@ class MoodScreen extends StatelessWidget {
             onTap: () => queueSongs(context, hits, next: true, origin: origin),
           ),
         ],
-        ...customCoverEntries(context, CustomCovers.moodKey(mood)),
+        ...customCoverEntries(
+          context,
+          current: mood.cover,
+          onSet: (hash) => MoodLibraryScope.of(context).setCover(mood, hash),
+        ),
         if (!mood.global) ...[
           MenuSheetEntry(
             Icons.edit_outlined,
@@ -251,7 +254,6 @@ class MoodScreen extends StatelessWidget {
 
   Future<void> _delete(BuildContext context, Mood mood) async {
     final moods = MoodLibraryScope.of(context);
-    final covers = CustomCoversScope.maybeOf(context);
     final navigator = Navigator.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -277,7 +279,6 @@ class MoodScreen extends StatelessWidget {
     );
     if (!(confirmed ?? false)) return;
     await moods.delete(mood);
-    await covers?.remove(CustomCovers.moodKey(mood));
     navigator.pop();
   }
 }

@@ -236,7 +236,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 13,
+        version: 14,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -271,6 +271,7 @@ class LocalLibrary extends ChangeNotifier {
           await _createRemovedVideosTable(db);
           await _addPlaylistSyncColumns(db);
           await _createMoodTables(db);
+          await _addCoverColumns(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -285,9 +286,31 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 11) await _addPlaylistSyncColumns(db);
           if (from < 12) await _createMoodTables(db);
           if (from == 12) await _allowPhoneOnlyMoods(db);
+          if (from < 14) await _addCoverColumns(db);
         },
       ),
     );
+  }
+
+  /// Version 14: covers picked for playlists and moods (`custom_covers.dart`, ADR 0009), by
+  /// the SHA-256 of the image; synced with MusicDatabase with the playlist or mood. A global
+  /// mood's cover is the user's own (`account` NULL: phone-only, like playlists), synced as its
+  /// own small collection.
+  static Future<void> _addCoverColumns(Database db) async {
+    await db.execute('ALTER TABLE playlists ADD COLUMN cover_sha256 VARCHAR');
+    await db.execute('ALTER TABLE moods ADD COLUMN cover_sha256 VARCHAR');
+    await db.execute('''
+      CREATE TABLE global_mood_covers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account VARCHAR,
+        -- tag.db's tags.id.
+        mood_id INTEGER NOT NULL,
+        -- NULL: the cover was removed (kept so the removal is sent).
+        cover_sha256 VARCHAR,
+        updated_at INTEGER NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 0,
+        dirty INTEGER NOT NULL DEFAULT 0
+      )''');
   }
 
   /// Version 13: moods made while logged out stay on the phone (`account` NULL), like

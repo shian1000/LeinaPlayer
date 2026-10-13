@@ -31,7 +31,7 @@ to be trimmed later — user's request); play history in
 "Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
-(phone-only) ([`covers.md`](docs/agent-notes/covers.md)). Every cache setting is in one screen, Oszczędzanie
+(synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Every cache setting is in one screen, Oszczędzanie
 danych i tryb offline › Pamięć podręczna. YouTube: searching it on request, showing which songs
 MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
 audio on Android through NewPipeExtractor, with a cache of played songs — see
@@ -78,7 +78,8 @@ saves it for later with the person who sent it (Menu profilu › Wiadomości ›
   [hand-off](docs/handoffs/musicdatabase-login.md)). The account's playlists are exchanged as JSON
 (`/users/<name>/playlists` — [ADR 0007](docs/decisions/0007-playlist-sync.md)), and so are its
 moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and its permissions
-(`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Syncing playlist and mood covers is decided but waits for MusicDatabase
+(`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Covers picked for playlists and moods go with them: the picture as
+`/users/<name>/covers/<sha256>`, global moods' own covers as `/users/<name>/global-mood-covers`
 ([ADR 0009](docs/decisions/0009-cover-sync.md)). Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 

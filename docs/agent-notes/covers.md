@@ -73,10 +73,11 @@ Once it has them, the "Serwer" source (now a dummy) should read them, keyed on `
   whole playlists. A Spotify album passes only its first track: its songs often look the album up
   separately (no album in music.db), which made a collage of four identical covers.
 - Picked covers (`CustomCovers`, `data/custom_covers.dart`): "Dodaj okładkę" in a playlist's or
-  mood's ⋮ (`customCoverEntries`), any image via `file_picker`, saved as a 660 px middle-square
-  PNG in `<app support>/custom_covers/<key>.<millis>.png` (a new name per change, so Flutter's
-  image cache never shows the old one). Keys: `playlist-<local id>`, `mood-<Mood.key>` — both
-  ids are AUTOINCREMENT, never reused. **Phone-only for now**: syncing them with the account
-  (blobs by SHA-256, `"cover"` in the playlist/mood JSON, private covers of global moods) is
-  decided in [ADR 0009](../decisions/0009-cover-sync.md) and asked of MusicDatabase in
-  [`musicdatabase-covers.md`](../handoffs/musicdatabase-covers.md) — not built on either side yet. User data, not a cache: not in Pamięć podręczna.
+  mood's ⋮ (`customCoverEntries`, saving through `PlaylistLibrary.setCover` /
+  `MoodLibrary.setCover`), any image via `file_picker`, kept as a 660 px middle-square PNG named
+  by its SHA-256 (`<app support>/custom_covers/<sha256>.png|.jpg`) — the same id MusicDatabase
+  uses, and a new name per picture, so Flutter's image cache never shows an old one. Which
+  playlist or mood has which cover is in `local.db`, synced with the account
+  ([ADR 0009](../decisions/0009-cover-sync.md)); a global mood's cover is the user's own. Until a
+  cover set on another phone is downloaded, the collage shows. User data, not a cache: not in
+  Pamięć podręczna.

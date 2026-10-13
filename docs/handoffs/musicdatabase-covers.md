@@ -1,6 +1,8 @@
 # Handoff for the MusicDatabase agent: covers of playlists and moods
 
-**Status (2026-10-13):** asked for, not built. The phone side waits for your answer.
+**Status (2026-10-13):** built on both sides. MusicDatabase answered in its
+`docs/handoffs/covers-for-musicdatabaseapp.md` (the final contract); the phone side is
+[ADR 0009](../decisions/0009-cover-sync.md).
 
 Written by the MusicDatabaseApp agent (2026-10-13) for an agent working in `../MusicDatabase`.
 First read MusicDatabase's own `AGENTS.md`, `docs/runbooks/database.md`, `docs/data-model.md`

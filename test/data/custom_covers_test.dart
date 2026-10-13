@@ -23,47 +23,74 @@ void main() {
     return (await codec.getNextFrame()).image;
   }
 
-  testWidgets(
-    'a picked cover is kept square, replaced, read back and removed',
-    (tester) async {
-      await tester.runAsync(() async {
-        root = await Directory.systemTemp.createTemp('custom_covers_test');
-        Future<Directory> dir() async => Directory('${root.path}/covers');
-        final covers = CustomCovers(directory: dir);
-        await covers.load();
-        expect(covers.fileFor('playlist-1'), isNull);
+  testWidgets('a picked cover is kept square under its hash and read back', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('custom_covers_test');
+      Future<Directory> dir() async => Directory('${root.path}/covers');
+      final covers = CustomCovers(directory: dir);
+      await covers.load();
+      expect(covers.fileFor(null), isNull);
 
-        await covers.set('playlist-1', await picture(1600, 900));
-        final first = covers.fileFor('playlist-1')!;
-        final image = await decode(first);
-        expect(
-          (image.width, image.height),
-          (CustomCovers.side, CustomCovers.side),
-        );
+      final wide = await covers.add(await picture(1600, 900));
+      final file = covers.fileFor(wide)!;
+      expect(CustomCovers.hashOf(await file.readAsBytes()), wide);
+      final image = await decode(file);
+      expect(
+        (image.width, image.height),
+        (CustomCovers.side, CustomCovers.side),
+      );
 
-        // A small picture isn't blown up; the old file goes.
-        await Future<void>.delayed(const Duration(milliseconds: 2));
-        await covers.set('playlist-1', await picture(100, 300));
-        final second = covers.fileFor('playlist-1')!;
-        expect(second.path, isNot(first.path));
-        expect(await first.exists(), isFalse);
-        expect(((await decode(second)).width), 100);
+      // A small picture isn't blown up.
+      final tall = await covers.add(await picture(100, 300));
+      expect((await decode(covers.fileFor(tall)!)).width, 100);
 
-        final reloaded = CustomCovers(directory: dir);
-        await reloaded.load();
-        expect(reloaded.fileFor('playlist-1')?.path, second.path);
+      final reloaded = CustomCovers(directory: dir);
+      await reloaded.load();
+      expect(reloaded.fileFor(wide)?.path, file.path);
+      expect((await reloaded.read(tall))!.jpeg, isFalse);
 
-        await reloaded.remove('playlist-1');
-        expect(reloaded.fileFor('playlist-1'), isNull);
-        expect(await second.exists(), isFalse);
+      await expectLater(covers.add([1, 2, 3]), throwsA(anything));
 
-        await expectLater(covers.set('mood-u1', [1, 2, 3]), throwsA(anything));
-        expect(covers.fileFor('mood-u1'), isNull);
+      covers.dispose();
+      reloaded.dispose();
+      await root.delete(recursive: true);
+    });
+  });
 
-        covers.dispose();
-        reloaded.dispose();
-        await root.delete(recursive: true);
-      });
+  test(
+    'a downloaded cover must match its hash; unused ones go after a day',
+    () async {
+      root = await Directory.systemTemp.createTemp('custom_covers_test');
+      final covers = CustomCovers(
+        directory: () async => Directory('${root.path}/covers'),
+      );
+      await covers.load();
+      final used = [1, 2, 3];
+      final unused = [4, 5, 6];
+      final usedHash = CustomCovers.hashOf(used);
+      final unusedHash = CustomCovers.hashOf(unused);
+      await expectLater(
+        covers.store(usedHash, unused, jpeg: false),
+        throwsArgumentError,
+      );
+      await covers.store(usedHash, used, jpeg: true);
+      await covers.store(unusedHash, unused, jpeg: false);
+      expect((await covers.read(usedHash))!.jpeg, isTrue);
+
+      // Picked moments ago: kept although nothing refers to it yet.
+      await covers.prune({usedHash});
+      expect(covers.fileFor(unusedHash), isNotNull);
+
+      await covers.prune({
+        usedHash,
+      }, now: DateTime.now().add(const Duration(days: 2)));
+      expect(covers.fileFor(unusedHash), isNull);
+      expect(covers.fileFor(usedHash), isNotNull);
+
+      covers.dispose();
+      await root.delete(recursive: true);
     },
   );
 }

@@ -3,7 +3,6 @@ import 'package:flutter/rendering.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
-import '../data/custom_covers.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_search.dart';
@@ -315,7 +314,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Widget _cover(List<SearchHit> hits, double size) {
     final saved = _saved;
     return CollectionCover(
-      coverKey: saved == null ? null : CustomCovers.playlistKey(saved),
+      // The cover changes in Biblioteka, not in the summary this screen was opened with.
+      cover: saved == null
+          ? null
+          : PlaylistLibraryScope.of(context).byId(saved.id)?.cover,
       songs:
           (_playlist.source == PlaylistSource.spotifyAlbum
                   ? hits.take(1)
@@ -352,7 +354,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   Future<void> _delete() async {
     final library = PlaylistLibraryScope.of(context);
-    final covers = CustomCoversScope.maybeOf(context);
     final navigator = Navigator.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -380,7 +381,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
     if (!(confirmed ?? false)) return;
     await library.delete(_playlist.id);
-    await covers?.remove(CustomCovers.playlistKey(_playlist));
     navigator.pop();
   }
 
@@ -464,7 +464,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ),
               const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
               const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),
-              ...customCoverEntries(context, CustomCovers.playlistKey(_saved!)),
+              ...customCoverEntries(
+                context,
+                current: PlaylistLibraryScope.of(context)
+                    .byId(_saved!.id)
+                    ?.cover,
+                onSet: (hash) =>
+                    PlaylistLibraryScope.of(context).setCover(_saved!.id, hash),
+              ),
               MenuSheetEntry(
                 Icons.rule,
                 'Wyświetl utwory, których nie ma w bazie danych',

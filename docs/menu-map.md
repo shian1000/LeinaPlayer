@@ -426,7 +426,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   kolejki / Odtwórz jako następny (the whole mood), and for the user's own mood Zmień nazwę
   (dialog) and Usuń nastrój (asks first; deleted on every device of the account, MusicDatabase
   archives it). For every mood, global ones too: **Dodaj okładkę** / **Zmień okładkę** (an
-  image from the phone, kept only on the phone) and **Usuń okładkę** (back to the collage).
+  image from the phone, synced with the account — a global mood's cover is the user's own) and **Usuń okładkę** (back to the collage).
 - Header: cover (the picked one, else a collage like a playlist's — `MoodCover`), name, "Twój nastrój" / "Nastrój globalny" • "N utworów".
 - **Odtwórz losowo**: the whole mood shuffled into the queue. A note when some of its songs
   aren't in the phone's music.db yet.

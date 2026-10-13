@@ -22,16 +22,16 @@ import 'song_cover.dart';
 class CollectionCover extends StatelessWidget {
   const CollectionCover({
     super.key,
-    this.coverKey,
+    this.cover,
     required this.songs,
     required this.seed,
     this.size = 56,
     this.icon = Icons.queue_music,
   });
 
-  /// Where a picked cover is kept ([CustomCovers.playlistKey], [CustomCovers.moodKey]);
-  /// `null` for a playlist not saved in Biblioteka.
-  final String? coverKey;
+  /// The picked cover's hash ([PlaylistSummary.cover], [Mood.cover]). Until its picture is on
+  /// the phone (downloaded with the next sync) the collage shows.
+  final String? cover;
 
   /// The songs in order, read only up to the fourth different album (may be lazy).
   final Iterable<CoverRequest> songs;
@@ -41,10 +41,7 @@ class CollectionCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final key = coverKey;
-    final file = key == null
-        ? null
-        : CustomCoversScope.maybeOf(context)?.fileFor(key);
+    final file = CustomCoversScope.maybeOf(context)?.fileFor(cover);
     final collage = _collage(context);
     if (file == null) return collage;
     final filter = ThemeScope.maybeOf(context)?.coverFilter ?? CoverFilter.none;
@@ -103,7 +100,7 @@ class PlaylistCover extends StatelessWidget {
     final youTube = YouTubeLibraryScope.of(context);
     final tracks = PlaylistLibraryScope.of(context).leadTracks(playlist.id);
     return CollectionCover(
-      coverKey: CustomCovers.playlistKey(playlist),
+      cover: playlist.cover,
       // An album is one cover, though its songs may each find it on their own.
       songs:
           (playlist.source == PlaylistSource.spotifyAlbum
@@ -128,7 +125,7 @@ class MoodCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CollectionCover(
-    coverKey: CustomCovers.moodKey(mood),
+    cover: mood.cover,
     songs: moodHits(
       mood,
       SongCatalogScope.of(context),
@@ -141,23 +138,27 @@ class MoodCover extends StatelessWidget {
   );
 }
 
-/// "Dodaj okładkę" (or "Zmień okładkę") and "Usuń okładkę" for a playlist's or mood's menu.
-List<MenuSheetEntry> customCoverEntries(BuildContext context, String coverKey) {
+/// "Dodaj okładkę" (or "Zmień okładkę") and "Usuń okładkę" for a playlist's or mood's menu;
+/// [onSet] saves the new cover's hash (`null`: removed) where it belongs.
+List<MenuSheetEntry> customCoverEntries(
+  BuildContext context, {
+  required String? current,
+  required Future<void> Function(String? hash) onSet,
+}) {
   final covers = CustomCoversScope.maybeOf(context);
   if (covers == null) return const [];
-  final has = covers.fileFor(coverKey) != null;
   return [
     MenuSheetEntry(
       Icons.add_photo_alternate_outlined,
-      has ? 'Zmień okładkę' : 'Dodaj okładkę',
-      onTap: () => _pickCover(context, covers, coverKey),
+      current == null ? 'Dodaj okładkę' : 'Zmień okładkę',
+      onTap: () => _pickCover(context, covers, onSet),
     ),
-    if (has)
+    if (current != null)
       MenuSheetEntry(
         Icons.hide_image_outlined,
         'Usuń okładkę',
         subtitle: 'Wróci kolaż z okładek utworów',
-        onTap: () => covers.remove(coverKey),
+        onTap: () => onSet(null),
       ),
   ];
 }
@@ -165,7 +166,7 @@ List<MenuSheetEntry> customCoverEntries(BuildContext context, String coverKey) {
 Future<void> _pickCover(
   BuildContext context,
   CustomCovers covers,
-  String coverKey,
+  Future<void> Function(String? hash) onSet,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
@@ -175,7 +176,7 @@ Future<void> _pickCover(
     );
     final file = picked.firstOrNull;
     if (file == null) return;
-    await covers.set(coverKey, await file.readAsBytes());
+    await onSet(await covers.add(await file.readAsBytes()));
   } catch (e) {
     debugPrint('Setting a cover failed: $e');
     messenger.showSnackBar(

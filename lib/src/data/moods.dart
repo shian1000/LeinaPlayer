@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'combined_search.dart';
+import 'custom_covers.dart';
 import 'database_sync.dart';
 import 'local_library.dart';
 import 'playlist_sync.dart';
@@ -24,6 +25,7 @@ class Mood {
     this.globalId,
     this.localId,
     this.phoneOnly = false,
+    this.cover,
   });
 
   final String name;
@@ -41,6 +43,10 @@ class Mood {
 
   /// Made while logged out: not in any MusicDatabase account (yet).
   final bool phoneOnly;
+
+  /// The picked cover's hash ([CustomCovers]) — for a global mood the user's own; `null`: a
+  /// collage of its songs' covers.
+  final String? cover;
 
   /// Tells moods apart across reloads (a user's mood may get another `uid` from MusicDatabase,
   /// never another local id).
@@ -65,6 +71,7 @@ class MoodLibrary extends ChangeNotifier {
     String? Function()? userName,
     String? Function()? authToken,
     bool Function()? canEditGlobal,
+    this.covers,
   }) : _now = now ?? DateTime.now,
        _userName = userName ?? (() => null),
        _authToken = authToken ?? (() => null),
@@ -85,6 +92,9 @@ class MoodLibrary extends ChangeNotifier {
   final String? Function() _userName;
   final String? Function() _authToken;
   final bool Function() _canEditGlobal;
+
+  /// Where cover pictures are kept, sent from and downloaded to; `null` in tests without them.
+  final CustomCovers? covers;
 
   /// A mood was changed here, e.g. to send it to MusicDatabase soon.
   VoidCallback? onChanged;
@@ -230,7 +240,7 @@ class MoodLibrary extends ChangeNotifier {
       (songs[row['mood_id']! as int] ??= {}).add(row['song_id']! as int);
     }
     for (final row in await db.rawQuery(
-      'SELECT m.id, m.name, m.account FROM moods m '
+      'SELECT m.id, m.name, m.account, m.cover_sha256 FROM moods m '
       'WHERE m.deleted_at IS NULL AND ${scope.where}',
       scope.args,
     )) {
@@ -241,8 +251,20 @@ class MoodLibrary extends ChangeNotifier {
           songIds: songs[id] ?? const {},
           localId: id,
           phoneOnly: row['account'] == null,
+          cover: row['cover_sha256'] as String?,
         ),
       );
+    }
+    // The account's own cover of a global mood wins over one set while logged out.
+    final globalCovers = <int, String?>{};
+    final coverScope = _scope();
+    for (final row in await db.query(
+      'global_mood_covers',
+      where: coverScope.where,
+      whereArgs: coverScope.args,
+      orderBy: 'account IS NOT NULL',
+    )) {
+      globalCovers[row['mood_id']! as int] = row['cover_sha256'] as String?;
     }
     if (user != null) {
       // In the order they were made, so the last change to a song is what counts.
@@ -263,7 +285,12 @@ class MoodLibrary extends ChangeNotifier {
     _userMoods = userMoods..sort(byName);
     _globalMoods = [
       for (final MapEntry(:key, :value) in global.entries)
-        Mood._(name: value.name, songIds: value.songs, globalId: key),
+        Mood._(
+          name: value.name,
+          songIds: value.songs,
+          globalId: key,
+          cover: globalCovers[key],
+        ),
     ]..sort(byName);
     final names = <int, List<String>>{};
     for (final mood in [..._userMoods, ..._globalMoods]) {
@@ -299,11 +326,50 @@ class MoodLibrary extends ChangeNotifier {
   Future<void> addPhoneOnlyToAccount() async {
     final user = _userName();
     if (user == null) return;
-    await (await _database()).rawUpdate(
-      'UPDATE moods SET account = ?, dirty = 1, revision = 0 '
-      'WHERE account IS NULL AND deleted_at IS NULL',
-      [user],
-    );
+    final db = await _database();
+    await db.transaction((txn) async {
+      await txn.rawUpdate(
+        'UPDATE moods SET account = ?, dirty = 1, revision = 0 '
+        'WHERE account IS NULL AND deleted_at IS NULL',
+        [user],
+      );
+      // Covers of global moods set while logged out replace the account's.
+      for (final row in await txn.query(
+        'global_mood_covers',
+        where: 'account IS NULL',
+      )) {
+        final own = await txn.query(
+          'global_mood_covers',
+          columns: ['id'],
+          where: 'account = ? AND mood_id = ?',
+          whereArgs: [user, row['mood_id']],
+        );
+        if (own.isEmpty) {
+          await txn.update(
+            'global_mood_covers',
+            {'account': user, 'dirty': 1, 'revision': 0},
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        } else {
+          await txn.update(
+            'global_mood_covers',
+            {
+              'cover_sha256': row['cover_sha256'],
+              'updated_at': row['updated_at'],
+              'dirty': 1,
+            },
+            where: 'id = ?',
+            whereArgs: [own.first['id']],
+          );
+          await txn.delete(
+            'global_mood_covers',
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        }
+      }
+    });
     await _loadLocal();
     onChanged?.call();
   }
@@ -386,7 +452,11 @@ class MoodLibrary extends ChangeNotifier {
       } else {
         await txn.update(
           'moods',
-          {'deleted_at': _now().millisecondsSinceEpoch, 'dirty': 0},
+          {
+            'deleted_at': _now().millisecondsSinceEpoch,
+            'dirty': 0,
+            'cover_sha256': null,
+          },
           where: 'id = ?',
           whereArgs: [mood.localId],
         );
@@ -394,6 +464,61 @@ class MoodLibrary extends ChangeNotifier {
     });
     await _loadLocal();
     onChanged?.call();
+  }
+
+  /// Gives [mood] the picked cover [hash] (`null`: back to the collage). The user's own mood
+  /// syncs it like a rename; a global mood's cover is the user's own, synced with
+  /// `/users/<name>/global-mood-covers` (phone-only while logged out).
+  Future<void> setCover(Mood mood, String? hash) async {
+    final db = await _database();
+    final now = _now().millisecondsSinceEpoch;
+    if (!mood.global) {
+      await db.update(
+        'moods',
+        {'cover_sha256': hash, 'updated_at': now, 'dirty': 1},
+        where: 'id = ?',
+        whereArgs: [mood.localId],
+      );
+    } else {
+      final user = _userName();
+      final values = {
+        'cover_sha256': hash,
+        'updated_at': now,
+        'dirty': user == null ? 0 : 1,
+      };
+      final where = user == null
+          ? 'account IS NULL AND mood_id = ?'
+          : 'account = ? AND mood_id = ?';
+      final args = [?user, mood.globalId];
+      final changed = await db.update(
+        'global_mood_covers',
+        values,
+        where: where,
+        whereArgs: args,
+      );
+      if (changed == 0) {
+        await db.insert('global_mood_covers', {
+          ...values,
+          'account': user,
+          'mood_id': mood.globalId,
+        });
+      }
+    }
+    await _loadLocal();
+    onChanged?.call();
+  }
+
+  /// Every cover hash a mood on the phone refers to (any account's), so [CustomCovers.prune]
+  /// keeps them.
+  Future<Set<String>> usedCovers() async {
+    final db = await _database();
+    return {
+      for (final table in ['moods', 'global_mood_covers'])
+        for (final row in await db.rawQuery(
+          'SELECT DISTINCT cover_sha256 FROM $table WHERE cover_sha256 IS NOT NULL',
+        ))
+          row['cover_sha256']! as String,
+    };
   }
 
   /// Puts [songId] into [mood] or takes it out ([inMood]). A global mood needs
@@ -511,7 +636,8 @@ class MoodLibrary extends ChangeNotifier {
       try {
         final moods = await _syncOn(client, user);
         final global = await _sendGlobalChanges(client, user);
-        return moods ?? global;
+        final covers = await _syncGlobalCovers(server, user, token);
+        return moods ?? global ?? covers;
       } on _SyncStopped catch (e) {
         return e.problem;
       } catch (e) {
@@ -584,7 +710,9 @@ class MoodLibrary extends ChangeNotifier {
       whereArgs: [user],
     )) {
       final id = row['id']! as int;
-      final answer = await client.put(
+      final answer = await putWithCover(
+        client,
+        covers,
         row['uid']! as String,
         await _toJson(db, row),
       );
@@ -610,7 +738,136 @@ class MoodLibrary extends ChangeNotifier {
         await _applyRemote(txn, remote, user, intoId: id);
       });
     }
+    await fetchCovers(client, covers, [
+      for (final row in await db.query(
+        'moods',
+        columns: ['cover_sha256'],
+        where: 'account = ? AND cover_sha256 IS NOT NULL',
+        whereArgs: [user],
+      ))
+        row['cover_sha256']! as String,
+    ]);
     return problem;
+  }
+
+  static String _coverRevisionKey(String user) =>
+      'moods.global_cover_revision.$user';
+
+  /// Exchanges the user's own covers of global moods with MusicDatabase, like the moods
+  /// themselves: rows changed there since the last time (one changed here too waits), then
+  /// the ones changed here — the newer `updated_at` stays, a removal is `cover: null`.
+  Future<String?> _syncGlobalCovers(
+    Uri server,
+    String user,
+    String token,
+  ) async {
+    final client = PlaylistSyncClient(
+      server,
+      user,
+      token,
+      collection: 'global-mood-covers',
+    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final since = prefs.getInt(_coverRevisionKey(user)) ?? 0;
+      var answer = await client.changedSince(since);
+      _check(answer);
+      var changes = answer.body! as Map<String, Object?>;
+      if ((changes['revision']! as int) < since) {
+        answer = await client.changedSince(0);
+        _check(answer);
+        changes = answer.body! as Map<String, Object?>;
+      }
+      final db = await _database();
+      await db.transaction((txn) async {
+        for (final row in changes['covers']! as List) {
+          final remote = row as Map<String, Object?>;
+          final local = await txn.query(
+            'global_mood_covers',
+            columns: ['dirty'],
+            where: 'account = ? AND mood_id = ?',
+            whereArgs: [user, remote['mood_id']],
+          );
+          if (local.isNotEmpty && local.first['dirty'] == 1) continue;
+          await _applyGlobalCover(txn, remote, user);
+        }
+      });
+      await prefs.setInt(_coverRevisionKey(user), changes['revision']! as int);
+
+      String? problem;
+      for (final row in await db.query(
+        'global_mood_covers',
+        where: 'account = ? AND dirty = 1',
+        whereArgs: [user],
+      )) {
+        final answer = await putWithCover(client, covers, '${row['mood_id']}', {
+          'base_revision': row['revision'],
+          'updated_at': row['updated_at'],
+          'cover': row['cover_sha256'],
+        }, required: true);
+        problem ??= _check(answer, keepGoing: true);
+        if (answer.body is! Map) continue;
+        final remote = answer.body! as Map<String, Object?>;
+        await db.transaction((txn) async {
+          final now = await txn.query(
+            'global_mood_covers',
+            columns: ['updated_at'],
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+          if (now.isEmpty) return;
+          // Changed again while this was on its way: only the base for sending that.
+          if (now.first['updated_at'] != row['updated_at']) {
+            await txn.update(
+              'global_mood_covers',
+              {'revision': remote['revision']},
+              where: 'id = ?',
+              whereArgs: [row['id']],
+            );
+            return;
+          }
+          await _applyGlobalCover(txn, remote, user);
+        });
+      }
+      await fetchCovers(client, covers, [
+        for (final row in await db.query(
+          'global_mood_covers',
+          columns: ['cover_sha256'],
+          where: 'account = ? AND cover_sha256 IS NOT NULL',
+          whereArgs: [user],
+        ))
+          row['cover_sha256']! as String,
+      ]);
+      return problem;
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<void> _applyGlobalCover(
+    Transaction txn,
+    Map<String, Object?> remote,
+    String user,
+  ) async {
+    final values = {
+      'cover_sha256': remote['cover'],
+      'updated_at': remote['updated_at'],
+      'revision': remote['revision'],
+      'dirty': 0,
+    };
+    final changed = await txn.update(
+      'global_mood_covers',
+      values,
+      where: 'account = ? AND mood_id = ?',
+      whereArgs: [user, remote['mood_id']],
+    );
+    if (changed == 0) {
+      await txn.insert('global_mood_covers', {
+        ...values,
+        'account': user,
+        'mood_id': remote['mood_id'],
+      });
+    }
   }
 
   /// Sends the global mood changes made here, oldest first. MusicDatabase applies them later;
@@ -710,6 +967,7 @@ class MoodLibrary extends ChangeNotifier {
     'uid': row['uid'],
     'base_revision': row['revision'],
     'name': row['name'],
+    'cover': row['cover_sha256'],
     'created_at': row['created_at'],
     'updated_at': row['updated_at'],
     'song_ids': [
@@ -795,6 +1053,8 @@ class MoodLibrary extends ChangeNotifier {
       'name': remote['name'],
       'created_at': remote['created_at'],
       'updated_at': remote['updated_at'],
+      // A server from before covers says nothing about them.
+      if (remote.containsKey('cover')) 'cover_sha256': remote['cover'],
     };
     if (id != null) {
       await txn.update('moods', values, where: 'id = ?', whereArgs: [id]);

@@ -151,6 +151,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _sourceSettings,
   );
   final _customCovers = CustomCovers();
+  late final Future<void> _coversLoaded;
   final _account = Account();
   late final _outbox = Outbox(
     userName: () => _account.userName,
@@ -176,6 +177,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _youTubeLibrary,
     userName: () => _account.userName,
     authToken: () => _account.token,
+    covers: _customCovers,
   )..onUnauthorized = _account.tokenRejected;
   Timer? _playlistSyncSoon;
   late final _moodLibrary =
@@ -185,6 +187,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
           userName: () => _account.userName,
           authToken: () => _account.token,
           canEditGlobal: () => _account.hasPermission(Account.editGlobalMoods),
+          covers: _customCovers,
         )
         ..onUnauthorized = _account.tokenRejected
         ..onPermissionRevoked = _account.permissionRevoked;
@@ -230,7 +233,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       (Object e) => debugPrint('Loading play history failed: $e'),
     );
     _laterLinks.load();
-    _customCovers.load().catchError(
+    _coversLoaded = _customCovers.load().catchError(
       (Object e) => debugPrint('Loading custom covers failed: $e'),
     );
     _historySub = _playbackQueue.played.listen(
@@ -360,16 +363,32 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   void _accountChanged() {
     final user = _account.userName;
     if (_playlistsLoaded && user == _playlistsUser) return;
+    final first = !_playlistsLoaded;
     _playlistsUser = user;
     _playlistsLoaded = true;
-    _playlistLibrary
+    final playlists = _playlistLibrary
         .load()
         .then((_) => _syncPlaylists())
         .catchError((Object e) => debugPrint('Loading playlists failed: $e'));
-    _moodLibrary
+    final moods = _moodLibrary
         .load()
         .then((_) => _syncMoods())
         .catchError((Object e) => debugPrint('Loading moods failed: $e'));
+    if (first) Future.wait([playlists, moods]).then((_) => _pruneCovers());
+  }
+
+  /// Deletes the cover pictures no playlist or mood refers to any more (replaced, removed or
+  /// deleted with their playlist), once after start.
+  Future<void> _pruneCovers() async {
+    try {
+      await _coversLoaded;
+      await _customCovers.prune({
+        ...await _playlistLibrary.usedCovers(),
+        ...await _moodLibrary.usedCovers(),
+      });
+    } catch (e) {
+      debugPrint('Pruning covers failed: $e');
+    }
   }
 
   bool _playlistsLoaded = false;
