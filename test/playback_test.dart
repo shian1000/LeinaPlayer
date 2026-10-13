@@ -113,6 +113,7 @@ void main() {
     final player = PlayerController(backend: () => backend);
     addTearDown(player.dispose);
     final queue = PlaybackQueue(
+      prefetchDelay: Duration.zero,
       TrackPlayer(
         player: player,
         settings: SourceSettings(),

@@ -196,7 +196,11 @@ void main() {
 
     tearDown(() => server.close(force: true));
 
-    PlaybackQueue queueOf({bool onWifi = true}) => PlaybackQueue(
+    PlaybackQueue queueOf({
+      bool onWifi = true,
+      Duration prefetchDelay = Duration.zero,
+    }) => PlaybackQueue(
+      prefetchDelay: prefetchDelay,
       TrackPlayer(
         player: player,
         settings: settings,
@@ -267,6 +271,25 @@ void main() {
       mobile.dispose();
     });
 
+    test('songs added quickly: only the ones then next are cached', () async {
+      final queue = queueOf(prefetchDelay: const Duration(milliseconds: 300));
+      await settings.setQueuePrefetch(1);
+      await queue.start(videos(2), 0);
+      for (final id in ['x1', 'x2', 'x3']) {
+        await queue.playNext([
+          SearchHit.youTubeOnly(title: id, artistLabel: 'A', videoId: id),
+        ]);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      await waitUntil(() => library.isCached('x3'));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect([
+        for (final id in ['v1', 'x1', 'x2'])
+          if (library.isCached(id)) id,
+      ], isEmpty);
+      queue.dispose();
+    });
+
     test('the cache keeps room for the songs cached ahead', () async {
       await settings.setCacheLimit(1);
       expect(settings.cacheKeep, 5);
@@ -277,6 +300,7 @@ void main() {
 
   group('the song in the YouTube app, inside its playlist', () {
     PlaybackQueue queueOf() => PlaybackQueue(
+      prefetchDelay: Duration.zero,
       TrackPlayer(
         player: player,
         settings: settings,
@@ -499,7 +523,7 @@ void main() {
     );
 
     test('"Otwórz w YouTube" opens the video found instead, also played from its playlist', () async {
-      final queue = PlaybackQueue(tracksWith());
+      final queue = PlaybackQueue(tracksWith(), prefetchDelay: Duration.zero);
       final fromPlaylist = SearchHit.youTubeOnly(
         title: 'Total Eclipse of the Heart',
         artistLabel: 'Bonnie Tyler',

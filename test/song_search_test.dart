@@ -155,6 +155,7 @@ void main() {
       ],
     );
     queue = PlaybackQueue(
+      prefetchDelay: Duration.zero,
       TrackPlayer(
         player: player,
         settings: settings,

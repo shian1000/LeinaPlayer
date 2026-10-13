@@ -78,6 +78,7 @@ void main() {
     player = PlayerController(backend: () => backend);
     youTubeLibrary = YouTubeLibrary(() => Future.error(StateError('not used')));
     queue = PlaybackQueue(
+      prefetchDelay: Duration.zero,
       tracks = TrackPlayer(
         player: player,
         settings: settings,
@@ -356,7 +357,7 @@ void main() {
     ], origin: QueueOrigin(playlistName: 'B'));
     queue.move(queue.upcoming.last, 0);
     final saved = jsonDecode(jsonEncode(queue.snapshot())) as Map;
-    final other = PlaybackQueue(tracks);
+    final other = PlaybackQueue(tracks, prefetchDelay: Duration.zero);
     addTearDown(other.dispose);
     other.restore(saved.cast(), (ref) => _file(ref.title));
     expect(titles(other.upcoming), ['c', 'p', 'q']);
@@ -728,6 +729,7 @@ void main() {
       await settings.load();
       await settings.setPlaybackMethod(YouTubePlaybackMethod.cache, false);
       offlineQueue = PlaybackQueue(
+        prefetchDelay: Duration.zero,
         TrackPlayer(
           player: player,
           settings: settings,

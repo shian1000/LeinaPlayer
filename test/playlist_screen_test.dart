@@ -85,6 +85,7 @@ void main() {
       await settings.load();
     });
     queue = PlaybackQueue(
+      prefetchDelay: Duration.zero,
       TrackPlayer(
         player: player,
         settings: settings,

@@ -63,6 +63,7 @@ void main() {
     final backend = _Backend();
     final player = PlayerController(backend: () => backend);
     final queue = PlaybackQueue(
+      prefetchDelay: Duration.zero,
       TrackPlayer(
         player: player,
         settings: settings,

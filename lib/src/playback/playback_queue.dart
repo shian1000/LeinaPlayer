@@ -89,6 +89,7 @@ class PlaybackQueue extends ChangeNotifier {
       Duration(seconds: 15),
       Duration(seconds: 30),
     ],
+    this.prefetchDelay = const Duration(seconds: 5),
   }) : _random = random ?? Random() {
     _completions = _tracks.player.completions.listen((_) => _advance());
     _skips = _tracks.player.skips.listen(
@@ -100,6 +101,11 @@ class PlaybackQueue extends ChangeNotifier {
   /// these waits instead of skipping it — otherwise it raced through dozens of songs in a
   /// second, each "unplayable" — then stops on it.
   final List<Duration> offlineRetries;
+
+  /// Caching ahead starts this long after the queue last changed: songs added quickly one after
+  /// another would each start a download, most of them pushed out of the songs cached ahead
+  /// by the next one, and the finished downloads would push useful songs out of the cache.
+  final Duration prefetchDelay;
 
   /// Within this much of a song's start, "Poprzedni" goes to the previous song; later it
   /// restarts the current one.
@@ -124,6 +130,7 @@ class PlaybackQueue extends ChangeNotifier {
   /// up.
   int _generation = 0;
   int _prefetchRun = 0;
+  Timer? _prefetchTimer;
 
   SearchHit? get current => _current?.hit;
   QueueEntry? get currentEntry => _current;
@@ -480,9 +487,19 @@ class PlaybackQueue extends ChangeNotifier {
   }
 
   /// Caches the next songs one at a time, so they play from the phone even if the connection
-  /// drops; a run gives up when a newer one starts (the queue changed, so its order did).
-  Future<void> _prefetchAhead() async {
+  /// drops, [prefetchDelay] after the queue last changed. A change makes the run under way give
+  /// up (the order changed), but only after the download it's on: that one isn't broken off.
+  void _prefetchAhead() {
     final run = ++_prefetchRun;
+    _prefetchTimer?.cancel();
+    if (prefetchDelay == Duration.zero) {
+      _cacheAhead(run);
+      return;
+    }
+    _prefetchTimer = Timer(prefetchDelay, () => _cacheAhead(run));
+  }
+
+  Future<void> _cacheAhead(int run) async {
     final count = _tracks.settings.activeQueuePrefetch;
     if (count == 0) return;
     for (final entry in upcoming.take(count)) {
@@ -628,6 +645,7 @@ class PlaybackQueue extends ChangeNotifier {
   void dispose() {
     _generation++;
     _prefetchRun++;
+    _prefetchTimer?.cancel();
     _completions.cancel();
     _skips.cancel();
     _played.close();

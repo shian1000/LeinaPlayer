@@ -94,7 +94,13 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 - Caching ahead (`TrackPlayer.prefetch`) resolves a stream with the switched-on stream methods
   and downloads it with `YouTubeLibrary.download` (1 MB Range chunks, like the cache while
   streaming). The cache limit used everywhere is `SourceSettings.cacheKeep` (≥ N + 2), so songs
-  cached ahead can't push out the playing one before they're played.
+  cached ahead can't push out the playing one before they're played. It starts 5 s after the
+  queue last changed (`PlaybackQueue.prefetchDelay`, user's choice): songs added one after
+  another ("Odtwórz jako następny" puts each at the front) used to start a download each, most
+  pushed out of the songs cached ahead by the next one, and the finished ones pushed recently
+  played songs out of the cache. A download under way is finished, not broken off (user's
+  choice). Tests pass `prefetchDelay: Duration.zero` — then it starts at once, with no `Timer`
+  left pending at the end of a widget test.
 - The NewPipe method-channel bridge is created once per Flutter engine (`MainActivity`
   companion), not per activity: the engine outlives the activity while music plays in the
   background, and the queue still needs NewPipe for the next song.
