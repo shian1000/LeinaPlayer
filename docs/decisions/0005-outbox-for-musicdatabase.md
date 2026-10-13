@@ -42,6 +42,12 @@ should be fixed in MusicDatabase, and the phone can't do that.
 - A dead link already in any request, waiting or sent (`outbox/sent/`), isn't reported again.
 - New reports go into the newest waiting request; a sent request leaves the outbox and the next
   report starts a new file.
+- The phone doesn't check whether a report is still current — neither when reporting nor before
+  sending, not even after a newer `music.db` is downloaded. Another phone may have got the link
+  fixed meanwhile, but only MusicDatabase knows its state when it processes the request: it
+  groups reports by (current song, dead video) and closes those whose link already changed
+  (`LINK_ALREADY_CHANGED` in its `inbox_requests.py`) without asking. A check on the phone could
+  only drop a few rows from waiting files, so it was left out (user agreed, 2026-10-13).
 
 ## Sending (MusicDatabase's inbox)
 
@@ -49,7 +55,8 @@ should be fixed in MusicDatabase, and the phone can't do that.
   best first (`DatabaseSync.serverAddresses`: local on the home Wi-Fi, then remote), at most
   1 MiB per file. Tried on start (after the daily download), on return to the app, and a minute
   after a new report (so the replacement found right after a dead link joins the same file).
-  The state and "Wyślij teraz" are in Ustawienia › Źródła muzyki › Baza danych.
+  The state and "Wyślij teraz" are in Ustawienia › Źródła muzyki › Baza danych. "Czeka na wysłanie"
+  there opens the songs reported in the waiting requests.
 - 201 / 200 (stored / this exact file already received) → the file moves to `outbox/sent/`.
 - 400 / 409 / 411 / 413 (malformed, number reused, no length, too big — bugs on the phone) →
   `outbox/rejected/`, kept, not sent again.

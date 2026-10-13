@@ -1,0 +1,113 @@
+import 'package:flutter/material.dart';
+
+import '../data/combined_search.dart';
+import '../data/local_library.dart';
+import '../data/outbox.dart';
+import '../data/song_catalog.dart';
+import '../data/youtube_library.dart';
+import '../theme.dart';
+import '../widgets/song_tile.dart';
+
+/// "Czeka na wysłanie" in Ustawienia › Źródła muzyki › Baza danych: the songs reported in the
+/// requests still waiting in the outbox, with the video the phone found instead.
+class OutboxContentsScreen extends StatefulWidget {
+  const OutboxContentsScreen({super.key});
+
+  @override
+  State<OutboxContentsScreen> createState() => _OutboxContentsScreenState();
+}
+
+class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
+  Future<List<DeadLinkReport>>? _reports;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Also after a send or a new report while the screen is open.
+    _reports = OutboxScope.of(context).waitingReports();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: palette.surface,
+        title: const Text('Czeka na wysłanie'),
+      ),
+      body: FutureBuilder<List<DeadLinkReport>>(
+        future: _reports,
+        builder: (context, snapshot) {
+          final reports = snapshot.data;
+          if (snapshot.hasError) {
+            return _Note('Nie udało się odczytać zgłoszeń.');
+          }
+          if (reports == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (reports.isEmpty) {
+            return const _Note('Wszystkie zgłoszenia zostały wysłane.');
+          }
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 24),
+            children: [
+              const _Note(
+                'Linki z bazy danych, których YouTube już nie odtwarza. Do czasu poprawki w '
+                'MusicDatabase telefon gra film znaleziony w zamian.',
+              ),
+              for (final report in reports) _ReportTile(report),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ReportTile extends StatelessWidget {
+  const _ReportTile(this.report);
+
+  final DeadLinkReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final replacement = report.replacementTitle;
+    final what = replacement == null
+        ? 'Bez zamiennika'
+        : 'Zamiennik: $replacement'
+              '${report.replacementChannel == null ? '' : ' (${report.replacementChannel})'}';
+    final subtitle = '${report.artist} · $what';
+    final song = SongCatalogScope.of(context).byId(report.songId);
+    // Gone from the downloaded music.db (merged or deleted since): shown as reported.
+    if (song == null) {
+      return ListTile(
+        leading: const Icon(Icons.music_note_outlined),
+        title: Text(report.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      );
+    }
+    final hit = withPhoneYouTube(
+      SearchHit.main(song, LocalLibraryScope.of(context).filesOf(song.id)),
+      YouTubeLibraryScope.of(context),
+    );
+    return SongTile(hit: hit, queue: [hit], subtitle: subtitle);
+  }
+}
+
+class _Note extends StatelessWidget {
+  const _Note(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+    child: Text(
+      text,
+      style: TextStyle(
+        color: context.palette.textSecondary,
+        fontSize: AppFontSize.small,
+      ),
+    ),
+  );
+}

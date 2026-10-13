@@ -97,6 +97,43 @@ void main() {
     expect(links.last['replacement_video_id'], isNull);
   });
 
+  test(
+    'waiting reports list the songs of unsent requests only, oldest first',
+    () async {
+      final outbox = newOutbox();
+      expect(await outbox.waitingReports(), isEmpty);
+
+      await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+      final sent = await Directory('${root.path}/outbox/sent').create();
+      final first = (await outbox.pending()).single;
+      await first.rename('${sent.path}/${first.path.split('/').last}');
+
+      now = now.add(const Duration(minutes: 1));
+      await outbox.reportDeadYouTubeLink(losingSleep, 'ad5ukUkNjgw');
+      now = now.add(const Duration(minutes: 1));
+      await outbox.reportDeadYouTubeLink(chromatic, 'anotherDead');
+      await outbox.reportReplacement(
+        chromatic,
+        'anotherDead',
+        const YouTubeVideo(
+          id: 'newChromati',
+          title: 'Chromatic (Live)',
+          channel: 'Elise Trouw',
+        ),
+      );
+
+      final reports = await outbox.waitingReports();
+      expect(
+        [for (final r in reports) (r.songId, r.deadVideoId)],
+        [(4602, 'ad5ukUkNjgw'), (4601, 'anotherDead')],
+      );
+      expect(reports.first.replacementTitle, isNull);
+      expect(reports.last.title, 'Chromatic');
+      expect(reports.last.replacementTitle, 'Chromatic (Live)');
+      expect(reports.last.replacementChannel, 'Elise Trouw');
+    },
+  );
+
   test('a link already reported, even in a sent request, is not reported again; numbers go on', () async {
     final outbox = newOutbox();
     await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');

@@ -132,6 +132,30 @@ class Outbox extends ChangeNotifier {
     return files;
   }
 
+  /// The dead links reported in the requests waiting to be sent, in the order they were found.
+  Future<List<DeadLinkReport>> waitingReports() => _inTurn(() async {
+    final factory = factoryOverride ?? databaseFactory;
+    final reports = <DeadLinkReport>[];
+    for (final file in await pending()) {
+      final db = await factory.openDatabase(
+        file.path,
+        options: OpenDatabaseOptions(readOnly: true),
+      );
+      try {
+        for (final row in await db.query('dead_youtube_links')) {
+          reports.add(DeadLinkReport._fromRow(row));
+        }
+      } finally {
+        await db.close();
+      }
+    }
+    // Parsed: across a change of summer time the offsets differ.
+    DateTime when(DeadLinkReport r) =>
+        DateTime.tryParse(r.detectedAt) ?? DateTime(0);
+    reports.sort((a, b) => when(a).compareTo(when(b)));
+    return reports;
+  });
+
   /// YouTube no longer plays music.db's link [deadVideoId] of [song]. Reported once: a link
   /// already in a request (waiting or sent) isn't added again. Returns whether it was added now.
   Future<bool> reportDeadYouTubeLink(CatalogSong song, String deadVideoId) =>
@@ -512,6 +536,42 @@ class OutboxSendResult {
   /// Refused by the inbox as malformed — kept in `outbox/rejected/`, not sent again.
   final int refused;
   final String? problem;
+}
+
+/// One row of a request's `dead_youtube_links`: music.db's link of a song that YouTube no longer
+/// plays, with the video the phone plays instead, if it found one.
+class DeadLinkReport {
+  const DeadLinkReport({
+    required this.songId,
+    required this.title,
+    required this.artist,
+    required this.deadVideoId,
+    required this.detectedAt,
+    this.replacementVideoId,
+    this.replacementTitle,
+    this.replacementChannel,
+  });
+
+  DeadLinkReport._fromRow(Map<String, Object?> row)
+    : songId = row['song_id']! as int,
+      title = row['title']! as String,
+      artist = row['artist']! as String,
+      deadVideoId = row['dead_video_id']! as String,
+      detectedAt = row['detected_at']! as String,
+      replacementVideoId = row['replacement_video_id'] as String?,
+      replacementTitle = row['replacement_title'] as String?,
+      replacementChannel = row['replacement_channel'] as String?;
+
+  final int songId;
+  final String title;
+  final String artist;
+  final String deadVideoId;
+
+  /// ISO 8601 with offset, as written to the request.
+  final String detectedAt;
+  final String? replacementVideoId;
+  final String? replacementTitle;
+  final String? replacementChannel;
 }
 
 class OutboxScope extends InheritedNotifier<Outbox> {

@@ -74,7 +74,9 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 - `youtube_removed_videos` (v10): videos YouTube no longer has — see
   [`playlists.md`](playlists.md) ("Videos YouTube removed"). `withPhoneYouTube` drops such a
   video from a row — music.db's own link too (`SearchHit.mainVideoRemoved`), so the song is
-  matched on the phone like one without a link.
+  matched on the phone like one without a link. Anything reading a row's `playlistVideoId`
+  straight from the queued row (`TrackPlayer.youTubeUri` — "Otwórz w YouTube" inside the
+  playlist) checks `isVideoRemoved` itself and falls back to the replacement.
 - **Server values win, phone values fill gaps** (user agreed): a music.db link or "N/A" always
   beats anything the phone found. So after each new `music.db` is loaded,
   `YouTubeLibrary.forgetSettled` (called from `main.dart`, `_forgetSettledMatches`, once per

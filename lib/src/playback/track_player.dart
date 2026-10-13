@@ -80,10 +80,13 @@ class TrackPlayer {
 
   /// Where the YouTube app should open [hit]: inside its YouTube playlist [listId] when it's
   /// played from one (the playlist's own video), else the video's page; `null` when no video
-  /// is known.
+  /// is known. A video YouTube removed — music.db's or the playlist's — gives way to the one the
+  /// phone found instead.
   Uri? youTubeUri(SearchHit hit, {String? listId}) {
     final inPlaylist = listId != null ? hit.playlistVideoId : null;
-    if (inPlaylist != null) return youTubeWatchUri(inPlaylist, listId: listId);
+    if (inPlaylist != null && !youTubeLibrary.isVideoRemoved(inPlaylist)) {
+      return youTubeWatchUri(inPlaylist, listId: listId);
+    }
     final videoId = _withRememberedVideo(hit).youtubeVideoId;
     return videoId == null ? null : youTubeWatchUri(videoId);
   }

@@ -149,7 +149,8 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
       local address (`DatabaseSync.discoverLocalServer`).
     - "Ostatnie pobranie" (with which address was used), the last error if any, "Pobierz teraz".
     - "Zgłoszenia dla MusicDatabase": "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by
-      default), "Czeka na wysłanie" (requests in the outbox), "Ostatnie wysyłanie" (sent /
+      default), "Czeka na wysłanie" (requests in the outbox; tapped, the reported songs with the phone's
+      replacement — `outbox_contents_screen.dart`), "Ostatnie wysyłanie" (sent /
       refused / why not, "kolejna próba jutro" after the server refused), "Wyślij teraz"
       ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
 

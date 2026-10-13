@@ -498,6 +498,22 @@ void main() {
       },
     );
 
+    test('"Otwórz w YouTube" opens the video found instead, also played from its playlist', () async {
+      final queue = PlaybackQueue(tracksWith());
+      final fromPlaylist = SearchHit.youTubeOnly(
+        title: 'Total Eclipse of the Heart',
+        artistLabel: 'Bonnie Tyler',
+        videoId: dead,
+        playlistVideoId: dead,
+      );
+      await queue.start([fromPlaylist], 0, youTubeListId: 'PL1');
+      expect(
+        queue.currentYouTubeUri,
+        Uri.parse('https://www.youtube.com/watch?v=alive123456'),
+      );
+      queue.dispose();
+    });
+
     test('MusicDatabase\'s own link: marked, replaced on the phone until music.db changes it', () async {
       final tracks = tracksWith();
       CatalogSong song(String videoId) => CatalogSong(
@@ -515,6 +531,10 @@ void main() {
       expect(library.isVideoRemoved(dead), isTrue);
       expect(library.matchFor(1), 'alive123456');
       expect(withPhoneYouTube(hit, library).youtubeVideoId, 'alive123456');
+      expect(
+        tracks.youTubeUri(hit),
+        Uri.parse('https://www.youtube.com/watch?v=alive123456'),
+      );
       // MusicDatabase is told, with the video found instead.
       final request = (await outbox.pending()).single;
       final db = await databaseFactoryFfi.openDatabase(request.path);

@@ -5,6 +5,7 @@ import '../data/database_sync.dart';
 import '../data/outbox.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'outbox_contents_screen.dart';
 
 /// "Ustawienia › Źródła muzyki › Baza danych" — the addresses MusicDatabase's files are
 /// downloaded from (remote, and local for the home Wi-Fi), the state of the last download, and
@@ -398,6 +399,15 @@ class _OutboxSection extends StatelessWidget {
               ? const SizedBox.square(
                   dimension: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : outbox.waiting > 0
+              ? const Icon(Icons.chevron_right)
+              : null,
+          onTap: outbox.waiting > 0
+              ? () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const OutboxContentsScreen(),
+                  ),
                 )
               : null,
         ),
