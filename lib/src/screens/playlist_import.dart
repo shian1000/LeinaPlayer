@@ -112,7 +112,7 @@ Future<PlaylistSummary?> runPlaylistImport(
       ref = spotifyPlaylistRef(await spotify.resolveShortLink(shortLink));
     }
     switch (ref?.source) {
-      case null:
+      case null || PlaylistSource.folder:
         message = 'To nie jest link do playlisty z YouTube ani playlisty lub albumu ze Spotify.';
       case PlaylistSource.youtube:
         final result = await playlists.importYouTube(

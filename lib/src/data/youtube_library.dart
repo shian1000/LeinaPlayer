@@ -238,6 +238,7 @@ class YouTubeLibrary extends ChangeNotifier {
         'video_id': videoId,
         'found_at': _now().millisecondsSinceEpoch,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await _markPlaylistsChanged(txn, videoId);
       await txn.update(
         'playlist_tracks',
         {'youtube_removed': 1},
@@ -261,6 +262,17 @@ class YouTubeLibrary extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Account playlists holding [videoId] go to MusicDatabase again (`playlist_library.dart`).
+  static Future<void> _markPlaylistsChanged(
+    DatabaseExecutor db,
+    String videoId,
+  ) => db.rawUpdate(
+    '''UPDATE playlists SET dirty = 1
+       WHERE account IS NOT NULL AND id IN (
+         SELECT playlist_id FROM playlist_tracks WHERE youtube_video_id = ?)''',
+    [videoId],
+  );
+
   /// These videos are on YouTube after all (back in a playlist).
   Future<void> clearVideosRemoved(Iterable<String> videoIds) async {
     final back = videoIds.where(_removedVideos.contains).toSet();
@@ -272,6 +284,7 @@ class YouTubeLibrary extends ChangeNotifier {
         where: 'video_id = ?',
         whereArgs: [id],
       );
+      await _markPlaylistsChanged(db, id);
       await db.update(
         'playlist_tracks',
         {'youtube_removed': 0},

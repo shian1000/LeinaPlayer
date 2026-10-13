@@ -132,7 +132,11 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 - Konto **→ Konto** (`account_screen.dart`) — **implemented**: logging in with a MusicDatabase
   user ("Nazwa użytkownika", "Hasło", "Zaloguj"; checked by the server, which hands back a
   token), or the logged-in user and "Wyloguj" (asks first)
-  ([ADR 0006](decisions/0006-musicdatabase-login.md)).
+  ([ADR 0006](decisions/0006-musicdatabase-login.md)). Logged in, a "Playlisty" row shows how
+  the account's playlists last synced with MusicDatabase, with ⟳ "Synchronizuj teraz"; right
+  after logging in, phone-only playlists are offered to the account ("Dodać playlisty z
+  telefonu do konta?" — Nie teraz / Dodaj), and while any are left a row "Playlisty tylko na tym
+telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)).
 - Źródła muzyki **→ Źródła muzyki** (`music_sources_screen.dart`), list of music sources:
   - Muzyka lokalna **→ Muzyka lokalna** (`local_music_screen.dart`) — **implemented**:
     - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
@@ -378,7 +382,8 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   - `Biblioteka › Sortuj wg › Twórca`
 - `Biblioteka › Widok siatki`
 - Library items: the user's playlists (`PlaylistLibrary`, newest first; cover, name,
-  "Playlista • <owner>") **→ Playlista**. No sample items any more; with no playlists the list
+  "Playlista • <owner>") **→ Playlista** — the logged-in account's (synced with MusicDatabase,
+  incl. ones made there, e.g. folder playlists) and the phone-only ones. No sample items any more; with no playlists the list
   shows "Brak playlist" and how to add one. Albums/artists don't exist yet.
 
 ## Playlista (`playlist_screen.dart`) — **implemented** for imported playlists

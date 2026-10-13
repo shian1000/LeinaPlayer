@@ -1,19 +1,26 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'playlist_sync.dart';
 import 'song_catalog.dart';
 import 'spotify_playlist.dart';
 import 'youtube_library.dart';
 import 'youtube_playlist.dart';
 import 'youtube_video.dart';
 
-/// Where a playlist was imported from: a YouTube or Spotify playlist, or a Spotify album.
+/// Where a playlist was imported from: a YouTube or Spotify playlist, a Spotify album, or (in
+/// MusicDatabase's menu) a music folder on the server.
 enum PlaylistSource {
   youtube,
   spotify,
-  spotifyAlbum;
+  spotifyAlbum,
+  folder;
 
-  bool get isSpotify => this != youtube;
+  bool get isSpotify => this == spotify || this == spotifyAlbum;
 }
 
 /// One playlist in Biblioteka.
@@ -27,6 +34,7 @@ class PlaylistSummary {
     required this.updatedAt,
     this.source,
     this.sourceId,
+    this.account,
   });
 
   final int id;
@@ -42,6 +50,9 @@ class PlaylistSummary {
   final PlaylistSource? source;
   final String? sourceId;
 
+  /// The MusicDatabase user whose playlists it's synced with; `null` = only on this phone.
+  final String? account;
+
   /// The YouTube playlist it was imported from (`list=` in its address).
   String? get youTubeId => source == PlaylistSource.youtube ? sourceId : null;
 
@@ -53,7 +64,7 @@ class PlaylistSummary {
     }),
     PlaylistSource.spotify => spotifyPlaylistUri(sourceId!),
     PlaylistSource.spotifyAlbum => spotifyAlbumUri(sourceId!),
-    null => null,
+    PlaylistSource.folder || null => null,
   };
 }
 
@@ -119,30 +130,62 @@ typedef _KeptTrack = ({PlaylistTrack track, bool videoRemoved});
 
 /// The user's playlists, in the phone's `local.db` (tables created by `LocalLibrary`). So far
 /// only imported from YouTube or Spotify; importing the same playlist again replaces its tracks.
+///
+/// While a MusicDatabase user is logged in, new playlists belong to that account and [sync]
+/// exchanges them with MusicDatabase ([ADR 0007](../../../docs/decisions/0007-playlist-sync.md)).
+/// Only the logged-in account's playlists and the phone-only ones are shown; another account's
+/// stay in `local.db`, hidden until it logs in again.
 class PlaylistLibrary extends ChangeNotifier {
   PlaylistLibrary(
     this._database,
     this._catalog,
     this._youTube, {
     DateTime Function()? now,
-  }) : _now = now ?? DateTime.now;
+    String? Function()? userName,
+    String? Function()? authToken,
+  }) : _now = now ?? DateTime.now,
+       _userName = userName ?? (() => null),
+       _authToken = authToken ?? (() => null);
 
   final Future<Database> Function() _database;
   final SongCatalog _catalog;
   final YouTubeLibrary _youTube;
   final DateTime Function() _now;
 
+  /// The logged-in MusicDatabase user ([Account]); `null` while logged out.
+  final String? Function() _userName;
+  final String? Function() _authToken;
+
+  /// A playlist was changed here, e.g. to send it to MusicDatabase soon.
+  VoidCallback? onChanged;
+
+  /// The server didn't accept [_authToken] (HTTP 401): the user has to log in again.
+  VoidCallback? onUnauthorized;
+
   List<PlaylistSummary> _playlists = const [];
 
   /// Most recently updated first.
   List<PlaylistSummary> get playlists => _playlists;
 
+  /// Rows of the account logged in now, or phone-only ones ([_userName] `null`: only those).
+  ({String where, List<Object?> args}) _scope([String prefix = '']) {
+    final user = _userName();
+    return user == null
+        ? (where: '${prefix}account IS NULL', args: const [])
+        : (
+            where: '(${prefix}account IS NULL OR ${prefix}account = ?)',
+            args: [user],
+          );
+  }
+
   Future<void> load() async {
+    final scope = _scope('p.');
     final rows = await (await _database()).rawQuery('''
-      SELECT p.id, p.name, p.owner, p.updated_at, p.source, p.source_id,
+      SELECT p.id, p.name, p.owner, p.updated_at, p.source, p.source_id, p.account,
              COUNT(t.position) AS tracks, COALESCE(SUM(t.duration_s), 0) AS seconds
       FROM playlists p LEFT JOIN playlist_tracks t ON t.playlist_id = p.id
-      GROUP BY p.id ORDER BY p.updated_at DESC''');
+      WHERE p.deleted_at IS NULL AND ${scope.where}
+      GROUP BY p.id ORDER BY p.updated_at DESC''', scope.args);
     _playlists = [
       for (final row in rows)
         PlaylistSummary(
@@ -156,6 +199,7 @@ class PlaylistLibrary extends ChangeNotifier {
           ),
           source: PlaylistSource.values.asNameMap()[row['source']],
           sourceId: row['source_id'] as String?,
+          account: row['account'] as String?,
         ),
     ];
     notifyListeners();
@@ -293,11 +337,13 @@ class PlaylistLibrary extends ChangeNotifier {
     PlaylistSource source,
     String sourceId,
   ) async {
+    final scope = _scope();
     final rows = await (await _database()).query(
       'playlists',
       columns: ['id'],
-      where: 'source = ? AND source_id = ?',
-      whereArgs: [source.name, sourceId],
+      where:
+          'source = ? AND source_id = ? AND deleted_at IS NULL AND ${scope.where}',
+      whereArgs: [source.name, sourceId, ...scope.args],
     );
     return rows.isEmpty ? const [] : tracks(rows.first['id']! as int);
   }
@@ -351,14 +397,17 @@ class PlaylistLibrary extends ChangeNotifier {
   }) async {
     final db = await _database();
     final now = _now().millisecondsSinceEpoch;
+    final scope = _scope();
     late int playlistId;
     var updated = false;
     await db.transaction((txn) async {
+      // A playlist deleted here but not yet on MusicDatabase comes back under its own id.
       final existing = await txn.query(
         'playlists',
-        columns: ['id'],
-        where: 'source = ? AND source_id = ?',
-        whereArgs: [source.name, sourceId],
+        columns: ['id', 'deleted_at'],
+        where: 'source = ? AND source_id = ? AND ${scope.where}',
+        whereArgs: [source.name, sourceId, ...scope.args],
+        orderBy: 'deleted_at IS NOT NULL',
       );
       if (existing.isEmpty) {
         playlistId = await txn.insert('playlists', {
@@ -368,13 +417,22 @@ class PlaylistLibrary extends ChangeNotifier {
           'source_id': sourceId,
           'created_at': now,
           'updated_at': now,
+          'uid': newPlaylistUid(),
+          'account': _userName(),
+          'dirty': 1,
         });
       } else {
-        updated = true;
+        updated = existing.first['deleted_at'] == null;
         playlistId = existing.first['id']! as int;
         await txn.update(
           'playlists',
-          {'name': name, 'owner': owner, 'updated_at': now},
+          {
+            'name': name,
+            'owner': owner,
+            'updated_at': now,
+            'dirty': 1,
+            'deleted_at': null,
+          },
           where: 'id = ?',
           whereArgs: [playlistId],
         );
@@ -415,6 +473,7 @@ class PlaylistLibrary extends ChangeNotifier {
       await batch.commit(noResult: true);
     });
     await load();
+    onChanged?.call();
     return (
       playlist: _playlists.firstWhere((p) => p.id == playlistId),
       recognised: tracks
@@ -462,16 +521,356 @@ class PlaylistLibrary extends ChangeNotifier {
     return _catalog.findExact(title: title, artist: artist);
   }
 
+  /// Removes the playlist. An account's playlist stays as a marker without tracks until
+  /// MusicDatabase hears of the deletion ([sync]), which deletes it on the account's other
+  /// devices too (keeping a copy in its archive).
   Future<void> delete(int playlistId) async {
     final db = await _database();
-    await db.delete(
-      'playlist_tracks',
-      where: 'playlist_id = ?',
-      whereArgs: [playlistId],
-    );
-    await db.delete('playlists', where: 'id = ?', whereArgs: [playlistId]);
+    await db.transaction((txn) async {
+      await txn.delete(
+        'playlist_tracks',
+        where: 'playlist_id = ?',
+        whereArgs: [playlistId],
+      );
+      await txn.rawUpdate(
+        'UPDATE playlists SET deleted_at = ?, dirty = 0 '
+        'WHERE id = ? AND account IS NOT NULL',
+        [_now().millisecondsSinceEpoch, playlistId],
+      );
+      await txn.delete(
+        'playlists',
+        where: 'id = ? AND account IS NULL',
+        whereArgs: [playlistId],
+      );
+    });
     await load();
+    onChanged?.call();
   }
+
+  /// Playlists that live only on this phone (made while logged out).
+  Future<int> phoneOnlyCount() async {
+    final rows = await (await _database()).rawQuery(
+      'SELECT COUNT(*) AS n FROM playlists '
+      'WHERE account IS NULL AND deleted_at IS NULL',
+    );
+    return rows.first['n']! as int;
+  }
+
+  /// The phone-only playlists become the logged-in account's, sent to MusicDatabase by [sync].
+  Future<void> addPhoneOnlyToAccount() async {
+    final user = _userName();
+    if (user == null) return;
+    await (await _database()).rawUpdate(
+      'UPDATE playlists SET account = ?, dirty = 1, revision = 0 '
+      'WHERE account IS NULL AND deleted_at IS NULL',
+      [user],
+    );
+    await load();
+    onChanged?.call();
+  }
+
+  bool _syncing = false;
+  bool _syncAgain = false;
+  PlaylistSyncResult? _lastSync;
+
+  bool get syncing => _syncing;
+
+  /// How the last [sync] went; `null` before the first one.
+  PlaylistSyncResult? get lastSync => _lastSync;
+
+  static String _revisionKey(String user) => 'playlists.sync_revision.$user';
+
+  /// Exchanges the logged-in account's playlists with MusicDatabase on the first of [servers]
+  /// that answers: first what changed there since the last time (a playlist changed here too
+  /// waits — sending it settles which version stays), then the deletions and changes made
+  /// here. MusicDatabase keeps whichever change is newer and answers with the stored playlist,
+  /// which replaces the phone's. Nothing happens while logged out.
+  Future<void> sync(List<Uri> servers) async {
+    if (_syncing) {
+      _syncAgain = true;
+      return;
+    }
+    final user = _userName();
+    final token = _authToken();
+    if (user == null || token == null || servers.isEmpty) return;
+    _syncing = true;
+    notifyListeners();
+    try {
+      do {
+        _syncAgain = false;
+        _lastSync = PlaylistSyncResult(
+          at: _now(),
+          problem: await _syncWith(servers, user, token),
+        );
+      } while (_syncAgain && _userName() == user && _authToken() == token);
+    } finally {
+      _syncing = false;
+      await load();
+    }
+  }
+
+  Future<String?> _syncWith(
+    List<Uri> servers,
+    String user,
+    String token,
+  ) async {
+    String? problem;
+    for (final server in servers) {
+      final client = PlaylistSyncClient(server, user, token);
+      try {
+        return await _syncOn(client, user);
+      } on _SyncStopped catch (e) {
+        return e.problem;
+      } catch (e) {
+        debugPrint('Playlist sync on $server failed: $e');
+        problem = 'Brak połączenia z serwerem MusicDatabase';
+      } finally {
+        client.close();
+      }
+    }
+    return problem;
+  }
+
+  Future<String?> _syncOn(PlaylistSyncClient client, String user) async {
+    final prefs = await SharedPreferences.getInstance();
+    final since = prefs.getInt(_revisionKey(user)) ?? 0;
+    var answer = await client.changedSince(since);
+    _check(answer);
+    var changes = answer.body! as Map<String, Object?>;
+    // The counter went back (the account's data was restored or made again): fetch it all.
+    if ((changes['revision']! as int) < since) {
+      answer = await client.changedSince(0);
+      _check(answer);
+      changes = answer.body! as Map<String, Object?>;
+    }
+    final db = await _database();
+    await db.transaction((txn) async {
+      for (final playlist in changes['playlists']! as List) {
+        final remote = playlist as Map<String, Object?>;
+        final local = await txn.query(
+          'playlists',
+          columns: ['dirty', 'deleted_at'],
+          where: 'uid = ?',
+          whereArgs: [remote['uid']],
+        );
+        if (local.isNotEmpty &&
+            (local.first['dirty'] == 1 || local.first['deleted_at'] != null)) {
+          continue;
+        }
+        await _applyRemote(txn, remote, user);
+      }
+    });
+    await prefs.setInt(_revisionKey(user), changes['revision']! as int);
+
+    String? problem;
+    for (final row in await db.query(
+      'playlists',
+      where: 'account = ? AND deleted_at IS NOT NULL',
+      whereArgs: [user],
+    )) {
+      final deletedAt = row['deleted_at']! as int;
+      final answer = await client.delete(
+        row['uid']! as String,
+        row['revision']! as int,
+        deletedAt,
+      );
+      problem ??= _check(answer, keepGoing: true);
+      if (answer.body is! Map) continue;
+      await db.transaction((txn) async {
+        // Brought back here while the answer was on its way: that's sent next time.
+        final still = await txn.query(
+          'playlists',
+          columns: ['id'],
+          where: 'id = ? AND deleted_at = ?',
+          whereArgs: [row['id'], deletedAt],
+        );
+        if (still.isEmpty) return;
+        final remote = answer.body! as Map<String, Object?>;
+        if (remote['deleted'] == true) {
+          await txn.delete(
+            'playlists',
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        } else {
+          await _applyRemote(txn, remote, user, intoId: row['id']! as int);
+        }
+      });
+    }
+    for (final row in await db.query(
+      'playlists',
+      where: 'account = ? AND dirty = 1 AND deleted_at IS NULL',
+      whereArgs: [user],
+    )) {
+      final id = row['id']! as int;
+      final answer = await client.put(
+        row['uid']! as String,
+        await _toJson(db, row),
+      );
+      problem ??= _check(answer, keepGoing: true);
+      if (answer.body is! Map) continue;
+      final remote = answer.body! as Map<String, Object?>;
+      await db.transaction((txn) async {
+        final now = await txn.query(
+          'playlists',
+          columns: ['updated_at', 'deleted_at'],
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        if (now.isEmpty) return;
+        // Changed again here while this was being sent: the answer's revision is the base the
+        // newer change goes with next time; its tracks would undo that change.
+        if (now.first['updated_at'] != row['updated_at'] ||
+            now.first['deleted_at'] != null) {
+          await txn.update(
+            'playlists',
+            {'revision': remote['revision'], 'uid': remote['uid']},
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+          return;
+        }
+        await _applyRemote(txn, remote, user, intoId: id);
+      });
+    }
+    return problem;
+  }
+
+  /// Throws [_SyncStopped] for answers that end this sync (logged out, the server's drive
+  /// missing) and returns the problem of one playlist's answer otherwise; `null` when it went.
+  String? _check(SyncAnswer answer, {bool keepGoing = false}) {
+    switch (answer.status) {
+      case HttpStatus.ok || HttpStatus.conflict when answer.body is Map:
+        return null;
+      case HttpStatus.unauthorized:
+        onUnauthorized?.call();
+        throw const _SyncStopped(
+          'Serwer nie przyjął logowania — zaloguj się ponownie (Ustawienia › Konto)',
+        );
+      case HttpStatus.serviceUnavailable:
+        throw const _SyncStopped(
+          'Serwer MusicDatabase nie może teraz zapisać playlist (dysk niepodłączony lub '
+          'baza użytkownika jeszcze nieprzygotowana)',
+        );
+      case HttpStatus.notFound when !keepGoing:
+        throw const _SyncStopped(
+          'Serwer MusicDatabase nie obsługuje jeszcze playlist',
+        );
+    }
+    final problem = 'Serwer odrzucił playlistę (HTTP ${answer.status})';
+    if (keepGoing) return problem;
+    throw _SyncStopped(problem);
+  }
+
+  /// [row] as MusicDatabase's PUT body: the whole playlist and the revision it's based on.
+  Future<Map<String, Object?>> _toJson(
+    Database db,
+    Map<String, Object?> row,
+  ) async => {
+    'uid': row['uid'],
+    'base_revision': row['revision'],
+    'name': row['name'],
+    'source': row['source'],
+    'source_id': row['source_id'],
+    'source_owner': row['owner'],
+    'created_at': row['created_at'],
+    'updated_at': row['updated_at'],
+    'tracks': [
+      for (final t in await tracks(row['id']! as int))
+        {
+          'song_id': t.mainDbId,
+          'title': t.title,
+          'artist': t.artist,
+          'youtube_video_id': t.youtubeVideoId,
+          'spotify_track_id': t.spotifyTrackId,
+          'youtube_removed': t.videoRemoved,
+          'duration_s': t.duration?.inSeconds,
+        },
+    ],
+  };
+
+  /// Stores MusicDatabase's [remote] playlist as [user]'s: in place of the row [intoId] (the
+  /// one just sent — MusicDatabase may have given it another playlist's uid), else of the row
+  /// with its uid, else as a new one. Local ids stay, as the queue and history refer to them.
+  Future<void> _applyRemote(
+    Transaction txn,
+    Map<String, Object?> remote,
+    String user, {
+    int? intoId,
+  }) async {
+    final uid = remote['uid']! as String;
+    final sameUid = [
+      for (final row in await txn.query(
+        'playlists',
+        columns: ['id'],
+        where: 'uid = ?',
+        whereArgs: [uid],
+      ))
+        row['id']! as int,
+    ];
+    final id = intoId ?? sameUid.firstOrNull;
+    for (final other in sameUid.where((other) => other != id)) {
+      await txn.delete(
+        'playlist_tracks',
+        where: 'playlist_id = ?',
+        whereArgs: [other],
+      );
+      await txn.delete('playlists', where: 'id = ?', whereArgs: [other]);
+    }
+    if (id != null) {
+      await txn.delete(
+        'playlist_tracks',
+        where: 'playlist_id = ?',
+        whereArgs: [id],
+      );
+    }
+    if (remote['deleted'] == true) {
+      if (id != null) {
+        await txn.delete('playlists', where: 'id = ?', whereArgs: [id]);
+      }
+      return;
+    }
+    final values = {
+      'uid': uid,
+      'account': user,
+      'revision': remote['revision'],
+      'dirty': 0,
+      'deleted_at': null,
+      'name': remote['name'],
+      'owner': remote['source_owner'],
+      'source': remote['source'],
+      'source_id': remote['source_id'],
+      'created_at': remote['created_at'],
+      'updated_at': remote['updated_at'],
+    };
+    if (id != null) {
+      await txn.update('playlists', values, where: 'id = ?', whereArgs: [id]);
+    }
+    final playlistId = id ?? await txn.insert('playlists', values);
+    final batch = txn.batch();
+    for (final (position, track) in (remote['tracks']! as List).indexed) {
+      final t = track as Map<String, Object?>;
+      batch.insert('playlist_tracks', {
+        'playlist_id': playlistId,
+        'position': position,
+        'title': t['title'],
+        'artist': t['artist'],
+        'main_db_id': t['song_id'],
+        'youtube_video_id': t['youtube_video_id'],
+        'spotify_track_id': t['spotify_track_id'],
+        'youtube_removed': t['youtube_removed'] == true ? 1 : 0,
+        'duration_s': t['duration_s'],
+      });
+    }
+    await batch.commit(noResult: true);
+  }
+}
+
+/// An answer that ends a [PlaylistLibrary.sync] early, with why (Polish, for display).
+class _SyncStopped implements Exception {
+  const _SyncStopped(this.problem);
+
+  final String problem;
 }
 
 /// Makes the [PlaylistLibrary] reachable from any screen.
@@ -482,7 +881,10 @@ class PlaylistLibraryScope extends InheritedNotifier<PlaylistLibrary> {
     required super.child,
   });
 
-  static PlaylistLibrary of(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<PlaylistLibraryScope>()!
-      .notifier!;
+  static PlaylistLibrary of(BuildContext context) => maybeOf(context)!;
+
+  /// `null` outside the app (widget tests that pump a single screen).
+  static PlaylistLibrary? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<PlaylistLibraryScope>()
+      ?.notifier;
 }

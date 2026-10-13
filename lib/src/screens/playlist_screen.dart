@@ -146,6 +146,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
             _fetched = data;
             _tracks = tracks;
           });
+        // Search finds only YouTube and Spotify playlists.
+        case PlaylistSource.folder:
+          throw StateError('No preview for a folder playlist');
       }
     } on YouTubeSearchException catch (e) {
       if (mounted) setState(() => _fetchError = e.message);
@@ -299,7 +302,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   String get _kind =>
       _playlist.source == PlaylistSource.spotifyAlbum ? 'Album' : 'Playlista';
   String get _owner =>
-      _playlist.owner ?? (_fromSpotify ? 'Spotify' : 'YouTube');
+      _playlist.owner ??
+      switch (_playlist.source) {
+        PlaylistSource.spotify || PlaylistSource.spotifyAlbum => 'Spotify',
+        PlaylistSource.folder => 'MusicDatabase',
+        _ => 'YouTube',
+      };
 
   /// Shares the playlist's own page where it was imported from — the phone's copy has no link.
   void _share(List<SearchHit> hits) {
@@ -307,7 +315,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     if (link == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Ta playlista jest tylko na telefonie — nie ma linku.'),
+          content: Text(
+            'Ta playlista nie pochodzi z YouTube ani Spotify — nie ma linku.',
+          ),
         ),
       );
       return;
@@ -335,8 +345,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Usunąć playlistę?'),
         content: Text(
-          '„${_playlist.name}” zniknie z Biblioteki. Utwory w bazie danych i na telefonie '
-          'zostają.',
+          _playlist.account == null
+              ? '„${_playlist.name}” zniknie z Biblioteki. Utwory w bazie danych i na '
+                    'telefonie zostają.'
+              : '„${_playlist.name}” zniknie z Biblioteki na wszystkich urządzeniach konta '
+                    '${_playlist.account} i z MusicDatabase (zostanie tam kopia w archiwum). '
+                    'Utwory w bazie danych i na telefonie zostają.',
         ),
         actions: [
           TextButton(

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'playlist_sync.dart';
 import 'song_catalog.dart';
 import 'text_normalizer.dart';
 
@@ -235,7 +236,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 10,
+        version: 11,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -268,6 +269,7 @@ class LocalLibrary extends ChangeNotifier {
           await _addSpotifyTrackColumn(db);
           await _addVideoRemovedColumn(db);
           await _createRemovedVideosTable(db);
+          await _addPlaylistSyncColumns(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -279,9 +281,35 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 8) await _addSpotifyTrackColumn(db);
           if (from < 9) await _addVideoRemovedColumn(db);
           if (from < 10) await _createRemovedVideosTable(db);
+          if (from < 11) await _addPlaylistSyncColumns(db);
         },
       ),
     );
+  }
+
+  /// Version 11: playlists synced with the user's MusicDatabase account (see
+  /// `playlist_library.dart`, ADR 0007): the id shared with MusicDatabase, whose account the
+  /// playlist belongs to (NULL: only on this phone), the server's revision last seen, a change
+  /// waiting to be sent, and a deletion waiting to be sent (the row stays, without tracks).
+  static Future<void> _addPlaylistSyncColumns(Database db) async {
+    for (final column in [
+      'uid VARCHAR',
+      'account VARCHAR',
+      'revision INTEGER NOT NULL DEFAULT 0',
+      'dirty INTEGER NOT NULL DEFAULT 0',
+      'deleted_at INTEGER',
+    ]) {
+      await db.execute('ALTER TABLE playlists ADD COLUMN $column');
+    }
+    for (final row in await db.query('playlists', columns: ['id'])) {
+      await db.update(
+        'playlists',
+        {'uid': newPlaylistUid()},
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+    await db.execute('CREATE UNIQUE INDEX ix_playlists_uid ON playlists (uid)');
   }
 
   /// Version 10: videos YouTube no longer has (found out by playing them or re-importing a

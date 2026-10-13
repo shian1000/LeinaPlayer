@@ -36,7 +36,8 @@ audio on Android through NewPipeExtractor, with a cache of played songs — see
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
 a share sheet; song search also finds Biblioteka playlists, and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
-([`playlists.md`](docs/agent-notes/playlists.md)).
+([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their
+MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).
 YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
 the video / track; a tapped link first shows a native sheet asking where to open it (Leina Radio,
 the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków).
@@ -66,7 +67,8 @@ the service's app, a browser; a choice can be remembered — Ustawienia › Otwi
   [hand-off](docs/handoffs/musicdatabase-outbox.md)). The phone logs in with a MusicDatabase user
   (Ustawienia › Konto, `account.dart`; `POST /login` gives a token sent with the requests —
   [ADR 0006](docs/decisions/0006-musicdatabase-login.md); the server side is in a
-  [hand-off](docs/handoffs/musicdatabase-login.md)). Any other way of talking to MusicDatabase is not decided — check with the user
+  [hand-off](docs/handoffs/musicdatabase-login.md)). The account's playlists are exchanged as JSON
+(`/users/<name>/playlists` — [ADR 0007](docs/decisions/0007-playlist-sync.md)). Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands
@@ -98,7 +100,8 @@ flutter build apk            # build a release Android APK
   (`incoming_links.dart`, `video_link.dart`), YouTube search / matching / audio
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
-  (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`),
+  (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), syncing
+playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`),
   album covers and their cache
   (`album_covers.dart`), play history (`play_history.dart`,
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and

@@ -90,7 +90,10 @@ SQLite files, so far dead music.db YouTube links with the phone's replacement �
 the inbox on MusicDatabase's sharing server (`PUT /inbox/<name>`, same addresses as the download;
 [ADR 0005](decisions/0005-outbox-for-musicdatabase.md)). `lib/src/data/account.dart` (`Account`,
 `AccountScope`) is the MusicDatabase user logged in on the phone (`POST /login` → a token sent with
-the requests; [ADR 0006](decisions/0006-musicdatabase-login.md)).
+the requests; [ADR 0006](decisions/0006-musicdatabase-login.md)). That user's playlists sync both
+ways with their account in MusicDatabase: `PlaylistLibrary.sync` (`playlist_library.dart`, HTTP in
+`playlist_sync.dart`) exchanges whole playlists as JSON on `/users/<name>/playlists`
+([ADR 0007](decisions/0007-playlist-sync.md)).
 
 ## Intended shape (not yet implemented)
 
@@ -109,4 +112,6 @@ MusicDatabase has its own ([ADR 0003](decisions/0003-app-supports-musicdatabase.
 keep working when MusicDatabase's server is unreachable. Proper fixes still belong in
 MusicDatabase: the phone reports what it found through its outbox, and the owner reviews it there
 (Manage database › "Resolve new requests") — nothing is applied automatically
-([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
+([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)). The user's own data (playlists) is
+private and isn't reviewed: it goes straight into their `user.db`
+([ADR 0007](decisions/0007-playlist-sync.md)).

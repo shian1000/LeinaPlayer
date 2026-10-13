@@ -170,7 +170,13 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _localLibrary.database,
     _songCatalog,
     _youTubeLibrary,
-  );
+    userName: () => _account.userName,
+    authToken: () => _account.token,
+  )..onUnauthorized = _account.tokenRejected;
+  Timer? _playlistSyncSoon;
+
+  /// The user whose playlists Biblioteka shows; another one logging in shows theirs.
+  String? _playlistsUser;
   late final _playHistory = PlayHistory(_localLibrary.database);
   late final _queueSession = QueueSession(
     queue: _playbackQueue,
@@ -222,15 +228,19 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     // After the first frame, when AppShell already listens (the link that started the app
     // would otherwise go nowhere).
     WidgetsBinding.instance.addPostFrameCallback((_) => _incomingLinks.start());
-    _playlistLibrary.load().catchError(
-      (Object e) => debugPrint('Loading playlists failed: $e'),
-    );
+    // A few seconds' wait lets several changes in a row go to MusicDatabase together.
+    _playlistLibrary.onChanged = () {
+      _playlistSyncSoon?.cancel();
+      _playlistSyncSoon = Timer(const Duration(seconds: 3), _syncPlaylists);
+    };
+    _account.addListener(_accountChanged);
     // Android often keeps the app alive for days, so "once a day on start" also has to cover
     // coming back to an app that was only in the background.
     _lifecycle = AppLifecycleListener(
       onResume: () async {
         await _databaseSync.syncIfDue();
         await _sendOutbox();
+        await _syncPlaylists();
       },
       onHide: _queueSession.save,
     );
@@ -301,6 +311,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     await _account.load().catchError(
       (Object e) => debugPrint('Loading the account failed: $e'),
     );
+    _accountChanged();
     try {
       await _databaseSync.load();
       await _databaseSync.syncIfDue();
@@ -311,6 +322,32 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       (Object e) => debugPrint('Reading the outbox failed: $e'),
     );
     await _sendOutbox();
+  }
+
+  /// Logging in or out changes which playlists Biblioteka shows; a login also fetches the
+  /// account's playlists from MusicDatabase. Also called once the saved login is read, which
+  /// is when playlists are first loaded.
+  void _accountChanged() {
+    final user = _account.userName;
+    if (_playlistsLoaded && user == _playlistsUser) return;
+    _playlistsUser = user;
+    _playlistsLoaded = true;
+    _playlistLibrary
+        .load()
+        .then((_) => _syncPlaylists())
+        .catchError((Object e) => debugPrint('Loading playlists failed: $e'));
+  }
+
+  bool _playlistsLoaded = false;
+
+  /// Exchanges the account's playlists with MusicDatabase, over the same addresses as the
+  /// download; changes that can't go now wait for the next start, return to the app or change.
+  Future<void> _syncPlaylists() async {
+    try {
+      await _playlistLibrary.sync(await _databaseSync.serverAddresses());
+    } catch (e) {
+      debugPrint('Syncing playlists failed: $e');
+    }
   }
 
   /// Hands the outbox to MusicDatabase's inbox, over the same addresses as the download;
@@ -329,6 +366,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.removeListener(_updateChooserLook);
     _songCatalog.removeListener(_forgetSettledMatches);
     _outboxSendSoon?.cancel();
+    _playlistSyncSoon?.cancel();
+    _account.removeListener(_accountChanged);
     _coverLook.dispose();
     _lifecycle.dispose();
     _historySub.cancel();

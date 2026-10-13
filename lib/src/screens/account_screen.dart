@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/account.dart';
 import '../data/database_sync.dart';
+import '../data/playlist_library.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -56,6 +57,38 @@ class _AccountScreenState extends State<AccountScreen> {
       _error = error;
       if (error == null) _password.clear();
     });
+    if (error == null) await _offerPhonePlaylists();
+  }
+
+  /// Playlists made while logged out live only on this phone; the user decides whether they
+  /// join the account (and so MusicDatabase and the account's other phones).
+  Future<void> _offerPhonePlaylists() async {
+    final playlists = PlaylistLibraryScope.maybeOf(context);
+    final user = AccountScope.of(context).userName;
+    if (playlists == null || user == null) return;
+    final count = await playlists.phoneOnlyCount();
+    if (count == 0 || !mounted) return;
+    final add = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Dodać playlisty z telefonu do konta?'),
+        content: Text(
+          'Playlisty tylko na tym telefonie: $count. Dodane do konta $user będą też w '
+          'MusicDatabase i na innych telefonach tego konta. Bez dodania zostaną tylko tutaj.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Nie teraz'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Dodaj'),
+          ),
+        ],
+      ),
+    );
+    if (add ?? false) await playlists.addPhoneOnlyToAccount();
   }
 
   @override
@@ -82,6 +115,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   title: Text(account.userName!),
                   subtitle: const Text('Zalogowano'),
                 ),
+                const _PlaylistSyncTile(),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: const LogOutButton(),
@@ -89,6 +123,8 @@ class _AccountScreenState extends State<AccountScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Text(
+                    'Playlisty z Biblioteki są zapisywane na tym koncie w MusicDatabase i '
+                    'widoczne na każdym telefonie, na którym się na nie zalogujesz. '
                     'Zgłoszenia poprawek wysyłane do MusicDatabase są podpisane tym kontem.',
                     style: hint,
                   ),
@@ -213,8 +249,9 @@ class LogOutButton extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Wylogować?'),
         content: Text(
-          'Telefon zapomni logowanie konta ${account.userName}. Zgłoszenia, które '
-          'czekają na wysłanie, zostaną.',
+          'Telefon zapomni logowanie konta ${account.userName}. Playlisty konta znikną '
+          'z Biblioteki do ponownego zalogowania (zmiany jeszcze niewysłane poczekają). '
+          'Zgłoszenia, które czekają na wysłanie, zostaną.',
         ),
         actions: [
           TextButton(
@@ -230,5 +267,59 @@ class LogOutButton extends StatelessWidget {
     );
     if (ok != true) return;
     await account.logOut(await sync.serverAddresses());
+  }
+}
+
+/// How the account's playlists last synced with MusicDatabase, and "sync now".
+class _PlaylistSyncTile extends StatelessWidget {
+  const _PlaylistSyncTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final playlists = PlaylistLibraryScope.maybeOf(context);
+    if (playlists == null) return const SizedBox.shrink();
+    final last = playlists.lastSync;
+    final error = Theme.of(context).colorScheme.error;
+    String two(int n) => n.toString().padLeft(2, '0');
+    final phoneOnly = playlists.playlists
+        .where((p) => p.account == null)
+        .length;
+    final syncTile = ListTile(
+      leading: Icon(
+        last?.problem == null ? Icons.sync : Icons.sync_problem,
+        color: last?.problem == null ? null : error,
+      ),
+      title: const Text('Playlisty'),
+      subtitle: Text(
+        playlists.syncing
+            ? 'Synchronizowanie…'
+            : last == null
+            ? 'Jeszcze nie synchronizowano'
+            : last.problem ??
+                  'Zsynchronizowano o ${two(last.at.hour)}:${two(last.at.minute)}',
+      ),
+      trailing: IconButton(
+        tooltip: 'Synchronizuj teraz',
+        icon: const Icon(Icons.refresh),
+        onPressed: playlists.syncing
+            ? null
+            : () async => playlists.sync(
+                await DatabaseSyncScope.of(context).serverAddresses(),
+              ),
+      ),
+    );
+    if (phoneOnly == 0) return syncTile;
+    // Also for a phone logged in before playlists synced, which was never asked.
+    return Column(
+      children: [
+        syncTile,
+        ListTile(
+          leading: const Icon(Icons.phone_android),
+          title: Text('Playlisty tylko na tym telefonie: $phoneOnly'),
+          subtitle: const Text('Dotknij, aby dodać je do konta'),
+          onTap: playlists.addPhoneOnlyToAccount,
+        ),
+      ],
+    );
   }
 }

@@ -21,6 +21,17 @@ fetching, title cleanup), `screens/playlist_import.dart`, `screens/playlist_scre
   null, so `playlistHit` shows it with a dimmed icon and it's searched on YouTube like a Spotify
   track (the found video is remembered by artist + title).
 
+## Syncing with MusicDatabase ([ADR 0007](../decisions/0007-playlist-sync.md))
+
+`local.db` v11 adds `uid`, `account`, `revision`, `dirty`, `deleted_at` to `playlists`.
+`PlaylistLibrary.load()` and the import lookup see only the logged-in account's rows and
+phone-only ones (`_scope`) — never assume `playlists` holds only visible rows. Every change
+that should reach MusicDatabase sets `dirty` (and `updated_at` when it's the user's change: that
+decides conflicts); a deletion of an account playlist sets `deleted_at` instead of deleting.
+`PlaylistLibrary.sync` does the exchange; tests use a fake server in
+`test/data/playlist_sync_test.dart` that follows MusicDatabase's rules — keep it in step with
+MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
+
 ## Import
 
 1. Fetch with the search methods switched on: NewPipeExtractor (Android, all pages, at most
@@ -173,5 +184,5 @@ których nie ma w bazie danych" (`missing_tracks_screen.dart`). Only a list so f
 to MusicDatabase as add requests is the user's intended next step, but how the phone talks back
 to MusicDatabase isn't decided — that needs an ADR first (see `AGENTS.md`, Sources of truth).
 
-Not done yet: creating playlists by hand, editing, Spotify playlists over 100 tracks, other
+Not done yet: creating playlists by hand, editing (the sync already carries any change), Spotify playlists over 100 tracks, other
 sources, asking MusicDatabase to add the missing tracks.
