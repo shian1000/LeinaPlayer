@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/account.dart';
+import '../data/later_links.dart';
 import '../dummy.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -14,10 +15,14 @@ class ProfileDrawer extends StatelessWidget {
     required this.onOpenSettings,
     required this.onOpenRecents,
     required this.onOpenAccount,
+    required this.onOpenLater,
   });
 
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenRecents;
+
+  /// "Na później": links people sent, saved from the link sheet.
+  final VoidCallback onOpenLater;
 
   /// Logging in (Ustawienia › Konto).
   final VoidCallback onOpenAccount;
@@ -33,6 +38,9 @@ class ProfileDrawer extends StatelessWidget {
     final palette = context.palette;
     final account = AccountScope.maybeOf(context);
     final loggedIn = account?.loggedIn ?? false;
+    final later = LaterLinksScope.maybeOf(context);
+    final laterCount = later?.links.length ?? 0;
+    final unopened = later?.unopenedCount ?? 0;
     return Drawer(
       width: MediaQuery.sizeOf(context).width * 0.9,
       child: SafeArea(
@@ -168,6 +176,25 @@ class ProfileDrawer extends StatelessWidget {
                   fontSize: AppFontSize.body,
                 ),
               ),
+            ),
+            ListTile(
+              leading: CircleAvatar(
+                radius: 24,
+                backgroundColor: palette.chip,
+                child: Icon(
+                  Icons.bookmark_border,
+                  color: palette.textSecondary,
+                ),
+              ),
+              title: const Text('Na później'),
+              subtitle: Text(
+                laterCount == 0
+                    ? 'Linki od znajomych zapisane z „Otwórz w…”'
+                    : unopened == 0
+                    ? 'Wszystko odsłuchane ($laterCount)'
+                    : 'Do odsłuchania: $unopened z $laterCount',
+              ),
+              onTap: onOpenLater,
             ),
             ListTile(
               leading: CircleAvatar(

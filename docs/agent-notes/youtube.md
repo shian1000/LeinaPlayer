@@ -115,7 +115,7 @@ NewPipe also offers a YouTube Music songs filter (`YoutubeSearchQueryHandlerFact
 with cleaner artist/title results; not used, because the matcher and its benchmark are tuned on
 plain video search.
 
-## Links given to the app (`incoming_links.dart`, `video_link.dart`, `MainActivity.kt`, `LinkChooserActivity.kt`, `LinkTargets.kt`)
+## Links given to the app (`incoming_links.dart`, `video_link.dart`, `MainActivity.kt`, `LinkChooserActivity.kt`, `LinkTargets.kt`, `LaterLinks.kt`)
 
 YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md)).
 
@@ -132,6 +132,15 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   (`readLinkChoices` / `saveLinkChoice`; Ustawienia › Otwieranie linków). The sheet takes the
   app's theme: `main.dart` sends both themes' colours + `themeMode` (`setLinkChooserLook`) on
   every theme change; until the app has run once it uses a plain light/dark look.
+- "Zapisz na później" (supported links only) swaps the sheet to "Od kogo?" — people picked most
+  recently first, "Nowa osoba" types a name in place (`adjustResize` + IME insets keep it above
+  the keyboard). Saved natively in SharedPreferences `later_links` (`LaterLinks.kt`) because
+  Flutter isn't running; Dart (`later_links.dart`, `LaterLinks` notifier) reads and changes them
+  over the links channel (`laterLinks`, `addLaterPerson`, `updateLaterLink`, …) and re-reads on
+  every resume. Shown in Menu profilu › Wiadomości › Na później (`later_links_screen.dart`),
+  which looks up titles for untitled links once per opening (`describeLaterLink`, the same
+  recognition as opening the link) and stores them back. A remembered choice skips the sheet, so
+  nothing can be saved then. Phone-only, not synced with MusicDatabase.
 - Opening outside the app always names the package (`LinkTargets.openInApp` /
   `openInBrowser`) — the system's choice for these links may be this app, which would loop.
   Both app packages are in `<queries>`.

@@ -42,11 +42,13 @@ class PillChip extends StatelessWidget {
     required this.label,
     this.selected = false,
     this.onTap,
+    this.onLongPress,
   });
 
   final String label;
   final bool selected;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +59,7 @@ class PillChip extends StatelessWidget {
       child: InkWell(
         customBorder: palette.pillShape,
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Text(

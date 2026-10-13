@@ -11,7 +11,7 @@
 - [`ui-sizing.md`](ui-sizing.md) — calibrated font sizes and spacing, no screen-size scaling.
 - [`youtube.md`](youtube.md) — YouTube search methods, lite matcher + benchmark, NewPipe playback,
   remembered matches, "not found" and removed videos, server-wins rule, the audio cache, links
-  given to the app and the native "Otwórz w…" sheet.
+  given to the app and the native "Otwórz w…" sheet with "Zapisz na później".
 
 Add one short file per non-obvious subsystem here as the app grows (e.g. how the
 backend client is structured, caching behavior, platform-specific quirks) — not a running log of

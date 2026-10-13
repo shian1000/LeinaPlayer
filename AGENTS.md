@@ -45,7 +45,9 @@ while logged out), playing shuffled, songs added from any song's menu, found by 
 permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)).
 YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
 the video / track; a tapped link first shows a native sheet asking where to open it (Leina Radio,
-the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków).
+the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
+saves it for later with the person who sent it (Menu profilu › Wiadomości › Na później,
+`later_links.dart`; kept natively in `LaterLinks.kt`).
 
 ## Read order
 
@@ -106,7 +108,8 @@ flutter build apk            # build a release Android APK
   `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
   search over both (`combined_search.dart`), requests for MusicDatabase waiting to be sent
   (`outbox.dart`), the logged-in MusicDatabase user (`account.dart`), YouTube and Spotify links given to the app
-  (`incoming_links.dart`, `video_link.dart`), YouTube search / matching / audio
+  (`incoming_links.dart`, `video_link.dart`), links saved for later from the link sheet
+  (`later_links.dart`), YouTube search / matching / audio
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), syncing
@@ -135,6 +138,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
   incoming YouTube/Spotify links and opening the YouTube app by package),
   `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links), `LinkTargets.kt`,
+  `LaterLinks.kt` (links saved for later),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `docs/` — documentation for humans and AI agents (see [`docs/index.md`](docs/index.md)).
 
@@ -148,7 +152,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `PlayHistoryScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `PlayHistoryScope`, `LaterLinksScope`,
   `AlbumCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
@@ -210,7 +214,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - [`youtube.md`](docs/agent-notes/youtube.md) — YouTube search methods, the lite matcher and its
   benchmark, NewPipe playback (build requirements, 403s), remembered matches, "not found" and
   removed videos, server-wins rule, the audio cache (why it downloads in 1 MB ranges), links
-  given to the app and the native "Otwórz w…" sheet, what's not done.
+  given to the app and the native "Otwórz w…" sheet (incl. "Zapisz na później"), what's not done.
 - [`playlists.md`](docs/agent-notes/playlists.md) — Biblioteka playlists: `local.db` tables,
   YouTube import (fetching, title parsing, recognising songs by video first), Spotify import (the
   embed page, 100-track limit, albums, track links), searching playlists (Spotify key / anonymous web-player search

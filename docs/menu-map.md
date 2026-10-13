@@ -132,6 +132,14 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 - `Menu profilu › Zaproś znajomych`
 - `Menu profilu › Wiadomości`
 - `Menu profilu › Nowa wiadomość (ikona)` — pencil icon next to "Wiadomości"
+- Na później (row under "Wiadomości", with how many are still to listen to) **→ Na później**
+  (`later_links_screen.dart`) — **implemented**: links saved from the "Otwórz w…" sheet's
+  "Zapisz na później" with who sent them. Chips "Wszyscy" + each person (count; long press:
+  Zmień nazwę / Usuń osobę — with their links, asks first), rows newest first (service icon,
+  title and artist looked up by the app, else the kind; "od: <osoba>", date; a dot until
+  opened). Tap opens it like a link given to the app (plays / imports) and marks it listened;
+  ⋮ / long press: Otwórz w Leina Radio, Oznacz jako (nie)odsłuchany, Zmień, od kogo jest (incl.
+  Nowa osoba), Otwórz w aplikacji YouTube/Spotify, Kopiuj link, Usuń z „Na później”.
 - `Menu profilu › Nowa wiadomość (przycisk)` — row at the bottom
 
 ## Ustawienia (`settings_screen.dart`)
@@ -245,7 +253,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - Otwieranie linków **→ Otwieranie linków** (`link_settings_screen.dart`) — **implemented**:
   "Linki z YouTube" / "Linki ze Spotify" (dialog: Pytaj za każdym razem — default, Leina Radio,
   Aplikacja YouTube/Spotify, Przeglądarka; the same choice "Zapamiętaj wybór" in the link sheet
-  sets), what a link does in the app, how to give the links to the app in the phone settings,
+  sets; the sheet also has "Zapisz na później" → "Od kogo?", see Menu profilu › Na później), what a link does in the app, how to give the links to the app in the phone settings,
   "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
   app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
   [`agent-notes/youtube.md`](agent-notes/youtube.md)).

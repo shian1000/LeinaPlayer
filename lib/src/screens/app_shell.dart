@@ -21,6 +21,7 @@ import '../widgets/queue_toast.dart';
 import '../widgets/song_tile.dart';
 import 'create_sheet.dart';
 import 'home_screen.dart';
+import 'later_links_screen.dart';
 import 'library_screen.dart';
 import 'now_playing.dart';
 import 'playlist_import.dart';
@@ -85,6 +86,9 @@ class AppShellState extends State<AppShell> {
     _toast.dispose();
     super.dispose();
   }
+
+  /// Opens [url] like a link given to the app ("Na później" uses it).
+  Future<void> openLink(String url) => _onLink(url);
 
   /// A playlist link (YouTube or Spotify, or a Spotify album) is imported and opened in
   /// Biblioteka; a YouTube video or Spotify track link is played (recognised as a MusicDatabase
@@ -238,6 +242,13 @@ class AppShellState extends State<AppShell> {
     );
   }
 
+  void _openLater() {
+    _scaffoldKey.currentState!.closeDrawer();
+    _navigatorKeys[_currentTab].currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const LaterLinksScreen()),
+    );
+  }
+
   void _onTabTapped(int index) {
     if (index == _createTabIndex) {
       showCreateSheet(context, idPrefix: 'Utwórz');
@@ -280,6 +291,7 @@ class AppShellState extends State<AppShell> {
           drawer: ProfileDrawer(
             onOpenSettings: _openSettings,
             onOpenRecents: _openRecents,
+            onOpenLater: _openLater,
             onOpenAccount: _openAccount,
           ),
           body: Stack(

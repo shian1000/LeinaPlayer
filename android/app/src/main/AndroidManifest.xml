@@ -61,7 +61,8 @@
             </intent-filter>
         </activity>
         <!-- Opening YouTube and Spotify links with this app: a sheet asks whether to open them
-             here, in the service's app or in a browser. Not autoVerify: only YouTube and Spotify
+             here, in the service's app or in a browser, or saves them for later (adjustResize:
+             the keyboard for a new person's name pushes the sheet up). Not autoVerify: only YouTube and Spotify
              can verify their domains, so on Android 12+ the user has to allow these links for
              this app by hand (explained in Ustawienia › Otwieranie linków). -->
         <activity
@@ -70,6 +71,7 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:taskAffinity=""
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/LinkChooserTheme">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>

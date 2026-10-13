@@ -102,6 +102,16 @@ Future<bool?> openInYouTubeApp(Uri uri) async {
       false;
 }
 
+/// Opens [uri] in the Spotify app itself (else a browser), never in this app; `null` off
+/// Android, like [openInYouTubeApp].
+Future<bool?> openInSpotifyApp(Uri uri) async {
+  if (kIsWeb || !Platform.isAndroid) return null;
+  return await _channel.invokeMethod<bool>('openSpotify', {
+        'url': uri.toString(),
+      }) ??
+      false;
+}
+
 /// The phone's "Otwieraj domyślnie" settings for this app, where YouTube links can be given to
 /// it; `false` when they couldn't be opened (or off Android).
 Future<bool> openLinkSettings() async {

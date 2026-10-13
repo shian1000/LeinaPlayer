@@ -52,8 +52,9 @@ class MainActivity : AudioServiceActivity() {
 
 /**
  * YouTube and Spotify links coming in ("Udostępnij" to this app, or a link opened with it —
- * through [LinkChooserActivity]) and going out to the YouTube app, plus the chooser's settings,
- * on the `music_database_app/links` channel (`lib/src/data/incoming_links.dart`).
+ * through [LinkChooserActivity]) and going out to the YouTube or Spotify app, plus the chooser's
+ * settings and the links it saved for later ([LaterLinks]), on the `music_database_app/links`
+ * channel (`lib/src/data/incoming_links.dart`, `lib/src/data/later_links.dart`).
  */
 private class LinksBridge(val messenger: BinaryMessenger, private val context: Context) :
     MethodChannel.MethodCallHandler {
@@ -86,17 +87,15 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
                 result.success(pending)
                 pending = null
             }
-            "openYouTube" -> {
+            "openYouTube", "openSpotify" -> {
                 val url = call.argument<String>("url")
                 if (url == null) {
                     result.error("bad_args", "url missing", null)
                 } else {
+                    val service =
+                        if (call.method == "openYouTube") LinkService.YOUTUBE else LinkService.SPOTIFY
                     result.success(
-                        LinkTargets.openInApp(
-                            context,
-                            Uri.parse(url),
-                            LinkService.YOUTUBE.appPackage,
-                        ),
+                        LinkTargets.openInApp(context, Uri.parse(url), service.appPackage),
                     )
                 }
             }
@@ -122,6 +121,34 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
                 LinkTargets.prefs(context).edit()
                     .putString(LinkTargets.LOOK_KEY, call.arguments as String?)
                     .apply()
+                result.success(null)
+            }
+            "laterLinks" -> result.success(LaterLinks.all(context))
+            "addLaterPerson" -> result.success(
+                LaterLinks.addPerson(context, call.argument<String>("name")!!),
+            )
+            "renameLaterPerson" -> {
+                LaterLinks.renamePerson(
+                    context,
+                    call.argument<String>("id")!!,
+                    call.argument<String>("name")!!,
+                )
+                result.success(null)
+            }
+            "removeLaterPerson" -> {
+                LaterLinks.removePerson(context, call.argument<String>("id")!!)
+                result.success(null)
+            }
+            "updateLaterLink" -> {
+                LaterLinks.updateLink(
+                    context,
+                    call.argument<String>("id")!!,
+                    call.argument<Map<String, Any?>>("fields")!!,
+                )
+                result.success(null)
+            }
+            "removeLaterLink" -> {
+                LaterLinks.removeLink(context, call.argument<String>("id")!!)
                 result.success(null)
             }
             else -> result.notImplemented()
