@@ -391,6 +391,24 @@ void main() {
     restarted.dispose();
   });
 
+  test('many songs at once: own and global moods', () async {
+    await moods.create('Chill');
+    await moods.setSongs(moods.userMoods.single, [1, 2, 3], true);
+    expect(moods.userMoods.single.songIds, {1, 2, 3});
+    expect(moods.moodKeysOf(2), {
+      moods.userMoods.single.key,
+      moods.globalMoods.single.key,
+    });
+    await moods.setSongs(moods.userMoods.single, [1, 2], false);
+    expect(moods.userMoods.single.songIds, {3});
+
+    await moods.setSongs(moods.globalMoods.single, [2, 3, 4], true);
+    expect(moods.globalMoods.single.songIds, {1, 2, 3, 4});
+    await syncNow();
+    // Song 2 was there already: nothing to send for it.
+    expect(server.globalChanges, unorderedEquals([(1, 3, true), (1, 4, true)]));
+  });
+
   test('a revoked permission drops the change', () async {
     server.permitted = false;
     await moods.setSong(moods.globalMoods.single, 4, true);

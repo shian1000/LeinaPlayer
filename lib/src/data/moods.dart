@@ -293,16 +293,33 @@ class MoodLibrary extends ChangeNotifier {
         ),
     ]..sort(byName);
     final names = <int, List<String>>{};
+    final keys = <int, Set<String>>{};
     for (final mood in [..._userMoods, ..._globalMoods]) {
       for (final songId in mood.songIds) {
         (names[songId] ??= []).add(mood.name);
+        (keys[songId] ??= {}).add(mood.key);
       }
     }
     _moodNames = names;
+    _moodKeys = keys;
+    _allKeys = {
+      for (final mood in [..._userMoods, ..._globalMoods]) mood.key,
+    };
     notifyListeners();
   }
 
   Map<int, List<String>> _moodNames = const {};
+  Map<int, Set<String>> _moodKeys = const {};
+  Set<String> _allKeys = const {};
+
+  /// The [Mood.key]s of the shown moods [songId] is in.
+  Set<String> moodKeysOf(int songId) => _moodKeys[songId] ?? const {};
+
+  /// The [Mood.key]s of every shown mood.
+  Set<String> get moodKeys => _allKeys;
+
+  /// The names of the shown moods [songId] is in, in order.
+  List<String> moodNameListOf(int songId) => _moodNames[songId] ?? const [];
 
   /// The names of the shown moods [songId] is in, for song search (`SearchField.mood`).
   String moodNamesOf(int songId) => _moodNames[songId]?.join(' ') ?? '';
@@ -523,22 +540,30 @@ class MoodLibrary extends ChangeNotifier {
 
   /// Puts [songId] into [mood] or takes it out ([inMood]). A global mood needs
   /// [canEditGlobal]; the change goes to MusicDatabase with the next [sync].
-  Future<void> setSong(Mood mood, int songId, bool inMood) async {
+  Future<void> setSong(Mood mood, int songId, bool inMood) =>
+      setSongs(mood, [songId], inMood);
+
+  /// [setSong] for many songs at once (a whole playlist or the queue).
+  Future<void> setSongs(Mood mood, Iterable<int> songIds, bool inMood) async {
+    final ids = songIds.toSet();
+    if (ids.isEmpty) return;
     final user = _userName();
     final db = await _database();
     if (!mood.global) {
       await db.transaction((txn) async {
-        if (inMood) {
-          await txn.insert('mood_songs', {
-            'mood_id': mood.localId,
-            'song_id': songId,
-          }, conflictAlgorithm: ConflictAlgorithm.ignore);
-        } else {
-          await txn.delete(
-            'mood_songs',
-            where: 'mood_id = ? AND song_id = ?',
-            whereArgs: [mood.localId, songId],
-          );
+        for (final songId in ids) {
+          if (inMood) {
+            await txn.insert('mood_songs', {
+              'mood_id': mood.localId,
+              'song_id': songId,
+            }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          } else {
+            await txn.delete(
+              'mood_songs',
+              where: 'mood_id = ? AND song_id = ?',
+              whereArgs: [mood.localId, songId],
+            );
+          }
         }
         await txn.update(
           'moods',
@@ -549,34 +574,35 @@ class MoodLibrary extends ChangeNotifier {
       });
     } else {
       if (user == null || !canEditGlobal) return;
-      final pair = [user, mood.globalId, songId];
       await db.transaction((txn) async {
-        // Changed back before it was sent: neither change has to go.
-        await txn.delete(
-          'global_mood_changes',
-          where:
-              'account = ? AND mood_id = ? AND song_id = ? AND sent_at IS NULL',
-          whereArgs: pair,
-        );
-        final sent = await txn.query(
-          'global_mood_changes',
-          columns: ['added'],
-          where: 'account = ? AND mood_id = ? AND song_id = ?',
-          whereArgs: pair,
-          orderBy: 'id DESC',
-          limit: 1,
-        );
-        final there = sent.isNotEmpty
-            ? sent.first['added'] == 1
-            : _tagMoods[mood.globalId]?.songs.contains(songId) ?? false;
-        if (there == inMood) return;
-        await txn.insert('global_mood_changes', {
-          'account': user,
-          'mood_id': mood.globalId,
-          'song_id': songId,
-          'added': inMood ? 1 : 0,
-          'made_at': _now().millisecondsSinceEpoch,
-        });
+        for (final songId in ids) {
+          final pair = [user, mood.globalId, songId];
+          // Changed back before it was sent: neither change has to go.
+          await txn.delete(
+            'global_mood_changes',
+            where: 'account = ? AND mood_id = ? AND song_id = ? AND sent_at IS NULL',
+            whereArgs: pair,
+          );
+          final sent = await txn.query(
+            'global_mood_changes',
+            columns: ['added'],
+            where: 'account = ? AND mood_id = ? AND song_id = ?',
+            whereArgs: pair,
+            orderBy: 'id DESC',
+            limit: 1,
+          );
+          final there = sent.isNotEmpty
+              ? sent.first['added'] == 1
+              : _tagMoods[mood.globalId]?.songs.contains(songId) ?? false;
+          if (there == inMood) continue;
+          await txn.insert('global_mood_changes', {
+            'account': user,
+            'mood_id': mood.globalId,
+            'song_id': songId,
+            'added': inMood ? 1 : 0,
+            'made_at': _now().millisecondsSinceEpoch,
+          });
+        }
       });
     }
     await _loadLocal();

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../data/combined_search.dart';
+import '../data/mood_filter.dart';
 import '../data/track_ref.dart';
 import 'player_controller.dart';
 import 'track_player.dart';
@@ -80,9 +82,13 @@ class QueueEntry {
 /// When a song ends the next one starts; "Poprzedni" restarts the song, or within its first
 /// [restartThreshold] goes back to the previous one in the queue. After each song starts, the
 /// next [SourceSettings.activeQueuePrefetch] songs are downloaded to the cache.
+///
+/// Songs the [filter] doesn't allow stay in the queue but are hidden and passed over (a song
+/// the user taps still plays); a filter change shows them again or hides others.
 class PlaybackQueue extends ChangeNotifier {
   PlaybackQueue(
     this._tracks, {
+    this.filter,
     Random? random,
     this.offlineRetries = const [
       Duration(seconds: 5),
@@ -95,7 +101,11 @@ class PlaybackQueue extends ChangeNotifier {
     _skips = _tracks.player.skips.listen(
       (skip) => skip == MediaSkip.next ? next() : previous(),
     );
+    filter?.addListener(_filterChanged);
   }
+
+  /// "Filtr nastrojów"; `null`: every song plays.
+  final MoodFilter? filter;
 
   /// Moving on by itself with no connection, the queue tries the same song again after each of
   /// these waits instead of skipping it — otherwise it raced through dozens of songs in a
@@ -156,15 +166,17 @@ class PlaybackQueue extends ChangeNotifier {
 
   bool get shuffle => _shuffle;
 
-  /// Everything that plays after the current song, in order.
-  List<QueueEntry> get upcoming => List.unmodifiable(_upcoming);
+  bool _shown(QueueEntry entry) => filter?.allows(entry.hit) ?? true;
+
+  /// Everything that plays after the current song, in order (without the songs [filter] hides).
+  List<QueueEntry> get upcoming => List.unmodifiable(_upcoming.where(_shown));
 
   /// What "Poprzedni" goes back through, oldest first: the songs played before the current one,
-  /// and the main songs listed before the tapped one.
-  List<QueueEntry> get history => List.unmodifiable(_history);
+  /// and the main songs listed before the tapped one (without the songs [filter] hides).
+  List<QueueEntry> get history => List.unmodifiable(_history.where(_shown));
 
-  bool get hasNext => _upcoming.isNotEmpty;
-  bool get hasPrevious => _history.isNotEmpty;
+  bool get hasNext => _upcoming.any(_shown);
+  bool get hasPrevious => _history.any(_shown);
 
   /// Replaces the whole queue with [entries] and plays the one at [index] (with [shuffle] on,
   /// the rest follow in random order). Only a user's tap gets here, so the YouTube app may be
@@ -335,7 +347,8 @@ class PlaybackQueue extends ChangeNotifier {
     _upcoming.removeRange(0, at + 1);
     final current = _current;
     if (current != null) _history.add(current);
-    _history.addAll(skipped.where(isMain));
+    // Hidden ones too: switching the filter off brings them back as played.
+    _history.addAll(skipped.where((e) => isMain(e) || !_shown(e)));
     _generation++;
     return _play(entry, allowExternal: true, onStatus: onStatus);
   }
@@ -373,14 +386,20 @@ class PlaybackQueue extends ChangeNotifier {
     _prefetchAhead();
   }
 
-  /// Moves [entry] to [to] in [upcoming] (an index after it's taken out). It keeps where it was
-  /// queued from, and shuffle no longer moves it.
+  /// Moves [entry] to [to] in [upcoming] (an index after it's taken out) — right after the song
+  /// shown before it, songs hidden by [filter] don't count. It keeps where it was queued from,
+  /// and shuffle no longer moves it.
   void move(QueueEntry entry, int to) {
     final at = _upcoming.indexOf(entry);
     if (at < 0) return;
-    _upcoming
-      ..removeAt(at)
-      ..insert(to.clamp(0, _upcoming.length), QueueEntry._pinnedFrom(entry));
+    _upcoming.removeAt(at);
+    final shown = _upcoming.where(_shown).toList();
+    final index = to <= 0
+        ? 0
+        : to >= shown.length
+        ? _upcoming.length
+        : _upcoming.indexOf(shown[to - 1]) + 1;
+    _upcoming.insert(index, QueueEntry._pinnedFrom(entry));
     notifyListeners();
     _prefetchAhead();
   }
@@ -400,10 +419,15 @@ class PlaybackQueue extends ChangeNotifier {
     return _play(entry, allowExternal: true, onStatus: onStatus);
   }
 
+  /// Takes the next song [filter] allows out of [_upcoming]; the hidden ones before it go to
+  /// the history, as passed.
   QueueEntry? _moveNext() {
-    if (_upcoming.isEmpty) return null;
+    final at = _upcoming.indexWhere(_shown);
+    if (at < 0) return null;
     final current = _current;
     if (current != null) _history.add(current);
+    _history.addAll(_upcoming.take(at));
+    _upcoming.removeRange(0, at);
     return _upcoming.removeAt(0);
   }
 
@@ -420,8 +444,10 @@ class PlaybackQueue extends ChangeNotifier {
       await player.seek(Duration.zero);
       return null;
     }
-    final current = _current;
-    if (current != null) _upcoming.insert(0, current);
+    final at = _history.lastIndexWhere(_shown);
+    final passed = _history.sublist(at + 1);
+    _history.removeRange(at + 1, _history.length);
+    _upcoming.insertAll(0, [...passed, ?_current]);
     _generation++;
     return _play(
       _history.removeLast(),
@@ -486,10 +512,27 @@ class PlaybackQueue extends ChangeNotifier {
     if (generation == _generation) await _tracks.player.stopAtEnd();
   }
 
+  /// The songs [_cacheAhead] would cache, to tell whether a [filter] change changed them.
+  List<int> _ahead() => [
+    for (final e in upcoming.take(_tracks.settings.activeQueuePrefetch)) e.key,
+  ];
+
+  List<int> _aheadPlanned = const [];
+
+  /// The filter changed, or the moods it looks at: other songs may be hidden now. Caching ahead
+  /// is planned again only when the songs to cache changed — moods change often while syncing.
+  void _filterChanged() {
+    notifyListeners();
+    if (_current != null && !listEquals(_ahead(), _aheadPlanned)) {
+      _prefetchAhead();
+    }
+  }
+
   /// Caches the next songs one at a time, so they play from the phone even if the connection
   /// drops, [prefetchDelay] after the queue last changed. A change makes the run under way give
   /// up (the order changed), but only after the download it's on: that one isn't broken off.
   void _prefetchAhead() {
+    _aheadPlanned = _ahead();
     final run = ++_prefetchRun;
     _prefetchTimer?.cancel();
     if (prefetchDelay == Duration.zero) {
@@ -646,6 +689,7 @@ class PlaybackQueue extends ChangeNotifier {
     _generation++;
     _prefetchRun++;
     _prefetchTimer?.cancel();
+    filter?.removeListener(_filterChanged);
     _completions.cancel();
     _skips.cancel();
     _played.close();

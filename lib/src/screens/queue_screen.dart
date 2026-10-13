@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/mood_filter.dart';
+import '../data/moods.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/song_tile.dart';
 import '../data/album_covers.dart';
+import '../widgets/mood_sheet.dart';
 import '../widgets/queue_toast.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/swipe_actions.dart';
@@ -67,6 +70,8 @@ class QueueScreen extends StatelessWidget {
     final queue = PlaybackQueueScope.of(context);
     final current = queue.current;
     final upcoming = queue.upcoming;
+    final moodFilter = MoodFilterScope.maybeOf(context);
+    final filtering = moodFilter?.active ?? false;
 
     // Headings (strings) and songs, as the list shows them.
     final items = <Object>[];
@@ -97,6 +102,18 @@ class QueueScreen extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: palette.surface,
           title: const Text('Kolejka'),
+          actions: [
+            if (current != null && MoodLibraryScope.maybeOf(context) != null)
+              IconButton(
+                tooltip: 'Nastrój dla wszystkich utworów w kolejce',
+                icon: const Icon(moodIcon),
+                // What will play: the songs the mood filter hides stay out.
+                onPressed: () => showMoodPickerForAll(context, [
+                  current,
+                  for (final entry in upcoming) entry.hit,
+                ], title: 'Kolejka: teraz odtwarzany i następne'),
+              ),
+          ],
         ),
         body: CustomScrollView(
           // Opens at the song playing; the songs before it are above, scrolled to.
@@ -120,7 +137,12 @@ class QueueScreen extends StatelessWidget {
                     _QueueRow(hit: current, isCurrent: true)
                   else
                     const _Empty('Nic nie jest odtwarzane'),
-                  if (upcoming.isEmpty)
+                  if (upcoming.isEmpty && filtering)
+                    const _Empty(
+                      'Po tym utworze nic więcej nie zagra: filtr nastrojów '
+                      'pomija resztę kolejki.',
+                    )
+                  else if (upcoming.isEmpty)
                     const _Empty(
                       'Po tym utworze nic więcej nie zagra. Dodaj coś przez '
                       '„Dodaj do kolejki” w menu utworu albo przeciągając utwór '
@@ -179,6 +201,20 @@ class QueueScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (moodFilter != null)
+                  TextButton.icon(
+                    onPressed: () => showMoodFilterSheet(context),
+                    icon: Icon(
+                      Icons.filter_list,
+                      color: filtering ? palette.accent : null,
+                    ),
+                    label: Text(
+                      filtering ? 'Nastroje: wł.' : 'Nastroje: wył.',
+                      style: TextStyle(
+                        color: filtering ? palette.accent : palette.textPrimary,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

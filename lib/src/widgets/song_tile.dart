@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/mood_filter.dart';
 import '../data/song_catalog.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
@@ -103,21 +104,44 @@ Future<void> queueSongs(
   final messenger = ScaffoldMessenger.of(context);
   final queue = PlaybackQueueScope.of(context);
   final toast = QueueToastScope.maybeOf(context);
+  final filter = MoodFilterScope.maybeOf(context);
+  // With nothing playing the first song starts right away, filter or not.
+  final waiting = queue.current == null ? hits.skip(1) : hits;
+  final outside = filter == null
+      ? 0
+      : waiting.where((hit) => !filter.allows(hit)).length;
+  String? filterNote;
+  if (outside > 0) {
+    final turnOff = filter!.offWhenAdded;
+    if (turnOff) await filter.reset();
+    filterNote = hits.length == 1
+        ? 'Utwór dodany do kolejki jest poza filtrami nastroju: '
+              '${turnOff ? 'wyłączam filtr' : 'będzie pominięty'}'
+        : outside == waiting.length
+        ? 'Utwory dodane do kolejki są poza filtrami nastroju: '
+              '${turnOff ? 'wyłączam filtr' : 'będą pominięte'}'
+        : 'Część utworów dodanych do kolejki jest poza filtrami nastroju: '
+              '${turnOff ? 'wyłączam filtr' : 'będą pominięte'}';
+  }
+  if (!context.mounted) return;
   await runQueueAction(context, (onStatus) async {
     final outcome = next
         ? await queue.playNext(hits, origin: origin, onStatus: onStatus)
         : await queue.add(hits, origin: origin, onStatus: onStatus);
-    if (outcome == null) {
+    if (outcome == null || filterNote != null) {
       // Short like the reference app's; the sheet or row just touched says what it was.
-      final text = !next
-          ? 'Dodano do kolejki'
-          : origin == null
-          ? 'Zagra jako następny'
-          : 'Zagra jako następna';
+      final text =
+          filterNote ??
+          (!next
+              ? 'Dodano do kolejki'
+              : origin == null
+              ? 'Zagra jako następny'
+              : 'Zagra jako następna');
       if (toast != null && context.mounted) {
         messenger.clearSnackBars();
         toast.show(
           text,
+          shownFor: filterNote == null ? null : const Duration(seconds: 5),
           actionLabel: 'Otwórz',
           onAction: () {
             if (context.mounted) QueueScreen.open(context);
@@ -127,7 +151,10 @@ Future<void> queueSongs(
         messenger
           ..clearSnackBars()
           ..showSnackBar(
-            SnackBar(duration: const Duration(seconds: 2), content: Text(text)),
+            SnackBar(
+              duration: Duration(seconds: filterNote == null ? 2 : 4),
+              content: Text(text),
+            ),
           );
       }
     }

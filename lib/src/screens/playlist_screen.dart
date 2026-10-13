@@ -437,6 +437,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 onTap: () => _share(hits),
               ),
               ..._queueEntries(hits),
+              ?moodForAllEntry(context, hits, title: _playlist.name),
               if (_fetched != null)
                 MenuSheetEntry(
                   Icons.add_circle_outline,
@@ -457,6 +458,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 onTap: () => _share(hits),
               ),
               ..._queueEntries(hits),
+              ?moodForAllEntry(context, hits, title: _playlist.name),
               MenuSheetEntry(
                 Icons.check_circle,
                 'Usuń z Biblioteki',

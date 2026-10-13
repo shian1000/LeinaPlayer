@@ -43,7 +43,10 @@ Spotify playlists, opened as a preview before saving; songs can be shared as the
 MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
 while logged out), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
-permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)).
+permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)); a whole playlist,
+mood or the queue can be put into a mood at once (after "Czy na pewno?"). A mood filter makes
+the queue hide and pass over songs outside the ticked moods (or with a mood, for "Utwory bez
+nastroju"); while it's on the full player shows a "Nastrój" button for the current song.
 YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
 the video / track; a tapped link first shows a native sheet asking where to open it (Leina Radio,
 the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
@@ -104,7 +107,7 @@ flutter build apk            # build a release Android APK
   lists get it by using `SongTile`, or call it from their own `onLongPress`);
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
-  adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju"; `SongInfoCard` — everything about a song under the full player; `SongCover` — a song's album cover, with the cover
+  adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player; `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog` in `common.dart`;
   `showShareSheet` in `share_sheet.dart`).
@@ -118,7 +121,8 @@ flutter build apk            # build a release Android APK
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
-  (`moods.dart`: global ones from tag.db, the user's own synced like playlists),
+  (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
+  mood filter (`mood_filter.dart`),
   a song's whole music.db / tag.db record (`song_details.dart`), covers the user picked for
   playlists and moods (`custom_covers.dart`),
   album covers and their cache
@@ -157,7 +161,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `PlayHistoryScope`, `LaterLinksScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus

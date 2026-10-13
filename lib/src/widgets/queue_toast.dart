@@ -16,10 +16,15 @@ class QueueToast extends ChangeNotifier {
   ({String text, String? actionLabel, VoidCallback? onAction})? get shown =>
       _shown;
 
-  void show(String text, {String? actionLabel, VoidCallback? onAction}) {
+  void show(
+    String text, {
+    String? actionLabel,
+    VoidCallback? onAction,
+    Duration? shownFor,
+  }) {
     _timer?.cancel();
     _shown = (text: text, actionLabel: actionLabel, onAction: onAction);
-    _timer = Timer(duration, hide);
+    _timer = Timer(shownFor ?? duration, hide);
     notifyListeners();
   }
 

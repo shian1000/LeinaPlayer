@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/collection_cover.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/mood_sheet.dart';
 import 'app_shell.dart';
 import 'create_sheet.dart';
 import 'mood_screen.dart';
@@ -237,7 +238,7 @@ class _EmptyMoods extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
       child: Column(
         children: [
-          Icon(Icons.mood, size: 48, color: palette.textSecondary),
+          Icon(moodIcon, size: 48, color: palette.textSecondary),
           const SizedBox(height: 16),
           const Text(
             'Brak nastrojów',

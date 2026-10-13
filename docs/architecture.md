@@ -58,6 +58,16 @@ playlists; `SongCatalog` asks it for each song's mood names (`SearchField.mood`)
 offers the same menu (`showSongMenu` in `song_tile.dart`: ⋮ or a long press), which is where "Dodaj
 do nastroju" lives.
 
+The mood filter (`MoodFilter` in `mood_filter.dart`, `MoodFilterScope`, settings in
+`shared_preferences`) is phone-only: `PlaybackQueue` takes it and asks `allows(hit)` for each
+entry. Songs it doesn't allow stay in the queue's lists and are only hidden (`upcoming`,
+`history`, `hasNext`) and passed over (`_moveNext`, `previous`), so switching the filter off
+brings them back in place. A filter change (or a song put into / out of a mood) re-plans caching
+ahead after the usual `prefetchDelay`, only when the songs to cache changed — moods change often
+while syncing. Adding a song outside the filter by hand is handled in `queueSongs`
+(`song_tile.dart`): by default it switches the filter off and clears it (user's choice), or —
+as set in the filter sheet — the song goes in hidden.
+
 History and resuming: `PlayHistory` (`play_history.dart`, `PlayHistoryScope`) records every song
 the queue starts (`PlaybackQueue.played`) in `local.db`, shown by `recents_screen.dart`.
 `QueueSession` (`lib/src/playback/queue_session.dart`) saves the queue snapshot and the position

@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/collection_cover.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/mood_sheet.dart';
 import '../widgets/song_tile.dart';
 
 const _id = 'Nastrój';
@@ -191,6 +192,7 @@ class MoodScreen extends StatelessWidget {
             'Odtwórz jako następny',
             onTap: () => queueSongs(context, hits, next: true, origin: origin),
           ),
+          ?moodForAllEntry(context, hits, title: mood.name),
         ],
         ...customCoverEntries(
           context,

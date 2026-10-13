@@ -22,7 +22,7 @@ Future<void> showCreateSheet(BuildContext context, {required String idPrefix}) {
       ),
       if (MoodLibraryScope.maybeOf(context) != null)
         MenuSheetEntry(
-          Icons.mood,
+          moodIcon,
           'Nastrój',
           subtitle: 'Utwory o podobnym klimacie, np. do ćwiczeń',
           onTap: () => createMood(context),

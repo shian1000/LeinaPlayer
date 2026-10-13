@@ -13,6 +13,7 @@ import '../theme.dart';
 import '../theme_controller.dart';
 import 'cover_art.dart';
 import 'menu_sheet.dart';
+import 'mood_sheet.dart';
 import 'song_cover.dart';
 
 /// The cover of a playlist or mood: the one the user picked ([CustomCovers]), else a collage
@@ -134,7 +135,7 @@ class MoodCover extends StatelessWidget {
     ).map(CoverRequest.of),
     seed: mood.name,
     size: size,
-    icon: Icons.mood,
+    icon: moodIcon,
   );
 }
 

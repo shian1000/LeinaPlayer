@@ -4,6 +4,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../data/album_covers.dart';
+import '../data/combined_search.dart';
+import '../data/mood_filter.dart';
+import '../data/moods.dart';
 import '../dummy.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
@@ -13,6 +16,7 @@ import '../widgets/queue_toast.dart';
 import '../theme_controller.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/share_sheet.dart';
+import '../widgets/mood_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_info.dart';
 import 'queue_screen.dart';
@@ -419,6 +423,7 @@ class NowPlayingScreen extends StatelessWidget {
     void dummy(String label) => showDummy(context, '$_id › $label');
     final youTubeUri = queue.currentYouTubeUri;
     final coverSize = _fullCoverSize(context);
+    final moodFilter = MoodFilterScope.maybeOf(context);
 
     return _CoverTint(
       track: track,
@@ -621,7 +626,29 @@ class NowPlayingScreen extends StatelessWidget {
                               icon: const Icon(Icons.devices_other),
                               onPressed: () => dummy('Urządzenia'),
                             ),
-                            const Spacer(),
+                            if (moodFilter != null)
+                              IconButton(
+                                tooltip: moodFilter.active
+                                    ? 'Filtr nastrojów: wł.'
+                                    : 'Filtr nastrojów: wył.',
+                                icon: Icon(
+                                  Icons.filter_list,
+                                  color: moodFilter.active
+                                      ? palette.accent
+                                      : null,
+                                ),
+                                onPressed: () => showMoodFilterSheet(context),
+                              ),
+                            Expanded(
+                              child:
+                                  moodFilter != null &&
+                                      moodFilter.active &&
+                                      queue.current != null
+                                  ? Center(
+                                      child: _MoodButton(hit: queue.current!),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
                             IconButton(
                               tooltip: 'Udostępnij',
                               icon: const Icon(Icons.share_outlined),
@@ -652,6 +679,35 @@ class NowPlayingScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// "Nastrój" while the mood filter is on: the moods the song is in, tapped to change them.
+class _MoodButton extends StatelessWidget {
+  const _MoodButton({required this.hit});
+
+  final SearchHit hit;
+
+  @override
+  Widget build(BuildContext context) {
+    final songId = hit.mainSong?.id;
+    final names = songId == null
+        ? const <String>[]
+        : MoodLibraryScope.of(context).moodNameListOf(songId);
+    return OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: context.palette.textPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        visualDensity: VisualDensity.compact,
+      ),
+      onPressed: () => openMoodPicker(context, hit),
+      icon: const Icon(moodIcon, size: 20),
+      label: Text(
+        names.isEmpty ? 'Nastrój' : names.join(', '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

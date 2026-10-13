@@ -68,7 +68,10 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     hand stay where they are. When a song ends the next one plays, skipping songs that can't
     be played (without opening the YouTube app). After each song starts, the next N songs are
     cached (see Oszczędzanie danych › Pamięć podręczna › Kolejka). A queue saved by an older
-    version is converted on start.
+    version is converted on start. With the mood filter on (**→ Filtr nastrojów**), songs it
+    doesn't allow stay in the queue but are hidden and passed over — by the end of a song,
+    Następny, Poprzedni and the notification; a song the user taps still plays, and switching
+    the filter off shows them again where they were.
   - Informacje o utworze (`SongInfoCard` in `widgets/song_info.dart`, data from
     `data/song_details.dart`) — **implemented**: the card whose top shows below the player,
     scrolled to like the reference app's cards. For now **everything** known (user's request; to
@@ -79,7 +82,10 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     from `MoodLibrary`) and the other tag.db tags, the files on the phone and what it plays
     from. Tapping a link opens it, a long press copies a value. Songs not in MusicDatabase show
     only what the phone knows.
-  - `Odtwarzacz › Urządzenia`, Udostępnij (**→ Udostępnij utwór**, see below; IDs
+  - `Odtwarzacz › Urządzenia`, Filtr nastrojów (**implemented**: filter icon, accent while on,
+    **→ Filtr nastrojów**), **Nastrój** (**implemented**, only while the filter is on, in the
+    middle of the row: the song's mood names, or "Nastrój" — tapping it **→ Dodaj do nastroju**),
+    Udostępnij (**→ Udostępnij utwór**, see below; IDs
     `Odtwarzacz › Udostępnij › …`), Kolejka **→ Kolejka**
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
     e.g. by caching ahead): opens at "Teraz odtwarzane"; scrolled up, "Poprzednie" — the last
@@ -96,7 +102,9 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     ("Usunięto z kolejki" with Cofnij — the reference app does the same), right makes it play
     next ("Usunięto z kolejki" is the screen's own SnackBar — it goes after 4 s, even with
     Cofnij, and with the screen). Tapping a row plays it (added songs before it are dropped, main songs before it
-    count as played). "Losowo: wł./wył." at the bottom.
+    count as played). "Losowo: wł./wył." and "Nastroje: wł./wył." (**→ Filtr nastrojów**) at the
+    bottom; songs the filter hides aren't listed. The moon in the app bar **→ Nastrój dla
+    wszystkich utworów** for the song playing and the ones shown after it.
 
 ## Bottom navigation (`lib/src/screens/app_shell.dart`)
 
@@ -388,6 +396,11 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     no title, short like the reference app (user's wish), with **Otwórz**
     (→ Kolejka). It goes after 3 s, or at once when the mini player or the bottom bar is
     touched, or the full player / Kolejka opens — it never stays over the full player.
+    A song added outside the mood filter says instead (for 5 s) "Utwór dodany do kolejki jest
+    poza filtrami nastroju: wyłączam filtr" (the default: the filter goes off and is cleared)
+    or "…: będzie pominięty" (added hidden) — as set in Filtr nastrojów; with several songs
+    "Utwory dodane… są…" / "Część utworów dodanych…". With nothing playing the first added song
+    starts anyway and doesn't count.
   - **Udostępnij utwór** (`showSongShareSheet` in `share_sheet.dart`; also from the playlist
     track ⋮ and the full player): a card with the song's cover, title and artist over four round
     buttons — `<prefix> › Udostępnij › Leina Radio` (dummy), YouTube (**implemented**: the
@@ -423,7 +436,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 ## Nastrój (`mood_screen.dart`) — **implemented**
 
 - App bar with the name and ⋮ **→ sheet**, IDs `Nastrój › Menu (⋮) › <pozycja>`: Dodaj do
-  kolejki / Odtwórz jako następny (the whole mood), and for the user's own mood Zmień nazwę
+  kolejki / Odtwórz jako następny (the whole mood), **Nastrój dla wszystkich utworów**, and for
+  the user's own mood Zmień nazwę
   (dialog) and Usuń nastrój (asks first; deleted on every device of the account, MusicDatabase
   archives it). For every mood, global ones too: **Dodaj okładkę** / **Zmień okładkę** (an
   image from the phone, synced with the account — a global mood's cover is the user's own) and **Usuń okładkę** (back to the collage).
@@ -438,7 +452,24 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 
 - Header with the song; "Nowy nastrój" (name dialog; the new mood gets the song); "Twoje
   nastroje" with a checkbox each (ticking adds / removes right away); "Globalne" the same, only
-  with the `edit_global_moods` permission.
+  with the `edit_global_moods` permission. Moods show a crescent moon (`moodIcon`) everywhere.
+
+## Sheet "Nastrój dla wszystkich utworów" (`showMoodPickerForAll` in `mood_sheet.dart`)
+
+From the playlist ⋮, the mood ⋮ and Kolejka (moon icon). The same lists as "Dodaj do nastroju",
+each mood ticked when all the songs are in it, a dash and "N z M" when some are. Tapping one asks
+"Czy na pewno? Dodać N utworów do nastroju „…”?" (the missing ones) — or, when all are in,
+"Usunąć N utworów z…" — and changes them at once. "Nowy nastrój" makes one with all of them.
+Songs not in MusicDatabase are left out (the sheet says how many).
+
+## Sheet "Filtr nastrojów" (`showMoodFilterSheet` in `mood_sheet.dart`)
+
+From the full player (filter icon) and Kolejka ("Nastroje: wł./wył."); kept across restarts.
+A switch, "Utwory bez nastroju" (also songs not in MusicDatabase), then every mood (own and
+global) with a checkbox; ticking anything switches the filter on, the ticks stay while it's
+off. The queue plays songs in any ticked mood, plus — with "Utwory bez nastroju" — songs in no
+mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **Wyłącz filtr**
+(default — switches off and clears the ticks) or **Pomiń utwór** (added hidden).
 
 ## Playlista (`playlist_screen.dart`) — **implemented** for imported playlists
 
@@ -447,7 +478,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   playable, shareable. Instead of the Pobierz icon and the Dodaj/Edytuj/Sortuj chips there's one
   chip **"Zapisz w Bibliotece"** ("Zaktualizuj w Bibliotece" when it was imported before): it
   imports the fetched playlist and the screen becomes the saved one. Its ⋮ has only
-  Udostępnij, Dodaj do kolejki / Odtwórz jako następną, the same save entry and "Wyświetl utwory, których nie ma w bazie danych". A failed
+  Udostępnij, Dodaj do kolejki / Odtwórz jako następną, Nastrój dla wszystkich utworów, the same save entry and "Wyświetl utwory, których nie ma w bazie danych". A failed
   fetch shows the error and "Spróbuj ponownie".
 
 - Transparent app bar over the header; once the header scrolls away it turns solid and shows
@@ -465,6 +496,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: **Udostępnij** (implemented, the
   same sheet as the icon below), **Dodaj do kolejki** / **Odtwórz jako następną** (implemented:
   the whole playlist into the queue, remembered as played from it; also in a preview's ⋮),
+  **Nastrój dla wszystkich utworów** (also in a preview's ⋮),
   **`Usuń z
   Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), `Dodaj do tej
   playlisty`, `Edytuj playlistę`, **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**

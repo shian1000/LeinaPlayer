@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/mood_filter.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/track_ref.dart';
@@ -788,5 +789,214 @@ void main() {
         expect(backend.opened.last, 'https://s/v1');
       },
     );
+  });
+
+  group('mood filter', () {
+    late Map<int, Set<String>> moodsOf;
+    late MoodFilter filter;
+    late PlaybackQueue filtered;
+
+    /// A music.db song on the phone, in [moods].
+    SearchHit song(int id, String name, [Set<String> moods = const {}]) {
+      moodsOf[id] = moods;
+      return SearchHit.main(
+        CatalogSong(id: id, title: name, artistLabel: 'X'),
+        [
+          LocalSong(
+            id: id,
+            filePath: '/music/$name.mp3',
+            title: name,
+            mainDbId: id,
+            pending: false,
+          ),
+        ],
+      );
+    }
+
+    setUp(() async {
+      moodsOf = {};
+      filter = MoodFilter(
+        moodsOf: (id) => moodsOf[id] ?? const {},
+        knownMoods: () => {'dance', 'gym', 'calm'},
+      );
+      await filter.load();
+      filtered = PlaybackQueue(
+        tracks,
+        filter: filter,
+        prefetchDelay: Duration.zero,
+      );
+    });
+
+    tearDown(() {
+      filtered.dispose();
+      filter.dispose();
+    });
+
+    List<String> titles(List<QueueEntry> entries) => [
+      for (final e in entries) e.hit.title,
+    ];
+
+    test('off: every song plays; on: songs in no ticked mood are hidden and '
+        'passed over', () async {
+      await filtered.start([
+        song(1, 'a', {'calm'}),
+        song(2, 'b', {'calm'}),
+        song(3, 'c', {'dance'}),
+        song(4, 'd', {'gym', 'calm'}),
+        _file('e'),
+      ], 0);
+      expect(titles(filtered.upcoming), ['b', 'c', 'd', 'e']);
+
+      await filter.setMood('dance', true);
+      await filter.setMood('gym', true);
+      expect(filter.active, isTrue);
+      expect(titles(filtered.upcoming), ['c', 'd']);
+
+      backend.finish();
+      await flush();
+      expect(filtered.current?.title, 'c');
+      // "b" was passed over: it's behind, hidden (like "a") while the filter is on.
+      expect(filtered.hasPrevious, isFalse);
+
+      await filter.setEnabled(false);
+      expect(titles(filtered.history), ['a', 'b']);
+      expect(titles(filtered.upcoming), ['d', 'e']);
+    });
+
+    test('"bez nastroju" lets through songs in no mood, and those in a ticked '
+        'mood', () async {
+      await filtered.start([
+        song(1, 'a'),
+        song(2, 'b', {'calm'}),
+        song(3, 'c', {'dance'}),
+        song(4, 'd'),
+        _file('e'),
+      ], 0);
+      await filter.setUntagged(true);
+      expect(titles(filtered.upcoming), ['d', 'e']);
+      await filter.setMood('dance', true);
+      expect(titles(filtered.upcoming), ['c', 'd', 'e']);
+    });
+
+    test('a ticked mood that is gone does not count', () async {
+      await filter.setMood('deleted', true);
+      expect(filter.active, isFalse);
+      await filtered.start([song(1, 'a'), song(2, 'b')], 0);
+      expect(titles(filtered.upcoming), ['b']);
+    });
+
+    test('"Następny" and "Poprzedni" skip hidden songs', () async {
+      await filtered.start([
+        song(1, 'a', {'dance'}),
+        song(2, 'b'),
+        song(3, 'c', {'dance'}),
+      ], 0);
+      await filter.setMood('dance', true);
+      await filtered.next();
+      expect(filtered.current?.title, 'c');
+      expect(filtered.hasNext, isFalse);
+
+      await filtered.previous();
+      expect(filtered.current?.title, 'a');
+      await filter.setEnabled(false);
+      expect(titles(filtered.upcoming), ['b', 'c']);
+    });
+
+    test('moving a song counts only the songs shown', () async {
+      await filtered.start([
+        song(1, 'a'),
+        song(2, 'b', {'dance'}),
+        song(3, 'hidden'),
+        song(4, 'c', {'dance'}),
+        song(5, 'd', {'dance'}),
+      ], 0);
+      await filter.setMood('dance', true);
+      final d = filtered.upcoming.last;
+      filtered.move(d, 1);
+      expect(titles(filtered.upcoming), ['b', 'd', 'c']);
+      await filter.setEnabled(false);
+      expect(titles(filtered.upcoming), ['b', 'd', 'hidden', 'c']);
+    });
+
+    Future<void> showRow(WidgetTester tester, SearchHit hit) =>
+        tester.pumpWidget(
+          PlayerScope(
+            notifier: player,
+            child: PlaybackQueueScope(
+              notifier: filtered,
+              child: MoodFilterScope(
+                notifier: filter,
+                child: MaterialApp(
+                  theme: buildAppTheme(dummifyTheme),
+                  home: Scaffold(
+                    body: ListView(children: [SongTile(hit: hit)]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('a song added from outside the filter switches it off and '
+        'clears it (the default)', (tester) async {
+      await tester.runAsync(() async {
+        await filtered.start([
+          song(1, 'a', {'dance'}),
+        ], 0);
+        await filter.setMood('dance', true);
+      });
+      await showRow(tester, song(2, 'b'));
+      await tester.drag(find.text('b'), const Offset(300, 0));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Utwór dodany do kolejki jest poza filtrami nastroju: wyłączam filtr',
+        ),
+        findsOneWidget,
+      );
+      expect(filter.enabled, isFalse);
+      expect(filter.moods, isEmpty);
+      expect(titles(filtered.upcoming), ['b']);
+    });
+
+    testWidgets('or, as set, it is added hidden and passed over', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        await filtered.start([
+          song(1, 'a', {'dance'}),
+        ], 0);
+        await filter.setMood('dance', true);
+        await filter.setOffWhenAdded(false);
+      });
+      await showRow(tester, song(2, 'b'));
+      await tester.drag(find.text('b'), const Offset(300, 0));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Utwór dodany do kolejki jest poza filtrami nastroju: '
+          'będzie pominięty',
+        ),
+        findsOneWidget,
+      );
+      expect(filter.active, isTrue);
+      expect(filtered.upcoming, isEmpty);
+      await tester.runAsync(() => filter.setEnabled(false));
+      expect(titles(filtered.upcoming), ['b']);
+    });
+
+    testWidgets('a song inside the filter is just added', (tester) async {
+      await tester.runAsync(() async {
+        await filtered.start([
+          song(1, 'a', {'dance'}),
+        ], 0);
+        await filter.setMood('dance', true);
+      });
+      await showRow(tester, song(2, 'b', {'dance'}));
+      await tester.drag(find.text('b'), const Offset(300, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Dodano do kolejki'), findsOneWidget);
+      expect(filter.active, isTrue);
+    });
   });
 }
