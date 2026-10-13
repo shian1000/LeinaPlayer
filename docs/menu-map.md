@@ -69,6 +69,16 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     be played (without opening the YouTube app). After each song starts, the next N songs are
     cached (see Oszczędzanie danych › Pamięć podręczna › Kolejka). A queue saved by an older
     version is converted on start.
+  - Informacje o utworze (`SongInfoCard` in `widgets/song_info.dart`, data from
+    `data/song_details.dart`) — **implemented**: the card whose top shows below the player,
+    scrolled to like the reference app's cards. For now **everything** known (user's request; to
+    be trimmed later): the whole music.db `songs` row (also columns added later, by their raw
+    name), former ids (`song_id_changes`), each artist's row with its role, the album's row with
+    MusicBrainz / iTunes / Deezer / Spotify links and its `album_covers`, the YouTube / Spotify
+    links (music.db's and the phone's or the playlist's when different), moods (global and own,
+    from `MoodLibrary`) and the other tag.db tags, the files on the phone and what it plays
+    from. Tapping a link opens it, a long press copies a value. Songs not in MusicDatabase show
+    only what the phone knows.
   - `Odtwarzacz › Urządzenia`, Udostępnij (**→ Udostępnij utwór**, see below; IDs
     `Odtwarzacz › Udostępnij › …`), Kolejka **→ Kolejka**
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,

@@ -14,6 +14,7 @@ import '../theme_controller.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/share_sheet.dart';
 import '../widgets/song_cover.dart';
+import '../widgets/song_info.dart';
 import 'queue_screen.dart';
 
 const _id = 'Odtwarzacz';
@@ -362,7 +363,11 @@ class _ProgressLine extends StatelessWidget {
   }
 }
 
-/// Full-screen player ("Teraz odtwarzane"), slid up from the mini player.
+/// How much of "Informacje o utworze" shows below the full player before scrolling.
+const _infoPeek = 44.0;
+
+/// Full-screen player ("Teraz odtwarzane"), slid up from the mini player; scrolled down, the
+/// song's details ([SongInfoCard]).
 class NowPlayingScreen extends StatelessWidget {
   const NowPlayingScreen({super.key});
 
@@ -427,194 +432,221 @@ class NowPlayingScreen extends StatelessWidget {
             ),
           ),
           child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
+            child: LayoutBuilder(
+              builder: (context, constraints) => ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        tooltip: 'Zwiń',
-                        icon: const Icon(Icons.keyboard_arrow_down, size: 32),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      Expanded(
-                        child: Column(
+                  SizedBox(
+                    // The info card's top shows below the player, so it's clear there's more.
+                    height: max(constraints.maxHeight - _infoPeek, 0),
+                    child: Column(
+                      children: [
+                        Row(
                           children: [
-                            Text(
-                              track.playlistName != null
-                                  ? 'Odtwarzanie z playlisty'
-                                  : track.searchQuery != null
-                                  ? 'Odtwarzanie z wyników wyszukiwania'
-                                  : 'Teraz odtwarzane',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: AppFontSize.small,
+                            IconButton(
+                              tooltip: 'Zwiń',
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down,
+                                size: 32,
+                              ),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  Text(
+                                    track.playlistName != null
+                                        ? 'Odtwarzanie z playlisty'
+                                        : track.searchQuery != null
+                                        ? 'Odtwarzanie z wyników wyszukiwania'
+                                        : 'Teraz odtwarzane',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: AppFontSize.small,
+                                    ),
+                                  ),
+                                  if (track.playlistName != null ||
+                                      track.searchQuery != null)
+                                    Text(
+                                      track.playlistName ??
+                                          '„${track.searchQuery}” w wyszukiwarce',
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: AppFontSize.body,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
-                            if (track.playlistName != null ||
-                                track.searchQuery != null)
-                              Text(
-                                track.playlistName ??
-                                    '„${track.searchQuery}” w wyszukiwarce',
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: AppFontSize.body,
-                                  fontWeight: FontWeight.bold,
+                            IconButton(
+                              tooltip: 'Menu odtwarzacza (⋮)',
+                              icon: const Icon(Icons.more_vert),
+                              onPressed: () {
+                                final hit = queue.current;
+                                if (hit == null) return dummy('Menu (⋮)');
+                                showSongMenu(
+                                  context,
+                                  hit,
+                                  idPrefix: '$_id › Menu (⋮)',
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        SongCover(cover: track.cover, size: coverSize),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    track.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: AppFontSize.largeTitle,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    track.artist,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.listTitle,
+                                      color: palette.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Otwórz w YouTube',
+                              icon: const Icon(
+                                Icons.smart_display_outlined,
+                                size: 30,
+                              ),
+                              onPressed: youTubeUri == null
+                                  ? null
+                                  : () => _openInYouTube(
+                                      context,
+                                      player,
+                                      youTubeUri,
+                                    ),
+                            ),
+                            IconButton(
+                              tooltip: 'Dodaj (+)',
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                size: 30,
+                              ),
+                              onPressed: () => dummy('Dodaj (+)'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _SeekBar(player: player),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              tooltip: queue.shuffle
+                                  ? 'Losowo: wł.'
+                                  : 'Losowo: wył.',
+                              icon: Icon(
+                                Icons.shuffle,
+                                size: 28,
+                                color: queue.shuffle ? palette.accent : null,
+                              ),
+                              onPressed: () => queue.setShuffle(!queue.shuffle),
+                            ),
+                            IconButton(
+                              tooltip: 'Poprzedni',
+                              icon: const Icon(Icons.skip_previous, size: 40),
+                              // Restarts the song, or near its start goes back (PlaybackQueue.previous).
+                              onPressed: () => runQueueAction(
+                                context,
+                                (onStatus) =>
+                                    queue.previous(onStatus: onStatus),
+                              ),
+                            ),
+                            Material(
+                              color: palette.textPrimary,
+                              shape: palette.rounded
+                                  ? const CircleBorder()
+                                  : const RoundedRectangleBorder(),
+                              child: IconButton(
+                                tooltip: player.playing ? 'Pauza' : 'Odtwórz',
+                                iconSize: 44,
+                                padding: const EdgeInsets.all(12),
+                                color: palette.background,
+                                icon: Icon(
+                                  player.playing
+                                      ? Icons.pause
+                                      : Icons.play_arrow,
                                 ),
+                                onPressed: player.togglePlay,
                               ),
+                            ),
+                            IconButton(
+                              tooltip: 'Następny',
+                              icon: const Icon(Icons.skip_next, size: 40),
+                              onPressed: queue.hasNext
+                                  ? () => runQueueAction(
+                                      context,
+                                      (onStatus) =>
+                                          queue.next(onStatus: onStatus),
+                                    )
+                                  : null,
+                            ),
+                            IconButton(
+                              tooltip: 'Wyłącznik czasowy',
+                              icon: const Icon(Icons.timer_outlined, size: 28),
+                              onPressed: () => dummy('Wyłącznik czasowy'),
+                            ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Menu odtwarzacza (⋮)',
-                        icon: const Icon(Icons.more_vert),
-                        onPressed: () {
-                          final hit = queue.current;
-                          if (hit == null) return dummy('Menu (⋮)');
-                          showSongMenu(
-                            context,
-                            hit,
-                            idPrefix: '$_id › Menu (⋮)',
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  SongCover(cover: track.cover, size: coverSize),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 16),
+                        Row(
                           children: [
-                            Text(
-                              track.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: AppFontSize.largeTitle,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            IconButton(
+                              tooltip: 'Urządzenia',
+                              icon: const Icon(Icons.devices_other),
+                              onPressed: () => dummy('Urządzenia'),
                             ),
-                            Text(
-                              track.artist,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: AppFontSize.listTitle,
-                                color: palette.textSecondary,
-                              ),
+                            const Spacer(),
+                            IconButton(
+                              tooltip: 'Udostępnij',
+                              icon: const Icon(Icons.share_outlined),
+                              onPressed: queue.current == null
+                                  ? null
+                                  : () => showSongShareSheet(
+                                      context,
+                                      queue.current!,
+                                      idPrefix: _id,
+                                    ),
+                            ),
+                            IconButton(
+                              tooltip: 'Kolejka',
+                              icon: const Icon(Icons.queue_music),
+                              onPressed: () => QueueScreen.open(context),
                             ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Otwórz w YouTube',
-                        icon: const Icon(
-                          Icons.smart_display_outlined,
-                          size: 30,
-                        ),
-                        onPressed: youTubeUri == null
-                            ? null
-                            : () => _openInYouTube(context, player, youTubeUri),
-                      ),
-                      IconButton(
-                        tooltip: 'Dodaj (+)',
-                        icon: const Icon(Icons.add_circle_outline, size: 30),
-                        onPressed: () => dummy('Dodaj (+)'),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  _SeekBar(player: player),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        tooltip: queue.shuffle ? 'Losowo: wł.' : 'Losowo: wył.',
-                        icon: Icon(
-                          Icons.shuffle,
-                          size: 28,
-                          color: queue.shuffle ? palette.accent : null,
-                        ),
-                        onPressed: () => queue.setShuffle(!queue.shuffle),
-                      ),
-                      IconButton(
-                        tooltip: 'Poprzedni',
-                        icon: const Icon(Icons.skip_previous, size: 40),
-                        // Restarts the song, or near its start goes back (PlaybackQueue.previous).
-                        onPressed: () => runQueueAction(
-                          context,
-                          (onStatus) => queue.previous(onStatus: onStatus),
-                        ),
-                      ),
-                      Material(
-                        color: palette.textPrimary,
-                        shape: palette.rounded
-                            ? const CircleBorder()
-                            : const RoundedRectangleBorder(),
-                        child: IconButton(
-                          tooltip: player.playing ? 'Pauza' : 'Odtwórz',
-                          iconSize: 44,
-                          padding: const EdgeInsets.all(12),
-                          color: palette.background,
-                          icon: Icon(
-                            player.playing ? Icons.pause : Icons.play_arrow,
-                          ),
-                          onPressed: player.togglePlay,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Następny',
-                        icon: const Icon(Icons.skip_next, size: 40),
-                        onPressed: queue.hasNext
-                            ? () => runQueueAction(
-                                context,
-                                (onStatus) => queue.next(onStatus: onStatus),
-                              )
-                            : null,
-                      ),
-                      IconButton(
-                        tooltip: 'Wyłącznik czasowy',
-                        icon: const Icon(Icons.timer_outlined, size: 28),
-                        onPressed: () => dummy('Wyłącznik czasowy'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      IconButton(
-                        tooltip: 'Urządzenia',
-                        icon: const Icon(Icons.devices_other),
-                        onPressed: () => dummy('Urządzenia'),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Udostępnij',
-                        icon: const Icon(Icons.share_outlined),
-                        onPressed: queue.current == null
-                            ? null
-                            : () => showSongShareSheet(
-                                context,
-                                queue.current!,
-                                idPrefix: _id,
-                              ),
-                      ),
-                      IconButton(
-                        tooltip: 'Kolejka',
-                        icon: const Icon(Icons.queue_music),
-                        onPressed: () => QueueScreen.open(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
+                  if (queue.current != null)
+                    SongInfoCard(hit: queue.current!, track: track),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

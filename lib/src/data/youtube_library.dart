@@ -584,7 +584,9 @@ class YouTubeLibraryScope extends InheritedNotifier<YouTubeLibrary> {
     required super.child,
   });
 
-  static YouTubeLibrary of(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<YouTubeLibraryScope>()!
-      .notifier!;
+  static YouTubeLibrary of(BuildContext context) => maybeOf(context)!;
+
+  static YouTubeLibrary? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<YouTubeLibraryScope>()
+      ?.notifier;
 }

@@ -164,36 +164,6 @@ class FakeMoodServer {
   }
 }
 
-/// A tag.db like MusicDatabase's since moods (`tags.kind`), or — [withKind] false — an older one.
-Future<void> writeTagDb(
-  String path, {
-  Map<int, (String, String, List<int>)> tags = const {},
-  bool withKind = true,
-}) async {
-  await File(path).parent.create(recursive: true);
-  if (await File(path).exists()) await File(path).delete();
-  final db = await databaseFactoryFfi.openDatabase(path);
-  await db.execute(
-    'CREATE TABLE tags (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL UNIQUE'
-    '${withKind ? ", kind VARCHAR NOT NULL DEFAULT 'marker'" : ''})',
-  );
-  await db.execute(
-    'CREATE TABLE song_tags (id INTEGER PRIMARY KEY, song_id INTEGER NOT NULL, '
-    'tag_id INTEGER NOT NULL)',
-  );
-  for (final MapEntry(key: id, value: (name, kind, songs)) in tags.entries) {
-    await db.insert('tags', {
-      'id': id,
-      'name': name,
-      'kind': ?(withKind ? kind : null),
-    });
-    for (final song in songs) {
-      await db.insert('song_tags', {'song_id': song, 'tag_id': id});
-    }
-  }
-  await db.close();
-}
-
 void main() {
   sqfliteFfiInit();
 

@@ -25,7 +25,9 @@ playing phone files with a mini/full player, a play queue (playlists, "Dodaj do 
 "Odtwórz jako następny" for songs and whole playlists, each entry remembering the playlist it
 was queued from, shuffle, the queue screen with reordering and swipe-to-remove, caching the next
 songs ahead; remembered across restarts), dragging a song row right to queue it and a
-media notification with previous/next (keeps playing in the background); play history in
+media notification with previous/next (keeps playing in the background); scrolled down, the full
+player shows everything music.db / tag.db / the phone know about the song (all of it for now,
+to be trimmed later — user's request); play history in
 "Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów)
 ([`covers.md`](docs/agent-notes/covers.md)). Every cache setting is in one screen, Oszczędzanie
@@ -97,7 +99,7 @@ flutter build apk            # build a release Android APK
   lists get it by using `SongTile`, or call it from their own `onLongPress`);
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
-  adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju"; `SongCover` — a song's album cover, with the cover
+  adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju"; `SongInfoCard` — everything about a song under the full player; `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `color_picker.dart`; `TextInputDialog` in `common.dart`;
   `showShareSheet` in `share_sheet.dart`).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
@@ -110,6 +112,7 @@ flutter build apk            # build a release Android APK
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists),
+  a song's whole music.db / tag.db record (`song_details.dart`),
   album covers and their cache
   (`album_covers.dart`), play history (`play_history.dart`,
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and

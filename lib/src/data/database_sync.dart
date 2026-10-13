@@ -409,7 +409,8 @@ class DatabaseSyncScope extends InheritedNotifier<DatabaseSync> {
     required super.child,
   });
 
-  static DatabaseSync of(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<DatabaseSyncScope>()!
-      .notifier!;
+  static DatabaseSync of(BuildContext context) => maybeOf(context)!;
+
+  static DatabaseSync? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<DatabaseSyncScope>()?.notifier;
 }
