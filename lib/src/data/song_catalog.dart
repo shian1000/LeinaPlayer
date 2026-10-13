@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -20,13 +21,17 @@ enum SearchField {
   language('Język'),
 
   /// `artists.origin` of all the song's artists ("Kraj - Region - Miasto").
-  origin('Pochodzenie wykonawcy');
+  origin('Pochodzenie wykonawcy'),
+
+  /// The names of the moods the song is in (global and the user's own; see
+  /// [SongCatalog.setMoodNames]), so typing a mood lists its songs.
+  mood('Nastrój');
 
   const SearchField(this.label);
 
   final String label;
 
-  static const defaults = {title, artist, album};
+  static const defaults = {title, artist, album, mood};
 }
 
 /// How well a (normalized) title matches the (normalized) query, lower is better: exact title,
@@ -100,6 +105,8 @@ class CatalogSong {
              // "Unknown" is MusicDatabase's placeholder, not a language to find songs by.
              SearchField.language => language == 'Unknown' ? null : language,
              SearchField.origin => origins.join(' '),
+             // Moods change while the song doesn't: SongCatalog adds them when searching.
+             SearchField.mood => null,
            }),
        ];
 
@@ -169,9 +176,20 @@ class SongCatalog extends ChangeNotifier {
 
   Set<SearchField> _searchFields = SearchField.defaults;
 
-  /// Each song's searchable text for [_searchFields], rebuilt only when the fields or the songs
-  /// change rather than on every keystroke.
+  /// Each song's searchable text for [_searchFields], rebuilt only when the fields, the songs
+  /// or the moods change rather than on every keystroke.
   List<String>? _searchTexts;
+
+  String Function(int songId)? _moodNames;
+
+  /// Where [SearchField.mood] gets the names of the moods a song is in.
+  void setMoodNames(String Function(int songId) moodNames) {
+    _moodNames = moodNames;
+    _searchTexts = null;
+  }
+
+  /// A mood was made, renamed or got other songs: search sees it from the next keystroke.
+  void moodsChanged() => _searchTexts = null;
 
   CatalogStatus get status => _status;
 
@@ -191,6 +209,14 @@ class SongCatalog extends ChangeNotifier {
         for (final name in stored ?? const <String>[])
           ...SearchField.values.where((f) => f.name == name),
       };
+      // Saved before moods could be searched, unchanged from the defaults then.
+      if (setEquals(fields, const {
+        SearchField.title,
+        SearchField.artist,
+        SearchField.album,
+      })) {
+        fields.add(SearchField.mood);
+      }
       if (fields.isNotEmpty) {
         _searchFields = fields;
         _searchTexts = null;
@@ -405,8 +431,15 @@ class SongCatalog extends ChangeNotifier {
     final normalizedQuery = normalizeForSearch(query);
     if (normalizedQuery.isEmpty) return const [];
     final words = normalizedQuery.split(' ');
+    final moodNames = _searchFields.contains(SearchField.mood)
+        ? _moodNames
+        : null;
     final texts = _searchTexts ??= [
-      for (final song in _songs) song._textFor(_searchFields),
+      for (final song in _songs)
+        moodNames == null
+            ? song._textFor(_searchFields)
+            : '${song._textFor(_searchFields)} '
+                  '${normalizeForSearch(moodNames(song.id))}',
     ];
     final hits = [
       for (var i = 0; i < _songs.length; i++)

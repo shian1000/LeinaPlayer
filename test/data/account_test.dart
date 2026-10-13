@@ -10,12 +10,14 @@ void main() {
   late List<String> loggedOut;
   late List<Map<String, Object?>> logins;
   int? loginAnswer;
+  var permissions = <String>[];
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     loggedOut = [];
     logins = [];
     loginAnswer = null;
+    permissions = [];
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       final body = await utf8.decodeStream(request);
@@ -35,10 +37,24 @@ void main() {
               login['password'] == 'tajne1') {
             request.response.headers.contentType = ContentType.json;
             request.response.write(
-              jsonEncode({'username': 'owner', 'token': 'tok-123'}),
+              jsonEncode({
+                'username': 'owner',
+                'token': 'tok-123',
+                'permissions': permissions,
+              }),
             );
           } else {
             request.response.statusCode = HttpStatus.unauthorized;
+          }
+        case '/users/owner' when request.method == 'GET':
+          if (request.headers.value(HttpHeaders.authorizationHeader) !=
+              'Bearer tok-123') {
+            request.response.statusCode = HttpStatus.unauthorized;
+          } else {
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode({'username': 'owner', 'permissions': permissions}),
+            );
           }
         case '/logout' when request.method == 'POST':
           loggedOut.add(
@@ -70,7 +86,11 @@ void main() {
       expect(account.token, 'tok-123');
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getKeys(), {'account.user_name', 'account.token'});
+      expect(prefs.getKeys(), {
+        'account.user_name',
+        'account.token',
+        'account.permissions',
+      });
       expect(prefs.getKeys().map(prefs.get), isNot(contains('tajne1')));
 
       final restarted = Account();
@@ -132,4 +152,29 @@ void main() {
       expect(account.userName, 'owner');
     },
   );
+
+  test('permissions come with the login and are refreshed', () async {
+    permissions = ['edit_global_moods'];
+    final account = Account();
+    await account.load();
+    expect(account.hasPermission(Account.editGlobalMoods), isFalse);
+    await account.logIn([base()], 'Owner', 'tajne1');
+    expect(account.hasPermission(Account.editGlobalMoods), isTrue);
+
+    // Revoked in MusicDatabase: the next refresh drops it, and it stays dropped.
+    permissions = [];
+    await account.refreshPermissions([base()]);
+    expect(account.hasPermission(Account.editGlobalMoods), isFalse);
+    final restarted = Account();
+    await restarted.load();
+    expect(restarted.hasPermission(Account.editGlobalMoods), isFalse);
+
+    // Granted again.
+    permissions = ['edit_global_moods'];
+    await restarted.refreshPermissions([base()]);
+    expect(restarted.hasPermission(Account.editGlobalMoods), isTrue);
+
+    await restarted.logOut([base()]);
+    expect(restarted.hasPermission(Account.editGlobalMoods), isFalse);
+  });
 }

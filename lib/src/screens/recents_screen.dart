@@ -169,6 +169,7 @@ class _PlayRow extends StatelessWidget {
       hit: hit,
       subtitle: [hit.artistLabel, ?playlist?.name].join(' • '),
       trailing: SongMenuButton(hit: hit, idPrefix: '$_id › Utwór › Menu (⋮)'),
+      menuIdPrefix: '$_id › Utwór › Menu (⋮)',
       // A playlist deleted since: the song just plays.
       onTap: playlist == null
           ? null

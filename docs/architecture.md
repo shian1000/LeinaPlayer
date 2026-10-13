@@ -49,7 +49,14 @@ Playlists ([`agent-notes/playlists.md`](agent-notes/playlists.md)): `PlaylistLib
 (`playlist_library.dart`, `PlaylistLibraryScope`) keeps playlists imported from YouTube or Spotify in
 `local.db`; their tracks render with the same `SongTile` (`lib/src/widgets/song_tile.dart`) as
 search results. `local.db` schema versions live in `LocalLibrary._open` (v2 YouTube tables, v3
-playlists, v4 `play_history`, v5 cover lookups and cache, v6 `youtube_track_matches`, v7 `youtube_not_found`, v8 `spotify_track_id` in `playlist_tracks` and `play_history`, v9 `playlist_tracks.youtube_removed`, v10 `youtube_removed_videos`).
+playlists, v4 `play_history`, v5 cover lookups and cache, v6 `youtube_track_matches`, v7 `youtube_not_found`, v8 `spotify_track_id` in `playlist_tracks` and `play_history`, v9 `playlist_tracks.youtube_removed`, v10 `youtube_removed_videos`, v11 playlist sync columns,
+v12 moods, v13 phone-only moods).
+
+Moods ([ADR 0008](decisions/0008-moods.md)): `MoodLibrary` (`moods.dart`, `MoodLibraryScope`)
+reads global moods from the downloaded `tag.db` and keeps the user's own in `local.db`, synced like
+playlists; `SongCatalog` asks it for each song's mood names (`SearchField.mood`). Every song row
+offers the same menu (`showSongMenu` in `song_tile.dart`: ⋮ or a long press), which is where "Dodaj
+do nastroju" lives.
 
 History and resuming: `PlayHistory` (`play_history.dart`, `PlayHistoryScope`) records every song
 the queue starts (`PlaybackQueue.played`) in `local.db`, shown by `recents_screen.dart`.

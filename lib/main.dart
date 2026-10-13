@@ -10,6 +10,7 @@ import 'src/data/database_sync.dart';
 import 'src/data/incoming_links.dart';
 import 'src/data/local_library.dart';
 import 'src/data/account.dart';
+import 'src/data/moods.dart';
 import 'src/data/outbox.dart';
 import 'src/data/play_history.dart';
 import 'src/data/playlist_library.dart';
@@ -174,6 +175,17 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     authToken: () => _account.token,
   )..onUnauthorized = _account.tokenRejected;
   Timer? _playlistSyncSoon;
+  late final _moodLibrary =
+      MoodLibrary(
+          _localLibrary.database,
+          _databaseSync,
+          userName: () => _account.userName,
+          authToken: () => _account.token,
+          canEditGlobal: () => _account.hasPermission(Account.editGlobalMoods),
+        )
+        ..onUnauthorized = _account.tokenRejected
+        ..onPermissionRevoked = _account.permissionRevoked;
+  Timer? _moodSyncSoon;
 
   /// The user whose playlists Biblioteka shows; another one logging in shows theirs.
   String? _playlistsUser;
@@ -231,7 +243,14 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     // A few seconds' wait lets several changes in a row go to MusicDatabase together.
     _playlistLibrary.onChanged = () {
       _playlistSyncSoon?.cancel();
+      _moodSyncSoon?.cancel();
       _playlistSyncSoon = Timer(const Duration(seconds: 3), _syncPlaylists);
+    };
+    _songCatalog.setMoodNames(_moodLibrary.moodNamesOf);
+    _moodLibrary.addListener(_songCatalog.moodsChanged);
+    _moodLibrary.onChanged = () {
+      _moodSyncSoon?.cancel();
+      _moodSyncSoon = Timer(const Duration(seconds: 3), _syncMoods);
     };
     _account.addListener(_accountChanged);
     // Android often keeps the app alive for days, so "once a day on start" also has to cover
@@ -241,6 +260,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         await _databaseSync.syncIfDue();
         await _sendOutbox();
         await _syncPlaylists();
+        await _syncMoods();
       },
       onHide: _queueSession.save,
     );
@@ -336,6 +356,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         .load()
         .then((_) => _syncPlaylists())
         .catchError((Object e) => debugPrint('Loading playlists failed: $e'));
+    _moodLibrary
+        .load()
+        .then((_) => _syncMoods())
+        .catchError((Object e) => debugPrint('Loading moods failed: $e'));
   }
 
   bool _playlistsLoaded = false;
@@ -347,6 +371,19 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       await _playlistLibrary.sync(await _databaseSync.serverAddresses());
     } catch (e) {
       debugPrint('Syncing playlists failed: $e');
+    }
+  }
+
+  /// Exchanges the account's moods with MusicDatabase (and sends changes to global moods),
+  /// after asking what the user may do now: a permission granted or revoked in MusicDatabase
+  /// shows without logging in again.
+  Future<void> _syncMoods() async {
+    try {
+      final servers = await _databaseSync.serverAddresses();
+      await _account.refreshPermissions(servers);
+      await _moodLibrary.sync(servers);
+    } catch (e) {
+      debugPrint('Syncing moods failed: $e');
     }
   }
 
@@ -365,8 +402,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.removeListener(_updateCoverLook);
     _themeController.removeListener(_updateChooserLook);
     _songCatalog.removeListener(_forgetSettledMatches);
+    _moodLibrary.removeListener(_songCatalog.moodsChanged);
     _outboxSendSoon?.cancel();
     _playlistSyncSoon?.cancel();
+    _moodSyncSoon?.cancel();
     _account.removeListener(_accountChanged);
     _coverLook.dispose();
     _lifecycle.dispose();
@@ -379,6 +418,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _sourceSettings.dispose();
     _albumCovers.dispose();
     _playlistLibrary.dispose();
+    _moodLibrary.dispose();
     _youTubeLibrary.dispose();
     _localLibrary.dispose();
     _songCatalog.dispose();
@@ -403,47 +443,52 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
                 notifier: _youTubeLibrary,
                 child: PlaylistLibraryScope(
                   notifier: _playlistLibrary,
-                  child: PlayHistoryScope(
-                    notifier: _playHistory,
-                    child: PlayerScope(
-                      notifier: _player,
-                      child: PlaybackQueueScope(
-                        notifier: _playbackQueue,
-                        child: SourceSettingsScope(
-                          notifier: _sourceSettings,
-                          child: AlbumCoversScope(
-                            notifier: _albumCovers,
-                            child: YouTubeScope(
-                              search: _youTubeSearch,
-                              audio: _youTubeAudio,
-                              playlists: _youTubePlaylists,
-                              child: ThemeScope(
-                                notifier: _themeController,
-                                child: ListenableBuilder(
-                                  listenable: _themeController,
-                                  builder: (context, _) => MaterialApp(
-                                    title: appName,
-                                    debugShowCheckedModeBanner: false,
-                                    theme: buildAppTheme(
-                                      _themeController.light,
+                  child: MoodLibraryScope(
+                    notifier: _moodLibrary,
+                    child: PlayHistoryScope(
+                      notifier: _playHistory,
+                      child: PlayerScope(
+                        notifier: _player,
+                        child: PlaybackQueueScope(
+                          notifier: _playbackQueue,
+                          child: SourceSettingsScope(
+                            notifier: _sourceSettings,
+                            child: AlbumCoversScope(
+                              notifier: _albumCovers,
+                              child: YouTubeScope(
+                                search: _youTubeSearch,
+                                audio: _youTubeAudio,
+                                playlists: _youTubePlaylists,
+                                child: ThemeScope(
+                                  notifier: _themeController,
+                                  child: ListenableBuilder(
+                                    listenable: _themeController,
+                                    builder: (context, _) => MaterialApp(
+                                      title: appName,
+                                      debugShowCheckedModeBanner: false,
+                                      theme: buildAppTheme(
+                                        _themeController.light,
+                                      ),
+                                      darkTheme: buildAppTheme(
+                                        _themeController.dark,
+                                      ),
+                                      themeMode: _themeController.themeMode,
+                                      // Tab screens have no AppBar to set the status-bar icon colour, so
+                                      // match it to the active theme here (dark icons on light themes and
+                                      // vice versa).
+                                      builder: (context, child) =>
+                                          AnnotatedRegion<SystemUiOverlayStyle>(
+                                            value:
+                                                Theme.of(context).brightness ==
+                                                    Brightness.light
+                                                ? SystemUiOverlayStyle.dark
+                                                : SystemUiOverlayStyle.light,
+                                            child: child!,
+                                          ),
+                                      home: AppShell(
+                                        links: _incomingLinks.links,
+                                      ),
                                     ),
-                                    darkTheme: buildAppTheme(
-                                      _themeController.dark,
-                                    ),
-                                    themeMode: _themeController.themeMode,
-                                    // Tab screens have no AppBar to set the status-bar icon colour, so
-                                    // match it to the active theme here (dark icons on light themes and
-                                    // vice versa).
-                                    builder: (context, child) =>
-                                        AnnotatedRegion<SystemUiOverlayStyle>(
-                                          value:
-                                              Theme.of(context).brightness ==
-                                                  Brightness.light
-                                              ? SystemUiOverlayStyle.dark
-                                              : SystemUiOverlayStyle.light,
-                                          child: child!,
-                                        ),
-                                    home: AppShell(links: _incomingLinks.links),
                                   ),
                                 ),
                               ),

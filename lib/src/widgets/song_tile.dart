@@ -7,6 +7,7 @@ import '../playback/player_controller.dart';
 import '../playback/track_player.dart';
 import '../theme.dart';
 import 'menu_sheet.dart';
+import 'mood_sheet.dart';
 import 'playing_bars.dart';
 import 'queue_toast.dart';
 import '../screens/queue_screen.dart';
@@ -149,6 +150,8 @@ class SongTile extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.onTap,
+    this.onLongPress,
+    this.menuIdPrefix = 'Utwór › Menu (⋮)',
   });
 
   final SearchHit hit;
@@ -176,6 +179,12 @@ class SongTile extends StatelessWidget {
 
   /// Instead of playing the song (e.g. "Ostatnie" opens the playlist it was played from).
   final VoidCallback? onTap;
+
+  /// Instead of the song's usual menu ([showSongMenu]), e.g. a playlist's own track menu.
+  final VoidCallback? onLongPress;
+
+  /// What the menu's dummy entries report, as `<menuIdPrefix> › <label>`.
+  final String menuIdPrefix;
 
   static const coverSize = 48.0;
 
@@ -229,6 +238,9 @@ class SongTile extends StatelessWidget {
               ],
             ),
       onTap: onTap ?? () => _onTap(context),
+      onLongPress:
+          onLongPress ??
+          () => showSongMenu(context, hit, idPrefix: menuIdPrefix),
     );
     // Like the reference app: dragging a song to the right queues it.
     return SwipeActions(
@@ -332,7 +344,50 @@ class SourceIcons extends StatelessWidget {
   }
 }
 
-/// A song's ⋮ (search, Ostatnie): "Dodaj do kolejki", "Odtwórz jako następny", the rest are dummies like in the reference app.
+/// The menu of a song — its ⋮, and a long press on its row anywhere: "Dodaj do kolejki",
+/// "Odtwórz jako następny", "Dodaj do nastroju", "Udostępnij"; the rest are dummies like in the
+/// reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
+Future<void> showSongMenu(
+  BuildContext context,
+  SearchHit hit, {
+  required String idPrefix,
+  List<MenuSheetEntry> extra = const [],
+}) {
+  FocusScope.of(context).unfocus();
+  return showMenuSheet(
+    context,
+    idPrefix: idPrefix,
+    header: MenuSheetHeader(
+      cover: SongCover(cover: CoverRequest.of(hit)),
+      title: hit.title,
+      subtitle: hit.artistLabel,
+    ),
+    entries: [
+      MenuSheetEntry(
+        Icons.queue_music,
+        'Dodaj do kolejki',
+        onTap: () => addToQueue(context, hit),
+      ),
+      MenuSheetEntry(
+        Icons.playlist_play,
+        'Odtwórz jako następny',
+        onTap: () => playNextInQueue(context, hit),
+      ),
+      ?moodMenuEntry(context, hit),
+      ...extra,
+      const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
+      const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
+      const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
+      MenuSheetEntry(
+        Icons.share_outlined,
+        'Udostępnij',
+        onTap: () => showSongShareSheet(context, hit, idPrefix: idPrefix),
+      ),
+    ],
+  );
+}
+
+/// A song's ⋮ button opening [showSongMenu].
 class SongMenuButton extends StatelessWidget {
   const SongMenuButton({super.key, required this.hit, required this.idPrefix});
 
@@ -345,37 +400,6 @@ class SongMenuButton extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
     tooltip: 'Menu utworu (⋮)',
     icon: const Icon(Icons.more_vert),
-    onPressed: () {
-      FocusScope.of(context).unfocus();
-      showMenuSheet(
-        context,
-        idPrefix: idPrefix,
-        header: MenuSheetHeader(
-          cover: SongCover(cover: CoverRequest.of(hit)),
-          title: hit.title,
-          subtitle: hit.artistLabel,
-        ),
-        entries: [
-          MenuSheetEntry(
-            Icons.queue_music,
-            'Dodaj do kolejki',
-            onTap: () => addToQueue(context, hit),
-          ),
-          MenuSheetEntry(
-            Icons.playlist_play,
-            'Odtwórz jako następny',
-            onTap: () => playNextInQueue(context, hit),
-          ),
-          const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
-          const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
-          const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
-          MenuSheetEntry(
-            Icons.share_outlined,
-            'Udostępnij',
-            onTap: () => showSongShareSheet(context, hit, idPrefix: idPrefix),
-          ),
-        ],
-      );
-    },
+    onPressed: () => showSongMenu(context, hit, idPrefix: idPrefix),
   );
 }

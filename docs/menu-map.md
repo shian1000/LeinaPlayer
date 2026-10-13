@@ -136,7 +136,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   the account's playlists last synced with MusicDatabase, with ⟳ "Synchronizuj teraz"; right
   after logging in, phone-only playlists are offered to the account ("Dodać playlisty z
   telefonu do konta?" — Nie teraz / Dodaj), and while any are left a row "Playlisty tylko na tym
-telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)).
+telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)). A
+  "Nastroje" row below it does the same for the account's moods, the login offer covers
+  phone-only moods too ("Dodać playlisty i nastroje z telefonu do konta?"), and a "Nastroje tylko
+  na tym telefonie: N" row adds them ([ADR 0008](decisions/0008-moods.md)).
 - Źródła muzyki **→ Źródła muzyki** (`music_sources_screen.dart`), list of music sources:
   - Muzyka lokalna **→ Muzyka lokalna** (`local_music_screen.dart`) — **implemented**:
     - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
@@ -296,8 +299,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - Filter icon (top right, where the reference app has a camera; also in the search screen's app
   bar) **→ sheet "Szukaj w"** (`search_fields_sheet.dart`) — **implemented**: checkboxes for the
   fields song search looks at — Tytuł, Wykonawca (incl. additional artists and the artists'
-  other names / `synonyms`), Album (these three are the default), Rok, Język, Pochodzenie
-  wykonawcy — plus "Przywróć
+  other names / `synonyms`), Album, Nastrój (a mood's name lists its songs; these four are the
+  default), Rok, Język, Pochodzenie wykonawcy — plus "Przywróć
   domyślne". At least one stays ticked; the choice is remembered. Below them the switch
   "Wyszukuj playlisty" (on): Biblioteka playlists while typing, and with the button YouTube /
   Spotify playlists as their own settings allow. A dot on the icon means the selection differs
@@ -344,9 +347,17 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     name or owner contain every word, as you type, above the songs; tapping one opens it.
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
     <pozycja>`: Dodaj do kolejki (**implemented**), Odtwórz jako następny (**implemented**),
-    `Dodaj do playlisty`, `Przejdź do albumu`,
+    `Dodaj do playlisty`, Dodaj do nastroju (**implemented**, MusicDatabase songs only, **→
+    sheet "Dodaj do nastroju"** below), `Przejdź do albumu`,
     `Przejdź do wykonawców`, Udostępnij (**→ Udostępnij utwór**, below). The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`).
+  - **The song menu** (`showSongMenu` in `song_tile.dart`): the same entries as this ⋮ — Dodaj do
+    kolejki, Odtwórz jako następny, Dodaj do nastroju (for a song not in MusicDatabase it says
+    only database songs can be in a mood), the dummies, Udostępnij — open with a **long press on
+    any song row** (search, YouTube results, Ostatnie, Kolejka `Kolejka › Utwór › Menu (⋮)`,
+    Pamięć podręczna, Utwory spoza bazy danych, outbox contents), the full player's ⋮ (`Odtwarzacz ›
+    Menu (⋮)`, was a dummy) and a long press on the mini player (`Mini odtwarzacz › Menu
+    utworu`). In a playlist or a mood a long press opens that screen's own track menu.
   - Gestures on song rows (search results — YouTube ones too —, playlists, Ostatnie, every
     `SongTile`; `SwipeActions` in `swipe_actions.dart`): dragging a row right adds the song to
     the queue, like the reference app — past a quarter of the row (at most 120 px) the strip
@@ -374,7 +385,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 
 - `Biblioteka › Wyszukaj w Bibliotece`
 - Utwórz (+) **→ sheet "Utwórz"** with prefix `Biblioteka › Utwórz (+)` (see below)
-- `Biblioteka › Filtr: Playlisty` / `Filtr: Albumy` / `Filtr: Wykonawcy`
+- Filtr: Playlisty (**implemented**: playlists only), Filtr: Nastroje (**implemented**: moods
+  only; "Brak nastrojów" and how to add one when there are none), `Biblioteka › Filtr: Albumy` /
+  `Filtr: Wykonawcy`. No filter: playlists, then moods.
 - Sort button (shows current order) **→ sheet "Sortuj wg"**:
   - `Biblioteka › Sortuj wg › Ostatnie`
   - `Biblioteka › Sortuj wg › Ostatnio dodane`
@@ -385,6 +398,27 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   "Playlista • <owner>") **→ Playlista** — the logged-in account's (synced with MusicDatabase,
   incl. ones made there, e.g. folder playlists) and the phone-only ones. No sample items any more; with no playlists the list
   shows "Brak playlist" and how to add one. Albums/artists don't exist yet.
+- Moods (`MoodLibrary`, [ADR 0008](decisions/0008-moods.md)): the user's own ("Nastrój • Twój"),
+  then the global ones ("Nastrój • globalny"), each by name **→ Nastrój**.
+
+## Nastrój (`mood_screen.dart`) — **implemented**
+
+- App bar with the name and ⋮ **→ sheet**, IDs `Nastrój › Menu (⋮) › <pozycja>`: Dodaj do
+  kolejki / Odtwórz jako następny (the whole mood), and for the user's own mood Zmień nazwę
+  (dialog) and Usuń nastrój (asks first; deleted on every device of the account, MusicDatabase
+  archives it).
+- Header: mood icon cover, name, "Twój nastrój" / "Nastrój globalny" • "N utworów".
+- **Odtwórz losowo**: the whole mood shuffled into the queue. A note when some of its songs
+  aren't in the phone's music.db yet.
+- Songs by title (tapping one plays on through the mood); ⋮ **→ sheet**, IDs `Nastrój › Utwór ›
+  Menu (⋮) › <pozycja>`: Dodaj do kolejki, Odtwórz jako następny, Dodaj do nastroju, Usuń z tego
+  nastroju (own mood, or a global one with the `edit_global_moods` permission), Udostępnij.
+
+## Sheet "Dodaj do nastroju" (`mood_sheet.dart`)
+
+- Header with the song; "Nowy nastrój" (name dialog; the new mood gets the song); "Twoje
+  nastroje" with a checkbox each (ticking adds / removes right away); "Globalne" the same, only
+  with the `edit_global_moods` permission.
 
 ## Playlista (`playlist_screen.dart`) — **implemented** for imported playlists
 
@@ -436,7 +470,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   list can scroll; the entry playing, when queued from this playlist, knows its place in it).
 - Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: Udostępnij (**→
   Udostępnij utwór**, see search), `Dodaj do
-  Polubionych utworów`, `Dodaj do playlisty`, `Usuń z tej playlisty`, Dodaj do kolejki and
+  Polubionych utworów`, `Dodaj do playlisty`, Dodaj do nastroju (**implemented**, see search),
+  `Usuń z tej playlisty`, Dodaj do kolejki and
   Odtwórz jako następny (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
 
 ## Utwórz sheet (`create_sheet.dart`)
@@ -454,6 +489,8 @@ Opened from the bottom-nav tab (prefix `Utwórz`) or the Library "+" (prefix
     video YouTube removed stay (dimmed YouTube icon, searched again when played), and the
     snackbar adds "YouTube usunął N utw. — zostały na liście i zostaną wyszukane od nowa." Spotify: at most 100
     tracks; the snackbar then adds "Spotify pokazuje bez logowania tylko pierwsze 100 z N."
+- Nastrój (**implemented**): name dialog, then a new mood — the logged-in user's, or one only on
+  this phone while logged out ([ADR 0008](decisions/0008-moods.md)).
 - `… › Współtworzone playlisty`
 - `… › Blend`
 

@@ -38,6 +38,9 @@ a share sheet; song search also finds Biblioteka playlists, and its online butto
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their
 MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).
+Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
+while logged out), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
+permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)).
 YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
 the video / track; a tapped link first shows a native sheet asking where to open it (Leina Radio,
 the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków).
@@ -68,7 +71,9 @@ the service's app, a browser; a choice can be remembered — Ustawienia › Otwi
   (Ustawienia › Konto, `account.dart`; `POST /login` gives a token sent with the requests —
   [ADR 0006](docs/decisions/0006-musicdatabase-login.md); the server side is in a
   [hand-off](docs/handoffs/musicdatabase-login.md)). The account's playlists are exchanged as JSON
-(`/users/<name>/playlists` — [ADR 0007](docs/decisions/0007-playlist-sync.md)). Any other way of talking to MusicDatabase is not decided — check with the user
+(`/users/<name>/playlists` — [ADR 0007](docs/decisions/0007-playlist-sync.md)), and so are its
+moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and its permissions
+(`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands
@@ -88,9 +93,11 @@ flutter build apk            # build a release Android APK
   per-tab navigators.
 - `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers,
   `SongTile` — the song row with source icons used by search, playlists, the queue and history;
+  `showSongMenu` — a song's menu, opened by ⋮ and by a long press on any song row (new song
+  lists get it by using `SongTile`, or call it from their own `onLongPress`);
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
-  adding to the queue; `SongCover` — a song's album cover, with the cover
+  adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju"; `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `color_picker.dart`; `TextInputDialog` in `common.dart`;
   `showShareSheet` in `share_sheet.dart`).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
@@ -101,7 +108,8 @@ flutter build apk            # build a release Android APK
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), syncing
-playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`),
+playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
+  (`moods.dart`: global ones from tag.db, the user's own synced like playlists),
   album covers and their cache
   (`album_covers.dart`), play history (`play_history.dart`,
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and
@@ -137,7 +145,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `PlayHistoryScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `PlayHistoryScope`,
   `AlbumCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus

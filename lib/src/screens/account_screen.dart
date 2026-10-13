@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../data/account.dart';
 import '../data/database_sync.dart';
+import '../data/moods.dart';
 import '../data/playlist_library.dart';
+import '../data/playlist_sync.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -60,21 +62,32 @@ class _AccountScreenState extends State<AccountScreen> {
     if (error == null) await _offerPhonePlaylists();
   }
 
-  /// Playlists made while logged out live only on this phone; the user decides whether they
-  /// join the account (and so MusicDatabase and the account's other phones).
+  /// Playlists and moods made while logged out live only on this phone; the user decides
+  /// whether they join the account (and so MusicDatabase and the account's other phones).
   Future<void> _offerPhonePlaylists() async {
     final playlists = PlaylistLibraryScope.maybeOf(context);
+    final moods = MoodLibraryScope.maybeOf(context);
     final user = AccountScope.of(context).userName;
-    if (playlists == null || user == null) return;
-    final count = await playlists.phoneOnlyCount();
-    if (count == 0 || !mounted) return;
+    if (user == null) return;
+    final playlistCount = await playlists?.phoneOnlyCount() ?? 0;
+    final moodCount = moods?.phoneOnlyCount ?? 0;
+    if ((playlistCount == 0 && moodCount == 0) || !mounted) return;
+    final what = [
+      if (playlistCount > 0) 'playlisty',
+      if (moodCount > 0) 'nastroje',
+    ].join(' i ');
     final add = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Dodać playlisty z telefonu do konta?'),
+        title: Text('Dodać $what z telefonu do konta?'),
         content: Text(
-          'Playlisty tylko na tym telefonie: $count. Dodane do konta $user będą też w '
-          'MusicDatabase i na innych telefonach tego konta. Bez dodania zostaną tylko tutaj.',
+          [
+            if (playlistCount > 0)
+              'Playlisty tylko na tym telefonie: $playlistCount.',
+            if (moodCount > 0) 'Nastroje tylko na tym telefonie: $moodCount.',
+            'Dodane do konta $user będą też w MusicDatabase i na innych telefonach tego '
+                'konta. Bez dodania zostaną tylko tutaj.',
+          ].join(' '),
         ),
         actions: [
           TextButton(
@@ -88,7 +101,9 @@ class _AccountScreenState extends State<AccountScreen> {
         ],
       ),
     );
-    if (add ?? false) await playlists.addPhoneOnlyToAccount();
+    if (!(add ?? false)) return;
+    await playlists?.addPhoneOnlyToAccount();
+    await moods?.addPhoneOnlyToAccount();
   }
 
   @override
@@ -116,6 +131,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   subtitle: const Text('Zalogowano'),
                 ),
                 const _PlaylistSyncTile(),
+                const _MoodSyncTile(),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: const LogOutButton(),
@@ -278,35 +294,15 @@ class _PlaylistSyncTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final playlists = PlaylistLibraryScope.maybeOf(context);
     if (playlists == null) return const SizedBox.shrink();
-    final last = playlists.lastSync;
-    final error = Theme.of(context).colorScheme.error;
-    String two(int n) => n.toString().padLeft(2, '0');
     final phoneOnly = playlists.playlists
         .where((p) => p.account == null)
         .length;
-    final syncTile = ListTile(
-      leading: Icon(
-        last?.problem == null ? Icons.sync : Icons.sync_problem,
-        color: last?.problem == null ? null : error,
-      ),
-      title: const Text('Playlisty'),
-      subtitle: Text(
-        playlists.syncing
-            ? 'Synchronizowanie…'
-            : last == null
-            ? 'Jeszcze nie synchronizowano'
-            : last.problem ??
-                  'Zsynchronizowano o ${two(last.at.hour)}:${two(last.at.minute)}',
-      ),
-      trailing: IconButton(
-        tooltip: 'Synchronizuj teraz',
-        icon: const Icon(Icons.refresh),
-        onPressed: playlists.syncing
-            ? null
-            : () async => playlists.sync(
-                await DatabaseSyncScope.of(context).serverAddresses(),
-              ),
-      ),
+    final syncTile = _SyncTile(
+      title: 'Playlisty',
+      syncing: playlists.syncing,
+      last: playlists.lastSync,
+      onSync: () async =>
+          playlists.sync(await DatabaseSyncScope.of(context).serverAddresses()),
     );
     if (phoneOnly == 0) return syncTile;
     // Also for a phone logged in before playlists synced, which was never asked.
@@ -320,6 +316,83 @@ class _PlaylistSyncTile extends StatelessWidget {
           onTap: playlists.addPhoneOnlyToAccount,
         ),
       ],
+    );
+  }
+}
+
+/// How the account's moods last synced with MusicDatabase (with this phone's changes to global
+/// moods), and "sync now".
+class _MoodSyncTile extends StatelessWidget {
+  const _MoodSyncTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final moods = MoodLibraryScope.maybeOf(context);
+    if (moods == null) return const SizedBox.shrink();
+    final syncTile = _SyncTile(
+      title: 'Nastroje',
+      syncing: moods.syncing,
+      last: moods.lastSync,
+      onSync: () async {
+        final servers = await DatabaseSyncScope.of(context).serverAddresses();
+        if (!context.mounted) return;
+        await AccountScope.of(context).refreshPermissions(servers);
+        await moods.sync(servers);
+      },
+    );
+    final phoneOnly = moods.phoneOnlyCount;
+    if (phoneOnly == 0) return syncTile;
+    return Column(
+      children: [
+        syncTile,
+        ListTile(
+          leading: const Icon(Icons.phone_android),
+          title: Text('Nastroje tylko na tym telefonie: $phoneOnly'),
+          subtitle: const Text('Dotknij, aby dodać je do konta'),
+          onTap: moods.addPhoneOnlyToAccount,
+        ),
+      ],
+    );
+  }
+}
+
+class _SyncTile extends StatelessWidget {
+  const _SyncTile({
+    required this.title,
+    required this.syncing,
+    required this.last,
+    required this.onSync,
+  });
+
+  final String title;
+  final bool syncing;
+  final PlaylistSyncResult? last;
+  final VoidCallback onSync;
+
+  @override
+  Widget build(BuildContext context) {
+    final last = this.last;
+    final error = Theme.of(context).colorScheme.error;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return ListTile(
+      leading: Icon(
+        last?.problem == null ? Icons.sync : Icons.sync_problem,
+        color: last?.problem == null ? null : error,
+      ),
+      title: Text(title),
+      subtitle: Text(
+        syncing
+            ? 'Synchronizowanie…'
+            : last == null
+            ? 'Jeszcze nie synchronizowano'
+            : last.problem ??
+                  'Zsynchronizowano o ${two(last.at.hour)}:${two(last.at.minute)}',
+      ),
+      trailing: IconButton(
+        tooltip: 'Synchronizuj teraz',
+        icon: const Icon(Icons.refresh),
+        onPressed: syncing ? null : onSync,
+      ),
     );
   }
 }

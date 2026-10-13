@@ -348,6 +348,8 @@ class _QueueRow extends StatelessWidget {
         ],
       ),
       onTap: onTap,
+      onLongPress: () =>
+          showSongMenu(context, hit, idPrefix: 'Kolejka › Utwór › Menu (⋮)'),
     );
   }
 }

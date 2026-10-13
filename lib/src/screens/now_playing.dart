@@ -150,7 +150,8 @@ class _FullCoverReadyState extends State<_FullCoverReady> {
   Widget build(BuildContext context) => widget.child;
 }
 
-/// Card above the bottom bar showing what's playing; tap to open [NowPlayingScreen].
+/// Card above the bottom bar showing what's playing; tap to open [NowPlayingScreen], long press
+/// for the song's menu.
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
 
@@ -173,6 +174,15 @@ class MiniPlayer extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () => NowPlayingScreen.open(context),
+              onLongPress: () {
+                final hit = PlaybackQueueScope.of(context).current;
+                if (hit == null) return;
+                showSongMenu(
+                  context,
+                  hit,
+                  idPrefix: 'Mini odtwarzacz › Menu utworu',
+                );
+              },
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -461,7 +471,15 @@ class NowPlayingScreen extends StatelessWidget {
                       IconButton(
                         tooltip: 'Menu odtwarzacza (⋮)',
                         icon: const Icon(Icons.more_vert),
-                        onPressed: () => dummy('Menu (⋮)'),
+                        onPressed: () {
+                          final hit = queue.current;
+                          if (hit == null) return dummy('Menu (⋮)');
+                          showSongMenu(
+                            context,
+                            hit,
+                            idPrefix: '$_id › Menu (⋮)',
+                          );
+                        },
                       ),
                     ],
                   ),

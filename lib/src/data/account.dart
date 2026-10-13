@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'playlist_sync.dart';
 
 /// The MusicDatabase user logged in on this phone ([ADR 0006](../../../docs/decisions/0006-musicdatabase-login.md)).
 /// Users are created in MusicDatabase (main menu › Users); the phone logs in with a username and
@@ -11,15 +14,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// username and the token are kept (in `shared_preferences`), never the password. The token goes
 /// with every request sent to the inbox, so MusicDatabase knows who sent it; the username goes
 /// into the request file names ([Outbox]).
+///
+/// The owner grants users permissions in MusicDatabase (main menu › Users › Permissions); the
+/// phone shows what they allow only while the user has them ([hasPermission]).
 class Account extends ChangeNotifier {
   static const _userKey = 'account.user_name';
   static const _tokenKey = 'account.token';
+  static const _permissionsKey = 'account.permissions';
+
+  /// Adding songs to and removing them from global moods ([ADR 0008](../../../docs/decisions/0008-moods.md)).
+  static const editGlobalMoods = 'edit_global_moods';
 
   /// How long to wait for the server before trying the next address (or giving up).
   static const timeout = Duration(seconds: 8);
 
   String? _userName;
   String? _token;
+  Set<String> _permissions = const {};
   bool _busy = false;
 
   /// The logged-in user (MusicDatabase's lowercase name), or the last one when the server no
@@ -30,6 +41,11 @@ class Account extends ChangeNotifier {
   String? get token => _token;
 
   bool get loggedIn => _token != null;
+
+  /// What the owner allowed the logged-in user in MusicDatabase, as of the last login or
+  /// [refreshPermissions]; nothing while logged out.
+  bool hasPermission(String permission) =>
+      loggedIn && _permissions.contains(permission);
 
   /// The server stopped accepting the saved login (token revoked, user deleted or renamed):
   /// the name is kept for the form, the password has to be typed again.
@@ -42,6 +58,7 @@ class Account extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _userName = prefs.getString(_userKey);
     _token = prefs.getString(_tokenKey);
+    _permissions = {...?prefs.getStringList(_permissionsKey)};
     notifyListeners();
   }
 
@@ -74,15 +91,14 @@ class Account extends ChangeNotifier {
           request.contentLength = body.length;
           request.add(body);
           final response = await request.close().timeout(timeout);
-          final answerText = await utf8
-              .decodeStream(response)
-              .timeout(timeout);
+          final answerText = await utf8.decodeStream(response).timeout(timeout);
           switch (response.statusCode) {
             case HttpStatus.ok:
               final answer = jsonDecode(answerText) as Map<String, Object?>;
               await _save(
                 answer['username'] as String? ?? userName.trim().toLowerCase(),
                 answer['token']! as String,
+                _permissionsOf(answer),
               );
               return null;
             case HttpStatus.unauthorized:
@@ -120,10 +136,12 @@ class Account extends ChangeNotifier {
     final token = _token;
     _userName = null;
     _token = null;
+    _permissions = const {};
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
     await prefs.remove(_tokenKey);
+    await prefs.remove(_permissionsKey);
     if (token == null || servers.isEmpty) return;
     final client = HttpClient()..connectionTimeout = timeout;
     try {
@@ -154,12 +172,70 @@ class Account extends ChangeNotifier {
     await (await SharedPreferences.getInstance()).remove(_tokenKey);
   }
 
-  Future<void> _save(String userName, String token) async {
+  /// Asks MusicDatabase (`GET /users/<name>`) what the user may do now, so a permission
+  /// granted or revoked since the login shows without logging in again. Quietly keeps what
+  /// it knew when no server answers.
+  Future<void> refreshPermissions(List<Uri> servers) async {
+    final user = _userName;
+    final token = _token;
+    if (user == null || token == null) return;
+    for (final server in servers) {
+      final client = PlaylistSyncClient(server, user, token);
+      try {
+        final answer = await client.user();
+        if (_token != token) return;
+        switch (answer.status) {
+          case HttpStatus.ok when answer.body is Map:
+            await _setPermissions(
+              _permissionsOf(answer.body! as Map<String, Object?>),
+            );
+            return;
+          case HttpStatus.unauthorized:
+            await tokenRejected();
+            return;
+        }
+        // An older server without this call (404) or another problem: try the next address.
+      } catch (e) {
+        debugPrint('Reading permissions on $server failed: $e');
+      } finally {
+        client.close();
+      }
+    }
+  }
+
+  /// MusicDatabase said the user no longer has [permission] (a 403 naming it).
+  Future<void> permissionRevoked(String permission) async {
+    if (!_permissions.contains(permission)) return;
+    await _setPermissions({..._permissions}..remove(permission));
+  }
+
+  static Set<String> _permissionsOf(Map<String, Object?> answer) => {
+    for (final p in answer['permissions'] as List? ?? const [])
+      if (p is String) p,
+  };
+
+  Future<void> _setPermissions(Set<String> permissions) async {
+    if (setEquals(permissions, _permissions)) return;
+    _permissions = permissions;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setStringList(
+      _permissionsKey,
+      [...permissions],
+    );
+  }
+
+  Future<void> _save(
+    String userName,
+    String token,
+    Set<String> permissions,
+  ) async {
     _userName = userName;
     _token = token;
+    _permissions = permissions;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, userName);
     await prefs.setString(_tokenKey, token);
+    await prefs.setStringList(_permissionsKey, [...permissions]);
   }
 }
 

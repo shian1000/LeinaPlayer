@@ -19,6 +19,7 @@ import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/mood_sheet.dart';
 import '../widgets/share_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_tile.dart';
@@ -491,6 +492,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           'Dodaj do Polubionych utworów',
         ),
         const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
+        ?moodMenuEntry(context, hit),
         const MenuSheetEntry(
           Icons.remove_circle_outline,
           'Usuń z tej playlisty',
@@ -596,6 +598,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           icon: Icon(Icons.more_vert, color: context.palette.textSecondary),
           onPressed: () => _showTrackMenu(hit),
         ),
+        onLongPress: () => _showTrackMenu(hit),
       );
 
   @override

@@ -236,7 +236,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 11,
+        version: 13,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -270,6 +270,7 @@ class LocalLibrary extends ChangeNotifier {
           await _addVideoRemovedColumn(db);
           await _createRemovedVideosTable(db);
           await _addPlaylistSyncColumns(db);
+          await _createMoodTables(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -282,9 +283,69 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 9) await _addVideoRemovedColumn(db);
           if (from < 10) await _createRemovedVideosTable(db);
           if (from < 11) await _addPlaylistSyncColumns(db);
+          if (from < 12) await _createMoodTables(db);
+          if (from == 12) await _allowPhoneOnlyMoods(db);
         },
       ),
     );
+  }
+
+  /// Version 13: moods made while logged out stay on the phone (`account` NULL), like
+  /// playlists; version 12 had `account NOT NULL`, which SQLite can only drop by copying.
+  static Future<void> _allowPhoneOnlyMoods(Database db) async {
+    await db.execute('ALTER TABLE moods RENAME TO moods_v12');
+    await db.execute('''
+      CREATE TABLE moods (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid VARCHAR NOT NULL UNIQUE,
+        account VARCHAR,
+        name VARCHAR NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 0,
+        dirty INTEGER NOT NULL DEFAULT 0,
+        deleted_at INTEGER
+      )''');
+    await db.execute('INSERT INTO moods SELECT * FROM moods_v12');
+    await db.execute('DROP TABLE moods_v12');
+  }
+
+  /// Version 12: moods (see `moods.dart`, ADR 0008). The logged-in user's own moods, synced with
+  /// MusicDatabase like playlists; and changes to global moods (tag.db's) made here, kept until
+  /// a downloaded tag.db has them.
+  static Future<void> _createMoodTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE moods (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid VARCHAR NOT NULL UNIQUE,
+        -- NULL: made while logged out, only on this phone.
+        account VARCHAR,
+        name VARCHAR NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 0,
+        dirty INTEGER NOT NULL DEFAULT 0,
+        deleted_at INTEGER
+      )''');
+    await db.execute('''
+      CREATE TABLE mood_songs (
+        mood_id INTEGER NOT NULL,
+        -- music.db's songs.id: only MusicDatabase songs can be in a mood.
+        song_id INTEGER NOT NULL,
+        PRIMARY KEY (mood_id, song_id)
+      )''');
+    await db.execute('''
+      CREATE TABLE global_mood_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account VARCHAR NOT NULL,
+        -- tag.db's tags.id and music.db's songs.id.
+        mood_id INTEGER NOT NULL,
+        song_id INTEGER NOT NULL,
+        added INTEGER NOT NULL,
+        made_at INTEGER NOT NULL,
+        -- When MusicDatabase accepted it (202); NULL: waiting to be sent.
+        sent_at INTEGER
+      )''');
   }
 
   /// Version 11: playlists synced with the user's MusicDatabase account (see

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../dummy.dart';
+import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -8,10 +9,15 @@ import '../widgets/cover_art.dart';
 import '../widgets/menu_sheet.dart';
 import 'app_shell.dart';
 import 'create_sheet.dart';
+import 'mood_screen.dart';
 import 'playlist_screen.dart';
 
 const _id = 'Biblioteka';
-const _filters = ['Playlisty', 'Albumy', 'Wykonawcy'];
+const _filters = ['Playlisty', 'Nastroje', 'Albumy', 'Wykonawcy'];
+
+/// Filters that work; the rest are dummies.
+const _playlistsFilter = 0;
+const _moodsFilter = 1;
 const _sortOptions = ['Ostatnie', 'Ostatnio dodane', 'Alfabetycznie', 'Twórca'];
 
 class LibraryScreen extends StatefulWidget {
@@ -65,7 +71,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final playlists = PlaylistLibraryScope.of(context).playlists;
+    final filter = _selectedFilter;
+    final showPlaylists = filter != _moodsFilter;
+    final showMoods = filter == null || filter == _moodsFilter;
+    final playlists = showPlaylists
+        ? PlaylistLibraryScope.of(context).playlists
+        : const <PlaylistSummary>[];
+    final moodLibrary = MoodLibraryScope.maybeOf(context);
+    final moods = showMoods && moodLibrary != null
+        ? [...moodLibrary.userMoods, ...moodLibrary.globalMoods]
+        : const <Mood>[];
     return SafeArea(
       // Stretch: a centred Column would push the (narrower) filter-chip row inwards.
       child: Column(
@@ -103,7 +118,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       setState(
                         () => _selectedFilter = i == _selectedFilter ? null : i,
                       );
-                      showDummy(context, '$_id › Filtr: ${_filters[i]}');
+                      if (i != _playlistsFilter && i != _moodsFilter) {
+                        showDummy(context, '$_id › Filtr: ${_filters[i]}');
+                      }
                     },
                   ),
                 ],
@@ -136,14 +153,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ],
                 ),
-                if (playlists.isEmpty)
+                if (filter == _moodsFilter && moods.isEmpty)
+                  const _EmptyMoods()
+                else if (playlists.isEmpty && moods.isEmpty)
                   const _EmptyLibrary()
-                else
+                else ...[
                   for (final playlist in playlists)
                     _PlaylistTile(
                       playlist: playlist,
                       onTap: () => _openPlaylist(playlist),
                     ),
+                  for (final mood in moods)
+                    _MoodTile(
+                      mood: mood,
+                      onTap: () => MoodScreen.open(context, mood),
+                    ),
+                ],
               ],
             ),
           ),
@@ -176,6 +201,60 @@ class _PlaylistTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       onTap: onTap,
+    );
+  }
+}
+
+class _MoodTile extends StatelessWidget {
+  const _MoodTile({required this.mood, required this.onTap});
+
+  final Mood mood;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: CoverArt(seed: mood.name, size: 64, icon: Icons.mood),
+      title: Text(mood.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        mood.global ? 'Nastrój • globalny' : 'Nastrój • Twój',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _EmptyMoods extends StatelessWidget {
+  const _EmptyMoods();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
+      child: Column(
+        children: [
+          Icon(Icons.mood, size: 48, color: palette.textSecondary),
+          const SizedBox(height: 16),
+          const Text(
+            'Brak nastrojów',
+            style: TextStyle(
+              fontSize: AppFontSize.listTitle,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Utwórz nastrój przyciskiem + u góry albo z menu ⋮ utworu („Dodaj do '
+            'nastroju”). Nastroje globalne przychodzą z MusicDatabase.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: palette.textSecondary),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/moods.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/mood_sheet.dart';
 import 'playlist_import.dart';
 
 /// "Utwórz" sheet — opened from the bottom-nav tab and from the "+" in the Library header,
@@ -18,6 +20,13 @@ Future<void> showCreateSheet(BuildContext context, {required String idPrefix}) {
         onTap: () =>
             showPlaylistSheet(context, idPrefix: '$idPrefix › Playlista'),
       ),
+      if (MoodLibraryScope.maybeOf(context) != null)
+        MenuSheetEntry(
+          Icons.mood,
+          'Nastrój',
+          subtitle: 'Utwory o podobnym klimacie, np. do ćwiczeń',
+          onTap: () => createMood(context),
+        ),
       const MenuSheetEntry(
         Icons.group_outlined,
         'Współtworzone playlisty',

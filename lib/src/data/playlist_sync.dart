@@ -17,16 +17,22 @@ String newPlaylistUid() {
       '${hex.substring(16, 20)}-${hex.substring(20)}';
 }
 
-/// One answer of MusicDatabase's playlist endpoints: the HTTP status and its JSON body, if any.
+/// One answer of MusicDatabase's account endpoints: the HTTP status and its JSON body, if any.
 typedef SyncAnswer = ({int status, Object? body});
 
 /// The user's playlists on MusicDatabase's sharing server
 /// ([ADR 0007](../../../docs/decisions/0007-playlist-sync.md); the server side is MusicDatabase's
-/// `docs/handoffs/playlists-for-musicdatabaseapp.md`). Only HTTP: what to send and what to do
-/// with the answers is [PlaylistLibrary.sync]'s.
+/// `docs/handoffs/playlists-for-musicdatabaseapp.md`), or — with [collection] `moods` — their
+/// moods, which follow the same rules ([ADR 0008](../../../docs/decisions/0008-moods.md)). Only
+/// HTTP: what to send and what to do with the answers is [PlaylistLibrary.sync]'s and
+/// `MoodLibrary.sync`'s.
 class PlaylistSyncClient {
-  PlaylistSyncClient(this.server, this.userName, this.token)
-    : _client = HttpClient()..connectionTimeout = connectTimeout;
+  PlaylistSyncClient(
+    this.server,
+    this.userName,
+    this.token, {
+    this.collection = 'playlists',
+  }) : _client = HttpClient()..connectionTimeout = connectTimeout;
 
   static const connectTimeout = Duration(seconds: 8);
 
@@ -36,10 +42,11 @@ class PlaylistSyncClient {
   final Uri server;
   final String userName;
   final String token;
+  final String collection;
   final HttpClient _client;
 
   Uri _uri(String path, [Map<String, String>? query]) => server
-      .resolve('/users/${Uri.encodeComponent(userName)}/playlists$path')
+      .resolve('/users/${Uri.encodeComponent(userName)}/$collection$path')
       .replace(queryParameters: query);
 
   Future<SyncAnswer> changedSince(int revision) =>
@@ -55,6 +62,18 @@ class PlaylistSyncClient {
           'base_revision': '$baseRevision',
           'deleted_at': '$deletedAt',
         }),
+      );
+
+  /// The user as MusicDatabase sees them now: `{"username", "permissions": [...]}`.
+  Future<SyncAnswer> user() =>
+      _call('GET', server.resolve('/users/${Uri.encodeComponent(userName)}'));
+
+  /// `PUT` (add) or `DELETE` (remove) [songId] in the global mood [moodId]; needs the
+  /// `edit_global_moods` permission.
+  Future<SyncAnswer> changeGlobalMood(int moodId, int songId, bool add) =>
+      _call(
+        add ? 'PUT' : 'DELETE',
+        server.resolve('/global-moods/$moodId/songs/$songId'),
       );
 
   Future<SyncAnswer> _call(
@@ -76,7 +95,7 @@ class PlaylistSyncClient {
       try {
         decoded = jsonDecode(text);
       } on FormatException catch (e) {
-        debugPrint('Playlist sync: bad JSON from $uri: $e');
+        debugPrint('Sync: bad JSON from $uri: $e');
       }
     }
     return (status: response.statusCode, body: decoded);

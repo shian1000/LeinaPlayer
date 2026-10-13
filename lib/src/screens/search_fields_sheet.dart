@@ -97,6 +97,9 @@ class _SearchFieldsSheet extends StatelessWidget {
                   'Także dodatkowi wykonawcy i inne nazwy wykonawców',
                 ),
                 SearchField.language => const Text('np. Polish, English'),
+                SearchField.mood => const Text(
+                  'Nazwa nastroju pokazuje wszystkie jego utwory',
+                ),
                 _ => null,
               },
               value: selected.contains(field),

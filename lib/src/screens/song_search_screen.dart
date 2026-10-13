@@ -303,6 +303,7 @@ class _Results extends StatelessWidget {
                 hit: results[i - leading.length],
                 idPrefix: 'Wyszukaj › Utwór › Menu (⋮)',
               ),
+              menuIdPrefix: 'Wyszukaj › Utwór › Menu (⋮)',
             ),
     );
   }
@@ -610,6 +611,8 @@ class _YouTubeTile extends StatelessWidget {
     );
     final tile = ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
+      onLongPress: () =>
+          showSongMenu(context, hit, idPrefix: 'Wyszukaj › Utwór › Menu (⋮)'),
       trailing: SongMenuButton(
         hit: hit,
         idPrefix: 'Wyszukaj › Utwór › Menu (⋮)',
