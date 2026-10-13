@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../sample_content.dart';
+import '../data/account.dart';
 import '../theme.dart';
 
 class ProfileAvatar extends StatelessWidget {
@@ -13,19 +13,23 @@ class ProfileAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final account = AccountScope.maybeOf(context);
+    final name = account?.loggedIn ?? false ? account!.userName! : null;
     return GestureDetector(
       onTap: onTap,
       child: CircleAvatar(
         radius: radius,
         backgroundColor: palette.accent,
-        child: Text(
-          userName.characters.first,
-          style: TextStyle(
-            color: palette.onAccent,
-            fontSize: radius,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        child: name == null
+            ? Icon(Icons.person, color: palette.onAccent, size: radius * 1.2)
+            : Text(
+                name.characters.first.toUpperCase(),
+                style: TextStyle(
+                  color: palette.onAccent,
+                  fontSize: radius,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
       ),
     );
   }

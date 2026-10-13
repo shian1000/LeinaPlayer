@@ -9,6 +9,8 @@ import 'src/data/album_covers.dart';
 import 'src/data/database_sync.dart';
 import 'src/data/incoming_links.dart';
 import 'src/data/local_library.dart';
+import 'src/data/account.dart';
+import 'src/data/outbox.dart';
 import 'src/data/play_history.dart';
 import 'src/data/playlist_library.dart';
 import 'src/data/song_catalog.dart';
@@ -145,6 +147,12 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _localLibrary.database,
     _sourceSettings,
   );
+  final _account = Account();
+  late final _outbox = Outbox(
+    userName: () => _account.userName,
+    authToken: () => _account.token,
+  )..onUnauthorized = _account.tokenRejected;
+  Timer? _outboxSendSoon;
   late final _youTubeSearch = widget.youTubeSearch ?? YouTubeSearch();
   late final _youTubeAudio = widget.youTubeAudio ?? YouTubeAudio();
   late final _youTubePlaylists = widget.youTubePlaylists ?? YouTubePlaylists();
@@ -155,6 +163,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       youTubeLibrary: _youTubeLibrary,
       youTubeAudio: _youTubeAudio,
       youTubeSearch: _youTubeSearch,
+      outbox: _outbox,
     ),
   );
   late final _playlistLibrary = PlaylistLibrary(
@@ -219,14 +228,23 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     // Android often keeps the app alive for days, so "once a day on start" also has to cover
     // coming back to an app that was only in the background.
     _lifecycle = AppLifecycleListener(
-      onResume: _databaseSync.syncIfDue,
+      onResume: () async {
+        await _databaseSync.syncIfDue();
+        await _sendOutbox();
+      },
       onHide: _queueSession.save,
     );
+    // A minute's wait lets the video found instead of a dead link join the same request.
+    _outbox.onReported = () {
+      _outboxSendSoon?.cancel();
+      _outboxSendSoon = Timer(const Duration(minutes: 1), _sendOutbox);
+    };
   }
 
   /// Once a newly downloaded `music.db` is loaded, the phone's own YouTube findings for songs it
   /// now settles (a link or "N/A") — or no longer has — are dropped: MusicDatabase's value wins
-  /// anyway.
+  /// anyway. A link YouTube removed settles nothing: the phone's replacement stays until
+  /// MusicDatabase changes it, and the dead link is in the outbox for MusicDatabase.
   Future<void> _forgetSettledMatches() async {
     final catalog = _songCatalog;
     final syncTime = catalog.loadedSyncTime;
@@ -238,13 +256,31 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _settledFor = syncTime;
     try {
       await _youTubeLoaded;
-      final forgotten = await _youTubeLibrary.forgetSettled(
-        (id) => catalog.byId(id)?.youTube != YouTubeLink.unknown,
-      );
+      final forgotten = await _youTubeLibrary.forgetSettled((id) {
+        final song = catalog.byId(id);
+        if (song == null) return true;
+        return switch (song.youTube) {
+          YouTubeLink.unknown => false,
+          YouTubeLink.linked => !_youTubeLibrary.isVideoRemoved(
+            song.youtubeVideoId!,
+          ),
+          _ => true,
+        };
+      });
       if (forgotten > 0) {
         debugPrint(
           'Forgot $forgotten phone YouTube findings settled by music.db',
         );
+      }
+      // Also those found dead before the outbox existed; already reported ones are skipped.
+      for (final videoId in _youTubeLibrary.removedVideos) {
+        final song = catalog.findByYouTubeId(videoId);
+        if (song == null) continue;
+        if (!await _outbox.reportDeadYouTubeLink(song, videoId)) continue;
+        final found = await _youTubeLibrary.matchDetailsFor(song.id);
+        if (found != null) {
+          await _outbox.reportReplacement(song, videoId, found);
+        }
       }
     } catch (e) {
       debugPrint('Forgetting settled YouTube findings failed: $e');
@@ -262,11 +298,28 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   }
 
   Future<void> _startDatabaseSync() async {
+    await _account.load().catchError(
+      (Object e) => debugPrint('Loading the account failed: $e'),
+    );
     try {
       await _databaseSync.load();
       await _databaseSync.syncIfDue();
     } catch (e) {
       debugPrint('Database sync on start failed: $e');
+    }
+    await _outbox.load().catchError(
+      (Object e) => debugPrint('Reading the outbox failed: $e'),
+    );
+    await _sendOutbox();
+  }
+
+  /// Hands the outbox to MusicDatabase's inbox, over the same addresses as the download;
+  /// whatever can't go now waits for the next start, return to the app or new report.
+  Future<void> _sendOutbox() async {
+    try {
+      await _outbox.send(await _databaseSync.serverAddresses());
+    } catch (e) {
+      debugPrint('Sending the outbox failed: $e');
     }
   }
 
@@ -275,6 +328,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.removeListener(_updateCoverLook);
     _themeController.removeListener(_updateChooserLook);
     _songCatalog.removeListener(_forgetSettledMatches);
+    _outboxSendSoon?.cancel();
     _coverLook.dispose();
     _lifecycle.dispose();
     _historySub.cancel();
@@ -298,51 +352,61 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   Widget build(BuildContext context) {
     return DatabaseSyncScope(
       notifier: _databaseSync,
-      child: SongCatalogScope(
-        notifier: _songCatalog,
-        child: LocalLibraryScope(
-          notifier: _localLibrary,
-          child: YouTubeLibraryScope(
-            notifier: _youTubeLibrary,
-            child: PlaylistLibraryScope(
-              notifier: _playlistLibrary,
-              child: PlayHistoryScope(
-                notifier: _playHistory,
-                child: PlayerScope(
-                  notifier: _player,
-                  child: PlaybackQueueScope(
-                    notifier: _playbackQueue,
-                    child: SourceSettingsScope(
-                      notifier: _sourceSettings,
-                      child: AlbumCoversScope(
-                        notifier: _albumCovers,
-                        child: YouTubeScope(
-                          search: _youTubeSearch,
-                          audio: _youTubeAudio,
-                          playlists: _youTubePlaylists,
-                          child: ThemeScope(
-                            notifier: _themeController,
-                            child: ListenableBuilder(
-                              listenable: _themeController,
-                              builder: (context, _) => MaterialApp(
-                                title: appName,
-                                debugShowCheckedModeBanner: false,
-                                theme: buildAppTheme(_themeController.light),
-                                darkTheme: buildAppTheme(_themeController.dark),
-                                themeMode: _themeController.themeMode,
-                                // Tab screens have no AppBar to set the status-bar icon colour, so
-                                // match it to the active theme here (dark icons on light themes and
-                                // vice versa).
-                                builder: (context, child) =>
-                                    AnnotatedRegion<SystemUiOverlayStyle>(
-                                      value:
-                                          Theme.of(context).brightness ==
-                                              Brightness.light
-                                          ? SystemUiOverlayStyle.dark
-                                          : SystemUiOverlayStyle.light,
-                                      child: child!,
+      child: AccountScope(
+        notifier: _account,
+        child: OutboxScope(
+          notifier: _outbox,
+          child: SongCatalogScope(
+            notifier: _songCatalog,
+            child: LocalLibraryScope(
+              notifier: _localLibrary,
+              child: YouTubeLibraryScope(
+                notifier: _youTubeLibrary,
+                child: PlaylistLibraryScope(
+                  notifier: _playlistLibrary,
+                  child: PlayHistoryScope(
+                    notifier: _playHistory,
+                    child: PlayerScope(
+                      notifier: _player,
+                      child: PlaybackQueueScope(
+                        notifier: _playbackQueue,
+                        child: SourceSettingsScope(
+                          notifier: _sourceSettings,
+                          child: AlbumCoversScope(
+                            notifier: _albumCovers,
+                            child: YouTubeScope(
+                              search: _youTubeSearch,
+                              audio: _youTubeAudio,
+                              playlists: _youTubePlaylists,
+                              child: ThemeScope(
+                                notifier: _themeController,
+                                child: ListenableBuilder(
+                                  listenable: _themeController,
+                                  builder: (context, _) => MaterialApp(
+                                    title: appName,
+                                    debugShowCheckedModeBanner: false,
+                                    theme: buildAppTheme(
+                                      _themeController.light,
                                     ),
-                                home: AppShell(links: _incomingLinks.links),
+                                    darkTheme: buildAppTheme(
+                                      _themeController.dark,
+                                    ),
+                                    themeMode: _themeController.themeMode,
+                                    // Tab screens have no AppBar to set the status-bar icon colour, so
+                                    // match it to the active theme here (dark icons on light themes and
+                                    // vice versa).
+                                    builder: (context, child) =>
+                                        AnnotatedRegion<SystemUiOverlayStyle>(
+                                          value:
+                                              Theme.of(context).brightness ==
+                                                  Brightness.light
+                                              ? SystemUiOverlayStyle.dark
+                                              : SystemUiOverlayStyle.light,
+                                          child: child!,
+                                        ),
+                                    home: AppShell(links: _incomingLinks.links),
+                                  ),
+                                ),
                               ),
                             ),
                           ),

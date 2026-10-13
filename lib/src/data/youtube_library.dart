@@ -59,6 +59,9 @@ class YouTubeLibrary extends ChangeNotifier {
   /// Whether YouTube no longer has [videoId] (playing or re-importing found out).
   bool isVideoRemoved(String videoId) => _removedVideos.contains(videoId);
 
+  /// Every video found removed so far.
+  Set<String> get removedVideos => Set.unmodifiable(_removedVideos);
+
   /// How long "not found on YouTube" holds before the queue searches again — the video may have
   /// been uploaded since. A tap on the song searches right away.
   static const notFoundFor = Duration(days: 30);
@@ -69,6 +72,22 @@ class YouTubeLibrary extends ChangeNotifier {
 
   /// The video the phone found for this MusicDatabase song, if any.
   String? matchFor(int mainDbId) => _matches[mainDbId];
+
+  /// [matchFor] with the title and channel saved with it.
+  Future<YouTubeVideo?> matchDetailsFor(int mainDbId) async {
+    final rows = await (await _database()).query(
+      'youtube_matches',
+      where: 'main_db_id = ?',
+      whereArgs: [mainDbId],
+    );
+    if (rows.isEmpty) return null;
+    final row = rows.single;
+    return YouTubeVideo(
+      id: row['video_id']! as String,
+      title: row['video_title'] as String? ?? '',
+      channel: row['channel'] as String? ?? '',
+    );
+  }
 
   /// The video the phone found for a track that isn't a MusicDatabase song, if any.
   String? matchForTrack(String artist, String title) =>

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/account.dart';
 import '../dummy.dart';
-import '../sample_content.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -13,10 +13,14 @@ class ProfileDrawer extends StatelessWidget {
     super.key,
     required this.onOpenSettings,
     required this.onOpenRecents,
+    required this.onOpenAccount,
   });
 
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenRecents;
+
+  /// Logging in (Ustawienia › Konto).
+  final VoidCallback onOpenAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +31,8 @@ class ProfileDrawer extends StatelessWidget {
     }
 
     final palette = context.palette;
+    final account = AccountScope.maybeOf(context);
+    final loggedIn = account?.loggedIn ?? false;
     return Drawer(
       width: MediaQuery.sizeOf(context).width * 0.9,
       child: SafeArea(
@@ -44,15 +50,17 @@ class ProfileDrawer extends StatelessWidget {
                     ListTile(
                       contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                       leading: const ProfileAvatar(radius: 22),
-                      title: const Text(
-                        userName,
-                        style: TextStyle(
+                      title: Text(
+                        loggedIn ? account!.userName! : 'Nie zalogowano',
+                        style: const TextStyle(
                           fontSize: AppFontSize.emphasis,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      subtitle: const Text('Pokaż profil'),
-                      onTap: () => dummy('Pokaż profil'),
+                      subtitle: Text(loggedIn ? 'Pokaż profil' : 'Zaloguj się'),
+                      onTap: loggedIn
+                          ? () => dummy('Pokaż profil')
+                          : onOpenAccount,
                     ),
                     const Divider(height: 1),
                     ListTile(
@@ -66,7 +74,7 @@ class ProfileDrawer extends StatelessWidget {
                       subtitle: const Text(
                         'Dodaj konto dziecka lub innej osoby',
                       ),
-                      onTap: () => dummy('Dodaj konto'),
+                      onTap: onOpenAccount,
                     ),
                   ],
                 ),

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/outbox.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
@@ -422,14 +423,20 @@ void main() {
     const dead = 'dead1234567';
     late List<Uri> openedApp;
     late int searches;
+    late Outbox outbox;
 
     TrackPlayer tracksWith() {
       openedApp = [];
       searches = 0;
+      outbox = Outbox(
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
       return TrackPlayer(
         player: player,
         settings: settings,
         youTubeLibrary: library,
+        outbox: outbox,
         youTubeAudio: YouTubeAudio(
           newPipeAvailable: true,
           newPipe: (id) async {
@@ -491,19 +498,43 @@ void main() {
       },
     );
 
-    test('MusicDatabase\'s own link is not overridden', () async {
+    test('MusicDatabase\'s own link: marked, replaced on the phone until music.db changes it', () async {
       final tracks = tracksWith();
-      final song = CatalogSong(
+      CatalogSong song(String videoId) => CatalogSong(
         id: 1,
         title: 'Total Eclipse of the Heart',
         artistLabel: 'Bonnie Tyler',
-        youtubeVideoId: dead,
+        youtubeVideoId: videoId,
       );
-      final outcome = await tracks.play(SearchHit.main(song, const []));
-      expect(outcome.played, isFalse);
-      expect(outcome.message, contains('MusicDatabase'));
-      expect(searches, 0);
-      expect(library.isVideoRemoved(dead), isFalse);
+      final hit = SearchHit.main(song(dead), const []);
+      final outcome = await tracks.play(hit);
+      expect(outcome.played, isTrue);
+      expect(searches, 1);
+      expect(backend.opened.last, 'https://s/alive123456');
+      expect(openedApp, isEmpty);
+      expect(library.isVideoRemoved(dead), isTrue);
+      expect(library.matchFor(1), 'alive123456');
+      expect(withPhoneYouTube(hit, library).youtubeVideoId, 'alive123456');
+      // MusicDatabase is told, with the video found instead.
+      final request = (await outbox.pending()).single;
+      final db = await databaseFactoryFfi.openDatabase(request.path);
+      final reported = await db.query('dead_youtube_links');
+      await db.close();
+      expect(reported, hasLength(1));
+      expect(reported.single, containsPair('song_id', 1));
+      expect(reported.single, containsPair('dead_video_id', dead));
+      expect(
+        reported.single,
+        containsPair('replacement_video_id', 'alive123456'),
+      );
+      // A new link in music.db wins over the phone's replacement.
+      expect(
+        withPhoneYouTube(
+          SearchHit.main(song('fixed123456'), const []),
+          library,
+        ).youtubeVideoId,
+        'fixed123456',
+      );
     });
 
     test('found out while caching ahead: marked, nothing played', () async {
@@ -515,6 +546,8 @@ void main() {
       );
       expect(await tracks.prefetch(hit), isFalse);
       expect(library.isVideoRemoved(dead), isTrue);
+      // Not a music.db link: nothing for MusicDatabase.
+      expect(await outbox.pending(), isEmpty);
     });
   });
 }

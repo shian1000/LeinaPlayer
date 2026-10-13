@@ -97,8 +97,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 
 ## Avatar (top-left on Home/Wyszukaj/Biblioteka) → Menu profilu (`profile_drawer.dart`)
 
-- `Menu profilu › Pokaż profil`
-- `Menu profilu › Dodaj konto`
+- Header: the logged-in MusicDatabase user (avatar with its initial) — `Menu profilu › Pokaż
+  profil` is still a dummy; logged out it reads "Nie zalogowano" / "Zaloguj się" and opens
+  **→ Konto**.
+- Dodaj konto **→ Konto** (`account_screen.dart`).
 - `Menu profilu › Statystyki słuchania`
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
   app: 🗑 "Wyczyść historię" in the app bar (confirm dialog), `Ostatnie › Filtr: Muzyka` chip
@@ -122,7 +124,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
 - `Ustawienia › Wyszukaj ustawienie` (magnifier in the app bar)
 - `Ustawienia › Tryb oszczędzania danych (kafelek)`
 - `Ustawienia › Sesja prywatna (kafelek)`
-- `Ustawienia › Konto`
+- Konto **→ Konto** (`account_screen.dart`) — **implemented**: logging in with a MusicDatabase
+  user ("Nazwa użytkownika", "Hasło", "Zaloguj"; checked by the server, which hands back a
+  token), or the logged-in user and "Wyloguj" (asks first)
+  ([ADR 0006](decisions/0006-musicdatabase-login.md)).
 - Źródła muzyki **→ Źródła muzyki** (`music_sources_screen.dart`), list of music sources:
   - Muzyka lokalna **→ Muzyka lokalna** (`local_music_screen.dart`) — **implemented**:
     - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
@@ -143,6 +148,10 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
       `music.db` (SQLite) on the remote address's port and path, and saves the first hit as the
       local address (`DatabaseSync.discoverLocalServer`).
     - "Ostatnie pobranie" (with which address was used), the last error if any, "Pobierz teraz".
+    - "Zgłoszenia dla MusicDatabase": "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by
+      default), "Czeka na wysłanie" (requests in the outbox), "Ostatnie wysyłanie" (sent /
+      refused / why not, "kolejna próba jutro" after the server refused), "Wyślij teraz"
+      ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
 
     On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
     answer), elsewhere the remote one. The download also runs automatically once a day on start —
@@ -261,7 +270,8 @@ system Back closes the drawer/sheet, then pops the tab, then goes to Home, then 
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
   Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków.
-- `Ustawienia › Wyloguj`
+- Wyloguj — **implemented**: logs out (asks first); reads "Zaloguj się" and opens Konto when
+  logged out.
 
 ## Home (`home_screen.dart`)
 

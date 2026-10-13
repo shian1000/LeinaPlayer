@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../data/account.dart';
 import '../dummy.dart';
 import '../theme.dart';
 import 'about_screen.dart';
+import 'account_screen.dart';
 import 'appearance_screen.dart';
 import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
@@ -27,7 +29,8 @@ const _entries = [
   _SettingsEntry(
     Icons.account_circle_outlined,
     'Konto',
-    'Nazwa użytkownika • Zamknięcie konta',
+    'Logowanie do MusicDatabase • Wyloguj',
+    opens: _openAccount,
   ),
   _SettingsEntry(
     Icons.library_music_outlined,
@@ -83,6 +86,8 @@ const _entries = [
     opens: _openAbout,
   ),
 ];
+
+Widget _openAccount(BuildContext context) => const AccountScreen();
 
 Widget _openAppearance(BuildContext context) => const AppearanceScreen();
 
@@ -167,26 +172,31 @@ class SettingsScreen extends StatelessWidget {
                         .push(MaterialPageRoute<void>(builder: entry.opens!)),
             ),
           const SizedBox(height: 16),
-          Center(
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: palette.textPrimary,
-                side: BorderSide(
-                  color: palette.outline ?? palette.textSecondary,
+          if (AccountScope.maybeOf(context)?.loggedIn ?? false)
+            const LogOutButton()
+          else
+            Center(
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: palette.textPrimary,
+                  side: BorderSide(
+                    color: palette.outline ?? palette.textSecondary,
+                  ),
+                  shape: palette.pillShape,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 8,
+                  ),
                 ),
-                shape: palette.pillShape,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 8,
+                onPressed: () =>
+                    Navigator.of(context)
+                        .push(MaterialPageRoute<void>(builder: _openAccount)),
+                child: const Text(
+                  'Zaloguj się',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-              ),
-              onPressed: () => dummy('Wyloguj'),
-              child: const Text(
-                'Wyloguj',
-                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-          ),
         ],
       ),
     );

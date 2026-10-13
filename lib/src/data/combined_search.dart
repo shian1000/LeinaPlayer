@@ -30,6 +30,7 @@ class SearchHit {
     this.spotifyTrackId,
     this.notFoundOnYouTube = false,
   }) : mainSong = song,
+       mainVideoRemoved = false,
        title = song.title,
        artistLabel = song.artistLabel,
        album = song.album,
@@ -45,6 +46,7 @@ class SearchHit {
     this.spotifyTrackId,
     this.notFoundOnYouTube = false,
   }) : mainSong = null,
+       mainVideoRemoved = false,
        phoneFiles = const [],
        phoneMatch = videoId,
        album = null,
@@ -52,6 +54,7 @@ class SearchHit {
 
   SearchHit.phoneOnly(LocalSong file)
     : mainSong = null,
+      mainVideoRemoved = false,
       phoneMatch = null,
       playlistVideoId = null,
       spotifyTrackId = null,
@@ -81,6 +84,11 @@ class SearchHit {
   /// The phone searched YouTube for it lately and found nothing ([YouTubeLink.notFound]).
   final bool notFoundOnYouTube;
 
+  /// YouTube no longer has music.db's video of the song (`youtube_removed_videos`): until
+  /// MusicDatabase changes the link, the song is treated as having none, so the phone looks for
+  /// another video ([phoneMatch]).
+  final bool mainVideoRemoved;
+
   final String title;
   final String artistLabel;
   final String? album;
@@ -93,7 +101,9 @@ class SearchHit {
     required this.phoneMatch,
     required this.notFoundOnYouTube,
     bool keepPlaylistVideo = true,
+    bool? mainVideoRemoved,
   }) : mainSong = hit.mainSong,
+       mainVideoRemoved = mainVideoRemoved ?? hit.mainVideoRemoved,
        phoneFiles = hit.phoneFiles,
        playlistVideoId = keepPlaylistVideo ? hit.playlistVideoId : null,
        spotifyTrackId = hit.spotifyTrackId,
@@ -106,13 +116,14 @@ class SearchHit {
   SearchHit withNotFoundOnYouTube([bool notFound = true]) =>
       SearchHit._copy(this, phoneMatch: null, notFoundOnYouTube: notFound);
 
-  /// The same song without the phone's or the playlist's video (YouTube removed it); still
-  /// MusicDatabase's own link, if any.
-  SearchHit withoutVideo() => SearchHit._copy(
+  /// The same song without the phone's or the playlist's video (YouTube removed it); with
+  /// [mainVideo] also without MusicDatabase's own link ([mainVideoRemoved]).
+  SearchHit withoutVideo({bool mainVideo = false}) => SearchHit._copy(
     this,
     phoneMatch: null,
     notFoundOnYouTube: false,
     keepPlaylistVideo: false,
+    mainVideoRemoved: mainVideo || mainVideoRemoved,
   );
 
   /// The same song, now with a video the phone found for it.
@@ -132,13 +143,17 @@ class SearchHit {
       ? phoneFiles.first.filePath
       : youtubeVideoId ?? title;
 
-  /// The video to play: music.db's link, else the one the phone found.
-  String? get youtubeVideoId => mainSong?.youtubeVideoId ?? phoneMatch;
+  /// The video to play: music.db's link (unless YouTube removed it), else the one the phone
+  /// found.
+  String? get youtubeVideoId =>
+      (mainVideoRemoved ? null : mainSong?.youtubeVideoId) ?? phoneMatch;
 
   /// Phone-only songs aren't in MusicDatabase, so nothing is known about them on YouTube.
   YouTubeLink get youTube {
     if (youtubeVideoId != null) return YouTubeLink.linked;
-    final stored = mainSong?.youTube ?? YouTubeLink.unknown;
+    final stored = mainVideoRemoved
+        ? YouTubeLink.unknown
+        : mainSong?.youTube ?? YouTubeLink.unknown;
     return stored == YouTubeLink.unknown && notFoundOnYouTube
         ? YouTubeLink.notFound
         : stored;
@@ -170,23 +185,24 @@ class SearchHit {
 
 /// [hit] with what the phone has learned about it on YouTube since the row was made: a video it
 /// found (`youtube_matches`, `youtube_track_matches`) or that it searched lately and found none
-/// (`youtube_not_found`), and dropping a playlist's or phone-found video YouTube removed
-/// (`youtube_removed_videos`). Queues and saved rows hold songs as they were, so they're shown and
-/// played through this.
+/// (`youtube_not_found`), and dropping a video YouTube removed (`youtube_removed_videos`) — a
+/// playlist's, a phone-found one, or music.db's own, which is then replaced by a phone-found one
+/// until MusicDatabase changes the link (ADR 0003: the phone only fills the gap). Queues and saved
+/// rows hold songs as they were, so they're shown and played through this.
 SearchHit withPhoneYouTube(SearchHit hit, YouTubeLibrary youTube) {
   final video = hit.youtubeVideoId;
   if (video != null) {
-    // MusicDatabase's own link wins even when it's dead: it's fixed there, not here.
-    if (hit.mainSong?.youtubeVideoId == video ||
-        !youTube.isVideoRemoved(video)) {
-      return hit;
-    }
-    hit = hit.withoutVideo();
+    if (!youTube.isVideoRemoved(video)) return hit;
+    hit = hit.withoutVideo(mainVideo: hit.mainSong?.youtubeVideoId == video);
   }
   final mainSong = hit.mainSong;
   // A phone-only song stays one: it plays from its file.
   if (mainSong == null && hit.onPhone) return hit;
-  if (mainSong != null && mainSong.youTube != YouTubeLink.unknown) return hit;
+  if (mainSong != null &&
+      !hit.mainVideoRemoved &&
+      mainSong.youTube != YouTubeLink.unknown) {
+    return hit;
+  }
   final videoId = mainSong != null
       ? youTube.matchFor(mainSong.id)
       : youTube.matchForTrack(hit.artistLabel, hit.title);

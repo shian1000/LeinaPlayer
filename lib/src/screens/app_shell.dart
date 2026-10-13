@@ -1,3 +1,5 @@
+import 'account_screen.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -222,6 +224,13 @@ class AppShellState extends State<AppShell> {
     );
   }
 
+  void _openAccount() {
+    _scaffoldKey.currentState!.closeDrawer();
+    _navigatorKeys[_currentTab].currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const AccountScreen()),
+    );
+  }
+
   void _openRecents() {
     _scaffoldKey.currentState!.closeDrawer();
     _navigatorKeys[_currentTab].currentState!.push(
@@ -271,6 +280,7 @@ class AppShellState extends State<AppShell> {
           drawer: ProfileDrawer(
             onOpenSettings: _openSettings,
             onOpenRecents: _openRecents,
+            onOpenAccount: _openAccount,
           ),
           body: Stack(
             children: [

@@ -3,7 +3,8 @@
 ## Status
 
 Accepted (2026-10-10). Supersedes the "thin client, no business logic" part of
-[ADR 0001](0001-project-setup.md).
+[ADR 0001](0001-project-setup.md). Its "nothing is sent back yet" is superseded by
+[ADR 0005](0005-outbox-for-musicdatabase.md) (the outbox, 2026-10-13).
 
 ## Context
 

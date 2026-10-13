@@ -381,7 +381,7 @@ void main() {
     expect(find.text('Wi-Fi sieci lokalnej'), findsOneWidget);
     expect(find.text('Nie wybrano'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.byKey(DatabaseSourceScreen.remoteFieldKey),
+      find.text('Adres serwera (połączenie zdalne)'),
       -200,
       scrollable: settingsList,
     );

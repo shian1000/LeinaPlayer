@@ -1,0 +1,526 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/widgets.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+
+import 'song_catalog.dart';
+import 'youtube_video.dart';
+
+/// Requests for MusicDatabase, waiting on the phone until it can hand them over
+/// ([ADR 0005](../../../docs/decisions/0005-outbox-for-musicdatabase.md)). Each request is a small
+/// SQLite file in `<support dir>/outbox/`, named `[<user>_]<date>_<time>_<number>.db` — no user
+/// part while the app has no user name. Its tables mirror music.db's where they can (song ids
+/// are `songs.id`); the format is described in
+/// `docs/handoffs/musicdatabase-outbox.md` for the MusicDatabase side.
+///
+/// New findings go into the newest request waiting in the outbox (a request holds one song or
+/// many). [send] hands the waiting requests to MusicDatabase's inbox (`PUT /inbox/<name>` on the
+/// sharing server — MusicDatabase's `docs/handoffs/inbox-for-musicdatabaseapp.md`); a received
+/// one moves to `outbox/sent/`, so the next finding starts a new request. One the server refuses
+/// as malformed moves to `outbox/rejected/` and isn't sent again. Both folders are kept: they
+/// stop a link from being reported twice and a number from being reused.
+class Outbox extends ChangeNotifier {
+  Outbox({
+    Future<Directory> Function()? storageRoot,
+    this.factoryOverride,
+    DateTime Function()? now,
+    String? Function()? userName,
+    String? Function()? authToken,
+  }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
+       _now = now ?? DateTime.now,
+       _userName = userName ?? (() => null),
+       _authToken = authToken ?? (() => null);
+
+  /// Version of the request file layout, stored in each file's `request` table.
+  static const format = 1;
+
+  final Future<Directory> Function() _storageRoot;
+  final DateTime Function() _now;
+  final String? Function() _userName;
+
+  /// The logged-in user's token ([Account]), sent with each request so MusicDatabase knows who
+  /// sent it; `null` sends without one.
+  final String? Function() _authToken;
+
+  /// The server didn't accept [_authToken] (HTTP 401): the user has to log in again.
+  VoidCallback? onUnauthorized;
+
+  /// SQLite implementation to use instead of sqflite's global one (tests use FFI).
+  final DatabaseFactory? factoryOverride;
+
+  // Playing and caching ahead may report at the same time, and a send may be under way; one
+  // at a time keeps two reports from both starting a new request file, and a report from
+  // writing into a file while it's being sent.
+  Future<void> _writes = Future.value();
+
+  int _waiting = 0;
+  bool _sending = false;
+  OutboxSendResult? _lastSend;
+
+  /// Requests waiting to be sent (as of the last report, send or [refresh]).
+  int get waiting => _waiting;
+  bool get sending => _sending;
+
+  /// How the last [send] went; `null` before the first one.
+  OutboxSendResult? get lastSend => _lastSend;
+
+  static const _autoSendKey = 'outbox.auto_send';
+  static const _heldOnKey = 'outbox.held_on_ms';
+
+  bool _autoSend = true;
+  DateTime? _heldOn;
+
+  /// Whether requests go to MusicDatabase by themselves ("Wysyłaj zgłoszenia automatycznie");
+  /// off, they wait for "Wyślij teraz".
+  bool get autoSend => _autoSend;
+
+  /// The server refused to take requests today (inbox full, its drive not mounted): automatic
+  /// sending waits for tomorrow — the next daily download — or a manual send.
+  bool get heldForToday {
+    final held = _heldOn;
+    if (held == null) return false;
+    final now = _now();
+    return held.year == now.year &&
+        held.month == now.month &&
+        held.day == now.day;
+  }
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    _autoSend = prefs.getBool(_autoSendKey) ?? true;
+    final held = prefs.getInt(_heldOnKey);
+    _heldOn = held == null ? null : DateTime.fromMillisecondsSinceEpoch(held);
+    await refresh();
+  }
+
+  Future<void> setAutoSend(bool value) async {
+    _autoSend = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(_autoSendKey, value);
+  }
+
+  Future<void> _setHeld(DateTime? day) async {
+    _heldOn = day;
+    final prefs = await SharedPreferences.getInstance();
+    await (day == null
+        ? prefs.remove(_heldOnKey)
+        : prefs.setInt(_heldOnKey, day.millisecondsSinceEpoch));
+  }
+
+  /// Called after a new finding was reported, e.g. to try sending it right away.
+  VoidCallback? onReported;
+
+  Future<void> refresh() async {
+    _waiting = (await pending()).length;
+    notifyListeners();
+  }
+
+  Future<Directory> directory() async =>
+      Directory('${(await _storageRoot()).path}/outbox')
+          .create(recursive: true);
+
+  /// The requests waiting to be sent, oldest first.
+  Future<List<File>> pending() async {
+    final files = [
+      await for (final f in (await directory()).list())
+        if (f is File && _requestName.hasMatch(_baseName(f.path))) f,
+    ];
+    files.sort((a, b) => _number(a.path).compareTo(_number(b.path)));
+    return files;
+  }
+
+  /// YouTube no longer plays music.db's link [deadVideoId] of [song]. Reported once: a link
+  /// already in a request (waiting or sent) isn't added again. Returns whether it was added now.
+  Future<bool> reportDeadYouTubeLink(CatalogSong song, String deadVideoId) =>
+      _write(
+        (db) async => db.insert('dead_youtube_links', {
+          'song_id': song.id,
+          'title': song.title,
+          'artist': song.artistLabel,
+          'dead_video_id': deadVideoId,
+          'detected_at': _timestamp(_now()),
+        }, conflictAlgorithm: ConflictAlgorithm.ignore),
+        unless: () => _reported(song.id, deadVideoId),
+      );
+
+  /// The phone found [video] to play instead of [song]'s dead link [deadVideoId] — a suggestion
+  /// for MusicDatabase, not a decision.
+  Future<void> reportReplacement(
+    CatalogSong song,
+    String deadVideoId,
+    YouTubeVideo video,
+  ) async => _write((db) async {
+    await db.insert('dead_youtube_links', {
+      'song_id': song.id,
+      'title': song.title,
+      'artist': song.artistLabel,
+      'dead_video_id': deadVideoId,
+      'detected_at': _timestamp(_now()),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.update(
+      'dead_youtube_links',
+      {
+        'replacement_video_id': video.id,
+        'replacement_title': video.title,
+        'replacement_channel': video.channel,
+        'replacement_found_at': _timestamp(_now()),
+      },
+      where: 'song_id = ? AND dead_video_id = ?',
+      whereArgs: [song.id, deadVideoId],
+    );
+  });
+
+  /// Folders holding requests that already have a number: waiting, sent and refused ones.
+  List<Directory> _numbered(Directory dir) => [
+    dir,
+    Directory('${dir.path}/sent'),
+    Directory('${dir.path}/rejected'),
+  ];
+
+  Future<bool> _reported(int songId, String deadVideoId) async {
+    final dir = await directory();
+    final factory = factoryOverride ?? databaseFactory;
+    for (final folder in _numbered(dir)) {
+      if (!await folder.exists()) continue;
+      await for (final f in folder.list()) {
+        if (!_requestName.hasMatch(_baseName(f.path))) continue;
+        final db = await factory.openDatabase(f.path);
+        try {
+          final rows = await db.query(
+            'dead_youtube_links',
+            where: 'song_id = ? AND dead_video_id = ?',
+            whereArgs: [songId, deadVideoId],
+            limit: 1,
+          );
+          if (rows.isNotEmpty) return true;
+        } finally {
+          await db.close();
+        }
+      }
+    }
+    return false;
+  }
+
+  /// [unless] is checked in turn with the writes, before any request file is opened. Returns
+  /// whether [change] was made.
+  Future<bool> _write(
+    Future<void> Function(Database db) change, {
+    Future<bool> Function()? unless,
+  }) {
+    return _inTurn(() async {
+      if (unless != null && await unless()) return false;
+      final db = await _openRequest();
+      try {
+        await change(db);
+      } finally {
+        await db.close();
+      }
+      _waiting = (await pending()).length;
+      notifyListeners();
+      onReported?.call();
+      return true;
+    });
+  }
+
+  Future<T> _inTurn<T>(Future<T> Function() work) {
+    final done = _writes.then((_) => work());
+    _writes = done.then((_) {}, onError: (_) {});
+    return done;
+  }
+
+  /// Sends the waiting requests to the first of [servers] (base addresses of MusicDatabase's
+  /// sharing server, best first) that answers. Requests that can't go now stay for the next try.
+  /// Without [manual] nothing happens while [autoSend] is off or the server refused today
+  /// ([heldForToday]); a manual send ("Wyślij teraz") always tries.
+  Future<OutboxSendResult> send(
+    List<Uri> servers, {
+    bool manual = false,
+  }) async {
+    if (_sending) return _lastSend ?? const OutboxSendResult(sent: 0);
+    if (!manual && (!_autoSend || heldForToday)) {
+      return const OutboxSendResult(sent: 0);
+    }
+    // Nothing to do: no connection attempt, and the last result stays shown.
+    if ((await pending()).isEmpty) return const OutboxSendResult(sent: 0);
+    _sending = true;
+    notifyListeners();
+    try {
+      final result = await _inTurn(() => _sendAll(servers));
+      _lastSend = result;
+      // Only the server saying "not now" holds sending back; no connection doesn't (the next
+      // start or return to the app may well have one).
+      if (result.serverRefused) {
+        await _setHeld(_now());
+      } else if (_heldOn != null && result.problem == null) {
+        await _setHeld(null);
+      }
+      return result;
+    } finally {
+      _sending = false;
+      _waiting = (await pending()).length;
+      notifyListeners();
+    }
+  }
+
+  Future<OutboxSendResult> _sendAll(List<Uri> servers) async {
+    final files = await pending();
+    if (files.isEmpty) return const OutboxSendResult(sent: 0);
+    if (servers.isEmpty) {
+      return const OutboxSendResult(
+        sent: 0,
+        problem: 'Nie ustawiono adresu serwera MusicDatabase',
+      );
+    }
+    final dir = await directory();
+    final client = HttpClient()..connectionTimeout = sendTimeout;
+    var sent = 0;
+    var refused = 0;
+    String? problem;
+    try {
+      for (final server in servers) {
+        problem = null;
+        var otherUser = 0;
+        try {
+          for (final file in await pending()) {
+            final name = _baseName(file.path);
+            final code = await _put(
+              client,
+              server.resolve('/inbox/$name'),
+              file,
+              _authToken(),
+            );
+            switch (code) {
+              case HttpStatus.created || HttpStatus.ok:
+                await _moveTo(file, Directory('${dir.path}/sent'));
+                sent++;
+              case HttpStatus.badRequest ||
+                  HttpStatus.conflict ||
+                  HttpStatus.lengthRequired ||
+                  HttpStatus.requestEntityTooLarge:
+                debugPrint('Outbox: the inbox refused $name ($code)');
+                await _moveTo(file, Directory('${dir.path}/rejected'));
+                refused++;
+              // Named after another user than the one logged in (made before switching
+              // accounts): only that user's token can send it, so it waits.
+              case HttpStatus.forbidden:
+                otherUser++;
+              case HttpStatus.unauthorized:
+                onUnauthorized?.call();
+                return OutboxSendResult(
+                  sent: sent,
+                  refused: refused,
+                  problem:
+                      'Serwer nie przyjął logowania — zaloguj się ponownie '
+                      '(Ustawienia › Konto)',
+                );
+              case HttpStatus.insufficientStorage:
+                return OutboxSendResult(
+                  sent: sent,
+                  refused: refused,
+                  problem: 'Skrzynka odbiorcza MusicDatabase jest pełna',
+                  serverRefused: true,
+                );
+              case HttpStatus.serviceUnavailable:
+                return OutboxSendResult(
+                  sent: sent,
+                  refused: refused,
+                  problem: 'Dysk serwera MusicDatabase nie jest podłączony',
+                  serverRefused: true,
+                );
+              default:
+                throw HttpException('HTTP $code');
+            }
+          }
+          return OutboxSendResult(
+            sent: sent,
+            refused: refused,
+            problem: otherUser == 0
+                ? null
+                : 'Zgłoszenia innego użytkownika ($otherUser) wyślą się po '
+                      'zalogowaniu na jego konto',
+          );
+        } catch (e) {
+          debugPrint('Outbox: sending to $server failed: $e');
+          problem = e is HttpException
+              ? 'Serwer odpowiedział: ${e.message}'
+              : 'Brak połączenia z serwerem MusicDatabase';
+        }
+      }
+    } finally {
+      client.close(force: true);
+    }
+    return OutboxSendResult(sent: sent, refused: refused, problem: problem);
+  }
+
+  /// How long to wait for the server before trying the next address (or giving up).
+  static const sendTimeout = Duration(seconds: 8);
+
+  static Future<int> _put(
+    HttpClient client,
+    Uri uri,
+    File file,
+    String? token,
+  ) async {
+    final bytes = await file.readAsBytes();
+    final request = await client.putUrl(uri).timeout(sendTimeout);
+    request.headers.contentType = ContentType.binary;
+    if (token != null) {
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+    }
+    request.contentLength = bytes.length;
+    request.add(bytes);
+    final response = await request.close().timeout(sendTimeout);
+    await response.drain<void>();
+    return response.statusCode;
+  }
+
+  static Future<void> _moveTo(File file, Directory folder) async {
+    await folder.create(recursive: true);
+    await file.rename('${folder.path}/${_baseName(file.path)}');
+    // A rollback journal SQLite may leave next to the file.
+    final journal = File('${file.path}-journal');
+    if (await journal.exists()) await journal.delete();
+  }
+
+  Future<Database> _openRequest() async {
+    final user = _safeUserName(_userName());
+    final factory = factoryOverride ?? databaseFactory;
+    // Only a request made by the same user (or, logged out, an unsigned one) takes more: the
+    // name says who sent it, and the server checks it against the token.
+    final own = (await pending()).where((f) => _userOf(f.path) == user);
+    if (own.isNotEmpty) return factory.openDatabase(own.last.path);
+    final dir = await directory();
+    final created = _now();
+    final number = await _nextNumber(dir);
+    final name = [
+      ?user,
+      _datePart(created),
+      _timePart(created),
+      number.toString().padLeft(3, '0'),
+    ].join('_');
+    return factory.openDatabase(
+      '${dir.path}/$name.db',
+      options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: (db, _) async {
+          await db.execute('''
+          CREATE TABLE request (
+            format INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            user_name TEXT,
+            app TEXT NOT NULL
+          )''');
+          await db.insert('request', {
+            'format': format,
+            'created_at': _timestamp(created),
+            'user_name': user,
+            'app': 'Leina Radio',
+          });
+          await db.execute('''
+          CREATE TABLE dead_youtube_links (
+            song_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            dead_video_id TEXT NOT NULL,
+            detected_at TEXT NOT NULL,
+            replacement_video_id TEXT,
+            replacement_title TEXT,
+            replacement_channel TEXT,
+            replacement_found_at TEXT,
+            PRIMARY KEY (song_id, dead_video_id)
+          )''');
+        },
+      ),
+    );
+  }
+
+  /// One more than any request ever numbered here, sent ones included, so a number isn't reused.
+  Future<int> _nextNumber(Directory dir) async {
+    var highest = 0;
+    for (final folder in _numbered(dir)) {
+      if (!await folder.exists()) continue;
+      await for (final f in folder.list()) {
+        if (!_requestName.hasMatch(_baseName(f.path))) continue;
+        final n = _number(f.path);
+        if (n > highest) highest = n;
+      }
+    }
+    return highest + 1;
+  }
+
+  static final _requestName = RegExp(
+    r'^(?:([A-Za-z0-9][A-Za-z0-9_-]*)_)?\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_(\d+)\.db$',
+  );
+
+  static String? _userOf(String path) =>
+      _requestName.firstMatch(_baseName(path))!.group(1);
+
+  static String _baseName(String path) => path.split('/').last;
+
+  static int _number(String path) =>
+      int.parse(_requestName.firstMatch(_baseName(path))!.group(2)!);
+
+  /// A MusicDatabase username as is (lowercase letters, digits, `-`, `_` — its
+  /// `USERNAME_PATTERN`); anything else becomes `-`. The date after it has a fixed shape, so a
+  /// `_` in the name doesn't make the file name ambiguous. At most 40 (the inbox's limit).
+  static String? _safeUserName(String? name) {
+    final safe = name
+        ?.trim()
+        .replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '-')
+        .replaceAll(RegExp(r'^[_-]+'), '');
+    if (safe == null || safe.isEmpty) return null;
+    return safe.length > 40 ? safe.substring(0, 40) : safe;
+  }
+
+  static String _two(int n) => n.toString().padLeft(2, '0');
+
+  static String _datePart(DateTime t) =>
+      '${t.year.toString().padLeft(4, '0')}-${_two(t.month)}-${_two(t.day)}';
+
+  static String _timePart(DateTime t) =>
+      '${_two(t.hour)}-${_two(t.minute)}-${_two(t.second)}';
+
+  /// Local time with its UTC offset, e.g. `2026-10-12T23:44:05+02:00`.
+  static String _timestamp(DateTime t) {
+    final offset = t.timeZoneOffset;
+    final sign = offset.isNegative ? '-' : '+';
+    final minutes = offset.inMinutes.abs();
+    return '${_datePart(t)}T${_two(t.hour)}:${_two(t.minute)}:${_two(t.second)}'
+        '$sign${_two(minutes ~/ 60)}:${_two(minutes % 60)}';
+  }
+}
+
+/// How one [Outbox.send] went; [problem] (Polish, for display) says why something is still
+/// waiting, `null` when everything went.
+class OutboxSendResult {
+  const OutboxSendResult({
+    required this.sent,
+    this.refused = 0,
+    this.problem,
+    this.serverRefused = false,
+  });
+
+  /// Stored by the inbox (201), or found there already (200).
+  final int sent;
+
+  /// The server answered but can't take requests now (507 inbox full, 503 drive not mounted).
+  final bool serverRefused;
+
+  /// Refused by the inbox as malformed — kept in `outbox/rejected/`, not sent again.
+  final int refused;
+  final String? problem;
+}
+
+class OutboxScope extends InheritedNotifier<Outbox> {
+  const OutboxScope({
+    super.key,
+    required Outbox super.notifier,
+    required super.child,
+  });
+
+  static Outbox of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<OutboxScope>()!.notifier!;
+}

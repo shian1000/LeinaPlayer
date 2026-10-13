@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
+import '../data/outbox.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
@@ -54,6 +55,7 @@ class TrackPlayer {
     required this.youTubeAudio,
     required this.youTubeSearch,
     this.openExternal,
+    this.outbox,
     Future<bool> Function()? onWifi,
   }) : _onWifi = onWifi ?? _wifiConnected;
 
@@ -65,6 +67,10 @@ class TrackPlayer {
 
   /// Replaced in tests; `null` opens the YouTube app for real.
   final OpenExternalFn? openExternal;
+
+  /// Where dead music.db links (and the videos found instead) are reported for MusicDatabase;
+  /// `null` reports nothing.
+  final Outbox? outbox;
 
   /// Whether the phone is on Wi-Fi now; replaced in tests.
   final Future<bool> Function() _onWifi;
@@ -104,16 +110,16 @@ class TrackPlayer {
     );
     final gone = outcome.goneVideo;
     if (gone == null) return outcome;
-    // MusicDatabase's own link: it's corrected there, the phone doesn't override it.
-    if (hit.mainSong?.youtubeVideoId == gone) {
-      return const PlayOutcome.failed(
-        'Filmu z bazy danych nie ma już na YouTube — popraw link w MusicDatabase.',
-      );
-    }
-    // A playlist's or the phone's own video: forget it and look for another one. Each round
-    // marks one more video, so this ends.
+    // Forget it and look for another one — music.db's own link too: the phone's video fills in
+    // only until MusicDatabase changes the link (withPhoneYouTube). Each round marks one more
+    // video, so this ends.
     await youTubeLibrary.markVideoRemoved(gone);
-    onStatus?.call('Tego filmu nie ma już na YouTube — szukam innego…');
+    await _reportIfMainLink(hit, gone);
+    onStatus?.call(
+      hit.mainSong?.youtubeVideoId == gone
+          ? 'Link z MusicDatabase wygasł — szukam innego filmu…'
+          : 'Tego filmu nie ma już na YouTube — szukam innego…',
+    );
     return play(
       hit,
       searchQuery: searchQuery,
@@ -238,6 +244,10 @@ class TrackPlayer {
       await (mainSong != null
           ? youTubeLibrary.saveMatch(mainSong.id, video)
           : youTubeLibrary.saveTrackMatch(hit.artistLabel, hit.title, video));
+      final dead = mainSong?.youtubeVideoId;
+      if (mainSong != null && dead != null && hit.mainVideoRemoved) {
+        await _report(() => outbox?.reportReplacement(mainSong, dead, video));
+      }
     } else {
       await youTubeLibrary.saveNotFound(
         mainDbId: mainSong?.id,
@@ -246,6 +256,22 @@ class TrackPlayer {
       );
     }
     return video;
+  }
+
+  /// MusicDatabase's own link of [hit] is [gone]: worth telling MusicDatabase.
+  Future<void> _reportIfMainLink(SearchHit hit, String gone) async {
+    final song = hit.mainSong;
+    if (song == null || song.youtubeVideoId != gone) return;
+    await _report(() => outbox?.reportDeadYouTubeLink(song, gone));
+  }
+
+  /// A report that fails (storage) mustn't stop playback.
+  Future<void> _report(Future<void>? Function() write) async {
+    try {
+      await write();
+    } catch (e) {
+      debugPrint('Writing to the outbox failed: $e');
+    }
   }
 
   /// A queue holds its songs as they were when it was filled; what was learned on YouTube since
@@ -295,11 +321,11 @@ class TrackPlayer {
       } on YouTubeAudioException catch (e) {
         debugPrint('Caching ahead: ${method.name} for $videoId failed: $e');
         if (e.gone) {
-          // Found out before it plays: the song is searched again when its turn comes.
-          if (hit.mainSong?.youtubeVideoId != videoId) {
-            await youTubeLibrary.markVideoRemoved(videoId);
-          }
-          return false;
+          // Found out before it plays: another video is looked for (and cached) now, so the
+          // queue doesn't stall on it. Each round marks one more video, so this ends.
+          await youTubeLibrary.markVideoRemoved(videoId);
+          await _reportIfMainLink(hit, videoId);
+          return prefetch(hit);
         }
       }
     }

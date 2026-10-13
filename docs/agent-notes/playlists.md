@@ -58,9 +58,21 @@ NewPipe answers `ContentNotAvailableException` / `PrivateContentException` /
 `YouTubeLibrary.markVideoRemoved` records it in `youtube_removed_videos` (v10), sets
 `youtube_removed` on every playlist row with it and drops phone matches to it, and
 `TrackPlayer.play` searches another video right away (the dead one is filtered out of search
-results); the YouTube app isn't opened for a gone video. MusicDatabase's own link is never
-overridden — that play fails with "popraw link w MusicDatabase" (server values win). A re-import
-that lists the video again clears it (`clearVideosRemoved`).
+results); the YouTube app isn't opened for a gone video. Caching ahead that finds a gone video
+looks for the replacement at once (`prefetch` recurses), so the queue doesn't stall on it.
+MusicDatabase's own link is handled the same way (user's decision, 2026-10-12; first seen with
+"… - Topic" videos YouTube answers `UNPLAYABLE` "This video is not available" while oEmbed still
+says they exist): `SearchHit.mainVideoRemoved` hides the dead link and the phone's replacement
+(`youtube_matches`) plays until MusicDatabase changes the link — see [`youtube.md`](youtube.md)
+("Server values win"). The dead link (and the replacement, once found) is reported in the
+phone's outbox and sent to MusicDatabase's inbox
+([ADR 0005](../decisions/0005-outbox-for-musicdatabase.md)). A re-import that lists the video again clears it (`clearVideosRemoved`).
+
+The detection relies on the bridge reporting the exception's **class name**, so
+`proguard-rules.pro` keeps the names of `org.schabi.newpipe.extractor.exceptions.**`. Without it
+R8 renamed `ContentNotAvailableException` (to `nf`), release builds saw an ordinary failure and
+fell through to the YouTube app — tests (which fake the code) stay green, so check
+`build/app/outputs/mapping/release/mapping.txt` after touching R8 rules.
 
 ## Spotify import
 

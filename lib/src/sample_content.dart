@@ -1,8 +1,6 @@
 /// Static placeholder content shown until the app talks to MusicDatabase.
 library;
 
-const userName = 'Shian';
-
 const searchDiscoverTags = ['#polskie indie', '#mod rock', '#dance rock'];
 
 const searchCategories = [

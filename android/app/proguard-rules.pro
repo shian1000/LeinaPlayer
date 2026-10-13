@@ -15,3 +15,8 @@
 # not found").
 -keep class org.schabi.newpipe.extractor.services.youtube.protos.** { *; }
 -keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite { <fields>; }
+
+# The bridge reports a failure by the exception's class name and the Dart side reads meaning from
+# it (isVideoGone: ContentNotAvailableException etc.); renamed, a removed video looked like any
+# other failure and fell through to the YouTube app.
+-keepnames class org.schabi.newpipe.extractor.exceptions.** { *; }

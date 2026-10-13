@@ -243,14 +243,7 @@ class DatabaseSync extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     try {
-      final onHomeWifi =
-          _localUrl != null &&
-          _localWifi != null &&
-          await _currentWifi() == _localWifi;
-      final attempts = [
-        if (onHomeWifi) (DatabaseSource.local, _localUrl!),
-        if (_remoteUrl != null) (DatabaseSource.remote, _remoteUrl!),
-      ];
+      final attempts = await _attempts();
       if (attempts.isEmpty) {
         throw const _SyncFailure(
           'Telefon nie jest w sieci lokalnej, a adres zdalny nie jest ustawiony',
@@ -279,6 +272,24 @@ class DatabaseSync extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// The addresses to try now, best first: the local one on the home Wi-Fi, then the remote one.
+  Future<List<(DatabaseSource, Uri)>> _attempts() async {
+    final onHomeWifi =
+        _localUrl != null &&
+        _localWifi != null &&
+        await _currentWifi() == _localWifi;
+    return [
+      if (onHomeWifi) (DatabaseSource.local, _localUrl!),
+      if (_remoteUrl != null) (DatabaseSource.remote, _remoteUrl!),
+    ];
+  }
+
+  /// MusicDatabase's server as the download reaches it now, best address first (e.g. for
+  /// sending the outbox).
+  Future<List<Uri>> serverAddresses() async => [
+    for (final (_, url) in await _attempts()) url,
+  ];
 
   Future<void> _downloadAll(Uri base) async {
     final parts = <File>[];

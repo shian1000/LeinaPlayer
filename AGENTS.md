@@ -59,9 +59,15 @@ the service's app, a browser; a choice can be remembered — Ustawienia › Otwi
   the phone's own findings only fill gaps and are dropped once music.db settles them — never
   the other way round (user agreed; see [`youtube.md`](docs/agent-notes/youtube.md)).
 - The app gets MusicDatabase's data by downloading its SQLite files over HTTP
-  ([ADR 0002](docs/decisions/0002-database-download.md)). Any other way of talking to it (an API,
-  sending phone-found data back for review — the intended direction) is not decided — check with
-  the user first, and record the decision as an ADR in `docs/decisions/`.
+  ([ADR 0002](docs/decisions/0002-database-download.md)). What goes back is a request file in the
+  phone's outbox ([ADR 0005](docs/decisions/0005-outbox-for-musicdatabase.md), `outbox.dart`; so
+  far dead music.db YouTube links), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
+  sharing server — the request format is a contract, see the
+  [hand-off](docs/handoffs/musicdatabase-outbox.md)). The phone logs in with a MusicDatabase user
+  (Ustawienia › Konto, `account.dart`; `POST /login` gives a token sent with the requests —
+  [ADR 0006](docs/decisions/0006-musicdatabase-login.md); the server side is in a
+  [hand-off](docs/handoffs/musicdatabase-login.md)). Any other way of talking to MusicDatabase is not decided — check with the user
+  first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands
 
@@ -87,7 +93,8 @@ flutter build apk            # build a release Android APK
   `showShareSheet` in `share_sheet.dart`).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
   `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
-  search over both (`combined_search.dart`), YouTube and Spotify links given to the app
+  search over both (`combined_search.dart`), requests for MusicDatabase waiting to be sent
+  (`outbox.dart`), the logged-in MusicDatabase user (`account.dart`), YouTube and Spotify links given to the app
   (`incoming_links.dart`, `video_link.dart`), YouTube search / matching / audio
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
@@ -127,7 +134,7 @@ flutter build apk            # build a release Android APK
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `PlaylistLibraryScope`, `PlayHistoryScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `PlayHistoryScope`,
   `AlbumCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus

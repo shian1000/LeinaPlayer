@@ -73,12 +73,14 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   uploaded later); a found video clears it. Keyed `db:<id>` or `track:<artist>\n<title>`.
 - `youtube_removed_videos` (v10): videos YouTube no longer has — see
   [`playlists.md`](playlists.md) ("Videos YouTube removed"). `withPhoneYouTube` drops such a
-  video from a row unless it's music.db's own link.
+  video from a row — music.db's own link too (`SearchHit.mainVideoRemoved`), so the song is
+  matched on the phone like one without a link.
 - **Server values win, phone values fill gaps** (user agreed): a music.db link or "N/A" always
   beats anything the phone found. So after each new `music.db` is loaded,
   `YouTubeLibrary.forgetSettled` (called from `main.dart`, `_forgetSettledMatches`, once per
   download) deletes `youtube_matches` / `db:` not-found rows of songs music.db now settles — or no
-  longer has. Name-keyed track entries (Spotify) aren't touched: they have no song id.
+  longer has. A music.db link in `youtube_removed_videos` settles nothing: the phone's replacement
+  stays until MusicDatabase puts a different link there (or "N/A"). Name-keyed track entries (Spotify) aren't touched: they have no song id.
   Pamięć podręczna › *Dopasowania z YouTube* forgets all phone matches or all not-founds by hand
   (`forgetPhoneMatches`, `forgetNotFound`), to re-search with a better method. Cached audio
   isn't deleted with them. Expired not-found rows are deleted on load.

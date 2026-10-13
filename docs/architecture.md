@@ -85,6 +85,13 @@ synonyms), kept in memory and filtered in Dart on every keystroke over the field
 and reloads after each successful download. Matching uses `text_normalizer.dart`, a port of
 MusicDatabase's `normalize()`; `tag.db` isn't read yet.
 
+Back to MusicDatabase: `lib/src/data/outbox.dart` (`Outbox`, `OutboxScope`) keeps requests — small
+SQLite files, so far dead music.db YouTube links with the phone's replacement — and sends them to
+the inbox on MusicDatabase's sharing server (`PUT /inbox/<name>`, same addresses as the download;
+[ADR 0005](decisions/0005-outbox-for-musicdatabase.md)). `lib/src/data/account.dart` (`Account`,
+`AccountScope`) is the MusicDatabase user logged in on the phone (`POST /login` → a token sent with
+the requests; [ADR 0006](decisions/0006-musicdatabase-login.md)).
+
 ## Intended shape (not yet implemented)
 
 - **`lib/main.dart`** — app entry point and top-level `MaterialApp` setup only.
@@ -100,4 +107,6 @@ and its values always win. The app may fill a gap locally — e.g. find a YouTub
 doesn't have yet — with deliberately simplified logic whose results stay on the phone until
 MusicDatabase has its own ([ADR 0003](decisions/0003-app-supports-musicdatabase.md)). The app must
 keep working when MusicDatabase's server is unreachable. Proper fixes still belong in
-MusicDatabase; sending phone-found data back to it for review is planned but not designed yet.
+MusicDatabase: the phone reports what it found through its outbox, and the owner reviews it there
+(Manage database › "Resolve new requests") — nothing is applied automatically
+([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
