@@ -412,7 +412,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   - `Biblioteka › Sortuj wg › Alfabetycznie`
   - `Biblioteka › Sortuj wg › Twórca`
 - `Biblioteka › Widok siatki`
-- Library items: the user's playlists (`PlaylistLibrary`, newest first; cover, name,
+- Library items: the user's playlists (`PlaylistLibrary`, newest first; cover — the picked one
+  or the collage, see Playlista › Header — name,
   "Playlista • <owner>") **→ Playlista** — the logged-in account's (synced with MusicDatabase,
   incl. ones made there, e.g. folder playlists) and the phone-only ones. No sample items any more; with no playlists the list
   shows "Brak playlist" and how to add one. Albums/artists don't exist yet.
@@ -424,8 +425,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - App bar with the name and ⋮ **→ sheet**, IDs `Nastrój › Menu (⋮) › <pozycja>`: Dodaj do
   kolejki / Odtwórz jako następny (the whole mood), and for the user's own mood Zmień nazwę
   (dialog) and Usuń nastrój (asks first; deleted on every device of the account, MusicDatabase
-  archives it).
-- Header: mood icon cover, name, "Twój nastrój" / "Nastrój globalny" • "N utworów".
+  archives it). For every mood, global ones too: **Dodaj okładkę** / **Zmień okładkę** (an
+  image from the phone, kept only on the phone) and **Usuń okładkę** (back to the collage).
+- Header: cover (the picked one, else a collage like a playlist's — `MoodCover`), name, "Twój nastrój" / "Nastrój globalny" • "N utworów".
 - **Odtwórz losowo**: the whole mood shuffled into the queue. A note when some of its songs
   aren't in the phone's music.db yet.
 - Songs by title (tapping one plays on through the mood); ⋮ **→ sheet**, IDs `Nastrój › Utwór ›
@@ -455,7 +457,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   listed (normalised like song search; "Brak wyników dla „…”" otherwise). Tapping one plays on
   through the whole playlist from it. Back (arrow or system) closes the search first — it's a
   local history entry of the route — and returns to the playlist where it was.
-- Header: 2×2 mosaic of the first four tracks' covers (one cover with fewer tracks), name, owner
+- Header: the cover picked with "Dodaj okładkę", else a 2×2 collage of the covers of the first
+  four different albums (the first track's cover with fewer; a Spotify album always just one) —
+  `CollectionCover`, also in Biblioteka, search and the menus; name, owner
   avatar + name (the YouTube channel / Spotify user; "YouTube"/"Spotify" when unknown), source icon
   (YouTube / Spotify) + "N utworów • X godz. Y min" (sum of the known lengths).
 - Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: **Udostępnij** (implemented, the
@@ -463,7 +467,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   the whole playlist into the queue, remembered as played from it; also in a preview's ⋮),
   **`Usuń z
   Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), `Dodaj do tej
-  playlisty`, `Edytuj playlistę`, **Wyświetl utwory, których nie ma w bazie danych**
+  playlisty`, `Edytuj playlistę`, **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**
+  (implemented, like a mood's), **Wyświetl utwory, których nie ma w bazie danych**
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
   tracks not recognised as MusicDatabase songs, "Poza bazą danych: N z M", rows like the
   playlist's — tapping plays on through the playlist from there; a note instead when music.db

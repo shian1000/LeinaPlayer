@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
+import '../data/custom_covers.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_search.dart';
@@ -17,7 +18,7 @@ import '../data/youtube_search.dart';
 import '../dummy.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
-import '../widgets/cover_art.dart';
+import '../widgets/collection_cover.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/mood_sheet.dart';
 import '../widgets/share_sheet.dart';
@@ -310,6 +311,21 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         _ => 'YouTube',
       };
 
+  /// The playlist's cover: the one picked for it, else a collage of [hits]' covers.
+  Widget _cover(List<SearchHit> hits, double size) {
+    final saved = _saved;
+    return CollectionCover(
+      coverKey: saved == null ? null : CustomCovers.playlistKey(saved),
+      songs:
+          (_playlist.source == PlaylistSource.spotifyAlbum
+                  ? hits.take(1)
+                  : hits)
+              .map(CoverRequest.of),
+      seed: _playlist.name,
+      size: size,
+    );
+  }
+
   /// Shares the playlist's own page where it was imported from — the phone's copy has no link.
   void _share(List<SearchHit> hits) {
     final link = _playlist.link;
@@ -329,17 +345,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       target: _fromSpotify ? ShareTarget.spotify : ShareTarget.youtube,
       title: _playlist.name,
       subtitle: '$_kind • $_owner',
-      cover: _Mosaic(
-        covers: [for (final hit in hits.take(4)) CoverRequest.of(hit)],
-        fallback: _playlist.name,
-        size: 160,
-      ),
+      cover: _cover(hits, 160),
       tint: context.palette.colorForSeed(_playlist.name),
     );
   }
 
   Future<void> _delete() async {
     final library = PlaylistLibraryScope.of(context);
+    final covers = CustomCoversScope.maybeOf(context);
     final navigator = Navigator.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -367,6 +380,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
     if (!(confirmed ?? false)) return;
     await library.delete(_playlist.id);
+    await covers?.remove(CustomCovers.playlistKey(_playlist));
     navigator.pop();
   }
 
@@ -411,7 +425,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       context,
       idPrefix: '$_id › Menu (⋮)',
       header: MenuSheetHeader(
-        cover: CoverArt(seed: _playlist.name, size: 56),
+        cover: _cover(hits, 56),
         title: _playlist.name,
         subtitle: '$_kind • $_owner',
       ),
@@ -450,6 +464,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ),
               const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
               const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),
+              ...customCoverEntries(context, CustomCovers.playlistKey(_saved!)),
               MenuSheetEntry(
                 Icons.rule,
                 'Wyświetl utwory, których nie ma w bazie danych',
@@ -674,15 +689,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Center(
-                      child: _Mosaic(
-                        covers: [
-                          for (final hit in hits.take(4)) CoverRequest.of(hit),
-                        ],
-                        fallback: _playlist.name,
-                        size: 220,
-                      ),
-                    ),
+                    Center(child: _cover(hits, 220)),
                     const SizedBox(height: 20),
                     Text(
                       _playlist.name,
@@ -896,42 +903,6 @@ String _trackCount(int n) {
 String _length(Duration d) => d.inHours > 0
     ? '${d.inHours} godz. ${d.inMinutes % 60} min'
     : '${d.inMinutes} min';
-
-/// Playlist cover: the first four tracks' covers in a 2×2 grid (as the reference app does for
-/// playlists people make), or one cover when there are fewer.
-class _Mosaic extends StatelessWidget {
-  const _Mosaic({
-    required this.covers,
-    required this.fallback,
-    required this.size,
-  });
-
-  final List<CoverRequest> covers;
-  final String fallback;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    if (covers.length < 4) {
-      final first = covers.firstOrNull;
-      return first == null
-          ? CoverArt(seed: fallback, size: size)
-          : SongCover(cover: first, size: size);
-    }
-    final half = size / 2;
-    return ClipRRect(
-      borderRadius: context.palette.radius(4),
-      child: SizedBox.square(
-        dimension: size,
-        child: Wrap(
-          children: [
-            for (final cover in covers) SongCover(cover: cover, size: half),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _ActionChip extends StatelessWidget {
   const _ActionChip({

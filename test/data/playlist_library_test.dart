@@ -106,6 +106,25 @@ void main() {
     expect((tracks[3].artist, tracks[3].title), ('Nieznany', 'Utwór'));
   });
 
+  test(
+    'keeps the first tracks of each playlist for its cover collage',
+    () async {
+      final result = await playlists.importYouTube(
+        data([
+          for (var i = 0; i < PlaylistLibrary.leadTrackCount + 3; i++)
+            v('v$i', 'A - $i', 'x'),
+        ]),
+      );
+      final lead = playlists.leadTracks(result.playlist.id);
+      expect(lead, hasLength(PlaylistLibrary.leadTrackCount));
+      expect(lead.first.youtubeVideoId, 'v0');
+      expect(lead.last.position, PlaylistLibrary.leadTrackCount - 1);
+
+      await playlists.delete(result.playlist.id);
+      expect(playlists.leadTracks(result.playlist.id), isEmpty);
+    },
+  );
+
   test('importing the same playlist again replaces it', () async {
     await playlists.importYouTube(
       data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x')]),

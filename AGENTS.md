@@ -29,8 +29,9 @@ media notification with previous/next (keeps playing in the background); scrolle
 player shows everything music.db / tag.db / the phone know about the song (all of it for now,
 to be trimmed later — user's request); play history in
 "Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
-thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów)
-([`covers.md`](docs/agent-notes/covers.md)). Every cache setting is in one screen, Oszczędzanie
+thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
+playlists and moods show a collage of their songs' covers or a picture the user picked
+(phone-only) ([`covers.md`](docs/agent-notes/covers.md)). Every cache setting is in one screen, Oszczędzanie
 danych i tryb offline › Pamięć podręczna. YouTube: searching it on request, showing which songs
 MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
 audio on Android through NewPipeExtractor, with a cache of played songs — see
@@ -77,7 +78,8 @@ saves it for later with the person who sent it (Menu profilu › Wiadomości ›
   [hand-off](docs/handoffs/musicdatabase-login.md)). The account's playlists are exchanged as JSON
 (`/users/<name>/playlists` — [ADR 0007](docs/decisions/0007-playlist-sync.md)), and so are its
 moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and its permissions
-(`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Any other way of talking to MusicDatabase is not decided — check with the user
+(`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Syncing playlist and mood covers is decided but waits for MusicDatabase
+([ADR 0009](docs/decisions/0009-cover-sync.md)). Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands
@@ -102,7 +104,8 @@ flutter build apk            # build a release Android APK
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
   adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju"; `SongInfoCard` — everything about a song under the full player; `SongCover` — a song's album cover, with the cover
-  filters from `cover_filters.dart`; `color_picker.dart`; `TextInputDialog` in `common.dart`;
+  filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
+  collage); `color_picker.dart`; `TextInputDialog` in `common.dart`;
   `showShareSheet` in `share_sheet.dart`).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
   `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
@@ -115,7 +118,8 @@ flutter build apk            # build a release Android APK
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists),
-  a song's whole music.db / tag.db record (`song_details.dart`),
+  a song's whole music.db / tag.db record (`song_details.dart`), covers the user picked for
+  playlists and moods (`custom_covers.dart`),
   album covers and their cache
   (`album_covers.dart`), play history (`play_history.dart`,
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and
@@ -153,7 +157,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
   `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `PlayHistoryScope`, `LaterLinksScope`,
-  `AlbumCoversScope`,
+  `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
   `YouTubeScope`, an `InheritedWidget` so tests can swap YouTube search, audio and playlist
@@ -220,7 +224,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   embed page, 100-track limit, albums, track links), searching playlists (Spotify key / anonymous web-player search
   and its changing hash), previews, sharing, R8 rules.
 - [`covers.md`](docs/agent-notes/covers.md) — album covers: sources and their order, matching,
-  rate limits, the cover cache, the MusicDatabase hand-off.
+  rate limits, the cover cache, the MusicDatabase hand-off, playlist/mood collages and picked
+  covers.
 - [`ui-sizing.md`](docs/agent-notes/ui-sizing.md) — font sizes/spacing are calibrated against the
   reference app; why there's no screen-size scaling.
 

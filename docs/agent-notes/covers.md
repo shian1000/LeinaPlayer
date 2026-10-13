@@ -63,3 +63,20 @@ Once it has them, the "Serwer" source (now a dummy) should read them, keyed on `
   rebuilds all song rows) reloaded each filtered cover with a frame of placeholder; and
   `SongCover`'s `frameBuilder` never goes back to the placeholder once the song's cover was shown.
   `test/widgets/song_cover_test.dart` guards this.
+
+## Playlist and mood covers
+
+- `CollectionCover` (`widgets/collection_cover.dart`): the cover the user picked, else a collage
+  of the first four *different* albums (by `CoverRequest.lookupKey`) among the songs, else the
+  `CoverArt` placeholder. Biblioteka rows use `PlaylistCover`, which reads only
+  `PlaylistLibrary.leadTracks` (first 12 tracks of every playlist, loaded with the list) instead of
+  whole playlists. A Spotify album passes only its first track: its songs often look the album up
+  separately (no album in music.db), which made a collage of four identical covers.
+- Picked covers (`CustomCovers`, `data/custom_covers.dart`): "Dodaj okładkę" in a playlist's or
+  mood's ⋮ (`customCoverEntries`), any image via `file_picker`, saved as a 660 px middle-square
+  PNG in `<app support>/custom_covers/<key>.<millis>.png` (a new name per change, so Flutter's
+  image cache never shows the old one). Keys: `playlist-<local id>`, `mood-<Mood.key>` — both
+  ids are AUTOINCREMENT, never reused. **Phone-only for now**: syncing them with the account
+  (blobs by SHA-256, `"cover"` in the playlist/mood JSON, private covers of global moods) is
+  decided in [ADR 0009](../decisions/0009-cover-sync.md) and asked of MusicDatabase in
+  [`musicdatabase-covers.md`](../handoffs/musicdatabase-covers.md) — not built on either side yet. User data, not a cache: not in Pamięć podręczna.

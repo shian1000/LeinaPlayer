@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/custom_covers.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/song_catalog.dart';
@@ -8,7 +9,7 @@ import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/cover_art.dart';
+import '../widgets/collection_cover.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/song_tile.dart';
 
@@ -72,7 +73,7 @@ class MoodScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(
               children: [
-                CoverArt(seed: mood.name, size: 96, icon: Icons.mood),
+                MoodCover(mood: mood, size: 96),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -175,7 +176,7 @@ class MoodScreen extends StatelessWidget {
       context,
       idPrefix: '$_id › Menu (⋮)',
       header: MenuSheetHeader(
-        cover: CoverArt(seed: mood.name, icon: Icons.mood),
+        cover: MoodCover(mood: mood),
         title: mood.name,
         subtitle: mood.global ? 'Nastrój globalny' : 'Twój nastrój',
       ),
@@ -192,6 +193,7 @@ class MoodScreen extends StatelessWidget {
             onTap: () => queueSongs(context, hits, next: true, origin: origin),
           ),
         ],
+        ...customCoverEntries(context, CustomCovers.moodKey(mood)),
         if (!mood.global) ...[
           MenuSheetEntry(
             Icons.edit_outlined,
@@ -249,6 +251,7 @@ class MoodScreen extends StatelessWidget {
 
   Future<void> _delete(BuildContext context, Mood mood) async {
     final moods = MoodLibraryScope.of(context);
+    final covers = CustomCoversScope.maybeOf(context);
     final navigator = Navigator.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -274,6 +277,7 @@ class MoodScreen extends StatelessWidget {
     );
     if (!(confirmed ?? false)) return;
     await moods.delete(mood);
+    await covers?.remove(CustomCovers.moodKey(mood));
     navigator.pop();
   }
 }

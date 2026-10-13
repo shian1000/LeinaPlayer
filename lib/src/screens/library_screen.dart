@@ -5,7 +5,7 @@ import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/cover_art.dart';
+import '../widgets/collection_cover.dart';
 import '../widgets/menu_sheet.dart';
 import 'app_shell.dart';
 import 'create_sheet.dart';
@@ -188,7 +188,7 @@ class _PlaylistTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: CoverArt(seed: playlist.name, size: 64),
+      leading: PlaylistCover(playlist: playlist, size: 64),
       title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         [
@@ -215,7 +215,7 @@ class _MoodTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: CoverArt(seed: mood.name, size: 64, icon: Icons.mood),
+      leading: MoodCover(mood: mood, size: 64),
       title: Text(mood.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         mood.global ? 'Nastrój • globalny' : 'Nastrój • Twój',

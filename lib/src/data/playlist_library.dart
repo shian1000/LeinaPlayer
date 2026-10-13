@@ -202,6 +202,17 @@ class PlaylistLibrary extends ChangeNotifier {
           account: row['account'] as String?,
         ),
     ];
+    final lead = <int, List<PlaylistTrack>>{};
+    for (final row in await (await _database()).rawQuery(
+      '''
+      SELECT t.* FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id
+      WHERE t.position < ? AND p.deleted_at IS NULL AND ${scope.where}
+      ORDER BY t.playlist_id, t.position''',
+      [leadTrackCount, ...scope.args],
+    )) {
+      (lead[row['playlist_id']! as int] ??= []).add(_track(row));
+    }
+    _leadTracks = lead;
     notifyListeners();
   }
 
@@ -212,22 +223,32 @@ class PlaylistLibrary extends ChangeNotifier {
       whereArgs: [playlistId],
       orderBy: 'position',
     );
-    return [
-      for (final row in rows)
-        PlaylistTrack(
-          position: row['position']! as int,
-          title: row['title']! as String,
-          artist: row['artist'] as String?,
-          mainDbId: row['main_db_id'] as int?,
-          youtubeVideoId: row['youtube_video_id'] as String?,
-          spotifyTrackId: row['spotify_track_id'] as String?,
-          duration: row['duration_s'] == null
-              ? null
-              : Duration(seconds: row['duration_s']! as int),
-          videoRemoved: row['youtube_removed'] == 1,
-        ),
-    ];
+    return [for (final row in rows) _track(row)];
   }
+
+  static PlaylistTrack _track(Map<String, Object?> row) => PlaylistTrack(
+    position: row['position']! as int,
+    title: row['title']! as String,
+    artist: row['artist'] as String?,
+    mainDbId: row['main_db_id'] as int?,
+    youtubeVideoId: row['youtube_video_id'] as String?,
+    spotifyTrackId: row['spotify_track_id'] as String?,
+    duration: row['duration_s'] == null
+        ? null
+        : Duration(seconds: row['duration_s']! as int),
+    videoRemoved: row['youtube_removed'] == 1,
+  );
+
+  /// How many tracks from the start [leadTracks] keeps: enough to find four different albums
+  /// for the collage in most playlists.
+  static const leadTrackCount = 12;
+
+  Map<int, List<PlaylistTrack>> _leadTracks = const {};
+
+  /// The first [leadTrackCount] tracks of a playlist in [playlists], for its cover collage
+  /// without reading the whole playlist.
+  List<PlaylistTrack> leadTracks(int playlistId) =>
+      _leadTracks[playlistId] ?? const [];
 
   /// The Biblioteka playlist imported from [source]'s playlist [sourceId], if there is one.
   PlaylistSummary? saved(PlaylistSource source, String sourceId) => _playlists

@@ -15,6 +15,7 @@ import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
+import '../widgets/collection_cover.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/swipe_actions.dart';
@@ -570,11 +571,7 @@ class _SavedPlaylistTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
-      leading: CoverArt(
-        seed: playlist.name,
-        size: SongTile.coverSize,
-        icon: Icons.queue_music,
-      ),
+      leading: PlaylistCover(playlist: playlist, size: SongTile.coverSize),
       title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         ['Playlista', ?playlist.owner].join(' • '),

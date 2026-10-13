@@ -12,13 +12,13 @@ import 'cover_filters.dart';
 bool isLargeCover(double size) => size >= 120;
 
 /// What [SongCover] draws for [image] at [size]: decoded at the size shown, with the user's
-/// filter. Also used to get a cover ready before it's shown ([precacheSongCover]), so both must
-/// build equal providers.
+/// filter ([seed] varies its grain). Also used to get a cover ready before it's shown
+/// ([precacheSongCover]), so both must build equal providers.
 ImageProvider coverImageFor(
   BuildContext context,
   ImageProvider image,
   double size,
-  CoverRequest cover, {
+  String seed, {
   double? strength,
 }) {
   final ratio = MediaQuery.devicePixelRatioOf(context);
@@ -37,7 +37,7 @@ ImageProvider coverImageFor(
     color: themes?.monochromeColor ?? ThemeController.defaultMonochromeColor,
     // About 1.25 dp per dot: coarse enough to see, fine enough to read.
     dot: max(2, (ratio * 1.25).round()),
-    seed: cover.seed.hashCode,
+    seed: seed.hashCode,
     strength: mix,
     background: themes?.monochromeBackground,
   );
@@ -54,7 +54,7 @@ Future<void> precacheSongCover(
   if (covers == null) return;
   final image = await covers.resolve(cover, large: isLargeCover(size));
   if (image == null || !context.mounted) return;
-  await precacheImage(coverImageFor(context, image, size, cover), context);
+  await precacheImage(coverImageFor(context, image, size, cover.seed), context);
 }
 
 /// A song's album cover ([AlbumCovers]); the placeholder [CoverArt] until it's found, or when
@@ -141,7 +141,7 @@ class _SongCoverState extends State<SongCover> {
           context,
           image,
           size,
-          widget.cover,
+          widget.cover.seed,
           strength: widget.filterStrength,
         ),
         filterQuality: filter == CoverFilter.monochrome
