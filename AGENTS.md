@@ -36,7 +36,7 @@ playlists and moods show a collage of their songs' covers or a picture the user 
 danych i tryb offline › Pamięć podręczna. YouTube: searching it on request, showing which songs
 MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
 audio on Android through NewPipeExtractor, with a cache of played songs — see
-[`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube or Spotify links
+[`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube or Spotify links or saved from the queue
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
 a share sheet; song search also finds Biblioteka playlists, and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link

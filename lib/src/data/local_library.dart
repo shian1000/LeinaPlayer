@@ -575,6 +575,12 @@ class LocalLibrary extends ChangeNotifier {
   /// Files on the phone that are this MusicDatabase song (`main_db_id`).
   List<LocalSong> filesOf(int mainDbId) => _byMainId[mainDbId] ?? const [];
 
+  /// A phone song not in MusicDatabase with exactly this [title] and [artist] (a playlist keeps
+  /// such a song only by those).
+  LocalSong? pendingFile({required String title, String? artist}) => _songs
+      .where((s) => s.pending && s.title == title && s.artist == artist)
+      .firstOrNull;
+
   /// Phone songs not in MusicDatabase whose chosen [fields] contain every word of [query].
   List<LocalSong> searchPending(String query, Set<SearchField> fields) {
     final normalized = normalizeForSearch(query);

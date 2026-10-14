@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import '../data/combined_search.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
+import '../data/playlist_library.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/song_tile.dart';
 import '../data/album_covers.dart';
+import '../widgets/common.dart';
 import '../widgets/mood_sheet.dart';
 import '../widgets/queue_toast.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/swipe_actions.dart';
+import 'playlist_screen.dart';
 
 /// "Kolejka", opened from the full player: the last few songs before the current one (above,
 /// scrolled to; tapping one goes back to it), the song playing, then everything after it, under
@@ -64,12 +67,54 @@ class QueueScreen extends StatelessWidget {
     return name != null ? 'Z playlisty: $name' : 'Następne w kolejce';
   }
 
+  /// Saves [songs] (every song listed: the shown previous ones, the one playing, what comes
+  /// next) as a new Biblioteka playlist, named by the user.
+  static Future<void> _saveAsPlaylist(
+    BuildContext context,
+    List<SearchHit> songs,
+  ) async {
+    final library = PlaylistLibraryScope.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final name = (await showDialog<String>(
+      context: context,
+      builder: (_) => const TextInputDialog(
+        title: 'Zapisz kolejkę jako playlistę',
+        hint: 'Nazwa playlisty',
+        initial: '',
+      ),
+    ))?.trim();
+    if (name == null || name.isEmpty) return;
+    final playlist = await library.create(name, songs);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Zapisano w Bibliotece: „${playlist.name}” '
+            '(${trackCountLabel(songs.length)})',
+          ),
+          // With an action a SnackBar otherwise stays until closed by hand.
+          persist: false,
+          action: SnackBarAction(
+            label: 'Pokaż',
+            onPressed: () => navigator.push(
+              MaterialPageRoute<void>(
+                builder: (_) => PlaylistScreen(playlist: playlist),
+              ),
+            ),
+          ),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final queue = PlaybackQueueScope.of(context);
     final current = queue.current;
     final upcoming = queue.upcoming;
+    final previous = queue.history.reversed.take(previousShown).toList();
     final moodFilter = MoodFilterScope.maybeOf(context);
     final filtering = moodFilter?.active ?? false;
 
@@ -103,15 +148,30 @@ class QueueScreen extends StatelessWidget {
           backgroundColor: palette.surface,
           title: const Text('Kolejka'),
           actions: [
+            if (current != null &&
+                PlaylistLibraryScope.maybeOf(context) != null)
+              // Its context is under the screen's own messenger, which shows the note.
+              Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Zapisz kolejkę jako playlistę',
+                  icon: const Icon(Icons.playlist_add),
+                  onPressed: () => _saveAsPlaylist(context, [
+                    for (final entry in previous.reversed) entry.hit,
+                    current,
+                    for (final entry in upcoming) entry.hit,
+                  ]),
+                ),
+              ),
             if (current != null && MoodLibraryScope.maybeOf(context) != null)
               IconButton(
                 tooltip: 'Nastrój dla wszystkich utworów w kolejce',
                 icon: const Icon(moodIcon),
-                // What will play: the songs the mood filter hides stay out.
+                // The songs listed: the ones the mood filter hides stay out.
                 onPressed: () => showMoodPickerForAll(context, [
+                  for (final entry in previous.reversed) entry.hit,
                   current,
                   for (final entry in upcoming) entry.hit,
-                ], title: 'Kolejka: teraz odtwarzany i następne'),
+                ], title: 'Kolejka: wszystkie widoczne utwory'),
               ),
           ],
         ),
@@ -122,7 +182,7 @@ class QueueScreen extends StatelessWidget {
             // Before the centre the list grows upwards: the newest song is first.
             SliverList.list(
               children: [
-                for (final entry in queue.history.reversed.take(previousShown))
+                for (final entry in previous)
                   _PreviousRow(key: ValueKey(entry.key), entry: entry),
                 if (queue.hasPrevious) const _Heading('Poprzednie'),
               ],

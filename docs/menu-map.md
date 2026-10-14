@@ -107,7 +107,11 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     Cofnij, and with the screen). Tapping a row plays it (added songs before it are dropped, main songs before it
     count as played). "Losowo: wł./wył." and "Nastroje: wł./wył." (**→ Filtr nastrojów**) at the
     bottom; songs the filter hides aren't listed. The moon in the app bar **→ Nastrój dla
-    wszystkich utworów** for the song playing and the ones shown after it.
+    wszystkich utworów** for every song listed (the shown "Poprzednie" too — user's choice).
+    "Zapisz kolejkę jako playlistę" (**implemented**, `Icons.playlist_add` in the app bar): asks
+    for a name and saves every song listed, in the screen's order, as a new Biblioteka
+    playlist (synced with the account like any other); the note "Zapisano w Bibliotece: …" has
+    "Pokaż", which opens it.
 
 ## Bottom navigation (`lib/src/screens/app_shell.dart`)
 
@@ -372,6 +376,10 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     sideways — picture, name, owner, track count when known; tapping one opens its **preview**,
     see Playlista) and "YouTube: N" (up to 15 videos: title, channel, duration; tapping one
     streams it like a song with a stored link).
+  - "Utwórz kolejkę z wyników" (`Icons.playlist_play`, left of the filter icon in the search
+    screen's app bar, while something is typed) — **implemented**: replaces the queue with every
+    found song (the "Utwory: N" list, not the online results) in the list's order and plays the
+    first, like tapping a song does for one.
   - "Playlisty w Bibliotece: N" (while "Wyszukuj playlisty" is on): Biblioteka playlists whose
     name or owner contain every word, as you type, above the songs; tapping one opens it.
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›

@@ -363,4 +363,55 @@ void main() {
       expect(youTube.isVideoRemoved('b'), isFalse);
     },
   );
+
+  test('a playlist made from songs (the queue saved) keeps them in order; a phone-only file is '
+      'found again by title and artist', () async {
+    final music = await Directory('${root.path}/Music').create();
+    // An empty file has no tags: artist and title come from its name.
+    await File('${music.path}/Nieznany Zespół - Nowość.mp3').create();
+    await local.addFolder(music.path);
+    await local.scan();
+    await catalog.ensureLoaded();
+    final file = (await local.pendingSongs()).single;
+
+    final saved = await playlists.create('Z kolejki', [
+      // music.db links it to a video: that stays music.db's.
+      SearchHit.main(catalog.byId(1)!, const []),
+      // Played through a video the phone found.
+      SearchHit.main(catalog.byId(2)!, const [], phoneMatch: 'gtc'),
+      SearchHit.youTubeOnly(
+        title: 'Klip',
+        artistLabel: 'Ktoś',
+        videoId: 'yt1',
+        playlistVideoId: 'yt1',
+      ),
+      SearchHit.phoneOnly(file),
+    ]);
+
+    expect(saved.name, 'Z kolejki');
+    expect(saved.source, isNull);
+    expect(saved.trackCount, 4);
+    expect(playlists.playlists.single.id, saved.id);
+    final tracks = await playlists.tracks(saved.id);
+    expect(
+      [
+        for (final t in tracks)
+          (t.mainDbId, t.title, t.artist, t.youtubeVideoId),
+      ],
+      [
+        (1, 'Małomiasteczkowy', 'Dawid Podsiadło', null),
+        (2, 'Going to California', 'Led Zeppelin', null),
+        (null, 'Klip', 'Ktoś', 'yt1'),
+        (null, 'Nowość', 'Nieznany Zespół', null),
+      ],
+    );
+
+    final phoneHit = playlistHit(tracks[3], catalog, local, youTube);
+    expect(phoneHit.onPhone, isTrue);
+    expect(phoneHit.phoneFiles.single.filePath, file.filePath);
+    expect(
+      playlistHit(tracks[2], catalog, local, youTube).youtubeVideoId,
+      'yt1',
+    );
+  });
 }

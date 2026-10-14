@@ -254,7 +254,8 @@ List<SearchHit> searchEverywhere(
 
 /// The row for a playlist track: the MusicDatabase song when it was recognised (by its
 /// `main_db_id`, or by the video if music.db has linked it since), with its phone files; otherwise
-/// just the playlist's YouTube video, or — with none (Spotify) — its title and artist; with what
+/// just the playlist's YouTube video, or a phone file not in MusicDatabase with the same title and
+/// artist (a saved queue's), or — with none (Spotify) — its title and artist; with what
 /// the phone learned on YouTube since ([withPhoneYouTube]).
 SearchHit playlistHit(
   PlaylistTrack track,
@@ -278,6 +279,10 @@ SearchHit playlistHit(
       ),
       youTube,
     );
+  }
+  if (videoId == null && track.spotifyTrackId == null) {
+    final file = library.pendingFile(title: track.title, artist: track.artist);
+    if (file != null) return SearchHit.phoneOnly(file);
   }
   return withPhoneYouTube(
     SearchHit.youTubeOnly(

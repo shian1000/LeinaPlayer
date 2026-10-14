@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'combined_search.dart';
 import 'custom_covers.dart';
 import 'playlist_sync.dart';
 import 'song_catalog.dart';
@@ -438,6 +439,48 @@ class PlaylistLibrary extends ChangeNotifier {
       owner: data.owner,
       tracks: [for (final track in data.tracks) _spotifyTrack(track)],
     );
+  }
+
+  /// A new playlist of [songs] made on the phone (e.g. the queue saved), with no source to
+  /// re-import it from. A song keeps music.db's id and, only when it has no MusicDatabase song,
+  /// the video it plays — music.db's own link stays music.db's (ADR 0003). A song only on the
+  /// phone is kept by its title and artist ([playlistHit] finds its file again).
+  Future<PlaylistSummary> create(String name, List<SearchHit> songs) async {
+    final db = await _database();
+    final now = _now().millisecondsSinceEpoch;
+    late int playlistId;
+    await db.transaction((txn) async {
+      playlistId = await txn.insert('playlists', {
+        'name': name,
+        'created_at': now,
+        'updated_at': now,
+        'uid': newPlaylistUid(),
+        'account': _userName(),
+        'dirty': 1,
+      });
+      final batch = txn.batch();
+      for (final (position, hit) in songs.indexed) {
+        final song = hit.mainSong;
+        batch.insert('playlist_tracks', {
+          'playlist_id': playlistId,
+          'position': position,
+          'artist': song != null
+              ? song.artistLabel
+              : hit.onPhone
+              ? hit.phoneFiles.first.artist
+              : hit.artistLabel,
+          'title': hit.title,
+          'main_db_id': song?.id,
+          'youtube_video_id':
+              hit.playlistVideoId ?? (song == null ? hit.youtubeVideoId : null),
+          'spotify_track_id': hit.spotifyTrackId,
+        });
+      }
+      await batch.commit(noResult: true);
+    });
+    await load();
+    onChanged?.call();
+    return _playlists.firstWhere((p) => p.id == playlistId);
   }
 
   _NewTrack _spotifyTrack(SpotifyTrack track) => (

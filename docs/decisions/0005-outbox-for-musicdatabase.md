@@ -67,7 +67,10 @@ album's title, year and type. Ids, links and service ids aren't editable. Format
   value, the row is dropped, and a file left empty is deleted (never sent, so its number may come
   again).
 - "Czeka na wysłanie" lists waiting corrections next to the dead links.
-- MusicDatabase doesn't process them yet (owner's choice: hand-off first); they wait in its inbox.
+- MusicDatabase reviews them in "Resolve new requests" since 2026-10-14 (its
+  `docs/handoffs/field-corrections-for-musicdatabaseapp.md`); nothing is applied without the
+  owner. A correction of a name can merge albums or artists there, so the row it named may be
+  gone from the next music.db — the phone's note goes with it.
 
 ## Sending (MusicDatabase's inbox)
 
@@ -94,8 +97,9 @@ album's title, year and type. Ids, links and service ids aren't editable. Format
 - ~~User name~~ — settled by [ADR 0006](0006-musicdatabase-login.md): the logged-in MusicDatabase
   user; uploads carry its token.
 - Whether `outbox/sent/` is ever pruned (e.g. once music.db reflects its rows).
-- A sent correction the owner rejects keeps its "Wysłano poprawkę" note until the field changes
-  in music.db; MusicDatabase has no way to tell the phone yet.
+- ~~Forgetting rejected corrections~~ — left as is (owner, 2026-10-14): a sent correction the
+  owner rejects keeps its "Wysłano poprawkę" note until the field changes in music.db; no answer
+  channel from MusicDatabase.
 
 ## Consequences
 

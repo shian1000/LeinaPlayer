@@ -15,6 +15,7 @@ import 'package:music_database_app/src/data/youtube_search.dart';
 import 'package:music_database_app/src/playback/playback_queue.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
 import 'package:music_database_app/src/playback/track_player.dart';
+import 'package:music_database_app/src/widgets/song_tile.dart';
 import 'package:music_database_app/src/screens/song_search_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -310,6 +311,27 @@ void main() {
       expect(find.textContaining('niedostępny'), findsOneWidget);
     },
   );
+
+  testWidgets('the queue button queues every found song in the list\'s order', (
+    tester,
+  ) async {
+    await pumpSearch(tester);
+    expect(find.byTooltip('Utwórz kolejkę z wyników'), findsNothing);
+
+    await type(tester, 'California');
+    final shown = [
+      for (final tile in tester.widgetList<SongTile>(find.byType(SongTile)))
+        tile.hit.title,
+    ];
+    expect(shown, hasLength(2));
+    await tester.tap(find.byTooltip('Utwórz kolejkę z wyników'));
+    await settle(tester, until: () => backend.opened.isNotEmpty);
+    expect(searches, isNot(contains('California')));
+    expect([
+      queue.current?.title,
+      for (final entry in queue.upcoming) entry.hit.title,
+    ], shown);
+  });
 
   testWidgets(
     'a song the phone matched gets a full icon, and plays from the cache next time',

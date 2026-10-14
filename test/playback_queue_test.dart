@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
+import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/mood_filter.dart';
+import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/track_ref.dart';
@@ -22,6 +25,9 @@ import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/widgets/queue_toast.dart';
 import 'package:music_database_app/src/widgets/song_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import 'support/waiting.dart';
 
 class _Backend implements AudioBackend {
   final opened = <String>[];
@@ -65,6 +71,8 @@ SearchHit _unplayable(String title) => SearchHit.main(
 );
 
 void main() {
+  sqfliteFfiInit();
+
   late _Backend backend;
   late PlayerController player;
   late PlaybackQueue queue;
@@ -429,10 +437,14 @@ void main() {
     }
   }
 
-  Future<void> showQueue(WidgetTester tester) async {
+  Future<void> showQueue(
+    WidgetTester tester, {
+    PlaylistLibrary? playlists,
+  }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
+    const screen = QueueScreen();
     await tester.pumpWidget(
       PlayerScope(
         notifier: player,
@@ -442,7 +454,9 @@ void main() {
             notifier: youTubeLibrary,
             child: MaterialApp(
               theme: buildAppTheme(dummifyTheme),
-              home: const QueueScreen(),
+              home: playlists == null
+                  ? screen
+                  : PlaylistLibraryScope(notifier: playlists, child: screen),
             ),
           ),
         ),
@@ -517,6 +531,59 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
       }
       expect(find.text('Cofnij'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    '"Kolejka": saved as a playlist — every song listed, the previous ones too',
+    (tester) async {
+      late Directory root;
+      late DatabaseSync sync;
+      late SongCatalog catalog;
+      late LocalLibrary local;
+      late YouTubeLibrary youTube;
+      late PlaylistLibrary playlists;
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('queue_playlist_test');
+        sync = DatabaseSync(storageRoot: () async => root);
+        catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+        local = LocalLibrary(
+          catalog,
+          storageRoot: () async => root,
+          factoryOverride: databaseFactoryFfi,
+        );
+        youTube = YouTubeLibrary(local.database, storageRoot: () async => root);
+        playlists = PlaylistLibrary(local.database, catalog, youTube);
+        await playlists.load();
+        await queue.start([_file('a'), _file('b'), _file('c')], 1);
+      });
+      addTearDown(() async {
+        playlists.dispose();
+        youTube.dispose();
+        local.dispose();
+        catalog.dispose();
+        sync.dispose();
+        await root.delete(recursive: true);
+      });
+      await showQueue(tester, playlists: playlists);
+
+      await tester.tap(find.byTooltip('Zapisz kolejkę jako playlistę'));
+      await settle(tester);
+      await tester.enterText(find.byType(TextField), '  W drodze ');
+      await tester.tap(find.text('Zapisz'));
+      await tester.runAsync(
+        () => waitUntil(() => playlists.playlists.isNotEmpty),
+      );
+      await settle(tester);
+
+      expect(
+        find.text('Zapisano w Bibliotece: „W drodze” (3 utwory)'),
+        findsOneWidget,
+      );
+      final saved = playlists.playlists.single;
+      expect(saved.name, 'W drodze');
+      final tracks = await tester.runAsync(() => playlists.tracks(saved.id));
+      expect([for (final t in tracks!) t.title], ['a', 'b', 'c']);
     },
   );
 

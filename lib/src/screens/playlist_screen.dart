@@ -744,7 +744,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         const SizedBox(width: 6),
                         Text(
                           [
-                            _trackCount(_playlist.trackCount),
+                            trackCountLabel(_playlist.trackCount),
                             if (_playlist.duration > Duration.zero)
                               _length(_playlist.duration),
                           ].join(' • '),
@@ -898,7 +898,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 }
 
 /// "1 utwór", "3 utwory", "12 utworów".
-String _trackCount(int n) {
+String trackCountLabel(int n) {
   final tens = n % 100;
   final word = n == 1
       ? 'utwór'

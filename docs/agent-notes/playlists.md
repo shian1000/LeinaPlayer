@@ -21,6 +21,17 @@ fetching, title cleanup), `screens/playlist_import.dart`, `screens/playlist_scre
   null, so `playlistHit` shows it with a dimmed icon and it's searched on YouTube like a Spotify
   track (the found video is remembered by artist + title).
 
+## Made on the phone (the queue saved)
+
+Kolejka's app-bar button (`queue_screen.dart`) saves every song it lists, in its order: the shown
+"Poprzednie" (user's choice), the song playing, what comes next — songs the mood filter hides
+stay out with `PlaylistLibrary.create`:
+`source` NULL (nothing to re-import or link to), synced like any other. A track keeps
+`main_db_id` and a video only when it has no MusicDatabase song (or a playlist video), so
+music.db's own link stays music.db's. A phone file not in MusicDatabase has no column of its own
+— it's kept by title + artist and `playlistHit` finds it again (`LocalLibrary.pendingFile`); on
+another phone, or once renamed, it's searched on YouTube like a Spotify track.
+
 ## Syncing with MusicDatabase ([ADR 0007](../decisions/0007-playlist-sync.md))
 
 `local.db` v11 adds `uid`, `account`, `revision`, `dirty`, `deleted_at` to `playlists`.
@@ -164,7 +175,7 @@ be an album page) over the Spotify playlist's track. `SearchHit` copies go throu
 The playlist's share icon and ⋮ › Udostępnij open `showShareSheet` (modelled on the reference
 app's sheet: preview card + round buttons): Kopiuj link (clipboard), Otwórz w YouTube / Spotify
 (`openInYouTube` / url_launcher), Więcej (`share_plus` → the phone's share sheet). The link is
-the source playlist's page; a playlist made on the phone (none yet) has no link and says so.
+the source playlist's page; a playlist made on the phone (a saved queue) has no link and says so.
 
 ## Android build
 
@@ -184,5 +195,5 @@ których nie ma w bazie danych" (`missing_tracks_screen.dart`). Only a list so f
 to MusicDatabase as add requests is the user's intended next step, but how the phone talks back
 to MusicDatabase isn't decided — that needs an ADR first (see `AGENTS.md`, Sources of truth).
 
-Not done yet: creating playlists by hand, editing (the sync already carries any change), Spotify playlists over 100 tracks, other
+Not done yet: creating empty playlists by hand, editing (the sync already carries any change), Spotify playlists over 100 tracks, other
 sources, asking MusicDatabase to add the missing tracks.

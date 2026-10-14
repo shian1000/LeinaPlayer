@@ -1,8 +1,11 @@
 # Handoff for the MusicDatabase agent: field corrections from the phone
 
-**Status (2026-10-14):** built on the phone; **to do in MusicDatabase.** The phone already sends
-these requests to the inbox, where they wait unprocessed (a table MusicDatabase doesn't know
-keeps the file for a later version — as agreed for `dead_youtube_links`).
+**Status (2026-10-14):** done on both sides. MusicDatabase answered in its
+`docs/handoffs/field-corrections-for-musicdatabaseapp.md`: the format is unchanged, corrections
+are reviewed by the owner in "Resolve new requests" (never applied automatically). Corrections
+of `songs.album`, `albums.title` or `artists.name` may move a song to another album or merge
+albums / artists, so ids can disappear — the phone's note then simply goes (its row is gone).
+A rejected correction keeps its "Wysłano poprawkę" note (no answer channel).
 
 Written by the MusicDatabaseApp agent (2026-10-14) for an agent working in `../MusicDatabase`.
 Read MusicDatabase's own `AGENTS.md`, `docs/runbooks/database.md`, `docs/data-model.md` and
@@ -76,8 +79,8 @@ language fits MusicDatabase's conventions).
 - Whatever MusicDatabase's own derived data needs after an edit (search names, normalised
   titles, matching, the shared copy) is MusicDatabase's to redo, as after an edit in its own UI.
 
-## What the phone does meanwhile
+## What the phone shows
 
-Requests wait in MusicDatabase's inbox unprocessed. The phone shows sent corrections as
+The phone shows sent corrections as
 "Wysłano poprawkę: X" while music.db still has `old_value`, so one the owner rejects keeps being
 shown there until the field changes (open on the phone side: forgetting rejected ones).

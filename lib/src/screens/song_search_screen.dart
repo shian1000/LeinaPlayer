@@ -134,6 +134,8 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
           onChanged: (_) => _onQueryChanged(),
         ),
         actions: [
+          if (_query.text.trim().isNotEmpty)
+            _QueueResultsButton(query: _query.text.trim()),
           const SearchFieldsButton(),
           if (_query.text.isNotEmpty)
             IconButton(
@@ -151,6 +153,45 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
         online: _online,
         onSearchOnline: _searchOnline,
       ),
+    );
+  }
+}
+
+/// Replaces the queue with every song found for [query], in the list's order, starting with
+/// the first; the online results aren't part of it.
+class _QueueResultsButton extends StatelessWidget {
+  const _QueueResultsButton({required this.query});
+
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Utwórz kolejkę z wyników',
+      icon: const Icon(Icons.playlist_play, size: 28),
+      onPressed: () {
+        FocusScope.of(context).unfocus();
+        final hits = searchEverywhere(
+          query,
+          SongCatalogScope.of(context),
+          LocalLibraryScope.of(context),
+          youTube: YouTubeLibraryScope.of(context),
+        );
+        if (hits.isEmpty) {
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(content: Text('Brak utworów dla „$query”')),
+            );
+          return;
+        }
+        final queue = PlaybackQueueScope.of(context);
+        runQueueAction(
+          context,
+          (onStatus) =>
+              queue.start(hits, 0, searchQuery: query, onStatus: onStatus),
+        );
+      },
     );
   }
 }
