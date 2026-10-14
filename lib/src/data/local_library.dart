@@ -236,7 +236,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 14,
+        version: 15,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -272,6 +272,7 @@ class LocalLibrary extends ChangeNotifier {
           await _addPlaylistSyncColumns(db);
           await _createMoodTables(db);
           await _addCoverColumns(db);
+          await _addYouTubeCopyColumns(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -287,8 +288,21 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 12) await _createMoodTables(db);
           if (from == 12) await _allowPhoneOnlyMoods(db);
           if (from < 14) await _addCoverColumns(db);
+          if (from < 15) await _addYouTubeCopyColumns(db);
         },
       ),
+    );
+  }
+
+  /// Version 15: the YouTube playlist made from a phone playlist (`youtube_export.dart`) —
+  /// phone only, not synced. `youtube_copy_done` counts the tracks handled so far; NULL once
+  /// all were.
+  static Future<void> _addYouTubeCopyColumns(Database db) async {
+    await db.execute(
+      'ALTER TABLE playlists ADD COLUMN youtube_copy_id VARCHAR',
+    );
+    await db.execute(
+      'ALTER TABLE playlists ADD COLUMN youtube_copy_done INTEGER',
     );
   }
 

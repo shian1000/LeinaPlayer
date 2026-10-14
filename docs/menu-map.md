@@ -175,6 +175,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   "Nastroje" row below it does the same for the account's moods, the login offer covers
   phone-only moods too ("Dodać playlisty i nastroje z telefonu do konta?"), and a "Nastroje tylko
   na tym telefonie: N" row adds them ([ADR 0008](decisions/0008-moods.md)).
+  Below everything, once signed in for "Utwórz na YouTube": "Konto Google (playlisty na
+  YouTube)" — the Google account's e-mail with **Wyloguj** (the next playlist asks for an
+  account again).
 - Źródła muzyki **→ Źródła muzyki** (`music_sources_screen.dart`), list of music sources:
   - Muzyka lokalna **→ Muzyka lokalna** (`local_music_screen.dart`) — **implemented**:
     - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
@@ -562,7 +565,12 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   `share_sheet.dart`: a card with the playlist's mosaic, name and "Playlista • <owner>" over three
   round buttons — Kopiuj link, Otwórz w YouTube/Spotify, Więcej (the phone's share sheet). The
   link is the playlist's page where it was imported from: `youtube.com/playlist?list=…` or
-  `open.spotify.com/playlist/…`), Odtwarzanie losowe
+  `open.spotify.com/playlist/…`. A playlist with no link — made on the phone, or a MusicDatabase
+  folder — has Kopiuj link / Więcej dimmed and **Utwórz na YouTube** in the middle
+  (`youtube_export_dialog.dart`: "Utworzyć playlistę na YouTube?" → Google sign-in → an unlisted
+  YouTube copy, progress with Przerwij, then what was skipped and "Otwórz w YouTube"); after that
+  the sheet shows the copy's link, or **Dokończ na YouTube** when it stopped half-way, e.g. at
+  YouTube's daily limit — see [`youtube.md`](agent-notes/youtube.md)), Odtwarzanie losowe
   (**implemented**: queues the playlist shuffled, from a random track), Odtwórz playlistę
   (**implemented**: queues the playlist from its first track, shuffle off),
   `Playlista › Dodaj (do tej playlisty)` / `Edytuj (playlistę)` / `Sortuj (playlistę)`.

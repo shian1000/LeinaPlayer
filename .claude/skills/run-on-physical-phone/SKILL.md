@@ -109,6 +109,9 @@ trouble. If install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (signature m
 a real release key is configured), tell the user that reinstalling requires uninstalling the
 existing app first — which wipes all of the app's local data on the phone — and only run
 `adb -s <device-id> uninstall com.shian1000.music_database_app` after they confirm.
+A different signing key (a real release key, or another machine's `debug.keystore`) also breaks
+"Utwórz na YouTube" (Google sign-in) until its SHA-1 is added in Google Cloud — see
+`docs/agent-notes/youtube.md`.
 
 ## Step 4 — Launch the app
 

@@ -21,6 +21,7 @@ import 'src/data/playlist_library.dart';
 import 'src/data/song_catalog.dart';
 import 'src/data/source_settings.dart';
 import 'src/data/track_ref.dart';
+import 'src/data/youtube_account.dart';
 import 'src/data/youtube_audio.dart';
 import 'src/data/youtube_library.dart';
 import 'src/data/youtube_search.dart';
@@ -162,6 +163,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   final _customCovers = CustomCovers();
   late final Future<void> _coversLoaded;
   final _account = Account();
+  final _youTubeAccount = YouTubeAccount();
   late final _outbox = Outbox(
     userName: () => _account.userName,
     authToken: () => _account.token,
@@ -255,6 +257,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       (Object e) => debugPrint('Loading play history failed: $e'),
     );
     _laterLinks.load();
+    _youTubeAccount.load().catchError(
+      (Object e) => debugPrint('Loading the YouTube account failed: $e'),
+    );
     _libraryFolders.load().catchError(
       (Object e) => debugPrint('Loading Biblioteka folders failed: $e'),
     );
@@ -495,6 +500,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _queueSession.dispose();
     _playHistory.dispose();
     _laterLinks.dispose();
+    _youTubeAccount.dispose();
     _libraryFolders.dispose();
     _playbackQueue.dispose();
     _moodFilter.dispose();
@@ -515,78 +521,82 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomCoversScope(
-      notifier: _customCovers,
-      child: DatabaseSyncScope(
-        notifier: _databaseSync,
-        child: AccountScope(
-          notifier: _account,
-          child: OutboxScope(
-            notifier: _outbox,
-            child: SongCatalogScope(
-              notifier: _songCatalog,
-              child: LocalLibraryScope(
-                notifier: _localLibrary,
-                child: YouTubeLibraryScope(
-                  notifier: _youTubeLibrary,
-                  child: PlaylistLibraryScope(
-                    notifier: _playlistLibrary,
-                    child: MoodLibraryScope(
-                      notifier: _moodLibrary,
-                      child: MoodFilterScope(
-                        notifier: _moodFilter,
-                        child: PlayHistoryScope(
-                          notifier: _playHistory,
-                          child: LaterLinksScope(
-                            notifier: _laterLinks,
-                            child: LibraryFoldersScope(
-                              notifier: _libraryFolders,
-                              child: PlayerScope(
-                                notifier: _player,
-                                child: PlaybackQueueScope(
-                                  notifier: _playbackQueue,
-                                  child: SourceSettingsScope(
-                                    notifier: _sourceSettings,
-                                    child: AlbumCoversScope(
-                                      notifier: _albumCovers,
-                                      child: YouTubeScope(
-                                        search: _youTubeSearch,
-                                        audio: _youTubeAudio,
-                                        playlists: _youTubePlaylists,
-                                        child: ThemeScope(
-                                          notifier: _themeController,
-                                          child: ListenableBuilder(
-                                            listenable: _themeController,
-                                            builder: (context, _) => MaterialApp(
-                                              title: appName,
-                                              debugShowCheckedModeBanner: false,
-                                              theme: buildAppTheme(
-                                                _themeController.light,
-                                              ),
-                                              darkTheme: buildAppTheme(
-                                                _themeController.dark,
-                                              ),
-                                              themeMode:
-                                                  _themeController.themeMode,
-                                              // Tab screens have no AppBar to set the status-bar icon colour, so
-                                              // match it to the active theme here (dark icons on light themes and
-                                              // vice versa).
-                                              builder: (context, child) =>
-                                                  AnnotatedRegion<
-                                                    SystemUiOverlayStyle
-                                                  >(
-                                                    value:
-                                                        Theme.of(context)
-                                                                .brightness ==
-                                                            Brightness.light
-                                                        ? SystemUiOverlayStyle
-                                                              .dark
-                                                        : SystemUiOverlayStyle
-                                                              .light,
-                                                    child: child!,
-                                                  ),
-                                              home: AppShell(
-                                                links: _incomingLinks.links,
+    return YouTubeAccountScope(
+      notifier: _youTubeAccount,
+      child: CustomCoversScope(
+        notifier: _customCovers,
+        child: DatabaseSyncScope(
+          notifier: _databaseSync,
+          child: AccountScope(
+            notifier: _account,
+            child: OutboxScope(
+              notifier: _outbox,
+              child: SongCatalogScope(
+                notifier: _songCatalog,
+                child: LocalLibraryScope(
+                  notifier: _localLibrary,
+                  child: YouTubeLibraryScope(
+                    notifier: _youTubeLibrary,
+                    child: PlaylistLibraryScope(
+                      notifier: _playlistLibrary,
+                      child: MoodLibraryScope(
+                        notifier: _moodLibrary,
+                        child: MoodFilterScope(
+                          notifier: _moodFilter,
+                          child: PlayHistoryScope(
+                            notifier: _playHistory,
+                            child: LaterLinksScope(
+                              notifier: _laterLinks,
+                              child: LibraryFoldersScope(
+                                notifier: _libraryFolders,
+                                child: PlayerScope(
+                                  notifier: _player,
+                                  child: PlaybackQueueScope(
+                                    notifier: _playbackQueue,
+                                    child: SourceSettingsScope(
+                                      notifier: _sourceSettings,
+                                      child: AlbumCoversScope(
+                                        notifier: _albumCovers,
+                                        child: YouTubeScope(
+                                          search: _youTubeSearch,
+                                          audio: _youTubeAudio,
+                                          playlists: _youTubePlaylists,
+                                          child: ThemeScope(
+                                            notifier: _themeController,
+                                            child: ListenableBuilder(
+                                              listenable: _themeController,
+                                              builder: (context, _) => MaterialApp(
+                                                title: appName,
+                                                debugShowCheckedModeBanner:
+                                                    false,
+                                                theme: buildAppTheme(
+                                                  _themeController.light,
+                                                ),
+                                                darkTheme: buildAppTheme(
+                                                  _themeController.dark,
+                                                ),
+                                                themeMode:
+                                                    _themeController.themeMode,
+                                                // Tab screens have no AppBar to set the status-bar icon colour, so
+                                                // match it to the active theme here (dark icons on light themes and
+                                                // vice versa).
+                                                builder: (context, child) =>
+                                                    AnnotatedRegion<
+                                                      SystemUiOverlayStyle
+                                                    >(
+                                                      value:
+                                                          Theme.of(context)
+                                                                  .brightness ==
+                                                              Brightness.light
+                                                          ? SystemUiOverlayStyle
+                                                                .dark
+                                                          : SystemUiOverlayStyle
+                                                                .light,
+                                                      child: child!,
+                                                    ),
+                                                home: AppShell(
+                                                  links: _incomingLinks.links,
+                                                ),
                                               ),
                                             ),
                                           ),

@@ -181,3 +181,28 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
 
 Not done yet: PO tokens (not needed so far), iOS streaming without youtube_explode, yt-dlp via
 the server.
+
+## Making a YouTube playlist (`youtube_account.dart`, `youtube_api.dart`, `youtube_export.dart`)
+
+A Biblioteka playlist with no link (made on the phone, or a MusicDatabase folder) gets "Utwórz na
+YouTube" ("Dokończ na YouTube" when stopped half-way) in its share sheet (`youtube_export_dialog.dart`). The phone does it itself
+with the YouTube Data API — MusicDatabase isn't involved (user's choice; its own
+`create_yt_playlist()` uses the owner's token on the server).
+
+- **Sign-in:** `google_sign_in` (Credential Manager) with the Google account picked on the phone
+  — separate from the MusicDatabase login; only its e-mail is kept (Ustawienia › Konto shows it,
+  with "Wyloguj"). Google Cloud project with YouTube Data API v3, OAuth consent screen in
+  "Testing" (testers listed there), scope `auth/youtube`. Two OAuth clients: **Android**
+  (package `com.shian1000.music_database_app` + SHA-1 of the signing key) and **Web**, whose id
+  is `serverClientId` in the code. The release is signed with `~/.android/debug.keystore`
+  (SHA-1 `F4:39:48:90:36:28:0A:1E:EB:FC:6E:8E:15:02:62:5A:A7:E9:2C:3D`): building on another
+  machine or with another key breaks sign-in (often reported as "canceled") until its SHA-1 is
+  added to the Android client. Android only; iOS would need its own client.
+- **Quota:** 10 000 units a day per project, 50 per playlist and per added video — ~200 songs.
+  Videos come from what playback would use, else the phone's own search (no API quota).
+  Progress is saved after each song (`playlists.youtube_copy_id` / `youtube_copy_done`,
+  `local.db` v15, phone only, not synced), so a run stopped by the limit, a lost connection or
+  "Przerwij" is finished from the same sheet ("Dokończ…"); a playlist deleted on YouTube
+  meanwhile is made again.
+- **Unlisted** (user's choice), and a copy: later changes to the Biblioteka playlist don't reach
+  it (user: maybe later). Once finished, the share sheet shows its link like an imported one.

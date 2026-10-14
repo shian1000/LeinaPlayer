@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import '../data/combined_search.dart';
 import '../data/mood_filter.dart';
 import '../data/track_ref.dart';
+import '../data/youtube_video.dart';
 import 'player_controller.dart';
 import 'track_player.dart';
 import '../data/album_covers.dart';
@@ -130,6 +131,10 @@ class PlaybackQueue extends ChangeNotifier {
   static const restartThreshold = Duration(seconds: 5);
 
   final TrackPlayer _tracks;
+
+  /// The best YouTube video for [hit], found and remembered the way playing it would
+  /// ([TrackPlayer.findVideo]).
+  Future<YouTubeVideo?> findVideo(SearchHit hit) => _tracks.findVideo(hit);
   final Random _random;
   late final StreamSubscription<void> _completions;
   late final StreamSubscription<MediaSkip> _skips;

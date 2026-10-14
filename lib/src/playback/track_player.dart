@@ -214,7 +214,7 @@ class TrackPlayer {
     onStatus?.call('Szukam na YouTube…');
     final YouTubeVideo? video;
     try {
-      video = await _findVideo(hit);
+      video = await findVideo(hit);
     } on YouTubeSearchException catch (e) {
       return PlayOutcome.failed(e.message, offline: e.offline);
     }
@@ -242,7 +242,7 @@ class TrackPlayer {
   /// The best video for [hit], remembered so the next play uses it (or its cached audio) without
   /// searching again, and the icon turns full; a MusicDatabase song's video also goes to the
   /// outbox as a suggestion. Finding none is remembered too ([YouTubeLibrary.saveNotFound]).
-  Future<YouTubeVideo?> _findVideo(SearchHit hit) async {
+  Future<YouTubeVideo?> findVideo(SearchHit hit) async {
     final target = hit.youTubeTarget;
     final mainSong = hit.mainSong;
     final video = pickYouTubeVideo(target, [
@@ -311,7 +311,7 @@ class TrackPlayer {
         return false;
       }
       try {
-        videoId = (await _findVideo(hit))?.id;
+        videoId = (await findVideo(hit))?.id;
       } on YouTubeSearchException catch (e) {
         debugPrint('Caching ahead: searching "${hit.title}" failed: $e');
       }

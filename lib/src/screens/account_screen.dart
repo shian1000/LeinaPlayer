@@ -5,6 +5,7 @@ import '../data/database_sync.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_sync.dart';
+import '../data/youtube_account.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -145,6 +146,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     style: hint,
                   ),
                 ),
+                const _YouTubeAccountSection(),
               ]
             : [
                 const SectionTitle('Zaloguj się do MusicDatabase'),
@@ -227,6 +229,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     style: hint,
                   ),
                 ),
+                const _YouTubeAccountSection(),
               ],
       ),
     );
@@ -283,6 +286,34 @@ class LogOutButton extends StatelessWidget {
     );
     if (ok != true) return;
     await account.logOut(await sync.serverAddresses());
+  }
+}
+
+/// The Google account playlists are made on YouTube with ("Utwórz na YouTube"), once
+/// signed in; signing out lets the next one pick another account.
+class _YouTubeAccountSection extends StatelessWidget {
+  const _YouTubeAccountSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final account = YouTubeAccountScope.maybeOf(context);
+    final email = account?.email;
+    if (account == null || email == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        const SectionTitle('Konto Google (playlisty na YouTube)'),
+        ListTile(
+          leading: const Icon(Icons.smart_display_outlined),
+          title: Text(email),
+          trailing: TextButton(
+            onPressed: account.signOut,
+            child: const Text('Wyloguj'),
+          ),
+        ),
+      ],
+    );
   }
 }
 

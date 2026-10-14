@@ -27,6 +27,7 @@ import '../widgets/share_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/youtube_export_dialog.dart';
 import 'missing_tracks_screen.dart';
 import '../widgets/song_names.dart';
 
@@ -340,27 +341,33 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
-  /// Shares the playlist's own page where it was imported from — the phone's copy has no link.
+  /// Shares the playlist's own page where it was imported from. One made on the phone has no
+  /// link until "Utwórz na YouTube" makes a copy of it there.
   void _share(List<SearchHit> hits) {
-    final link = _playlist.link;
-    if (link == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Ta playlista nie pochodzi z YouTube ani Spotify — nie ma linku.',
-          ),
-        ),
-      );
-      return;
-    }
+    final saved = _saved;
+    final playlist =
+        (saved == null
+            ? null
+            : PlaylistLibraryScope.of(context).byId(saved.id)) ??
+        _playlist;
+    final canMake =
+        saved != null &&
+        (playlist.source == null || playlist.source == PlaylistSource.folder) &&
+        (playlist.youTubeCopyId == null || playlist.youTubeCopyUnfinished);
     showLinkShareSheet(
       context,
-      link: link,
-      target: _fromSpotify ? ShareTarget.spotify : ShareTarget.youtube,
-      title: _playlist.name,
+      link: playlist.link,
+      target: playlist.linksToYouTube
+          ? ShareTarget.youtube
+          : ShareTarget.spotify,
+      title: playlist.name,
       subtitle: '$_kind • $_owner',
       cover: _cover(hits, 160),
-      tint: context.palette.colorForSeed(_playlist.name),
+      tint: context.palette.colorForSeed(playlist.name),
+      makeOnYouTube: canMake
+          ? () => showYouTubeExportDialog(context, playlist)
+          : null,
+      unfinished: playlist.youTubeCopyUnfinished,
     );
   }
 

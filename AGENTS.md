@@ -56,7 +56,10 @@ mood or the queue can be put into a mood at once (after "Czy na pewno?"). A mood
 the queue hide and pass over songs outside the ticked moods (or with a mood, for "Utwory bez
 nastroju"); while it's on the full player shows a "Nastrój" button for the current song.
 YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
-the video / track; a tapped link first shows a native sheet asking where to open it (Leina Radio,
+the video / track; a playlist with no link (made on the phone, a MusicDatabase folder) can be
+made on YouTube from its share sheet — the phone signs in to Google and uses the YouTube Data API
+itself, without MusicDatabase (unlisted, a one-off copy; [`youtube.md`](docs/agent-notes/youtube.md));
+a tapped link first shows a native sheet asking where to open it (Leina Radio,
 the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
 saves it for later with the person who sent it (Menu profilu › Wiadomości › Na później,
 `later_links.dart`; kept natively in `LaterLinks.kt`).
@@ -121,7 +124,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `showSongMenu` — a song's menu, opened by ⋮ (and a long press outside a selection area);
   `SongSelectionArea` in `song_selection.dart` — wrap a song list's body in it and a long press on
   a `SongTile` starts ticking songs, with a bar of actions for all of them (new song lists should
-  use it); `showAddToPlaylistSheet` in `playlist_picker.dart`; `folder_sheet.dart` — "Przenieś do
+  use it); `showAddToPlaylistSheet` in `playlist_picker.dart`; `youtube_export_dialog.dart` — "Utwórz na YouTube"; `folder_sheet.dart` — "Przenieś do
   folderu" for Biblioteka;
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
@@ -136,7 +139,9 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   (`outbox.dart`), the logged-in MusicDatabase user (`account.dart`), YouTube and Spotify links given to the app
   (`incoming_links.dart`, `video_link.dart`), links saved for later from the link sheet
   (`later_links.dart`), YouTube search / matching / audio
-  (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
+  (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), making a YouTube
+  playlist from a Biblioteka one (`youtube_account.dart` — Google sign-in, `youtube_api.dart`,
+  `youtube_export.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
   folders, sort order and "last opened" (`library_folders.dart`, phone only), syncing
@@ -183,7 +188,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`, `LibraryFoldersScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`, `LibraryFoldersScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
@@ -248,7 +253,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - [`youtube.md`](docs/agent-notes/youtube.md) — YouTube search methods, the lite matcher and its
   benchmark, NewPipe playback (build requirements, 403s), remembered matches, "not found" and
   removed videos, server-wins rule, the audio cache (why it downloads in 1 MB ranges), links
-  given to the app and the native "Otwórz w…" sheet (incl. "Zapisz na później"), what's not done.
+  given to the app and the native "Otwórz w…" sheet (incl. "Zapisz na później"), making a YouTube
+  playlist (Google Cloud clients, signing key SHA-1, daily limit), what's not done.
 - [`playlists.md`](docs/agent-notes/playlists.md) — Biblioteka playlists: `local.db` tables,
   YouTube import (fetching, title parsing, recognising songs by video first), Spotify import (the
   embed page, 100-track limit, albums, track links), searching playlists (Spotify key / anonymous web-player search

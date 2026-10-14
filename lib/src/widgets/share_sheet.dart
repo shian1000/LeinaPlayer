@@ -120,16 +120,23 @@ Future<void> showShareSheet(
 enum ShareTarget { youtube, spotify }
 
 /// A playlist's link: Kopiuj link, Otwórz w YouTube / Spotify, Więcej (the phone's share sheet).
+/// [makeOnYouTube] takes the middle place for a playlist made on the phone: "Utwórz na
+/// YouTube" while it has no [link] (the other two dimmed), "Dokończ…" ([unfinished]) when
+/// making it stopped half-way.
 Future<void> showLinkShareSheet(
   BuildContext context, {
-  required Uri link,
+  required Uri? link,
   required ShareTarget target,
   required String title,
   required String subtitle,
   required Widget cover,
   required Color tint,
+  VoidCallback? makeOnYouTube,
+  bool unfinished = false,
 }) {
   final messenger = ScaffoldMessenger.of(context);
+  const noLink =
+      'Ta playlista nie ma jeszcze linku — najpierw utwórz ją na YouTube.';
   return showShareSheet(
     context,
     title: title,
@@ -140,35 +147,46 @@ Future<void> showLinkShareSheet(
       ShareOption(
         icon: Icons.link,
         label: 'Kopiuj link',
-        onTap: () async {
-          await Clipboard.setData(ClipboardData(text: link.toString()));
-          messenger.showSnackBar(
-            const SnackBar(content: Text('Skopiowano link')),
-          );
-        },
+        onTap: link == null
+            ? null
+            : () async {
+                await Clipboard.setData(ClipboardData(text: link.toString()));
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Skopiowano link')),
+                );
+              },
+        unavailable: noLink,
       ),
-      ShareOption(
-        icon: target == ShareTarget.youtube
-            ? Icons.smart_display_outlined
-            : Icons.graphic_eq,
-        label: target == ShareTarget.youtube
-            ? 'Otwórz w YouTube'
-            : 'Otwórz w Spotify',
-        onTap: () async {
-          final opened = target == ShareTarget.youtube
-              ? await openInYouTube(link)
-              : await _openSpotify(link);
-          if (!opened) {
-            messenger.showSnackBar(
-              const SnackBar(content: Text('Nie udało się otworzyć linku.')),
-            );
-          }
-        },
-      ),
+      if (makeOnYouTube != null)
+        ShareOption(
+          icon: Icons.playlist_add,
+          label: unfinished ? 'Dokończ na YouTube' : 'Utwórz na YouTube',
+          onTap: makeOnYouTube,
+        )
+      else if (link != null)
+        ShareOption(
+          icon: target == ShareTarget.youtube
+              ? Icons.smart_display_outlined
+              : Icons.graphic_eq,
+          label: target == ShareTarget.youtube
+              ? 'Otwórz w YouTube'
+              : 'Otwórz w Spotify',
+          onTap: () async {
+            final opened = target == ShareTarget.youtube
+                ? await openInYouTube(link)
+                : await _openSpotify(link);
+            if (!opened) {
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Nie udało się otworzyć linku.')),
+              );
+            }
+          },
+        ),
       ShareOption(
         icon: Icons.more_horiz,
         label: 'Więcej',
-        onTap: () => _shareLink(link, title),
+        onTap: link == null ? null : () => _shareLink(link, title),
+        unavailable: noLink,
       ),
     ],
   );

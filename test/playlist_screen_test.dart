@@ -2,12 +2,14 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/library_folders.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
+import 'package:music_database_app/src/data/youtube_account.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_playlist.dart';
@@ -22,6 +24,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'data/fixtures.dart';
 import 'support/waiting.dart';
+import 'support/youtube_api_fakes.dart';
 
 void main() {
   sqfliteFfiInit();
@@ -37,14 +40,23 @@ void main() {
   late PlaybackQueue queue;
   late LibraryFolders folders;
   late List<String> fetched;
+  late FakeYouTubeApi youTubeApi;
+  late YouTubeAccount youTubeAccount;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     fetched = [];
+    youTubeApi = FakeYouTubeApi();
+    youTubeAccount = YouTubeAccount(
+      auth: FakeGoogleAuth(),
+      api: youTubeApi,
+      supported: true,
+    );
   });
 
   tearDown(() async {
     queue.dispose();
+    youTubeAccount.dispose();
     folders.dispose();
     player.dispose();
     playlists.dispose();
@@ -151,9 +163,12 @@ void main() {
                         ),
                         child: LibraryFoldersScope(
                           notifier: folders,
-                          child: MaterialApp(
-                            theme: buildAppTheme(dummifyTheme),
-                            home: const Scaffold(body: LibraryScreen()),
+                          child: YouTubeAccountScope(
+                            notifier: youTubeAccount,
+                            child: MaterialApp(
+                              theme: buildAppTheme(dummifyTheme),
+                              home: const Scaffold(body: LibraryScreen()),
+                            ),
                           ),
                         ),
                       ),
@@ -375,4 +390,58 @@ void main() {
     await tester.runAsync(reloaded.load);
     expect(reloaded.sort, LibrarySort.alphabetical);
   });
+
+  testWidgets(
+    'a playlist made on the phone is shared after making it on YouTube',
+    (tester) async {
+      await pumpLibrary(
+        tester,
+        before: () async {
+          await importDoAuta();
+          final imported = playlists.playlists.single;
+          final tracks = await playlists.tracks(imported.id);
+          await playlists.create('Na telefonie', [
+            for (final t in tracks)
+              playlistHit(t, catalog, library, youTubeLibrary),
+          ]);
+        },
+      );
+      await tester.tap(find.text('Na telefonie'));
+      await settle(tester, until: find.text('Utwór'));
+
+      await tester.tap(find.byTooltip('Udostępnij'));
+      await tester.pumpAndSettle();
+      expect(find.text('Otwórz w YouTube'), findsNothing);
+      await tester.tap(find.text('Kopiuj link'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('nie ma jeszcze linku'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Udostępnij'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Utwórz na YouTube'));
+      await tester.pumpAndSettle();
+      expect(find.text('Utworzyć playlistę na YouTube?'), findsOneWidget);
+      await tester.tap(find.text('Utwórz'));
+      await settle(tester, until: find.text('Playlista jest na YouTube'));
+      expect(find.text('Dodano 2 utw.'), findsOneWidget);
+      expect(youTubeApi.playlists.values.single, ['X2XWBcd5jn0', 'nn']);
+      await tester.tap(find.text('Zamknij'));
+      await tester.pumpAndSettle();
+
+      expect(youTubeAccount.email, 'ja@example.com');
+      await tester.tap(find.byTooltip('Udostępnij'));
+      await tester.pumpAndSettle();
+      expect(find.text('Utwórz na YouTube'), findsNothing);
+      expect(find.text('Otwórz w YouTube'), findsOneWidget);
+      final made = playlists.playlists.firstWhere(
+        (p) => p.name == 'Na telefonie',
+      );
+      expect(
+        made.link,
+        Uri.parse(
+          'https://www.youtube.com/playlist?list=${youTubeApi.playlists.keys.single}',
+        ),
+      );
+    },
+  );
 }

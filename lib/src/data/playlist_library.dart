@@ -39,6 +39,8 @@ class PlaylistSummary {
     this.sourceId,
     this.account,
     this.cover,
+    this.youTubeCopyId,
+    this.youTubeCopyDone,
   });
 
   final int id;
@@ -64,20 +66,38 @@ class PlaylistSummary {
   /// The picked cover's hash ([CustomCovers]); `null`: a collage of its tracks' covers.
   final String? cover;
 
+  /// The YouTube playlist made from this one on the phone (`youtube_export.dart`), a copy of
+  /// it as it was then — later changes don't reach it.
+  final String? youTubeCopyId;
+
+  /// How many tracks went to [youTubeCopyId] before it stopped (e.g. YouTube's daily limit);
+  /// `null` when it was finished.
+  final int? youTubeCopyDone;
+
+  bool get youTubeCopyUnfinished =>
+      youTubeCopyId != null && youTubeCopyDone != null;
+
   /// The YouTube playlist it was imported from (`list=` in its address).
   String? get youTubeId => source == PlaylistSource.youtube ? sourceId : null;
 
-  /// The playlist's page where it was imported from, for sharing it; `null` for one that lives
-  /// only on the phone.
+  /// The playlist's page where it was imported from (or the YouTube playlist made from it), for
+  /// sharing it; `null` for one that lives only on the phone.
   Uri? get link => switch (source) {
-    PlaylistSource.youtube => Uri.https('www.youtube.com', '/playlist', {
-      'list': sourceId,
-    }),
+    PlaylistSource.youtube => youTubePlaylistUri(sourceId!),
     PlaylistSource.spotify => spotifyPlaylistUri(sourceId!),
     PlaylistSource.spotifyAlbum => spotifyAlbumUri(sourceId!),
-    PlaylistSource.folder || null => null,
+    PlaylistSource.folder ||
+    null => youTubeCopyId == null ? null : youTubePlaylistUri(youTubeCopyId!),
   };
+
+  /// Whether [link] leads to YouTube.
+  bool get linksToYouTube =>
+      source == PlaylistSource.youtube ||
+      (!(source?.isSpotify ?? false) && youTubeCopyId != null);
 }
+
+Uri youTubePlaylistUri(String id) =>
+    Uri.https('www.youtube.com', '/playlist', {'list': id});
 
 /// One row of a playlist.
 class PlaylistTrack {
@@ -197,7 +217,7 @@ class PlaylistLibrary extends ChangeNotifier {
     final scope = _scope('p.');
     final rows = await (await _database()).rawQuery('''
       SELECT p.id, p.name, p.owner, p.created_at, p.updated_at, p.source, p.source_id, p.account,
-             p.cover_sha256,
+             p.cover_sha256, p.youtube_copy_id, p.youtube_copy_done,
              COUNT(t.position) AS tracks, COALESCE(SUM(t.duration_s), 0) AS seconds
       FROM playlists p LEFT JOIN playlist_tracks t ON t.playlist_id = p.id
       WHERE p.deleted_at IS NULL AND ${scope.where}
@@ -220,6 +240,8 @@ class PlaylistLibrary extends ChangeNotifier {
           sourceId: row['source_id'] as String?,
           account: row['account'] as String?,
           cover: row['cover_sha256'] as String?,
+          youTubeCopyId: row['youtube_copy_id'] as String?,
+          youTubeCopyDone: row['youtube_copy_done'] as int?,
         ),
     ];
     final lead = <int, List<PlaylistTrack>>{};
@@ -273,6 +295,25 @@ class PlaylistLibrary extends ChangeNotifier {
   /// The Biblioteka playlist [id] as now loaded, if it's still there.
   PlaylistSummary? byId(int id) =>
       _playlists.where((p) => p.id == id).firstOrNull;
+
+  /// Remembers the YouTube playlist [copyId] made from playlist [playlistId] and how far it
+  /// got ([PlaylistSummary.youTubeCopyDone]). Phone only: not a change sent to MusicDatabase.
+  /// [copyId] `null` forgets it. [reload] `false` leaves [playlists] as they were, for the
+  /// progress saved after every song.
+  Future<void> setYouTubeCopy(
+    int playlistId,
+    String? copyId, {
+    int? done,
+    bool reload = true,
+  }) async {
+    await (await _database()).update(
+      'playlists',
+      {'youtube_copy_id': copyId, 'youtube_copy_done': done},
+      where: 'id = ?',
+      whereArgs: [playlistId],
+    );
+    if (reload) await load();
+  }
 
   /// Gives the playlist the picked cover [hash] (`null`: back to the collage); synced like a
   /// rename.

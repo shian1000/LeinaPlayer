@@ -581,10 +581,12 @@ void main() {
       await settle(tester);
       await tester.enterText(find.byType(TextField), '  W drodze ');
       await tester.tap(find.text('Zapisz'));
-      await tester.runAsync(
-        () => waitUntil(() => playlists.playlists.isNotEmpty),
+      // Not just the playlist in Biblioteka: `create` still reads its first tracks after that.
+      await pumpUntil(
+        tester,
+        () =>
+            find.textContaining('Zapisano w Bibliotece').evaluate().isNotEmpty,
       );
-      await settle(tester);
 
       expect(
         find.text('Zapisano w Bibliotece: „W drodze” (3 utwory)'),
