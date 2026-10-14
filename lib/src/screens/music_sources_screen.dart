@@ -18,7 +18,7 @@ class MusicSourcesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = SourceSettingsScope.of(context);
-    final order = settings.playbackOrder;
+    final order = settings.activePlaybackOrder;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.palette.surface,
@@ -77,10 +77,12 @@ class MusicSourcesScreen extends StatelessWidget {
             leading: const Icon(Icons.low_priority),
             title: const Text('Kolejność odtwarzania'),
             subtitle: Text(
-              [
-                for (final (i, source) in order.indexed)
-                  '${i + 1}. ${source.label}',
-              ].join(', '),
+              order.isEmpty
+                  ? 'Wszystkie źródła wyłączone'
+                  : [
+                      for (final (i, source) in order.indexed)
+                        '${i + 1}. ${source.label}',
+                    ].join(', '),
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(

@@ -9,6 +9,9 @@ import 'spotify_playlist.dart';
 /// Kolejność odtwarzania".
 enum PlaybackSource {
   phone('Telefon'),
+
+  /// The song's file in the music library on MusicDatabase's server (`files.db`), streamed.
+  server('Serwer'),
   youtube('YouTube');
 
   const PlaybackSource(this.label);
@@ -85,6 +88,7 @@ class SourceSettings extends ChangeNotifier {
   static const _spotifyClientSecretKey = 'spotify.client_secret';
   static const _apiKeyKey = 'youtube.api_key';
   static const _playbackOrderKey = 'sources.playback_order';
+  static String _sourceKey(PlaybackSource s) => 'sources.enabled.${s.name}';
   static const _cacheLimitKey = 'youtube.cache_limit';
   static String _methodKey(YouTubeMethod m) => 'youtube.method.${m.name}';
   static String _playbackKey(YouTubePlaybackMethod m) =>
@@ -118,6 +122,7 @@ class SourceSettings extends ChangeNotifier {
   Set<YouTubeMethod> _methods = {YouTubeMethod.newPipe, YouTubeMethod.explode};
   String? _apiKey;
   List<PlaybackSource> _playbackOrder = PlaybackSource.values;
+  Set<PlaybackSource> _enabledSources = PlaybackSource.values.toSet();
   Set<YouTubePlaybackMethod> _playbackMethods = YouTubePlaybackMethod.defaults;
   List<YouTubePlaybackMethod> _playbackMethodOrder =
       YouTubePlaybackMethod.values;
@@ -166,6 +171,15 @@ class SourceSettings extends ChangeNotifier {
 
   /// Every [PlaybackSource], most preferred first.
   List<PlaybackSource> get playbackOrder => _playbackOrder;
+
+  /// The sources switched on in "Kolejność odtwarzania" (all by default).
+  Set<PlaybackSource> get enabledSources => _enabledSources;
+
+  /// The switched-on sources, most preferred first: what playback picks from.
+  List<PlaybackSource> get activePlaybackOrder => [
+    for (final s in _playbackOrder)
+      if (_enabledSources.contains(s)) s,
+  ];
 
   Set<YouTubePlaybackMethod> get playbackMethods => _playbackMethods;
 
@@ -267,19 +281,28 @@ class SourceSettings extends ChangeNotifier {
       PlaybackSource.values,
       prefs.getStringList(_playbackOrderKey),
     );
+    _enabledSources = {
+      for (final s in PlaybackSource.values)
+        if (prefs.getBool(_sourceKey(s)) ?? true) s,
+    };
     notifyListeners();
   }
 
-  /// A saved order (enum names) with anything added in a later version appended at the end.
+  /// A saved order (enum names) with anything added in a later version put right after the
+  /// value it follows in [all] (e.g. "Serwer" after "Telefon", wherever the user moved that),
+  /// or first when it has none.
   static List<T> _withAll<T extends Enum>(List<T> all, List<String>? saved) {
-    final order = [
+    final order = <T>{
       for (final name in saved ?? const <String>[])
         ...all.where((e) => e.name == name),
-    ];
-    return List.unmodifiable([
-      ...order.toSet(),
-      ...all.where((e) => !order.contains(e)),
-    ]);
+    }.toList();
+    if (order.isEmpty) return List.unmodifiable(all);
+    for (final (i, e) in all.indexed) {
+      if (order.contains(e)) continue;
+      final before = all.take(i).lastWhere(order.contains, orElse: () => e);
+      order.insert(before == e ? 0 : order.indexOf(before) + 1, e);
+    }
+    return List.unmodifiable(order);
   }
 
   Future<void> setYouTubeSearchEnabled(bool value) async {
@@ -467,6 +490,19 @@ class SourceSettings extends ChangeNotifier {
     } else {
       await prefs.setString(_apiKeyKey, _apiKey!);
     }
+  }
+
+  Future<void> setSourceEnabled(PlaybackSource source, bool enabled) async {
+    _enabledSources = Set.unmodifiable(
+      enabled
+          ? {..._enabledSources, source}
+          : _enabledSources.difference({source}),
+    );
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _sourceKey(source),
+      enabled,
+    );
   }
 
   Future<void> setPlaybackOrder(List<PlaybackSource> order) async {

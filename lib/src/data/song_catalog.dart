@@ -61,6 +61,21 @@ enum YouTubeLink {
   notFound,
 }
 
+/// The song's audio file in the music library on MusicDatabase's server: a row of the
+/// downloaded `files.db` (MusicDatabase's `files_index.py`), played over HTTP as
+/// `GET /library/<id>` (hand-off `musicdatabase-server-files.md`).
+class ServerFile {
+  const ServerFile({required this.id, required this.path});
+
+  /// `files.id`; never reused for another file.
+  final int id;
+
+  /// Relative to the library folder, with `/` separators ("Artist/Album/01 Song.mp3").
+  final String path;
+
+  String get fileName => path.split('/').last;
+}
+
 /// One row of MusicDatabase's `songs` table, with its artists already joined in.
 class CatalogSong {
   CatalogSong({
@@ -79,6 +94,7 @@ class CatalogSong {
     String? titleLatin,
     String? albumLatin,
     this.artistLatin,
+    this.serverFile,
   }) : titleLatin = latinFormOf(title, titleLatin),
        albumLatin = latinFormOf(album, albumLatin),
        youTubeTarget =
@@ -144,6 +160,10 @@ class CatalogSong {
   /// it may also be an album page, which isn't the song.
   final String? spotifyTrackId;
   final YouTubeLink youTube;
+
+  /// The song's file on MusicDatabase's server (`files.db`), `null` when it has none or the
+  /// server shares no `files.db`.
+  final ServerFile? serverFile;
 
   /// What to look for when the phone searches YouTube for this song itself.
   final MatchTarget youTubeTarget;
@@ -296,7 +316,10 @@ class SongCatalog extends ChangeNotifier {
         _badVideos = BadVideos.none;
         _status = CatalogStatus.noDatabase;
       } else {
-        _songs = await _readSongs(file);
+        _songs = await _readSongs(
+          file,
+          await _readServerFiles(await _sync.localFile('files.db')),
+        );
         _badVideos = await _readBadVideos(file);
         _status = CatalogStatus.ready;
       }
@@ -328,7 +351,41 @@ class SongCatalog extends ChangeNotifier {
     }
   }
 
-  Future<List<CatalogSong>> _readSongs(File file) async {
+  /// `files.db`'s files of each song, the largest one when a song has several; empty when there's
+  /// no `files.db` or it can't be read — the songs still load, only without server files.
+  Future<Map<int, ServerFile>> _readServerFiles(File file) async {
+    if (!await file.exists()) return const {};
+    try {
+      final db = await (factoryOverride ?? databaseFactory).openDatabase(
+        file.path,
+        options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+      );
+      try {
+        final found = <int, ServerFile>{};
+        for (final row in await db.rawQuery(
+          'SELECT id, path, song_id FROM files WHERE song_id IS NOT NULL '
+          'ORDER BY size DESC, id',
+        )) {
+          found.putIfAbsent(
+            row['song_id']! as int,
+            () =>
+                ServerFile(id: row['id']! as int, path: row['path']! as String),
+          );
+        }
+        return found;
+      } finally {
+        await db.close();
+      }
+    } catch (e) {
+      debugPrint('Reading files.db failed: $e');
+      return const {};
+    }
+  }
+
+  Future<List<CatalogSong>> _readSongs(
+    File file,
+    Map<int, ServerFile> serverFiles,
+  ) async {
     final db = await (factoryOverride ?? databaseFactory).openDatabase(
       file.path,
       options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
@@ -361,14 +418,21 @@ class SongCatalog extends ChangeNotifier {
       final extra = await _readAdditionalArtists(db, artistLatin);
       return [
         for (final row in rows)
-          _song(row, [_artistOf(row, 'main'), ...?extra[row['id']! as int]]),
+          _song(row, [
+            _artistOf(row, 'main'),
+            ...?extra[row['id']! as int],
+          ], serverFiles[row['id']! as int]),
       ];
     } finally {
       await db.close();
     }
   }
 
-  static CatalogSong _song(Map<String, Object?> row, List<_Artist> artists) {
+  static CatalogSong _song(
+    Map<String, Object?> row,
+    List<_Artist> artists,
+    ServerFile? serverFile,
+  ) {
     String? present(String? s) => s == null || s.trim().isEmpty ? null : s;
     final otherNames = [
       for (final a in artists) ...[?present(a.synonyms), ?present(a.nameLatin)],
@@ -399,6 +463,7 @@ class SongCatalog extends ChangeNotifier {
       titleLatin: row['title_latin'] as String?,
       albumLatin: row['album_latin'] as String?,
       artistLatin: _artistLatinLabel(artists),
+      serverFile: serverFile,
     );
   }
 

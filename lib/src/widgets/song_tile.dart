@@ -248,7 +248,9 @@ class SongTile extends StatelessWidget {
     final isCurrent =
         current != null &&
         (hit.phoneFiles.any((f) => f.filePath == current.source) ||
-            (videoId != null && current.youtubeVideoId == videoId));
+            (videoId != null && current.youtubeVideoId == videoId) ||
+            (current.serverFileId != null &&
+                current.serverFileId == hit.serverFile?.id));
     final details =
         subtitle ??
         [
@@ -360,8 +362,14 @@ class SourceIcons extends StatelessWidget {
         children: [
           slot(
             visible: hit.inMainDatabase,
-            tooltip: 'W bazie danych',
-            child: Icon(Icons.storage, size: 14, color: palette.textSecondary),
+            tooltip: hit.serverFile != null
+                ? 'W bazie danych, z plikiem na serwerze'
+                : 'W bazie danych',
+            child: Icon(
+              hit.serverFile != null ? Icons.dns : Icons.storage,
+              size: 14,
+              color: palette.textSecondary,
+            ),
           ),
           slot(
             visible: hit.onPhone,

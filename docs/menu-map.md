@@ -190,7 +190,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
       **→ list of pending files** (`PendingSongsScreen`).
   - Baza danych **→ Baza danych** (`database_source_screen.dart`) — **implemented**:
     - "Adres serwera (połączenie zdalne)" and "Adres serwera (sieć lokalna)" — two addresses of
-      MusicDatabase's `music.db` / `tag.db`, validated and saved with "Zapisz" (saving downloads
+      MusicDatabase's `music.db` / `tag.db` / `files.db` (the server's music files, ADR 0010),
+      validated and saved with "Zapisz" (saving downloads
       right away).
     - "Wi-Fi sieci lokalnej" — the saved home Wi-Fi name (× clears it) and "Użyj bieżącego
       połączenia", which asks for location permission (Android's requirement for reading the
@@ -242,7 +243,10 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     characters) and a note on both ways. Section *Importowanie playlist*: a note on the embed
     page's 100-track limit (the key doesn't lift it yet). Spotify is not a playback source.
   - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
-    reorder the playback sources (default: 1. Telefon, 2. YouTube). When a song is playable
+    reorder the playback sources (default: 1. Telefon, 2. Serwer, 3. YouTube; Serwer = the song's
+    file in MusicDatabase's music library, streamed — [ADR 0010](decisions/0010-server-files.md)),
+    and a switch per source (all on by default; a switched-off source is never used, and with
+    YouTube off a song no other source has isn't searched there either). When a song is playable
     from several, the first one in this order is used.
 - Wygląd **→ Wygląd** (`appearance_screen.dart`) — **implemented**, everything applies at once
   and is remembered after restart:
@@ -366,12 +370,13 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     marked "N/A" (no video on YouTube) or the phone searched YouTube in the last 30 days and found
     nothing (`youtube_not_found`; tapping the song searches again, the queue skips it). All use the theme's secondary text colour. Hidden icons
     keep their slot so the column lines up.
-  - Results are "Dostępne" (a phone file, pending or not, or a stored YouTube video),
+  - Results are "Dostępne" (a phone file, pending or not, a file on the server, or a stored
+    YouTube video),
     "Potencjalnie dostępne" (dimmed YouTube icon, not on the phone) or "Niedostępne"
     (`SongAvailability`). Tapping a result uses the first source in "Kolejność odtwarzania"
     that has it: phone → plays the file (**implemented**, `just_audio`, row highlighted with a
     green title + `PlayingBars`, bars that bounce while it plays and stop while paused, like the
-    reference app's); YouTube → streams the video's audio (**implemented on Android**
+    reference app's); server → streams the song's `files.db` file (`GET /library/<id>`, ADR 0010; the database icon is then a server icon); YouTube → streams the video's audio (**implemented on Android**
     through NewPipeExtractor, `youtube_audio.dart` + `NewPipeBridge.kt`; Opus 251, else AAC 140;
     on iOS only from the cache or via youtube_explode).
     With no such source and a dimmed icon it searches YouTube for "main artists + title" (if

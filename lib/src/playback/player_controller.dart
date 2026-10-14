@@ -19,6 +19,7 @@ class NowPlaying {
     this.searchQuery,
     this.playlistName,
     this.youtubeVideoId,
+    this.serverFileId,
     this.titleLatin,
     this.artistLatin,
   }) : _givenCover = cover;
@@ -35,6 +36,9 @@ class NowPlaying {
 
   /// Set when [source] is this YouTube video's audio.
   final String? youtubeVideoId;
+
+  /// Set when [source] is this file on MusicDatabase's server (`files.id`, [ServerFile.id]).
+  final int? serverFileId;
 
   bool get isStream => source.startsWith('http');
 
@@ -572,7 +576,9 @@ class PlayerController extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('Playing ${track.source} failed: $e');
-      _lastError = track.isStream
+      _lastError = track.serverFileId != null
+          ? 'Nie udało się odtworzyć utworu „${track.title}” z serwera'
+          : track.isStream
           ? 'Nie udało się odtworzyć utworu „${track.title}” z YouTube'
           : 'Nie udało się odtworzyć pliku ${track.source.split('/').last}';
       if (fade) {

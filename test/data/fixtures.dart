@@ -40,6 +40,32 @@ Future<void> writeMusicDb(String path) async {
   await db.close();
 }
 
+/// A `files.db` like MusicDatabase's music library index (`files_index.py`): each of [files]
+/// is (id, path, size, song id).
+Future<void> writeFilesDb(
+  String path,
+  List<(int, String, int, int?)> files,
+) async {
+  final db = await databaseFactoryFfi.openDatabase(path);
+  await db.execute(
+    'CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, path VARCHAR NOT NULL UNIQUE, '
+    'size INTEGER NOT NULL, mtime INTEGER NOT NULL, song_id INTEGER, '
+    "match_source VARCHAR NOT NULL DEFAULT 'auto', artist VARCHAR, title VARCHAR, "
+    'duration_s INTEGER, indexed_at VARCHAR NOT NULL)',
+  );
+  for (final (id, file, size, songId) in files) {
+    await db.insert('files', {
+      'id': id,
+      'path': file,
+      'size': size,
+      'mtime': 0,
+      'song_id': songId,
+      'indexed_at': '2026-10-14T12:00:00+00:00',
+    });
+  }
+  await db.close();
+}
+
 /// A tag.db like MusicDatabase's since moods (`tags.kind`), or — [withKind] false — an older one.
 Future<void> writeTagDb(
   String path, {

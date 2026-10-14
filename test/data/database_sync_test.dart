@@ -26,7 +26,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     storage = await Directory.systemTemp.createTemp('database_sync_test');
     now = DateTime(2026, 10, 10, 9);
-    served = {'music.db': _sqlite, 'tag.db': _sqlite};
+    served = {'music.db': _sqlite, 'tag.db': _sqlite, 'files.db': _sqlite};
     wifi = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) {
@@ -96,6 +96,24 @@ void main() {
     now = DateTime(2026, 10, 11, 8);
     await sync.syncIfDue();
     expect(sync.lastError, 'Serwer zwrócił błąd 404 dla music.db');
+  });
+
+  test('goes on without files.db when the server has none', () async {
+    final sync = newSync();
+    await sync.load();
+    await sync.setRemoteUrl('127.0.0.1:${server.port}');
+    expect(await sync.syncNow(), isTrue);
+    expect(await (await sync.localFile('files.db')).exists(), isTrue);
+
+    served.remove('files.db');
+    expect(await sync.syncNow(), isTrue);
+    expect(sync.lastError, isNull);
+    expect(
+      await (await sync.localFile('files.db')).exists(),
+      isFalse,
+      reason: 'a copy the server no longer has is stale',
+    );
+    expect(await localContent(sync, 'music.db'), String.fromCharCodes(_sqlite));
   });
 
   test('remembers address and last download across restarts', () async {

@@ -27,7 +27,11 @@ class DatabaseSync extends ChangeNotifier {
        _currentWifi = currentWifi ?? readCurrentWifiName,
        _currentWifiIp = currentWifiIp ?? readCurrentWifiIp;
 
-  static const fileNames = ['music.db', 'tag.db'];
+  static const fileNames = ['music.db', 'tag.db', ...optionalFileNames];
+
+  /// Files an older MusicDatabase server doesn't have (it answers 404): the download goes on
+  /// without them, and a copy left from before is removed.
+  static const optionalFileNames = ['files.db'];
 
   // The remote address keeps the key from before local addresses existed, so phones that were
   // already set up keep working.
@@ -234,9 +238,9 @@ class DatabaseSync extends ChangeNotifier {
     await syncNow();
   }
 
-  /// Downloads both files; returns whether it succeeded. The previous copy stays in place
-  /// until both new files have arrived and look like SQLite databases, so a half-finished
-  /// download never leaves the two files out of step with each other.
+  /// Downloads all files; returns whether it succeeded. The previous copy stays in place
+  /// until all new files have arrived and look like SQLite databases, so a half-finished
+  /// download never leaves the files out of step with each other.
   Future<bool> syncNow() async {
     if (!hasSource || _downloading) return false;
     _downloading = true;
@@ -297,13 +301,26 @@ class DatabaseSync extends ChangeNotifier {
       ..connectionTimeout = const Duration(seconds: 15);
     try {
       final dir = await databaseDirectory();
+      final missing = <String>[];
       for (final name in fileNames) {
         final part = File('${dir.path}/$name.part');
         parts.add(part);
-        await _download(client, base.resolve(name), part, name);
+        final found = await _download(
+          client,
+          base.resolve(name),
+          part,
+          name,
+          optional: optionalFileNames.contains(name),
+        );
+        if (!found) missing.add(name);
       }
       for (var i = 0; i < fileNames.length; i++) {
-        await parts[i].rename('${dir.path}/${fileNames[i]}');
+        final target = File('${dir.path}/${fileNames[i]}');
+        if (missing.contains(fileNames[i])) {
+          if (await target.exists()) await target.delete();
+        } else {
+          await parts[i].rename(target.path);
+        }
       }
     } catch (_) {
       for (final part in parts) {
@@ -324,14 +341,20 @@ class DatabaseSync extends ChangeNotifier {
   Future<File> localFile(String name) async =>
       File('${(await databaseDirectory()).path}/$name');
 
-  Future<void> _download(
+  /// Returns `false` when an [optional] file isn't on the server.
+  Future<bool> _download(
     HttpClient client,
     Uri uri,
     File target,
-    String name,
-  ) async {
+    String name, {
+    bool optional = false,
+  }) async {
     final request = await client.getUrl(uri);
     final response = await request.close();
+    if (optional && response.statusCode == HttpStatus.notFound) {
+      await response.drain<void>();
+      return false;
+    }
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>();
       throw _SyncFailure(
@@ -347,6 +370,7 @@ class DatabaseSync extends ChangeNotifier {
     if (!await _looksLikeSqlite(target)) {
       throw _SyncFailure('$name z serwera nie jest bazą SQLite');
     }
+    return true;
   }
 
   static const _sqliteHeader = 'SQLite format 3\u0000';

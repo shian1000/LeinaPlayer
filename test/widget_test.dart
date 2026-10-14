@@ -328,7 +328,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Źródła muzyki'));
     await tester.pumpAndSettle();
-    expect(find.text('1. Telefon, 2. YouTube'), findsOneWidget);
+    expect(find.text('1. Telefon, 2. Serwer, 3. YouTube'), findsOneWidget);
     await tester.tap(find.text('YouTube'));
     await tester.pumpAndSettle();
 
@@ -361,13 +361,18 @@ void main() {
     await tester.tap(find.text('Kolejność odtwarzania'));
     await tester.pumpAndSettle();
     await tester.drag(
-      find.byIcon(Icons.drag_handle).first,
-      const Offset(0, 120),
+      find.byIcon(Icons.drag_handle).last,
+      const Offset(0, -200),
     );
     await tester.pumpAndSettle();
     expect(find.text('1. YouTube'), findsOneWidget);
     expect(find.text('2. Telefon'), findsOneWidget);
-    expect(prefs.getStringList('sources.playback_order'), ['youtube', 'phone']);
+    expect(find.text('3. Serwer'), findsOneWidget);
+    expect(prefs.getStringList('sources.playback_order'), [
+      'youtube',
+      'phone',
+      'server',
+    ]);
   });
 
   testWidgets('database address is validated and saved under Źródła muzyki', (

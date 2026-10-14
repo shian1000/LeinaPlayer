@@ -4,12 +4,14 @@ import '../data/source_settings.dart';
 import '../theme.dart';
 
 /// "Ustawienia › Źródła muzyki › Kolejność odtwarzania": which source plays a song that more
-/// than one source has. Rows are reordered by dragging.
+/// than one source has, and which sources are used at all (switches). Rows are reordered by
+/// dragging.
 class PlaybackOrderScreen extends StatelessWidget {
   const PlaybackOrderScreen({super.key});
 
   static IconData iconOf(PlaybackSource source) => switch (source) {
     PlaybackSource.phone => Icons.smartphone,
+    PlaybackSource.server => Icons.dns_outlined,
     PlaybackSource.youtube => Icons.smart_display_outlined,
   };
 
@@ -30,8 +32,9 @@ class PlaybackOrderScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Gdy utwór jest dostępny w kilku miejscach, odtwarzany jest z pierwszego na '
-              'liście. Przeciągnij, aby zmienić kolejność.',
+              'Gdy utwór jest dostępny w kilku miejscach, odtwarzany jest z pierwszego '
+              'włączonego na liście. Wyłączone źródła nie są używane. Przeciągnij, aby zmienić '
+              'kolejność.',
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -52,9 +55,22 @@ class PlaybackOrderScreen extends StatelessWidget {
                     key: ValueKey(source),
                     leading: Icon(iconOf(source)),
                     title: Text('${i + 1}. ${source.label}'),
-                    trailing: ReorderableDragStartListener(
-                      index: i,
-                      child: const Icon(Icons.drag_handle),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Switch(
+                          value: settings.enabledSources.contains(source),
+                          onChanged: (v) =>
+                              settings.setSourceEnabled(source, v),
+                        ),
+                        ReorderableDragStartListener(
+                          index: i,
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Icon(Icons.drag_handle),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],

@@ -48,8 +48,14 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   find it); **unavailable** = not on the phone and `youtube_video_id` is MusicDatabase's
   `NO_VIDEO_SENTINEL` ("N/A" — confirmed by hand as not on YouTube; an empty string counts as
   nothing stored). Older `music.db` files without the column are read as "nothing stored".
-- Which source plays a song is `SourceSettings.playbackOrder` (user-ordered; first source that
-  `SearchHit.playableFrom` wins). YouTube is searched (`YouTubeSearch`) only on an explicit
+- Which source plays a song is `SourceSettings.activePlaybackOrder` (user-ordered, only the
+  switched-on sources; first source that `SearchHit.playableFrom` wins). `PlaybackSource.server` streams the song's file from
+  MusicDatabase's music library (`files.db` → `CatalogSong.serverFile`, `GET /library/<files.id>`;
+  [ADR 0010](../decisions/0010-server-files.md)): `TrackPlayer` sends a `HEAD` first so an
+  unreachable address is passed over in seconds and "no connection" (queue retries) is told from
+  404/503 (queue moves on), and when the server can't play it the next source in the order
+  does. A new `PlaybackSource` lands in saved orders right after the value it follows by
+  default (`_withAll`), not at the end — otherwise YouTube would keep winning. YouTube is searched (`YouTubeSearch`) only on an explicit
   action — the "Wyszukaj na YouTubie" button or tapping a song no source has — never per
   keystroke. YouTube search, matching and playback: [`youtube.md`](youtube.md).
 - Snackbars on the search screen use `clearSnackBars()`, not `hideCurrentSnackBar()`: a

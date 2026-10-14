@@ -100,6 +100,29 @@ void main() {
       },
     );
 
+    test('files on the server come from files.db, the largest one per song; '
+        'none without it', () async {
+      await loadSample();
+      expect(catalog.byId(1)!.serverFile, isNull);
+
+      await writeFilesDb((await sync.localFile('files.db')).path, [
+        (10, 'Dawid Podsiadło/Małomiasteczkowy.mp3', 5000, 1),
+        (11, 'Dawid Podsiadło/Małomiasteczkowy (128k).mp3', 3000, 1),
+        (12, 'Unknown/track.mp3', 4000, null),
+        (13, 'Led Zeppelin/Going to California.mp3', 6000, 2),
+      ]);
+      final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      addTearDown(again.dispose);
+      await again.ensureLoaded();
+      expect(again.byId(1)!.serverFile!.id, 10);
+      expect(again.byId(1)!.serverFile!.fileName, 'Małomiasteczkowy.mp3');
+      expect(
+        again.byId(2)!.serverFile!.path,
+        'Led Zeppelin/Going to California.mp3',
+      );
+      expect(again.byId(3)!.serverFile, isNull);
+    });
+
     test('Latin forms of names in another alphabet: music.db\'s, else an '
         'artist\'s Latin synonym; found by search', () async {
       final path = (await sync.localFile('music.db')).path;

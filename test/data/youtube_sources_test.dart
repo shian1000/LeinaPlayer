@@ -60,6 +60,7 @@ void main() {
     expect(settings.methods, {YouTubeMethod.newPipe, YouTubeMethod.explode});
     expect(settings.playbackOrder, [
       PlaybackSource.phone,
+      PlaybackSource.server,
       PlaybackSource.youtube,
     ]);
 
@@ -70,6 +71,7 @@ void main() {
     await settings.setApiKey('  key123 ');
     await settings.setPlaybackOrder([
       PlaybackSource.youtube,
+      PlaybackSource.server,
       PlaybackSource.phone,
     ]);
 
@@ -78,7 +80,11 @@ void main() {
     expect(again.youTubeSearchEnabled, isTrue);
     expect(again.methods, {YouTubeMethod.api});
     expect(again.apiKey, 'key123');
-    expect(again.playbackOrder, [PlaybackSource.youtube, PlaybackSource.phone]);
+    expect(again.playbackOrder, [
+      PlaybackSource.youtube,
+      PlaybackSource.server,
+      PlaybackSource.phone,
+    ]);
 
     await again.setApiKey('   ');
     expect(again.apiKey, isNull);
@@ -101,6 +107,54 @@ void main() {
       YouTubePlaybackMethod.youtubeApp,
       YouTubePlaybackMethod.newPipe,
     ]);
+  });
+
+  test('sources can be switched off, and stay so', () async {
+    final settings = SourceSettings();
+    await settings.load();
+    expect(settings.enabledSources, PlaybackSource.values.toSet());
+    await settings.setSourceEnabled(PlaybackSource.server, false);
+
+    final again = SourceSettings();
+    await again.load();
+    expect(again.activePlaybackOrder, [
+      PlaybackSource.phone,
+      PlaybackSource.youtube,
+    ]);
+    expect(again.playbackOrder, contains(PlaybackSource.server));
+  });
+
+  test(
+    'a source added later goes after the one it follows by default',
+    () async {
+      // Saved before "Serwer" existed.
+      SharedPreferences.setMockInitialValues({
+        'sources.playback_order': ['youtube', 'phone'],
+      });
+      final settings = SourceSettings();
+      await settings.load();
+      expect(settings.playbackOrder, [
+        PlaybackSource.youtube,
+        PlaybackSource.phone,
+        PlaybackSource.server,
+      ]);
+    },
+  );
+
+  test('a song with a file on the server plays from it', () {
+    final hit = SearchHit.main(
+      CatalogSong(
+        id: 1,
+        title: 'Song',
+        artistLabel: 'Artist',
+        youtubeVideoId: 'N/A',
+        serverFile: const ServerFile(id: 7, path: 'A/Song.mp3'),
+      ),
+      const [],
+    );
+    expect(hit.playableFrom(PlaybackSource.server), isTrue);
+    expect(hit.availability, SongAvailability.available);
+    expect(_hit().playableFrom(PlaybackSource.server), isFalse);
   });
 
   group('YouTubeSearch', () {

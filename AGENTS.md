@@ -22,7 +22,9 @@ far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `
 or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)), scanning music
 folders on the phone into the phone's own `local.db`, song search over both databases, and
 ticking several songs with a long press for a shared action (queue, playlist, mood),
-playing phone files with a mini/full player, a play queue (playlists, "Dodaj do kolejki" /
+playing phone files with a mini/full player, streaming a song's file from MusicDatabase's
+music library on the server when its `files.db` knows one (source "Serwer";
+[ADR 0010](docs/decisions/0010-server-files.md)), a play queue (playlists, "Dodaj do kolejki" /
 "Odtwórz jako następny" for songs and whole playlists, each entry remembering the playlist it
 was queued from, shuffle, the queue screen with reordering and swipe-to-remove, caching the next
 songs ahead; remembered across restarts), crossfading into the next song (Ustawienia ›
@@ -95,7 +97,8 @@ saves it for later with the person who sent it (Menu profilu › Wiadomości ›
 moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and its permissions
 (`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Covers picked for playlists and moods go with them: the picture as
 `/users/<name>/covers/<sha256>`, global moods' own covers as `/users/<name>/global-mood-covers`
-([ADR 0009](docs/decisions/0009-cover-sync.md)). Biblioteka's folders and sort order stay on the
+([ADR 0009](docs/decisions/0009-cover-sync.md)). The music library's files are streamed from
+`GET /library/<files.id>` ([ADR 0010](docs/decisions/0010-server-files.md)). Biblioteka's folders and sort order stay on the
 phone (`library_folders.dart`), not synced. Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
@@ -134,7 +137,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `showShareSheet` in `share_sheet.dart`; `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
-  `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
+  `music.db` and `files.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
   search over both (`combined_search.dart`), requests for MusicDatabase waiting to be sent
   (`outbox.dart`), the logged-in MusicDatabase user (`account.dart`), YouTube and Spotify links given to the app
   (`incoming_links.dart`, `video_link.dart`), links saved for later from the link sheet

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 import '../data/combined_search.dart';
@@ -43,8 +45,31 @@ class PlayOutcome {
   final String? message;
 }
 
+/// Where MusicDatabase's server at [base] serves [file]'s audio.
+Uri serverFileUri(Uri base, ServerFile file) =>
+    base.resolve('library/${file.id}');
+
+/// The status MusicDatabase's server answers a `HEAD` of [uri] with, `null` when it can't be
+/// reached within a few seconds.
+Future<int?> _probeServer(Uri uri) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+  try {
+    final request = await client
+        .headUrl(uri)
+        .timeout(const Duration(seconds: 3));
+    final response = await request.close().timeout(const Duration(seconds: 5));
+    await response.drain<void>();
+    return response.statusCode;
+  } catch (_) {
+    return null;
+  } finally {
+    client.close(force: true);
+  }
+}
+
 /// Plays one song from the first source in the user's order that has it
-/// ([SourceSettings.playbackOrder]): a phone file, or YouTube ([YouTubePlayback]). When no source
+/// ([SourceSettings.activePlaybackOrder] — switched-off sources are never used): a phone file, a file on MusicDatabase's server (when the
+/// server can't play it, the next source does), or YouTube ([YouTubePlayback]). When no source
 /// has it but YouTube might, YouTube is searched, the best video picked ([pickYouTubeVideo]) and
 /// remembered on the phone. No UI here, so the queue can use it with the screen off.
 class TrackPlayer {
@@ -56,8 +81,10 @@ class TrackPlayer {
     required this.youTubeSearch,
     this.openExternal,
     this.outbox,
+    Future<List<Uri>> Function()? serverAddresses,
     Future<bool> Function()? onWifi,
-  }) : _onWifi = onWifi ?? _wifiConnected;
+  }) : _serverAddresses = serverAddresses ?? _noServer,
+       _onWifi = onWifi ?? _wifiConnected;
 
   final PlayerController player;
   final SourceSettings settings;
@@ -71,6 +98,12 @@ class TrackPlayer {
   /// Where dead music.db links (and the videos found instead), and videos found for songs
   /// music.db has no link for, are reported for MusicDatabase; `null` reports nothing.
   final Outbox? outbox;
+
+  /// MusicDatabase's server as the phone reaches it now, best address first
+  /// ([DatabaseSync.serverAddresses]), for [PlaybackSource.server].
+  final Future<List<Uri>> Function() _serverAddresses;
+
+  static Future<List<Uri>> _noServer() async => const [];
 
   /// Whether the phone is on Wi-Fi now; replaced in tests.
   final Future<bool> Function() _onWifi;
@@ -140,9 +173,35 @@ class TrackPlayer {
     String? youTubeListId,
     required bool allowExternal,
     void Function(String status)? onStatus,
+    bool skipServer = false,
   }) async {
-    final source = settings.playbackOrder.where(hit.playableFrom).firstOrNull;
+    final source = settings.activePlaybackOrder
+        .where((s) => !(skipServer && s == PlaybackSource.server))
+        .where(hit.playableFrom)
+        .firstOrNull;
     switch (source) {
+      case PlaybackSource.server:
+        final outcome = await _playFromServer(
+          hit,
+          hit.serverFile!,
+          searchQuery: searchQuery,
+          playlistName: playlistName,
+          onStatus: onStatus,
+        );
+        if (outcome.played) return outcome;
+        // Away from home without the tailnet, or the drive unplugged: the next source plays it.
+        final fallback = await _playOnce(
+          hit,
+          searchQuery: searchQuery,
+          playlistName: playlistName,
+          youTubeListId: youTubeListId,
+          allowExternal: allowExternal,
+          onStatus: onStatus,
+          skipServer: true,
+        );
+        return fallback.played || fallback.goneVideo != null
+            ? fallback
+            : outcome;
       case PlaybackSource.phone:
         final ok = await player.play(
           NowPlaying(
@@ -176,6 +235,12 @@ class TrackPlayer {
           externalUri: youTubeUri(hit, listId: youTubeListId),
         );
       case null:
+        if (!settings.enabledSources.contains(PlaybackSource.youtube)) {
+          return const PlayOutcome.failed(
+            'Tego utworu nie ma w żadnym włączonym źródle '
+            '(Ustawienia › Źródła muzyki › Kolejność odtwarzania).',
+          );
+        }
         // Not found lately: the queue moves on, but a tap (allowExternal) searches again.
         if (hit.youTube == YouTubeLink.notFound && !allowExternal) {
           return const PlayOutcome.failed(
@@ -196,6 +261,68 @@ class TrackPlayer {
           onStatus: onStatus,
         );
     }
+  }
+
+  /// [file] streamed from the first of MusicDatabase's addresses that answers for it
+  /// (`GET /library/<files.id>`, hand-off `musicdatabase-server-files.md`). Each address is
+  /// asked first ([_probeServer]), so an unreachable one is passed over in seconds and "no
+  /// connection" (the queue waits and tries again) is told from "the server hasn't got it" (the
+  /// queue moves on).
+  Future<PlayOutcome> _playFromServer(
+    SearchHit hit,
+    ServerFile file, {
+    String? searchQuery,
+    String? playlistName,
+    void Function(String status)? onStatus,
+  }) async {
+    final addresses = await _serverAddresses();
+    if (addresses.isEmpty) {
+      return const PlayOutcome.failed(
+        'Utwór jest na serwerze, ale telefon nie jest w sieci domowej, a adres zdalny serwera '
+        'nie jest ustawiony.',
+      );
+    }
+    onStatus?.call('Łączę z serwerem…');
+    int? refused;
+    for (final base in addresses) {
+      final uri = serverFileUri(base, file);
+      final status = await _probeServer(uri);
+      if (status == null) continue;
+      if (status != HttpStatus.ok) {
+        refused ??= status;
+        continue;
+      }
+      final ok = await player.play(
+        NowPlaying(
+          title: hit.title,
+          artist: hit.artistLabel,
+          titleLatin: hit.titleLatin,
+          artistLatin: hit.artistLatin,
+          source: uri.toString(),
+          serverFileId: file.id,
+          coverSeed: hit.coverSeed,
+          cover: CoverRequest.of(hit),
+          searchQuery: searchQuery,
+          playlistName: playlistName,
+        ),
+      );
+      return ok
+          ? const PlayOutcome.played()
+          : PlayOutcome.failed(player.lastError);
+    }
+    return switch (refused) {
+      null => const PlayOutcome.failed(
+        'Nie można połączyć się z serwerem MusicDatabase.',
+        offline: true,
+      ),
+      HttpStatus.serviceUnavailable => const PlayOutcome.failed(
+        'Biblioteka muzyki na serwerze jest niedostępna (dysk nie jest podłączony?).',
+      ),
+      HttpStatus.notFound => PlayOutcome.failed(
+        'Pliku „${file.fileName}” nie ma już na serwerze.',
+      ),
+      _ => PlayOutcome.failed('Serwer zwrócił błąd $refused dla utworu.'),
+    };
   }
 
   Future<PlayOutcome> _findOnYouTube(
@@ -301,13 +428,19 @@ class TrackPlayer {
       return false;
     }
     hit = _withRememberedVideo(hit);
-    final source = settings.playbackOrder.where(hit.playableFrom).firstOrNull;
-    if (source == PlaybackSource.phone) return false;
+    final source = settings.activePlaybackOrder
+        .where(hit.playableFrom)
+        .firstOrNull;
+    // A server file streams like a phone file plays: nothing to cache.
+    if (source == PlaybackSource.phone || source == PlaybackSource.server) {
+      return false;
+    }
     if (settings.queuePrefetchWifiOnly && !await _onWifi()) return false;
     var videoId = hit.youtubeVideoId;
     if (source == null) {
       if (hit.youTube != YouTubeLink.unknown ||
-          !settings.youTubeSearchEnabled) {
+          !settings.youTubeSearchEnabled ||
+          !settings.enabledSources.contains(PlaybackSource.youtube)) {
         return false;
       }
       try {

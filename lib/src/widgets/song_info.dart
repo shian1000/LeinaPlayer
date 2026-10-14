@@ -451,7 +451,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
     return _Section('Na telefonie', [
       // Empty until a song restored after a restart is played.
       if (track != null && track.source.isNotEmpty)
-        track.isStream
+        track.serverFileId != null
+            ? _Field('Odtwarzane z', 'serwera: ${track.source}')
+            : track.isStream
             ? _Field(
                 'Odtwarzane z',
                 'YouTube${track.youtubeVideoId == null ? '' : ': ${track.youtubeVideoId}'}',
@@ -461,6 +463,8 @@ class _SongInfoCardState extends State<SongInfoCard> {
                 fromPlayer: true,
               )
             : _Field('Odtwarzane z', 'pliku: ${track.source}'),
+      if (hit.inMainDatabase)
+        _Field('Plik na serwerze (files.db)', hit.serverFile?.path ?? 'brak'),
       if (hit.phoneFiles.isEmpty) const _Field('Pliki', 'brak'),
       for (final file in hit.phoneFiles) ...[
         _Field('Plik', file.filePath),

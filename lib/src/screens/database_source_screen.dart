@@ -173,7 +173,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
         decoration: InputDecoration(
           hintText: hint,
           helperText: helper,
-          helperMaxLines: 2,
+          helperMaxLines: 4,
           errorText: error,
           border: const OutlineInputBorder(),
         ),
@@ -205,7 +205,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
             hint: 'http://serwer:8000/',
             helper:
                 'Używany poza siecią lokalną (np. przez Tailscale). Pobierane są pliki '
-                '${DatabaseSync.fileNames.join(' i ')}.',
+                'music.db, tag.db i files.db (pliki muzyki na serwerze).',
             error: _remoteError,
             onSubmitted: () => _save(sync),
           ),

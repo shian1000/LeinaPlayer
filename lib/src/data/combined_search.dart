@@ -8,14 +8,14 @@ import 'youtube_matcher.dart';
 
 /// Whether a search result can be played.
 enum SongAvailability {
-  /// Can be played now: a file on the phone (pending or not) or a YouTube video stored in
-  /// MusicDatabase.
+  /// Can be played now: a file on the phone (pending or not) or on MusicDatabase's server, or a
+  /// YouTube video stored in MusicDatabase.
   available,
 
   /// Not playable as is, but YouTube may find it (no link stored, and not marked "N/A").
   potentiallyAvailable,
 
-  /// Not on the phone and marked in MusicDatabase as not on YouTube.
+  /// Not on the phone or the server and marked in MusicDatabase as not on YouTube.
   unavailable,
 }
 
@@ -170,12 +170,16 @@ class SearchHit {
       MatchTarget(title: title, mainArtists: [MatchArtist(artistLabel)]);
   bool get onPhone => phoneFiles.isNotEmpty;
 
+  /// The song's file on MusicDatabase's server ([PlaybackSource.server]).
+  ServerFile? get serverFile => mainSong?.serverFile;
+
   /// On the phone but not in MusicDatabase yet.
   bool get pending => !inMainDatabase && onPhone;
 
   /// Whether [source] can play this song right now, without searching.
   bool playableFrom(PlaybackSource source) => switch (source) {
     PlaybackSource.phone => onPhone,
+    PlaybackSource.server => serverFile != null,
     PlaybackSource.youtube => youTube == YouTubeLink.linked,
   };
 

@@ -180,6 +180,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       youTubeAudio: _youTubeAudio,
       youTubeSearch: _youTubeSearch,
       outbox: _outbox,
+      serverAddresses: _databaseSync.serverAddresses,
     ),
     filter: _moodFilter,
   );
