@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
@@ -713,7 +714,8 @@ class _MoodButton extends StatelessWidget {
   }
 }
 
-/// Position slider with elapsed / total time; dragging only seeks on release.
+/// Position slider with elapsed / total time; dragging only seeks on release. Tapping the
+/// total time switches it to the time left (and back), remembered like in Spotify.
 class _SeekBar extends StatefulWidget {
   const _SeekBar({required this.player});
 
@@ -724,7 +726,38 @@ class _SeekBar extends StatefulWidget {
 }
 
 class _SeekBarState extends State<_SeekBar> {
+  static const _showRemainingKey = 'player.show_remaining_time';
+
+  /// Kept across opens of the full player so it never shows the other time for a frame.
+  static bool? _rememberedShowRemaining;
+
   double? _dragMs;
+  bool _showRemaining = _rememberedShowRemaining ?? false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_rememberedShowRemaining == null) unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final value =
+        (await SharedPreferences.getInstance()).getBool(_showRemainingKey) ??
+        false;
+    _rememberedShowRemaining ??= value;
+    if (mounted) setState(() => _showRemaining = _rememberedShowRemaining!);
+  }
+
+  void _toggleRemaining() {
+    final value = !_showRemaining;
+    _rememberedShowRemaining = value;
+    setState(() => _showRemaining = value);
+    unawaited(
+      SharedPreferences.getInstance().then(
+        (prefs) => prefs.setBool(_showRemainingKey, value),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -772,11 +805,20 @@ class _SeekBarState extends State<_SeekBar> {
                     color: palette.textSecondary,
                   ),
                 ),
-                Text(
-                  _formatTime(total),
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    color: palette.textSecondary,
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _toggleRemaining,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 24),
+                    child: Text(
+                      _showRemaining
+                          ? '-${_formatTime(total - Duration(milliseconds: positionMs.round()))}'
+                          : _formatTime(total),
+                      style: TextStyle(
+                        fontSize: AppFontSize.caption,
+                        color: palette.textSecondary,
+                      ),
+                    ),
                   ),
                 ),
               ],

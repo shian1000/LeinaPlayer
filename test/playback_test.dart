@@ -150,6 +150,19 @@ void main() {
     expect(find.text('„aurora” w wyszukiwarce'), findsOneWidget);
     expect(find.text('4:26'), findsOneWidget);
 
+    await tester.tap(find.text('4:26'));
+    await tester.pump();
+    expect(find.text('-4:26'), findsOneWidget);
+    expect(
+      (await SharedPreferences.getInstance()).getBool(
+        'player.show_remaining_time',
+      ),
+      isTrue,
+    );
+    await tester.tap(find.text('-4:26'));
+    await tester.pump();
+    expect(find.text('4:26'), findsOneWidget);
+
     await tester.tap(find.byTooltip('Pauza').last);
     await tester.pumpAndSettle();
     expect(player.playing, isFalse);

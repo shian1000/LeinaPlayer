@@ -47,7 +47,7 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     the song in the YouTube app — inside its YouTube playlist when it plays from an imported
     one, so YouTube then has the whole playlist; pauses this player; disabled when no video is
     known), `Odtwarzacz › Dodaj (+)`.
-  - Seek bar with elapsed/total time (**implemented**).
+  - Seek bar with elapsed/total time; tapping the total switches it to the time left (`-m:ss`) and back, remembered across restarts (**implemented**).
   - Losowo (**implemented**: toggles shuffle, green while on — see the queue below), Poprzedni (**implemented**: within the first 5 s the previous song
     in the queue, otherwise — or with nothing before it — the song from the start), play/pause
     (**implemented**), Następny (**implemented**: the next song in the queue; disabled at its
