@@ -57,7 +57,8 @@ Future<SearchHit> hitForVideoLink(
   final song = catalog.findExact(title: parsed.title, artist: parsed.artist);
   if (song != null) {
     // Not over MusicDatabase's own answer, including "not on YouTube" (N/A).
-    if (song.youTube == YouTubeLink.unknown) {
+    if (song.youTube == YouTubeLink.unknown &&
+        !youTube.isWrongFor(song.id, video.id)) {
       await youTube.saveMatch(song.id, video);
     }
     return hitOf(song);

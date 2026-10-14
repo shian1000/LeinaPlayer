@@ -169,8 +169,52 @@ class Outbox extends ChangeNotifier {
           'dead_video_id': deadVideoId,
           'detected_at': _timestamp(_now()),
         }, conflictAlgorithm: ConflictAlgorithm.ignore),
-        unless: () => _reported(song.id, deadVideoId),
+        unless: () =>
+            _reported(_deadLinks, 'dead_video_id', song.id, deadVideoId),
       );
+
+  /// The phone found [video] for [song], which music.db has no link for — a suggestion for
+  /// MusicDatabase, not a decision. Reported once: a video already in a request (waiting or
+  /// sent) for the song isn't added again. Returns whether it was added now.
+  Future<bool> reportFoundYouTubeLink(CatalogSong song, YouTubeVideo video) =>
+      _write(
+        (db) async => db.insert(_foundLinks, {
+          'song_id': song.id,
+          'title': song.title,
+          'artist': song.artistLabel,
+          'video_id': video.id,
+          'video_title': video.title,
+          'video_channel': video.channel,
+          'found_at': _timestamp(_now()),
+        }, conflictAlgorithm: ConflictAlgorithm.ignore),
+        unless: () => _reported(_foundLinks, 'video_id', song.id, video.id),
+        table: _foundLinks,
+      );
+
+  /// The links found for songs without one in the requests waiting to be sent, in the order
+  /// they were found.
+  Future<List<FoundLinkReport>> waitingFoundLinks() => _inTurn(() async {
+    final factory = factoryOverride ?? databaseFactory;
+    final reports = <FoundLinkReport>[];
+    for (final file in await pending()) {
+      final db = await factory.openDatabase(
+        file.path,
+        options: OpenDatabaseOptions(readOnly: true),
+      );
+      try {
+        if (!await _hasTable(db, _foundLinks)) continue;
+        for (final row in await db.query(_foundLinks)) {
+          reports.add(FoundLinkReport._fromRow(row));
+        }
+      } finally {
+        await db.close();
+      }
+    }
+    DateTime when(FoundLinkReport r) =>
+        DateTime.tryParse(r.foundAt) ?? DateTime(0);
+    reports.sort((a, b) => when(a).compareTo(when(b)));
+    return reports;
+  });
 
   /// The phone found [video] to play instead of [song]'s dead link [deadVideoId] — a suggestion
   /// for MusicDatabase, not a decision.
@@ -329,7 +373,12 @@ class Outbox extends ChangeNotifier {
     Directory('${dir.path}/rejected'),
   ];
 
-  Future<bool> _reported(int songId, String deadVideoId) async {
+  Future<bool> _reported(
+    String table,
+    String videoColumn,
+    int songId,
+    String videoId,
+  ) async {
     final dir = await directory();
     final factory = factoryOverride ?? databaseFactory;
     for (final folder in _numbered(dir)) {
@@ -338,11 +387,11 @@ class Outbox extends ChangeNotifier {
         if (!_requestName.hasMatch(_baseName(f.path))) continue;
         final db = await factory.openDatabase(f.path);
         try {
-          if (!await _hasTable(db, _deadLinks)) continue;
+          if (!await _hasTable(db, table)) continue;
           final rows = await db.query(
-            _deadLinks,
-            where: 'song_id = ? AND dead_video_id = ?',
-            whereArgs: [songId, deadVideoId],
+            table,
+            where: 'song_id = ? AND $videoColumn = ?',
+            whereArgs: [songId, videoId],
             limit: 1,
           );
           if (rows.isNotEmpty) return true;
@@ -584,6 +633,7 @@ class Outbox extends ChangeNotifier {
 
   static const _deadLinks = 'dead_youtube_links';
   static const _corrections = 'field_corrections';
+  static const _foundLinks = 'found_youtube_links';
 
   // Each kind of report gets files of its own: MusicDatabase keeps a whole file unprocessed
   // while it doesn't know one of its tables, and corrections came after dead links.
@@ -613,6 +663,17 @@ class Outbox extends ChangeNotifier {
       artist TEXT NOT NULL,
       corrected_at TEXT NOT NULL,
       PRIMARY KEY (table_name, row_id, column_name)
+    )''',
+    _foundLinks: '''
+    CREATE TABLE found_youtube_links (
+      song_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      artist TEXT NOT NULL,
+      video_id TEXT NOT NULL,
+      video_title TEXT,
+      video_channel TEXT,
+      found_at TEXT NOT NULL,
+      PRIMARY KEY (song_id, video_id)
     )''',
   };
 
@@ -733,6 +794,28 @@ class DeadLinkReport {
   final String? replacementVideoId;
   final String? replacementTitle;
   final String? replacementChannel;
+}
+
+/// A video the phone found for a song music.db has no link for.
+class FoundLinkReport {
+  FoundLinkReport._fromRow(Map<String, Object?> row)
+    : songId = row['song_id']! as int,
+      title = row['title']! as String,
+      artist = row['artist']! as String,
+      videoId = row['video_id']! as String,
+      videoTitle = row['video_title'] as String?,
+      videoChannel = row['video_channel'] as String?,
+      foundAt = row['found_at']! as String;
+
+  final int songId;
+  final String title;
+  final String artist;
+  final String videoId;
+  final String? videoTitle;
+  final String? videoChannel;
+
+  /// ISO 8601 with offset, as written to the request.
+  final String foundAt;
 }
 
 /// A field of music.db the user corrected on the phone, for MusicDatabase to review.

@@ -392,16 +392,17 @@ class NowPlayingScreen extends StatelessWidget {
     );
   }
 
-  /// The song in the YouTube app (inside its playlist when played from one); this app's player
-  /// pauses so the two don't play over each other.
+  /// The song in the YouTube app (inside its playlist when played from one), from the moment
+  /// this app's player is at; the player pauses so the two don't play over each other.
   static Future<void> _openInYouTube(
     BuildContext context,
     PlayerController player,
     Uri uri,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
+    final at = player.currentPosition;
     if (player.playing) await player.togglePlay();
-    if (!await openInYouTube(uri)) {
+    if (!await openInYouTube(youTubeUriAt(uri, at))) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Nie udało się otworzyć YouTube.')),
       );

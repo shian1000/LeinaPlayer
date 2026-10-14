@@ -187,12 +187,18 @@ class SearchHit {
 /// found (`youtube_matches`, `youtube_track_matches`) or that it searched lately and found none
 /// (`youtube_not_found`), and dropping a video YouTube removed (`youtube_removed_videos`) — a
 /// playlist's, a phone-found one, or music.db's own, which is then replaced by a phone-found one
-/// until MusicDatabase changes the link (ADR 0003: the phone only fills the gap). Queues and saved
+/// until MusicDatabase changes the link (ADR 0003: the phone only fills the gap) — and a video
+/// MusicDatabase turned down ([YouTubeLibrary.useBadVideos]). Queues and saved
 /// rows hold songs as they were, so they're shown and played through this.
 SearchHit withPhoneYouTube(SearchHit hit, YouTubeLibrary youTube) {
   final video = hit.youtubeVideoId;
   if (video != null) {
-    if (!youTube.isVideoRemoved(video)) return hit;
+    final own = hit.mainSong;
+    final turnedDown =
+        own != null &&
+        video != own.youtubeVideoId &&
+        youTube.isWrongFor(own.id, video);
+    if (!youTube.isVideoRemoved(video) && !turnedDown) return hit;
     hit = hit.withoutVideo(mainVideo: hit.mainSong?.youtubeVideoId == video);
   }
   final mainSong = hit.mainSong;

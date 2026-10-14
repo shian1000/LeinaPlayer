@@ -77,6 +77,30 @@ album's title, year and type. Ids, links and service ids aren't editable. Format
   reads "Wysłano poprawkę" (owner's decision, 2026-10-14). A correction of a name can merge albums or artists there, so the row it named may be
   gone from the next music.db — the phone's note goes with it.
 
+## Links found for songs without one (2026-10-14)
+
+Third request type, the owner's decision: **`found_youtube_links`** — a video the phone found
+for a song whose music.db `youtube_video_id` is empty (not "N/A", which is never searched; a
+dead link's replacement stays in `dead_youtube_links`). Before, such matches were kept on the
+phone only. Format in
+[`../handoffs/musicdatabase-found-youtube-links.md`](../handoffs/musicdatabase-found-youtube-links.md).
+
+- Reported when `TrackPlayer` finds the video (playing or caching ahead), and after each
+  `music.db` load for every phone match of a song music.db still has no link for (matches made
+  before this existed, or outside `TrackPlayer` — a shared video recognised as a song). A video
+  YouTube removed meanwhile isn't reported then.
+- Once per (song, video), waiting or sent; a different video found later for the same song (the
+  first one removed, the matches forgotten by hand) is a new row.
+- Files of their own, like corrections. "Czeka na wysłanie" lists them as "Znaleziono: …".
+- A suggestion, not a decision; the phone keeps its match until music.db settles the song.
+- MusicDatabase reads them since 2026-10-14 (its
+  `docs/handoffs/found-links-for-musicdatabaseapp.md`): saved by itself when its own search
+  finds the same video, otherwise reviewed by the owner. Videos it found bad (removed, not
+  playing in Poland, or wrong for a song) are kept in its `bad_videos.json` and turned down
+  without asking YouTube. Published at the owner's request (2026-10-14) as music.db's
+  `bad_youtube_videos` ([`../handoffs/musicdatabase-bad-videos.md`](../handoffs/musicdatabase-bad-videos.md)),
+  so the phone drops a turned-down video and searches again (`youtube.md`).
+
 ## Sending (MusicDatabase's inbox)
 
 - `PUT <server>/inbox/<file name>` with `Content-Length`, to the same addresses as the download,

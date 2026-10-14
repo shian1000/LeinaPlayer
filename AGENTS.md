@@ -74,8 +74,8 @@ saves it for later with the person who sent it (Menu profilu › Wiadomości ›
 - The app gets MusicDatabase's data by downloading its SQLite files over HTTP
   ([ADR 0002](docs/decisions/0002-database-download.md)). What goes back is a request file in the
   phone's outbox ([ADR 0005](docs/decisions/0005-outbox-for-musicdatabase.md), `outbox.dart`; so
-  far dead music.db YouTube links and the user's corrections of song / artist / album fields, each
-  kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
+  far dead music.db YouTube links, videos the phone found for songs music.db has no link for, and
+  the user's corrections of song / artist / album fields, each kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
   sharing server — the request format is a contract, see the
   [hand-off](docs/handoffs/musicdatabase-outbox.md)). The phone logs in with a MusicDatabase user
   (Ustawienia › Konto, `account.dart`; `POST /login` gives a token sent with the requests —

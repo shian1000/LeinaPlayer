@@ -61,6 +61,45 @@ void main() {
       expect(catalog.search('anything'), isEmpty);
     });
 
+    test(
+      'reads the videos MusicDatabase found bad; none without the table',
+      () async {
+        final path = (await sync.localFile('music.db')).path;
+        await writeMusicDb(path);
+        final before = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+        await before.ensureLoaded();
+        expect(before.status, CatalogStatus.ready);
+        expect(before.badVideos.everySong, isEmpty);
+        expect(before.badVideos.forSong, isEmpty);
+        before.dispose();
+
+        final db = await databaseFactoryFfi.openDatabase(path);
+        await db.execute('''
+        CREATE TABLE bad_youtube_videos (
+          id INTEGER PRIMARY KEY, video_id TEXT NOT NULL, song_id INTEGER,
+          reason TEXT NOT NULL, marked_at TEXT NOT NULL)''');
+        for (final (video, song, reason) in [
+          ('gone1234567', null, 'removed'),
+          ('wrong123456', 1, 'wrong_for_song'),
+          ('wrong654321', 1, 'wrong_for_song'),
+        ]) {
+          await db.insert('bad_youtube_videos', {
+            'video_id': video,
+            'song_id': song,
+            'reason': reason,
+            'marked_at': '2026-10-14T12:00:00+02:00',
+          });
+        }
+        await db.close();
+        await catalog.ensureLoaded();
+
+        expect(catalog.badVideos.everySong, {'gone1234567'});
+        expect(catalog.badVideos.isWrongFor(1, 'wrong123456'), isTrue);
+        expect(catalog.badVideos.isWrongFor(1, 'gone1234567'), isFalse);
+        expect(catalog.badVideos.isWrongFor(2, 'wrong123456'), isFalse);
+      },
+    );
+
     test('loads every song with its artists', () async {
       await loadSample();
       expect(catalog.status, CatalogStatus.ready);

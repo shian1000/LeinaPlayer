@@ -155,6 +155,21 @@ enum CatalogStatus { notLoaded, loading, ready, noDatabase, error }
 /// MusicDatabase instead of SQLite's ASCII-only `LIKE`. The file is opened read-only and closed
 /// right after reading, so [DatabaseSync] can swap it at any time; a finished download triggers
 /// a reload.
+/// YouTube videos MusicDatabase found bad (music.db's `bad_youtube_videos`, its handoff
+/// `bad-videos-for-musicdatabaseapp.md`): [everySong] are removed or don't play (treated like a
+/// video YouTube removed), [forSong] are wrong for that `songs.id` only.
+class BadVideos {
+  const BadVideos({this.everySong = const {}, this.forSong = const {}});
+
+  static const none = BadVideos();
+
+  final Set<String> everySong;
+  final Map<int, Set<String>> forSong;
+
+  bool isWrongFor(int songId, String videoId) =>
+      forSong[songId]?.contains(videoId) ?? false;
+}
+
 class SongCatalog extends ChangeNotifier {
   SongCatalog(this._sync, {this.factoryOverride}) {
     _sync.addListener(_onSyncChanged);
@@ -192,6 +207,11 @@ class SongCatalog extends ChangeNotifier {
   void moodsChanged() => _searchTexts = null;
 
   CatalogStatus get status => _status;
+
+  BadVideos _badVideos = BadVideos.none;
+
+  /// Videos MusicDatabase found bad (`bad_youtube_videos`).
+  BadVideos get badVideos => _badVideos;
 
   /// When the `music.db` now loaded was downloaded (`DatabaseSync.lastSync` at load time).
   DateTime? get loadedSyncTime => _loadedSyncTime;
@@ -255,15 +275,18 @@ class SongCatalog extends ChangeNotifier {
       final file = await _sync.localFile('music.db');
       if (!await file.exists()) {
         _songs = const [];
+        _badVideos = BadVideos.none;
         _status = CatalogStatus.noDatabase;
       } else {
         _songs = await _readSongs(file);
+        _badVideos = await _readBadVideos(file);
         _status = CatalogStatus.ready;
       }
       _loadedSyncTime = syncTime;
     } catch (e) {
       debugPrint('Loading music.db failed: $e');
       _songs = const [];
+      _badVideos = BadVideos.none;
       _status = CatalogStatus.error;
     } finally {
       _searchTexts = null;
@@ -355,6 +378,38 @@ class SongCatalog extends ChangeNotifier {
     origin: row['origin'] as String?,
     synonyms: row['synonyms'] as String?,
   );
+
+  /// `bad_youtube_videos`; none in a music.db from before MusicDatabase's migration 0010.
+  Future<BadVideos> _readBadVideos(File file) async {
+    final db = await (factoryOverride ?? databaseFactory).openDatabase(
+      file.path,
+      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+    );
+    try {
+      final hasTable = await db.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'bad_youtube_videos'",
+      );
+      if (hasTable.isEmpty) return BadVideos.none;
+      final everySong = <String>{};
+      final forSong = <int, Set<String>>{};
+      for (final row in await db.rawQuery(
+        'SELECT video_id, song_id FROM bad_youtube_videos',
+      )) {
+        final video = (row['video_id'] as String?)?.trim();
+        if (video == null || video.isEmpty) continue;
+        final song = row['song_id'] as int?;
+        if (song == null) {
+          everySong.add(video);
+        } else {
+          (forSong[song] ??= {}).add(video);
+        }
+      }
+      return BadVideos(everySong: everySong, forSong: forSong);
+    } finally {
+      await db.close();
+    }
+  }
 
   /// `additional_song_artists` (role `main` or `feat`) per song id; empty for databases created
   /// before that table existed.

@@ -349,6 +349,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final storedVideo = details?.song['youtube_video_id'] as String?;
     final spotifyUrl = details?.song['spotify_url'] as String?;
     Uri video(String id) => youTubeWatchUri(id);
+    final fromPlayer = widget.track != null;
     return _Section('Linki', [
       if (mainSong != null)
         switch (storedVideo?.trim() ?? mainSong.youtubeVideoId) {
@@ -361,6 +362,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
             'YouTube (music.db)',
             hit.mainVideoRemoved ? '$id — usunięty z YouTube' : id,
             link: video(id),
+            fromPlayer: fromPlayer,
           ),
         },
       if (mainSong != null)
@@ -374,6 +376,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
           'YouTube (znaleziony na telefonie)',
           hit.phoneMatch,
           link: video(hit.phoneMatch!),
+          fromPlayer: fromPlayer,
         ),
       if (hit.playlistVideoId != null &&
           hit.playlistVideoId != storedVideo?.trim())
@@ -381,6 +384,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
           'YouTube (z playlisty)',
           hit.playlistVideoId,
           link: video(hit.playlistVideoId!),
+          fromPlayer: fromPlayer,
         ),
       if (hit.spotifyTrackId != null &&
           hit.spotifyTrackId != mainSong?.spotifyTrackId)
@@ -391,6 +395,21 @@ class _SongInfoCardState extends State<SongInfoCard> {
         ),
       if (hit.notFoundOnYouTube)
         const _Field('YouTube', 'telefon niedawno szukał i nie znalazł'),
+      for (final bad in details?.badVideos ?? const <DbRow>[])
+        _Field(
+          'YouTube (odrzucony w MusicDatabase)',
+          [
+            '${bad['video_id']}',
+            switch (bad['reason']) {
+              'wrong_for_song' => 'zły film dla tego utworu',
+              'no_video_for_song' => 'utwór oznaczony jako N/A',
+              final reason => '$reason',
+            },
+            if (bad['marked_at'] != null) '${bad['marked_at']}',
+          ].join(' · '),
+          link: video('${bad['video_id']}'),
+          fromPlayer: fromPlayer,
+        ),
     ]);
   }
 
@@ -436,6 +455,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
                 link: track.youtubeVideoId == null
                     ? null
                     : youTubeWatchUri(track.youtubeVideoId!),
+                fromPlayer: true,
               )
             : _Field('Odtwarzane z', 'pliku: ${track.source}'),
       if (hit.phoneFiles.isEmpty) const _Field('Pliki', 'brak'),
@@ -605,6 +625,7 @@ class _Field extends StatelessWidget {
     this.link,
     this.onEdit,
     this.correction,
+    this.fromPlayer = false,
   });
 
   final String label;
@@ -617,12 +638,17 @@ class _Field extends StatelessWidget {
   /// The user's correction waiting for MusicDatabase, under the value.
   final String? correction;
 
+  /// [link] is the playing song's video: it opens where the player is, and the player pauses
+  /// (like "Otwórz w YouTube" above the card).
+  final bool fromPlayer;
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final messenger = ScaffoldMessenger.of(context);
+    final player = fromPlayer ? PlayerScope.of(context) : null;
     return InkWell(
-      onTap: link == null ? null : () => _openLink(link!),
+      onTap: link == null ? null : () => _openLink(link!, player: player),
       onLongPress: () {
         Clipboard.setData(ClipboardData(text: value!));
         messenger.showSnackBar(
@@ -745,9 +771,14 @@ class _Chips extends StatelessWidget {
   }
 }
 
-/// YouTube links in the YouTube app, the rest in the app that claims them or the browser.
-Future<void> _openLink(Uri uri) async {
+/// YouTube links in the YouTube app, the rest in the app that claims them or the browser. With
+/// [player], the video of the song it's playing: from that moment, with the player paused.
+Future<void> _openLink(Uri uri, {PlayerController? player}) async {
   if (uri.host.endsWith('youtube.com')) {
+    if (player != null) {
+      uri = youTubeUriAt(uri, player.currentPosition);
+      if (player.playing) await player.togglePlay();
+    }
     await openInYouTube(uri);
     return;
   }

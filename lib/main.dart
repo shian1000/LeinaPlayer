@@ -309,6 +309,23 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _settledFor = syncTime;
     try {
       await _youTubeLoaded;
+      final bad = catalog.badVideos;
+      // Never music.db's own link (MusicDatabase takes a picked video off its list): the phone
+      // would take it for a dead one.
+      final dropped = await _youTubeLibrary.useBadVideos(
+        BadVideos(
+          everySong: {
+            for (final v in bad.everySong)
+              if (catalog.findByYouTubeId(v) == null) v,
+          },
+          forSong: bad.forSong,
+        ),
+      );
+      if (dropped > 0) {
+        debugPrint(
+          'Forgot $dropped phone YouTube findings MusicDatabase turned down',
+        );
+      }
       final forgotten = await _youTubeLibrary.forgetSettled((id) {
         final song = catalog.byId(id);
         if (song == null) return true;
@@ -334,6 +351,15 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         if (found != null) {
           await _outbox.reportReplacement(song, videoId, found);
         }
+      }
+      // Videos found for songs without a link before this was reported, or matched outside
+      // TrackPlayer (a shared link); already reported ones are skipped.
+      for (final id in _youTubeLibrary.matchedSongIds) {
+        final song = catalog.byId(id);
+        if (song == null || song.youTube != YouTubeLink.unknown) continue;
+        final found = await _youTubeLibrary.matchDetailsFor(id);
+        if (found == null || _youTubeLibrary.isVideoRemoved(found.id)) continue;
+        await _outbox.reportFoundYouTubeLink(song, found);
       }
     } catch (e) {
       debugPrint('Forgetting settled YouTube findings failed: $e');

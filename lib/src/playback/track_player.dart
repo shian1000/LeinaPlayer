@@ -68,8 +68,8 @@ class TrackPlayer {
   /// Replaced in tests; `null` opens the YouTube app for real.
   final OpenExternalFn? openExternal;
 
-  /// Where dead music.db links (and the videos found instead) are reported for MusicDatabase;
-  /// `null` reports nothing.
+  /// Where dead music.db links (and the videos found instead), and videos found for songs
+  /// music.db has no link for, are reported for MusicDatabase; `null` reports nothing.
   final Outbox? outbox;
 
   /// Whether the phone is on Wi-Fi now; replaced in tests.
@@ -234,15 +234,17 @@ class TrackPlayer {
   }
 
   /// The best video for [hit], remembered so the next play uses it (or its cached audio) without
-  /// searching again, and the icon turns full (ADR 0003: kept on the phone only). Finding none is
-  /// remembered too ([YouTubeLibrary.saveNotFound]).
+  /// searching again, and the icon turns full; a MusicDatabase song's video also goes to the
+  /// outbox as a suggestion. Finding none is remembered too ([YouTubeLibrary.saveNotFound]).
   Future<YouTubeVideo?> _findVideo(SearchHit hit) async {
     final target = hit.youTubeTarget;
+    final mainSong = hit.mainSong;
     final video = pickYouTubeVideo(target, [
       for (final v in await youTubeSearch.search(target.query, settings))
-        if (!youTubeLibrary.isVideoRemoved(v.id)) v,
+        if (!youTubeLibrary.isVideoRemoved(v.id) &&
+            !(mainSong != null && youTubeLibrary.isWrongFor(mainSong.id, v.id)))
+          v,
     ]);
-    final mainSong = hit.mainSong;
     if (video != null) {
       await (mainSong != null
           ? youTubeLibrary.saveMatch(mainSong.id, video)
@@ -250,6 +252,8 @@ class TrackPlayer {
       final dead = mainSong?.youtubeVideoId;
       if (mainSong != null && dead != null && hit.mainVideoRemoved) {
         await _report(() => outbox?.reportReplacement(mainSong, dead, video));
+      } else if (mainSong?.youTube == YouTubeLink.unknown) {
+        await _report(() => outbox?.reportFoundYouTubeLink(mainSong!, video));
       }
     } else {
       await youTubeLibrary.saveNotFound(

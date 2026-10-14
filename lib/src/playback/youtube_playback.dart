@@ -47,6 +47,17 @@ typedef OpenExternalFn = Future<bool> Function(Uri uri);
 Uri youTubeWatchUri(String videoId, {String? listId}) =>
     Uri.https('www.youtube.com', '/watch', {'v': videoId, 'list': ?listId});
 
+/// [uri] of a video starting at [position], so YouTube goes on from where this app's player is.
+/// Not done for Spotify: its Android app opens a track link as the album's page (on a free
+/// account), with no way to say where to start.
+Uri youTubeUriAt(Uri uri, Duration position) {
+  final seconds = position.inSeconds;
+  if (seconds <= 0) return uri;
+  return uri.replace(
+    queryParameters: {...uri.queryParameters, 't': '${seconds}s'},
+  );
+}
+
 /// The YouTube app when it's installed, the browser otherwise.
 Future<bool> openInYouTube(Uri uri) async {
   // On Android this app may handle YouTube links itself, so it names the YouTube app.

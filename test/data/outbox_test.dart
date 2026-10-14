@@ -98,6 +98,60 @@ void main() {
   });
 
   test(
+    'found links go into files of their own, each video of a song once',
+    () async {
+      final outbox = newOutbox();
+      final noLink = CatalogSong(
+        id: 7,
+        title: 'Obsession',
+        artistLabel: 'Elise Trouw',
+      );
+      const video = YouTubeVideo(
+        id: 'foundVideo1',
+        title: 'Elise Trouw - Obsession',
+        channel: 'Elise Trouw - Topic',
+      );
+      await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+      expect(await outbox.reportFoundYouTubeLink(noLink, video), isTrue);
+      expect(await outbox.reportFoundYouTubeLink(noLink, video), isFalse);
+
+      final files = await outbox.pending();
+      expect(names(files), [
+        '2026-10-12_23-44-05_001.db',
+        '2026-10-12_23-44-05_002.db',
+      ]);
+      final found = await rows(files.last, 'found_youtube_links');
+      expect(found.single, containsPair('song_id', 7));
+      expect(found.single, containsPair('title', 'Obsession'));
+      expect(found.single, containsPair('video_id', 'foundVideo1'));
+      expect(
+        found.single,
+        containsPair('video_channel', 'Elise Trouw - Topic'),
+      );
+      expect(found.single['found_at'], startsWith('2026-10-12T23:44:05'));
+      expect((await outbox.waitingFoundLinks()).single.videoId, 'foundVideo1');
+
+      // Sent: still not reported again; another video of the song is.
+      final sent = await Directory('${root.path}/outbox/sent').create();
+      await files.last.rename('${sent.path}/${names([files.last]).single}');
+      expect(await outbox.reportFoundYouTubeLink(noLink, video), isFalse);
+      expect(await outbox.waitingFoundLinks(), isEmpty);
+      expect(
+        await outbox.reportFoundYouTubeLink(
+          noLink,
+          const YouTubeVideo(
+            id: 'foundVideo2',
+            title: 'Obsession',
+            channel: '',
+          ),
+        ),
+        isTrue,
+      );
+      expect(names(await outbox.pending()).last, '2026-10-12_23-44-05_003.db');
+    },
+  );
+
+  test(
     'waiting reports list the songs of unsent requests only, oldest first',
     () async {
       final outbox = newOutbox();

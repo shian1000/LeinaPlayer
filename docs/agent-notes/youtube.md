@@ -62,8 +62,12 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 ## What the phone remembers (`youtube_library.dart`, tables in `local.db` v2, v6, v7)
 
 - `youtube_matches` (`main_db_id` → `video_id`): videos the phone matched itself. Kept after the
-  file leaves the cache; `SearchHit.youtubeVideoId` prefers music.db's own link. Never sent back
-  to MusicDatabase (ADR 0003).
+  file leaves the cache; `SearchHit.youtubeVideoId` prefers music.db's own link. Since
+  2026-10-14 (owner's request) a video found for a song music.db has **no** link for goes to the
+  outbox as `found_youtube_links` — when `TrackPlayer._findVideo` finds it, and after each
+  music.db load for older or otherwise-made matches (a shared video recognised as a song,
+  `video_link.dart`) — see [ADR 0005](../decisions/0005-outbox-for-musicdatabase.md). The phone
+  keeps playing its match until music.db settles the song, as before.
 - `youtube_track_matches` (v6): the same for tracks that aren't MusicDatabase songs (Spotify
   playlists), keyed by normalised artist + title — see [`playlists.md`](playlists.md).
 - `youtube_not_found` (v7): a search that found no sure match (`TrackPlayer._findVideo`; a failed
@@ -77,6 +81,16 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   matched on the phone like one without a link. Anything reading a row's `playlistVideoId`
   straight from the queued row (`TrackPlayer.youTubeUri` — "Otwórz w YouTube" inside the
   playlist) checks `isVideoRemoved` itself and falls back to the replacement.
+- **Videos MusicDatabase found bad** (music.db's `bad_youtube_videos`, since 2026-10-14 —
+  [hand-off](../handoffs/musicdatabase-bad-videos.md)): read by `SongCatalog.badVideos` and handed
+  to `YouTubeLibrary.useBadVideos` on every music.db load (`main.dart`, `_forgetSettledMatches`).
+  "Every song" rows count as removed (`isVideoRemoved`), "one song" rows only for that song
+  (`isWrongFor` — skipped in `TrackPlayer._findVideo`, dropped by `withPhoneYouTube`, not saved
+  from a shared link); the phone's matches to them are deleted, so those songs are searched
+  again. Held **in memory only**, not in `youtube_removed_videos`: MusicDatabase takes a video off
+  the list when the owner picks it, and a stored mark would then hide music.db's own link (and
+  report it dead). Also never applied to a video that is some song's music.db link. Shown under
+  "Linki" in "Informacje o utworze" (per-song rows, `SongDetails.badVideos`).
 - **Server values win, phone values fill gaps** (user agreed): a music.db link or "N/A" always
   beats anything the phone found. So after each new `music.db` is loaded,
   `YouTubeLibrary.forgetSettled` (called from `main.dart`, `_forgetSettledMatches`, once per

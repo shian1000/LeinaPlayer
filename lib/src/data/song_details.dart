@@ -17,6 +17,7 @@ class SongDetails {
     this.albumCovers = const [],
     this.tags = const [],
     this.formerIds = const [],
+    this.badVideos = const [],
   });
 
   /// The `songs` row.
@@ -39,6 +40,9 @@ class SongDetails {
 
   /// Ids the song had before MusicDatabase merged or renumbered it (`song_id_changes`).
   final List<({int id, String? changedAt})> formerIds;
+
+  /// `bad_youtube_videos` rows of this song: videos MusicDatabase turned down for it.
+  final List<DbRow> badVideos;
 }
 
 /// Reads [SongDetails] of `songs.id` [songId] from the files [sync] downloaded, or `null` when
@@ -129,8 +133,17 @@ Future<SongDetails?> readSongDetails(
               ),
           ];
 
+    final badVideos = !tables.contains('bad_youtube_videos')
+        ? const <DbRow>[]
+        : await db.rawQuery(
+            'SELECT * FROM bad_youtube_videos WHERE song_id = ? '
+            'ORDER BY marked_at',
+            [songId],
+          );
+
     return SongDetails(
       song: song,
+      badVideos: badVideos,
       artists: artists,
       album: album,
       albumArtist: albumArtist,

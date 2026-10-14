@@ -70,6 +70,50 @@ void main() {
     expect(again.matchFor(8), isNull);
   });
 
+  test('videos MusicDatabase found bad: matches to them forgotten, kept out until it changes', () async {
+    final library = newLibrary();
+    await library.load();
+    const gone = YouTubeVideo(id: 'gone', title: 'T', channel: 'C');
+    const wrong = YouTubeVideo(id: 'wrong', title: 'T', channel: 'C');
+    await library.saveMatch(1, gone);
+    await library.saveMatch(2, wrong);
+    await library.saveMatch(3, wrong);
+    await library.saveTrackMatch('A', 'B', gone);
+
+    expect(
+      await library.useBadVideos(
+        const BadVideos(
+          everySong: {'gone'},
+          forSong: {
+            2: {'wrong'},
+          },
+        ),
+      ),
+      3,
+    );
+    expect(library.matchFor(1), isNull);
+    expect(library.matchFor(2), isNull);
+    expect(library.matchFor(3), 'wrong'); // only wrong for song 2
+    expect(library.matchForTrack('A', 'B'), isNull);
+    expect(library.isVideoRemoved('gone'), isTrue);
+    expect(library.isWrongFor(2, 'wrong'), isTrue);
+    expect(library.isWrongFor(3, 'wrong'), isFalse);
+    // Not the phone's own removed videos: never reported as dead links.
+    expect(library.removedVideos, isEmpty);
+
+    // A queued row still holding the turned-down video drops it.
+    final song = CatalogSong(id: 2, title: 'T', artistLabel: 'A');
+    final queued = SearchHit.main(song, const [], phoneMatch: 'wrong');
+    expect(withPhoneYouTube(queued, library).youtubeVideoId, isNull);
+
+    // Off MusicDatabase's list (the owner picked it): usable again, and not stored.
+    await library.useBadVideos(BadVideos.none);
+    expect(library.isVideoRemoved('gone'), isFalse);
+    final again = newLibrary();
+    await again.load();
+    expect(again.isVideoRemoved('gone'), isFalse);
+  });
+
   test('a match for a track known only by name is remembered', () async {
     final library = newLibrary();
     await library.load();

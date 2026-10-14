@@ -44,9 +44,9 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   - Header: ⌄ (collapse), "Odtwarzanie z wyników wyszukiwania / „<query>” w wyszukiwarce",
     `Odtwarzacz › Menu (⋮)`.
   - Big cover, title, artist, Otwórz w YouTube (**implemented**: YouTube icon left of (+); opens
-    the song in the YouTube app — inside its YouTube playlist when it plays from an imported
-    one, so YouTube then has the whole playlist; pauses this player; disabled when no video is
-    known), `Odtwarzacz › Dodaj (+)`.
+    the song in the YouTube app from where this player is (`t=` in the link) — inside its
+    YouTube playlist when it plays from an imported one, so YouTube then has the whole playlist;
+    pauses this player; disabled when no video is known), `Odtwarzacz › Dodaj (+)`.
   - Seek bar with elapsed/total time; tapping the total switches it to the time left (`-m:ss`) and back, remembered across restarts (**implemented**).
   - Losowo (**implemented**: toggles shuffle, green while on — see the queue below), Poprzedni (**implemented**: within the first 5 s the previous song
     in the queue, otherwise — or with nothing before it — the song from the start), play/pause
@@ -80,7 +80,9 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     MusicBrainz / iTunes / Deezer / Spotify links and its `album_covers`, the YouTube / Spotify
     links (music.db's and the phone's or the playlist's when different), moods (global and own,
     from `MoodLibrary`) and the other tag.db tags, the files on the phone and what it plays
-    from. Tapping a link opens it, a long press copies a value. Songs not in MusicDatabase show
+    from. Tapping a link opens it (the song's YouTube videos from where the player is, pausing it,
+    like Otwórz w YouTube; Spotify can't be told where to start — its app opens a track link as
+    the album's page on a free account), a long press copies a value. Songs not in MusicDatabase show
     only what the phone knows. A pencil next to the song's, its artists' and its album's own
     fields (empty ones shown as "—") corrects the value: the correction goes to the outbox for
     MusicDatabase ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md), field corrections)

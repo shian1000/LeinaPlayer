@@ -347,6 +347,18 @@ void main() {
       },
     );
 
+    test('"Otwórz w YouTube" starts where the player is', () {
+      final uri = Uri.parse('https://www.youtube.com/watch?v=pl&list=PL1');
+      expect(
+        youTubeUriAt(
+          uri,
+          const Duration(minutes: 1, seconds: 30, milliseconds: 700),
+        ),
+        Uri.parse('https://www.youtube.com/watch?v=pl&list=PL1&t=90s'),
+      );
+      expect(youTubeUriAt(uri, const Duration(milliseconds: 400)), uri);
+    });
+
     test('the last-resort fallback opens it the same way', () async {
       newPipeFails = true;
       final queue = queueOf();
@@ -580,6 +592,66 @@ void main() {
         'fixed123456',
       );
     });
+
+    test(
+      'a song music.db has no link for: the video found is reported, once',
+      () async {
+        final tracks = tracksWith();
+        final song = CatalogSong(
+          id: 2,
+          title: 'Total Eclipse of the Heart',
+          artistLabel: 'Bonnie Tyler',
+        );
+        // The removed one would be picked first otherwise.
+        await library.markVideoRemoved(dead);
+        expect(
+          (await tracks.play(SearchHit.main(song, const []))).played,
+          isTrue,
+        );
+        expect(library.matchFor(2), 'alive123456');
+        await outbox.reportFoundYouTubeLink(
+          song,
+          const YouTubeVideo(id: 'alive123456', title: '', channel: ''),
+        );
+        final found = await outbox.waitingFoundLinks();
+        expect(found, hasLength(1));
+        expect(found.single.songId, 2);
+        expect(found.single.videoId, 'alive123456');
+        expect(found.single.videoChannel, 'Bonnie Tyler');
+        // Not a dead link.
+        expect(await outbox.waitingReports(), isEmpty);
+      },
+    );
+
+    test(
+      'a video MusicDatabase turned down for the song isn\'t picked for it',
+      () async {
+        final tracks = tracksWith();
+        CatalogSong song(int id) => CatalogSong(
+          id: id,
+          title: 'Total Eclipse of the Heart',
+          artistLabel: 'Bonnie Tyler',
+        );
+        await library.useBadVideos(
+          const BadVideos(
+            everySong: {dead},
+            forSong: {
+              3: {'alive123456'},
+            },
+          ),
+        );
+        final outcome = await tracks.play(SearchHit.main(song(3), const []));
+        expect(outcome.played, isFalse);
+        expect(library.matchFor(3), isNull);
+        expect(await outbox.pending(), isEmpty);
+        // Another song may still use it.
+        expect(
+          (await tracks.play(SearchHit.main(song(4), const []))).played,
+          isTrue,
+        );
+        expect(library.matchFor(4), 'alive123456');
+      },
+    );
 
     test('found out while caching ahead: marked, nothing played', () async {
       final tracks = tracksWith();

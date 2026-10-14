@@ -392,7 +392,12 @@ class _OutboxSection extends StatelessWidget {
                 : switch (outbox.waiting) {
                     0 => 'Nic',
                     1 => '1 zgłoszenie',
-                    final n => '$n zgłoszenia',
+                    final n
+                        when n % 10 >= 2 &&
+                            n % 10 <= 4 &&
+                            (n % 100 < 12 || n % 100 > 14) =>
+                      '$n zgłoszenia',
+                    final n => '$n zgłoszeń',
                   },
           ),
           trailing: outbox.sending

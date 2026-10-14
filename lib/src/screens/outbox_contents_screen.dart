@@ -10,8 +10,8 @@ import '../widgets/song_info.dart';
 import '../widgets/song_tile.dart';
 
 /// "Czeka na wysłanie" in Ustawienia › Źródła muzyki › Baza danych: the songs reported in the
-/// requests still waiting in the outbox, with the video the phone found instead, and the fields
-/// the user corrected in "Informacje o utworze".
+/// requests still waiting in the outbox, with the video the phone found instead, the videos found
+/// for songs without a link, and the fields the user corrected in "Informacje o utworze".
 class OutboxContentsScreen extends StatefulWidget {
   const OutboxContentsScreen({super.key});
 
@@ -20,13 +20,14 @@ class OutboxContentsScreen extends StatefulWidget {
 }
 
 class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
-  Future<List<DeadLinkReport>>? _reports;
+  Future<(List<DeadLinkReport>, List<FoundLinkReport>)>? _reports;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Also after a send or a new report while the screen is open.
-    _reports = OutboxScope.of(context).waitingReports();
+    final outbox = OutboxScope.of(context);
+    _reports = (outbox.waitingReports(), outbox.waitingFoundLinks()).wait;
   }
 
   @override
@@ -38,17 +39,18 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
         backgroundColor: palette.surface,
         title: const Text('Czeka na wysłanie'),
       ),
-      body: FutureBuilder<List<DeadLinkReport>>(
+      body: FutureBuilder<(List<DeadLinkReport>, List<FoundLinkReport>)>(
         future: _reports,
         builder: (context, snapshot) {
-          final reports = snapshot.data;
           if (snapshot.hasError) {
             return _Note('Nie udało się odczytać zgłoszeń.');
           }
-          if (reports == null) {
+          final data = snapshot.data;
+          if (data == null) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (reports.isEmpty && corrections.isEmpty) {
+          final (reports, found) = data;
+          if (reports.isEmpty && found.isEmpty && corrections.isEmpty) {
             return const _Note('Wszystkie zgłoszenia zostały wysłane.');
           }
           return ListView(
@@ -59,7 +61,29 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
                   'Linki z bazy danych, których YouTube już nie odtwarza. Do czasu poprawki w '
                   'MusicDatabase telefon gra film znaleziony w zamian.',
                 ),
-                for (final report in reports) _ReportTile(report),
+                for (final report in reports)
+                  _SongReportTile(
+                    songId: report.songId,
+                    title: report.title,
+                    artist: report.artist,
+                    what: report.replacementTitle == null
+                        ? 'Bez zamiennika'
+                        : 'Zamiennik: '
+                              '${_video(report.replacementTitle, report.replacementChannel)}',
+                  ),
+              ],
+              if (found.isNotEmpty) ...[
+                const _Note(
+                  'Filmy znalezione przez telefon dla utworów bez linku w bazie danych.',
+                ),
+                for (final report in found)
+                  _SongReportTile(
+                    songId: report.songId,
+                    title: report.title,
+                    artist: report.artist,
+                    what:
+                        'Znaleziono: ${_video(report.videoTitle, report.videoChannel)}',
+                  ),
               ],
               if (corrections.isNotEmpty) ...[
                 const _Note(
@@ -77,25 +101,31 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
   }
 }
 
-class _ReportTile extends StatelessWidget {
-  const _ReportTile(this.report);
+String _video(String? title, String? channel) =>
+    '${title ?? ''}${channel == null || channel.isEmpty ? '' : ' ($channel)'}';
 
-  final DeadLinkReport report;
+class _SongReportTile extends StatelessWidget {
+  const _SongReportTile({
+    required this.songId,
+    required this.title,
+    required this.artist,
+    required this.what,
+  });
+
+  final int songId;
+  final String title;
+  final String artist;
+  final String what;
 
   @override
   Widget build(BuildContext context) {
-    final replacement = report.replacementTitle;
-    final what = replacement == null
-        ? 'Bez zamiennika'
-        : 'Zamiennik: $replacement'
-              '${report.replacementChannel == null ? '' : ' (${report.replacementChannel})'}';
-    final subtitle = '${report.artist} · $what';
-    final song = SongCatalogScope.of(context).byId(report.songId);
+    final subtitle = '$artist · $what';
+    final song = SongCatalogScope.of(context).byId(songId);
     // Gone from the downloaded music.db (merged or deleted since): shown as reported.
     if (song == null) {
       return ListTile(
         leading: const Icon(Icons.music_note_outlined),
-        title: Text(report.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
       );
     }

@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'song_catalog.dart';
 import 'text_normalizer.dart';
 import 'youtube_video.dart';
 
@@ -57,9 +58,60 @@ class YouTubeLibrary extends ChangeNotifier {
   Set<String> _removedVideos = const {};
 
   /// Whether YouTube no longer has [videoId] (playing or re-importing found out).
-  bool isVideoRemoved(String videoId) => _removedVideos.contains(videoId);
+  bool isVideoRemoved(String videoId) =>
+      _removedVideos.contains(videoId) ||
+      _badVideos.everySong.contains(videoId);
 
-  /// Every video found removed so far.
+  /// MusicDatabase turned [videoId] down for this song ([BadVideos.forSong]).
+  bool isWrongFor(int mainDbId, String videoId) =>
+      _badVideos.isWrongFor(mainDbId, videoId);
+
+  // Kept in memory only: MusicDatabase takes a video off its list when the owner picks it, and
+  // the phone must follow (a stored mark would outlive that).
+  BadVideos _badVideos = BadVideos.none;
+
+  /// The videos MusicDatabase found bad, from the music.db just loaded. The phone's own matches
+  /// to them are forgotten, so those songs are searched again; returns how many.
+  Future<int> useBadVideos(BadVideos bad) async {
+    _badVideos = bad;
+    final db = await _database();
+    var forgotten = 0;
+    await db.transaction((txn) async {
+      for (final video in bad.everySong) {
+        forgotten += await txn.delete(
+          'youtube_matches',
+          where: 'video_id = ?',
+          whereArgs: [video],
+        );
+        forgotten += await txn.delete(
+          'youtube_track_matches',
+          where: 'video_id = ?',
+          whereArgs: [video],
+        );
+      }
+      for (final MapEntry(key: song, value: videos) in bad.forSong.entries) {
+        for (final video in videos) {
+          forgotten += await txn.delete(
+            'youtube_matches',
+            where: 'main_db_id = ? AND video_id = ?',
+            whereArgs: [song, video],
+          );
+        }
+      }
+    });
+    if (forgotten > 0) {
+      _matches = {..._matches}
+        ..removeWhere(
+          (song, v) => bad.everySong.contains(v) || bad.isWrongFor(song, v),
+        );
+      _trackMatches = {..._trackMatches}
+        ..removeWhere((_, v) => bad.everySong.contains(v));
+    }
+    notifyListeners();
+    return forgotten;
+  }
+
+  /// Every video found removed so far on the phone (not MusicDatabase's [useBadVideos]).
   Set<String> get removedVideos => Set.unmodifiable(_removedVideos);
 
   /// How long "not found on YouTube" holds before the queue searches again — the video may have
@@ -72,6 +124,9 @@ class YouTubeLibrary extends ChangeNotifier {
 
   /// The video the phone found for this MusicDatabase song, if any.
   String? matchFor(int mainDbId) => _matches[mainDbId];
+
+  /// MusicDatabase songs the phone found a video for.
+  Iterable<int> get matchedSongIds => _matches.keys.toList();
 
   /// [matchFor] with the title and channel saved with it.
   Future<YouTubeVideo?> matchDetailsFor(int mainDbId) async {

@@ -92,6 +92,14 @@ void main() {
           CatalogSong(id: 999, title: 'Usunięty', artistLabel: 'Ktoś'),
           'goneVideo12',
         );
+        await outbox.reportFoundYouTubeLink(
+          CatalogSong(id: 998, title: 'Bez linku', artistLabel: 'Ktoś inny'),
+          const YouTubeVideo(
+            id: 'foundVideo1',
+            title: 'Bez linku (Audio)',
+            channel: 'Ktoś inny - Topic',
+          ),
+        );
       });
       queue = PlaybackQueue(
         prefetchDelay: Duration.zero,
@@ -142,7 +150,7 @@ void main() {
         const Offset(0, -300),
       );
       await tester.pumpAndSettle();
-      expect(find.text('1 zgłoszenie'), findsOneWidget);
+      expect(find.text('2 zgłoszenia'), findsOneWidget);
       await tester.tap(waiting);
       await pumpUntil(
         tester,
@@ -159,6 +167,17 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Ktoś · Bez zamiennika'), findsOneWidget);
+      await tester.dragUntilVisible(
+        find.text('Bez linku'),
+        find.byType(ListView),
+        const Offset(0, -300),
+      );
+      expect(
+        find.text(
+          'Ktoś inny · Znaleziono: Bez linku (Audio) (Ktoś inny - Topic)',
+        ),
+        findsOneWidget,
+      );
     },
   );
 }
