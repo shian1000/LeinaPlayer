@@ -177,4 +177,21 @@ void main() {
     await restarted.logOut([base()]);
     expect(restarted.hasPermission(Account.editGlobalMoods), isFalse);
   });
+
+  test('permissions the phone does not know are ignored', () async {
+    permissions = [
+      'edit_global_moods',
+      'apply_corrections',
+      'not_invented_yet',
+    ];
+    final account = Account();
+    await account.load();
+    await account.logIn([base()], 'Owner', 'tajne1');
+    expect(account.loggedIn, isTrue);
+    expect(account.hasPermission(Account.editGlobalMoods), isTrue);
+
+    await account.refreshPermissions([base()]);
+    expect(account.loggedIn, isTrue);
+    expect(account.hasPermission(Account.editGlobalMoods), isTrue);
+  });
 }

@@ -30,7 +30,8 @@ should be fixed in MusicDatabase, and the phone can't do that.
   go stays in the outbox for the next try.
 - First request type: **`dead_youtube_links`** — music.db's `youtube_video_id` that YouTube no
   longer plays, with the video the phone found instead when it found one (a suggestion; the
-  owner reviews it in MusicDatabase). The phone keeps playing its replacement until a downloaded
+  owner reviews it in MusicDatabase, or — since 2026-10-14 — MusicDatabase applies it by itself
+  when its own search finds the same video, so a good suggestion matters). The phone keeps playing its replacement until a downloaded
   `music.db` has a different link or "N/A" (server values still win).
 
 ## How the phone fills it
@@ -68,8 +69,12 @@ album's title, year and type. Ids, links and service ids aren't editable. Format
   again).
 - "Czeka na wysłanie" lists waiting corrections next to the dead links.
 - MusicDatabase reviews them in "Resolve new requests" since 2026-10-14 (its
-  `docs/handoffs/field-corrections-for-musicdatabaseapp.md`); nothing is applied without the
-  owner. A correction of a name can merge albums or artists there, so the row it named may be
+  `docs/handoffs/field-corrections-for-musicdatabaseapp.md`). Since 2026-10-14 an automatic
+  pass every 15 minutes saves a correction without review when the file was signed by a user
+  with MusicDatabase's `apply_corrections` permission and nothing conflicts; everything else
+  waits for the owner (its `docs/handoffs/automatic-requests-for-musicdatabaseapp.md`). The
+  phone doesn't use that permission and shows nothing extra for it — a sent correction still
+  reads "Wysłano poprawkę" (owner's decision, 2026-10-14). A correction of a name can merge albums or artists there, so the row it named may be
   gone from the next music.db — the phone's note goes with it.
 
 ## Sending (MusicDatabase's inbox)

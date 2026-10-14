@@ -35,7 +35,9 @@ had tags (`tag.db`, global) and private tags per user (`user.db`, its ADR-0004).
   the next tag.db.
 - **Some users may edit global moods** (add and remove songs): the `edit_global_moods`
   permission, granted in MusicDatabase's menu. Without it the phone doesn't offer it. The
-  phone learns permissions from `POST /login` and `GET /users/<name>`.
+  phone learns permissions from `POST /login` and `GET /users/<name>`; names it doesn't know
+  (`apply_corrections`, future ones) are kept and ignored, never a parse error — MusicDatabase
+  adds new permissions to the same list.
 - In the UI: "Nastrój" / "Nastroje".
 - **Moods work without a login** (owner, 2026-10-13): global moods show and play for anyone;
   moods made while logged out stay on the phone, like playlists, and the phone offers them to
