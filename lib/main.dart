@@ -148,6 +148,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     setLinkChooserLook(mode: mode, light: light, dark: dark);
   }
 
+  /// Takes effect from the next song the notification shows.
+  void _updateNotificationNames() =>
+      widget.mediaSession?.latinNames = _themeController.latinNames;
+
   late final _albumCovers = AlbumCovers(
     _localLibrary.database,
     _sourceSettings,
@@ -228,6 +232,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.addListener(_updateCoverLook);
     _updateChooserLook();
     _themeController.addListener(_updateChooserLook);
+    _updateNotificationNames();
+    _themeController.addListener(_updateNotificationNames);
     _moodFilter.load().catchError(
       (Object e) => debugPrint('Loading the mood filter failed: $e'),
     );
@@ -471,6 +477,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   void dispose() {
     _themeController.removeListener(_updateCoverLook);
     _themeController.removeListener(_updateChooserLook);
+    _themeController.removeListener(_updateNotificationNames);
     _songCatalog.removeListener(_forgetSettledMatches);
     _moodLibrary.removeListener(_songCatalog.moodsChanged);
     _outboxSendSoon?.cancel();

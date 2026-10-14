@@ -13,6 +13,7 @@ import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'history_settings_screen.dart';
 import 'playlist_screen.dart';
+import '../widgets/song_names.dart';
 
 const _id = 'Ostatnie';
 
@@ -170,7 +171,7 @@ class _PlayRow extends StatelessWidget {
               .firstOrNull;
     return SongTile(
       hit: hit,
-      subtitle: [hit.artistLabel, ?playlist?.name].join(' • '),
+      subtitle: [hit.shownArtist(context), ?playlist?.name].join(' • '),
       trailing: SongMenuButton(hit: hit, idPrefix: '$_id › Utwór › Menu (⋮)'),
       menuIdPrefix: '$_id › Utwór › Menu (⋮)',
       // A playlist deleted since: the song just plays.

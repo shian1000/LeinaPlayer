@@ -18,6 +18,7 @@ import 'song_selection.dart';
 import '../data/album_covers.dart';
 import 'song_cover.dart';
 import 'swipe_actions.dart';
+import 'song_names.dart';
 
 /// Result title; the song in the player is highlighted like in the reference app.
 class CurrentTitle extends StatelessWidget {
@@ -251,8 +252,9 @@ class SongTile extends StatelessWidget {
     final details =
         subtitle ??
         [
-          hit.artistLabel,
-          if (hit.album != null && hit.album!.isNotEmpty) hit.album!,
+          hit.shownArtist(context),
+          if (hit.album != null && hit.album!.isNotEmpty)
+            hit.shownAlbum(context)!,
           if (hit.year != null) '${hit.year}',
         ].join(' • ');
     final selection = SongSelectionScope.maybeOf(context);
@@ -289,7 +291,7 @@ class SongTile extends StatelessWidget {
               ],
             )
           : cover,
-      title: CurrentTitle(text: hit.title, isCurrent: isCurrent),
+      title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
       subtitle: Text(details, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: trailing == null
           ? SourceIcons(hit: hit)
@@ -428,8 +430,8 @@ Future<void> showSongMenu(
     idPrefix: idPrefix,
     header: MenuSheetHeader(
       cover: SongCover(cover: CoverRequest.of(hit)),
-      title: hit.title,
-      subtitle: hit.artistLabel,
+      title: hit.shownTitle(context),
+      subtitle: hit.shownArtist(context),
     ),
     entries: [
       MenuSheetEntry(

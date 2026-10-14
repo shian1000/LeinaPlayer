@@ -149,4 +149,101 @@ void main() {
     sync.dispose();
     await tester.runAsync(() => root.delete(recursive: true));
   });
+
+  testWidgets('a Latin form can be sent for a name in another alphabet, '
+      'even before music.db has the column', (tester) async {
+    databaseFactory = databaseFactoryFfi;
+    SharedPreferences.setMockInitialValues({});
+    late Directory root;
+    late DatabaseSync sync;
+    late Outbox outbox;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('song_info_test');
+      sync = DatabaseSync(storageRoot: () async => root);
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.rawInsert("INSERT INTO artists (id, name) VALUES (7, 'Кино')");
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, artist_id) '
+        "VALUES (6, 'Группа крови', 7)",
+      );
+      await db.close();
+      outbox = Outbox(
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
+    });
+    final hit = SearchHit.main(
+      CatalogSong(id: 6, title: 'Группа крови', artistLabel: 'Кино'),
+      const [],
+    );
+    await tester.pumpWidget(
+      app(
+        SongInfoCard(hit: hit),
+        sync: sync,
+        outbox: outbox,
+      ),
+    );
+    await pumpUntil(
+      tester,
+      () => find.text('Tytuł alfabetem łacińskim').evaluate().isNotEmpty,
+    );
+    expect(find.text('Nazwa alfabetem łacińskim'), findsOneWidget);
+
+    final row = find.ancestor(
+      of: find.text('Tytuł alfabetem łacińskim'),
+      matching: find.byType(Row),
+    );
+    await tester.tap(
+      find.descendant(
+        of: row.first,
+        matching: find.byIcon(Icons.edit_outlined),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Gruppa krovi');
+    await tester.tap(find.text('Zapisz'));
+    await pumpUntil(
+      tester,
+      () => find
+          .text('Poprawka czeka na wysłanie: Gruppa krovi')
+          .evaluate()
+          .isNotEmpty,
+    );
+    final corrections = await tester.runAsync(
+      () async => outbox.waitingCorrections,
+    );
+    expect(corrections!.single.table, 'songs');
+    expect(corrections.single.column, 'title_latin');
+    expect(corrections.single.oldValue, isNull);
+    expect(corrections.single.newValue, 'Gruppa krovi');
+
+    sync.dispose();
+    await tester.runAsync(() => root.delete(recursive: true));
+  });
+
+  testWidgets('no Latin form fields for names in Latin letters', (
+    tester,
+  ) async {
+    databaseFactory = databaseFactoryFfi;
+    late Directory root;
+    late DatabaseSync sync;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('song_info_test');
+      sync = DatabaseSync(storageRoot: () async => root);
+      await writeMusicDb((await sync.localFile('music.db')).path);
+    });
+    final hit = SearchHit.main(
+      CatalogSong(id: 3, title: 'Pay Your Respect', artistLabel: 'Afina'),
+      const [],
+    );
+    await tester.pumpWidget(app(SongInfoCard(hit: hit), sync: sync));
+    await pumpUntil(tester, () => find.text('CJ Pitts').evaluate().isNotEmpty);
+    expect(find.text('Tytuł alfabetem łacińskim'), findsNothing);
+    expect(find.text('Nazwa alfabetem łacińskim'), findsNothing);
+
+    sync.dispose();
+    await tester.runAsync(() => root.delete(recursive: true));
+  });
 }

@@ -29,6 +29,7 @@ class ThemeController extends ChangeNotifier {
   static const _monochromeColorKey = 'appearance.monochrome_color';
   static const _monochromeBackgroundKey = 'appearance.monochrome_background';
   static const _savedColorsKey = 'appearance.saved_colors';
+  static const _latinNamesKey = 'appearance.latin_names';
   static const maxSavedColors = 8;
   static String _strengthKey(CoverFilter f) =>
       'appearance.cover_filter_strength.${f.name}';
@@ -45,6 +46,11 @@ class ThemeController extends ChangeNotifier {
   Map<CoverFilter, double> _strengths = const {};
   Color? _monochromeBackground;
   List<Color> _savedColors = const [];
+  bool _latinNames = true;
+
+  /// "Nazwy w alfabecie łacińskim": names in another alphabet followed by their Latin form
+  /// from music.db, "Кино (Kino)" (`latin_names.dart`).
+  bool get latinNames => _latinNames;
 
   CoverFilter get coverFilter => _coverFilter;
 
@@ -83,6 +89,7 @@ class ThemeController extends ChangeNotifier {
     _dark = _byName(darkThemes, prefs.getString(_darkKey)) ?? _dark;
     _darkMode = prefs.getBool(_darkModeKey) ?? _darkMode;
     _followSystem = prefs.getBool(_followSystemKey) ?? _followSystem;
+    _latinNames = prefs.getBool(_latinNamesKey) ?? _latinNames;
     _coverFilter =
         CoverFilter.values
             .where((f) => f.name == prefs.getString(_coverFilterKey))
@@ -190,6 +197,15 @@ class ThemeController extends ChangeNotifier {
     notifyListeners();
     await (await SharedPreferences.getInstance()).setDouble(
       _strengthKey(filter),
+      value,
+    );
+  }
+
+  Future<void> setLatinNames(bool value) async {
+    _latinNames = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _latinNamesKey,
       value,
     );
   }

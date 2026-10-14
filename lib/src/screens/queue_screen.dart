@@ -15,6 +15,7 @@ import '../widgets/queue_toast.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/swipe_actions.dart';
 import 'playlist_screen.dart';
+import '../widgets/song_names.dart';
 
 /// "Kolejka", opened from the full player: the last few songs before the current one (above,
 /// scrolled to; tapping one goes back to it), the song playing, then everything after it, under
@@ -430,9 +431,9 @@ class _QueueRow extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
       leading: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),
-      title: CurrentTitle(text: hit.title, isCurrent: isCurrent),
+      title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
       subtitle: Text(
-        hit.artistLabel,
+        hit.shownArtist(context),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

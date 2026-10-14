@@ -11,6 +11,7 @@ import '../dummy.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import 'song_cover.dart';
+import 'song_names.dart';
 
 /// One round button of the share sheet; [onTap] `null` shows it dimmed, and tapping it then
 /// shows [unavailable] (why it can't be used).
@@ -190,8 +191,8 @@ Future<void> showSongShareSheet(
       showDummy(context, '$idPrefix › Udostępnij › $label');
   return showShareSheet(
     context,
-    title: song.title,
-    subtitle: song.artistLabel,
+    title: song.shownTitle(context),
+    subtitle: song.shownArtist(context),
     cover: SongCover(cover: CoverRequest.of(song), size: 160),
     tint: context.palette.colorForSeed(song.coverSeed),
     options: [

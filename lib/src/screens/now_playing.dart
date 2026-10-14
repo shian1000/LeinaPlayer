@@ -21,6 +21,7 @@ import '../widgets/mood_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_info.dart';
 import 'queue_screen.dart';
+import '../widgets/song_names.dart';
 
 const _id = 'Odtwarzacz';
 
@@ -208,7 +209,7 @@ class MiniPlayer extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        track.title,
+                                        track.shownTitle(context),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -217,7 +218,7 @@ class MiniPlayer extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        track.artist,
+                                        track.shownArtist(context),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
@@ -513,7 +514,7 @@ class NowPlayingScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    track.title,
+                                    track.shownTitle(context),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -522,7 +523,7 @@ class NowPlayingScreen extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    track.artist,
+                                    track.shownArtist(context),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

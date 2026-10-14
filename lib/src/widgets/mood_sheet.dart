@@ -8,6 +8,7 @@ import '../theme.dart';
 import 'common.dart';
 import 'menu_sheet.dart';
 import 'song_cover.dart';
+import 'song_names.dart';
 
 /// What stands for a mood (a "Nastrój") everywhere.
 const moodIcon = Icons.nightlight;
@@ -200,7 +201,8 @@ Future<void> showMoodPicker(BuildContext context, SearchHit hit) {
                 MenuSheetHeader(
                   cover: SongCover(cover: CoverRequest.of(hit)),
                   title: 'Dodaj do nastroju',
-                  subtitle: '${hit.title} • ${hit.artistLabel}',
+                  subtitle:
+                      '${hit.shownTitle(context)} • ${hit.shownArtist(context)}',
                 ),
                 const Divider(),
                 ListTile(

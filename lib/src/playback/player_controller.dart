@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../data/album_covers.dart';
+import '../data/latin_names.dart';
 
 /// What's loaded in the player.
 class NowPlaying {
@@ -17,10 +18,16 @@ class NowPlaying {
     this.searchQuery,
     this.playlistName,
     this.youtubeVideoId,
+    this.titleLatin,
+    this.artistLatin,
   }) : _givenCover = cover;
 
   final String title;
   final String artist;
+
+  /// Latin forms of [title] and [artist] from music.db ([SearchHit.titleLatin]).
+  final String? titleLatin;
+  final String? artistLatin;
 
   /// A file path on the phone, or an http(s) address of a stream.
   final String source;
@@ -84,6 +91,9 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
     player.playbackEventStream.map(_state).pipe(playbackState);
   }
 
+  /// Ustawienia › Wygląd › "Nazwy w alfabecie łacińskim", for the notification.
+  bool latinNames = true;
+
   final player = AudioPlayer();
   final _skips = StreamController<MediaSkip>.broadcast();
 
@@ -93,8 +103,12 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   void show(NowPlaying track, Duration? duration, Uri? art) => mediaItem.add(
     MediaItem(
       id: track.youtubeVideoId ?? track.source,
-      title: track.title,
-      artist: track.artist,
+      title: latinNames
+          ? withLatin(track.title, track.titleLatin)
+          : track.title,
+      artist: latinNames
+          ? withLatin(track.artist, track.artistLatin)
+          : track.artist,
       duration: duration,
       artUri: art,
     ),

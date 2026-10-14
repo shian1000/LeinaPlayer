@@ -45,6 +45,16 @@ void main() {
     },
   );
 
+  test('Latin names: on at first, the choice kept', () async {
+    final themes = ThemeController();
+    await themes.load();
+    expect(themes.latinNames, isTrue);
+    await themes.setLatinNames(false);
+    final restarted = ThemeController();
+    await restarted.load();
+    expect(restarted.latinNames, isFalse);
+  });
+
   test('each filter keeps its own intensity', () async {
     final themes = ThemeController();
     await themes.setFilterStrength(CoverFilter.lain, 0.4);

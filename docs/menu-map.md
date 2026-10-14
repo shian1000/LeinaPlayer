@@ -250,6 +250,10 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     the system's current mode) while the next switch is on.
   - "Systemowe przełączanie trybu ciemnego" — switch; when on, light/dark follows the phone's
     dark-mode setting.
+  - "Nazwy w alfabecie łacińskim" — switch, on by default: a title, artist or album in another
+    alphabet is followed by its Latin form from music.db, "Кино (Kino)" — song rows, the queue,
+    menus, the mini/full player and the notification (`latin_names.dart`, `song_names.dart`;
+    hand-off [`musicdatabase-latin-names.md`](handoffs/musicdatabase-latin-names.md)).
   - Filtry do albumów **→ Filtry do albumów** (`cover_filter_screen.dart`) — **implemented**: a
     preview on the playing song's cover, then Brak / Lain / Monochromatic (radio); with a filter
     on, "Intensywność" (slider 0–100 % in 5 % steps, default 100 %, kept per filter; the preview

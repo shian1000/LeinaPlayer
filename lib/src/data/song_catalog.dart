@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'database_sync.dart';
+import 'latin_names.dart';
 import 'text_normalizer.dart';
 import 'youtube_matcher.dart';
 
@@ -75,7 +76,12 @@ class CatalogSong {
     List<String> artistNames = const [],
     List<String> origins = const [],
     List<String> synonyms = const [],
-  }) : youTubeTarget =
+    String? titleLatin,
+    String? albumLatin,
+    this.artistLatin,
+  }) : titleLatin = latinFormOf(title, titleLatin),
+       albumLatin = latinFormOf(album, albumLatin),
+       youTubeTarget =
            youTubeTarget ??
            MatchTarget(title: title, mainArtists: [MatchArtist(artistLabel)]),
        youtubeVideoId = const {null, '', 'N/A'}.contains(youtubeVideoId)
@@ -95,12 +101,14 @@ class CatalogSong {
        _fieldTexts = [
          for (final field in SearchField.values)
            normalizeForSearch(switch (field) {
-             SearchField.title => title,
+             SearchField.title => [title, ?titleLatin].join(' '),
              SearchField.artist => [
                if (artistNames.isEmpty) artistLabel else ...artistNames,
                ...synonyms,
+               ?artistLatin,
              ].join(' '),
-             SearchField.album => album,
+             SearchField.album =>
+               album == null ? null : [album, ?albumLatin].join(' '),
              SearchField.year => year?.toString(),
              // "Unknown" is MusicDatabase's placeholder, not a language to find songs by.
              SearchField.language => language == 'Unknown' ? null : language,
@@ -116,6 +124,16 @@ class CatalogSong {
   /// Main artist(s), then featured ones: "A, B feat. C".
   final String artistLabel;
   final String? album;
+
+  /// The Latin form of [title] (`songs.title_latin`), when the title is in another alphabet.
+  final String? titleLatin;
+
+  /// [artistLabel] with each artist's Latin form (`artists.name_latin`, else a Latin synonym),
+  /// when some artist is in another alphabet and all of them have one.
+  final String? artistLatin;
+
+  /// The Latin form of [album] (`albums.title_latin` of `songs.album_id`).
+  final String? albumLatin;
   final int? year;
   final String? language;
 
@@ -322,13 +340,25 @@ class SongCatalog extends ChangeNotifier {
           c['name'],
       };
       String column(String name) => columns.contains(name) ? 's.$name' : 'NULL';
+      final artistLatin = await _hasColumn(db, 'artists', 'name_latin')
+          ? 'a.name_latin'
+          : 'NULL';
+      // Before MusicDatabase's Latin forms (hand-off musicdatabase-latin-names.md) and its
+      // albums table, the columns aren't there.
+      final albumLatin =
+          columns.contains('album_id') &&
+              await _hasColumn(db, 'albums', 'title_latin')
+          ? '(SELECT al.title_latin FROM albums al WHERE al.id = s.album_id)'
+          : 'NULL';
       final rows = await db.rawQuery('''
         SELECT s.id, s.title, s.album, s.year, s.language,
                ${column('youtube_video_id')} AS youtube_video_id,
                ${column('spotify_url')} AS spotify_url,
-               a.name AS artist, a.origin, a.synonyms
+               ${column('title_latin')} AS title_latin,
+               $albumLatin AS album_latin,
+               a.name AS artist, a.origin, a.synonyms, $artistLatin AS name_latin
         FROM songs s JOIN artists a ON a.id = s.artist_id''');
-      final extra = await _readAdditionalArtists(db);
+      final extra = await _readAdditionalArtists(db, artistLatin);
       return [
         for (final row in rows)
           _song(row, [_artistOf(row, 'main'), ...?extra[row['id']! as int]]),
@@ -340,6 +370,9 @@ class SongCatalog extends ChangeNotifier {
 
   static CatalogSong _song(Map<String, Object?> row, List<_Artist> artists) {
     String? present(String? s) => s == null || s.trim().isEmpty ? null : s;
+    final otherNames = [
+      for (final a in artists) ...[?present(a.synonyms), ?present(a.nameLatin)],
+    ];
     return CatalogSong(
       id: row['id']! as int,
       title: row['title']! as String,
@@ -352,19 +385,57 @@ class SongCatalog extends ChangeNotifier {
         title: row['title']! as String,
         mainArtists: [
           for (final a in artists)
-            if (a.role == 'main') MatchArtist(a.name, a.synonyms),
+            if (a.role == 'main') MatchArtist(a.name, _otherNames(a)),
         ],
         featArtists: [
           for (final a in artists)
-            if (a.role == 'feat') MatchArtist(a.name, a.synonyms),
+            if (a.role == 'feat') MatchArtist(a.name, _otherNames(a)),
         ],
       ),
       artistLabel: _artistLabel(artists),
       artistNames: [for (final a in artists) a.name],
       origins: [for (final a in artists) ?present(a.origin)],
-      synonyms: [for (final a in artists) ?present(a.synonyms)],
+      synonyms: otherNames,
+      titleLatin: row['title_latin'] as String?,
+      albumLatin: row['album_latin'] as String?,
+      artistLatin: _artistLatinLabel(artists),
     );
   }
+
+  /// `artists.synonyms` with `name_latin` added, as one comma-separated list.
+  static String? _otherNames(_Artist a) => [
+    for (final s in [a.synonyms, a.nameLatin])
+      if (s != null && s.trim().isNotEmpty) s,
+  ].join(', ');
+
+  /// [_artistLabel] in Latin letters: each artist's `name_latin`, else (for a name in another
+  /// alphabet) its first Latin synonym; `null` when no artist needs one, or one has none.
+  static String? _artistLatinLabel(List<_Artist> artists) {
+    if (!artists.any((a) => hasNonLatinLetters(a.name))) return null;
+    final latin = <_Artist>[];
+    for (final a in artists) {
+      final name =
+          latinFormOf(a.name, a.nameLatin) ??
+          (hasNonLatinLetters(a.name) ? latinSynonym(a.synonyms) : a.name);
+      if (name == null) return null;
+      latin.add((
+        role: a.role,
+        name: name,
+        origin: a.origin,
+        synonyms: a.synonyms,
+        nameLatin: null,
+      ));
+    }
+    return _artistLabel(latin);
+  }
+
+  static Future<bool> _hasColumn(
+    Database db,
+    String table,
+    String column,
+  ) async =>
+      (await db.rawQuery('PRAGMA table_info($table)'))
+          .any((c) => c['name'] == column);
 
   static String? _spotifyTrackId(String? url) => url == null
       ? null
@@ -377,6 +448,7 @@ class SongCatalog extends ChangeNotifier {
     name: (row['artist'] ?? row['name'])! as String,
     origin: row['origin'] as String?,
     synonyms: row['synonyms'] as String?,
+    nameLatin: row['name_latin'] as String?,
   );
 
   /// `bad_youtube_videos`; none in a music.db from before MusicDatabase's migration 0010.
@@ -413,14 +485,18 @@ class SongCatalog extends ChangeNotifier {
 
   /// `additional_song_artists` (role `main` or `feat`) per song id; empty for databases created
   /// before that table existed.
-  Future<Map<int, List<_Artist>>> _readAdditionalArtists(Database db) async {
+  Future<Map<int, List<_Artist>>> _readAdditionalArtists(
+    Database db,
+    String nameLatin,
+  ) async {
     final hasTable = await db.rawQuery(
       "SELECT 1 FROM sqlite_master WHERE type = 'table' "
       "AND name = 'additional_song_artists'",
     );
     if (hasTable.isEmpty) return const {};
     final rows = await db.rawQuery('''
-      SELECT x.song_id, x.role, a.name, a.origin, a.synonyms
+      SELECT x.song_id, x.role, a.name, a.origin, a.synonyms,
+             $nameLatin AS name_latin
       FROM additional_song_artists x JOIN artists a ON a.id = x.artist_id
       ORDER BY x.song_id, a.name''');
     final result = <int, List<_Artist>>{};
@@ -524,6 +600,7 @@ typedef _Artist = ({
   String name,
   String? origin,
   String? synonyms,
+  String? nameLatin,
 });
 
 /// Makes the [SongCatalog] reachable from any screen.

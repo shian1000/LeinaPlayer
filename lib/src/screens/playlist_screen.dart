@@ -28,6 +28,7 @@ import '../widgets/song_cover.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'missing_tracks_screen.dart';
+import '../widgets/song_names.dart';
 
 const _id = 'Playlista';
 
@@ -517,8 +518,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       idPrefix: '$_id › Utwór › Menu (⋮)',
       header: MenuSheetHeader(
         cover: SongCover(cover: CoverRequest.of(hit)),
-        title: hit.title,
-        subtitle: hit.artistLabel,
+        title: hit.shownTitle(context),
+        subtitle: hit.shownArtist(context),
       ),
       entries: [
         MenuSheetEntry(
@@ -637,7 +638,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         youTubeListId: _playlist.youTubeId,
         playlistName: _playlist.name,
         // Like the reference app's playlists: just the artist.
-        subtitle: hit.artistLabel,
+        subtitle: hit.shownArtist(context),
         trailing: IconButton(
           tooltip: 'Menu utworu (⋮)',
           icon: Icon(Icons.more_vert, color: context.palette.textSecondary),

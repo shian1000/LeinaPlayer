@@ -78,6 +78,17 @@ class AppearanceScreen extends StatelessWidget {
             value: themes.followSystem,
             onChanged: themes.setFollowSystem,
           ),
+          const Divider(height: 24),
+          SwitchListTile(
+            secondary: const Icon(Icons.translate),
+            title: const Text('Nazwy w alfabecie łacińskim'),
+            subtitle: const Text(
+              'Tytuł, wykonawca i album zapisane innym alfabetem z wersją '
+              'łacińską w nawiasie, np. Кино (Kino)',
+            ),
+            value: themes.latinNames,
+            onChanged: themes.setLatinNames,
+          ),
         ],
       ),
     );

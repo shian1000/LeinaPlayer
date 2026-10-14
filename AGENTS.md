@@ -33,7 +33,11 @@ going to the outbox for MusicDatabase while the phone keeps showing music.db's v
 "Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
-(synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Every cache setting is in one screen, Oszczędzanie
+(synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Names in another
+alphabet are shown with their Latin form, "Кино (Kino)" (Wygląd › "Nazwy w alfabecie
+łacińskim"): only music.db's `title_latin` / `name_latin` columns or an artist's Latin synonym,
+never transliterated on the phone (user's decision); the forms are sent as field corrections
+([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Every cache setting is in one screen, Oszczędzanie
 danych i tryb offline › Pamięć podręczna. YouTube: searching it on request, showing which songs
 MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
 audio on Android through NewPipeExtractor, with a cache of played songs — see
@@ -123,7 +127,8 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player; `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog` in `common.dart`;
-  `showShareSheet` in `share_sheet.dart`).
+  `showShareSheet` in `share_sheet.dart`; `song_names.dart` — `shownTitle` / `shownArtist` /
+  `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
   `music.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
   search over both (`combined_search.dart`), requests for MusicDatabase waiting to be sent
@@ -143,7 +148,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (`album_covers.dart`), play history (`play_history.dart`,
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
-  (`network_errors.dart`), and the port of MusicDatabase's `normalize()` (`text_normalizer.dart`).
+  (`network_errors.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
+  port of MusicDatabase's `normalize()` (`text_normalizer.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
   (the queue and position saved across restarts) and `YouTubePlayback` (the user's ordered ways
@@ -182,6 +188,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `YouTubeScope`, an `InheritedWidget` so tests can swap YouTube search, audio and playlist
   fetching); no
   state-management package. Settings persist via `shared_preferences`.
+- Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
+  `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
+  reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.
 - Screens never hard-code colours or font sizes: `context.palette` and `AppFontSize`
   ([`theming.md`](docs/agent-notes/theming.md), [`ui-sizing.md`](docs/agent-notes/ui-sizing.md)).
 - System Back in `AppShell` pops tab routes directly (bypassing their `PopScope`), so a pushed

@@ -55,7 +55,11 @@ should be fixed in MusicDatabase, and the phone can't do that.
 Second request type, the owner's decision: **`field_corrections`** — values the user corrects in
 "Informacje o utworze" under the full player (the pencil next to a field): the song's title,
 album, year, language, track and disc number; its artists' name, origin and other names; its
-album's title, year and type. Ids, links and service ids aren't editable. Format in
+album's title, year and type; and the Latin forms of names in other alphabets
+(`songs.title_latin`, `artists.name_latin`, `albums.title_latin` — offered only next to a name in
+another alphabet, even before music.db has the columns; hand-off
+[`../handoffs/musicdatabase-latin-names.md`](../handoffs/musicdatabase-latin-names.md)). Ids, links
+and service ids aren't editable. Format in
 [`../handoffs/musicdatabase-field-corrections.md`](../handoffs/musicdatabase-field-corrections.md).
 
 - **The phone keeps showing music.db's value** (server wins, ADR 0003), with "Poprawka czeka na

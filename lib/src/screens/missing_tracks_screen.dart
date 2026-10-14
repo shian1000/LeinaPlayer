@@ -8,6 +8,7 @@ import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/song_names.dart';
 
 /// "Wyświetl utwory, których nie ma w bazie danych" from a playlist's ⋮: its tracks not
 /// recognised as MusicDatabase songs. Only a list for now; later the place to ask
@@ -100,7 +101,7 @@ class MissingTracksScreen extends StatelessWidget {
                   playlistId: saved ? playlist.id : null,
                   youTubeListId: playlist.youTubeId,
                   playlistName: playlist.name,
-                  subtitle: hits[i].artistLabel,
+                  subtitle: hits[i].shownArtist(context),
                 ),
           ],
         ),

@@ -7,6 +7,7 @@ import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/song_names.dart';
 
 /// "Pamięć podręczna › Zajęte miejsce": the songs in the cache, most recently played first.
 /// Tapping one plays it and then the rest of the list (all from the phone, so offline too); ⊖
@@ -98,7 +99,8 @@ class _CacheContentsScreenState extends State<CacheContentsScreen> {
                 hit: hits[i],
                 queue: hits,
                 queueIndex: i,
-                subtitle: '${hits[i].artistLabel} • ${mb(entry.sizeBytes)} MB',
+                subtitle:
+                    '${hits[i].shownArtist(context)} • ${mb(entry.sizeBytes)} MB',
                 trailing: IconButton(
                   tooltip: 'Usuń z pamięci podręcznej',
                   icon: Icon(

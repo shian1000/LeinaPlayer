@@ -100,6 +100,65 @@ void main() {
       },
     );
 
+    test('Latin forms of names in another alphabet: music.db\'s, else an '
+        'artist\'s Latin synonym; found by search', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE artists ADD COLUMN name_latin VARCHAR');
+      await db.execute('ALTER TABLE songs ADD COLUMN title_latin VARCHAR');
+      await db.execute('ALTER TABLE songs ADD COLUMN album_id INTEGER');
+      await db.execute(
+        'CREATE TABLE albums (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL, '
+        'title_latin VARCHAR)',
+      );
+      await db.rawInsert(
+        "INSERT INTO albums VALUES (1, 'Группа крови', 'Gruppa krovi')",
+      );
+      await db.rawInsert(
+        "INSERT INTO artists (id, name, synonyms, name_latin) VALUES "
+        "(7, 'Кино', NULL, 'Kino'), "
+        "(8, 'Бумбокс', 'Бумбокс UA, familyboombox, Bumboks', NULL), "
+        "(9, 'Земфира', NULL, NULL)",
+      );
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, album, language, artist_id, '
+        'title_latin, album_id) VALUES '
+        "(6, 'Группа крови', 'Группа крови', 'Russian', 7, 'Gruppa krovi', 1), "
+        "(7, 'Вахтёрам', NULL, 'Ukrainian', 8, NULL, NULL), "
+        "(8, 'Хочешь?', NULL, 'Russian', 9, 'Khochesh?', NULL)",
+      );
+      await db.rawInsert(
+        "INSERT INTO additional_song_artists VALUES (7, 2, 'feat')",
+      );
+      await db.execute("UPDATE songs SET title_latin = 'Maly' WHERE id = 1");
+      await db.close();
+      await catalog.ensureLoaded();
+
+      final kino = catalog.byId(6)!;
+      expect(kino.titleLatin, 'Gruppa krovi');
+      expect(kino.artistLatin, 'Kino');
+      expect(kino.albumLatin, 'Gruppa krovi');
+      final boombox = catalog.byId(7)!;
+      expect(boombox.titleLatin, isNull);
+      expect(boombox.artistLatin, 'familyboombox feat. Led Zeppelin');
+      // Nothing to go by: no Latin form rather than a half-Latin one.
+      expect(catalog.byId(8)!.artistLatin, isNull);
+      // Already in Latin letters: nothing more to show.
+      expect(catalog.byId(1)!.titleLatin, isNull);
+      expect(catalog.byId(1)!.artistLatin, isNull);
+
+      expect(catalog.search('gruppa kino').single.id, 6);
+      expect(catalog.search('khochesh').single.id, 8);
+      expect(catalog.findExact(title: 'Группа крови', artist: 'Kino')?.id, 6);
+    });
+
+    test('no Latin forms in a music.db from before them', () async {
+      await loadSample();
+      expect(catalog.byId(1)!.titleLatin, isNull);
+      expect(catalog.byId(1)!.albumLatin, isNull);
+    });
+
     test('loads every song with its artists', () async {
       await loadSample();
       expect(catalog.status, CatalogStatus.ready);

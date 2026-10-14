@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
+import '../data/latin_names.dart';
 import '../data/moods.dart';
 import '../data/outbox.dart';
 import '../data/song_catalog.dart';
@@ -134,7 +135,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
   }
 
   Widget _songSection(SongDetails details) {
-    final song = details.song;
+    final song = _withLatinColumn(details.song, 'title', 'title_latin');
     const shownElsewhere = {
       'artist_id',
       'album_id',
@@ -153,21 +154,23 @@ class _SongInfoCardState extends State<SongInfoCard> {
     ]);
   }
 
-  Widget _artistSection(String role, DbRow artist, {required bool first}) =>
-      _Section(
-        first
-            ? 'Wykonawca'
-            : role == 'feat'
-            ? 'Gościnnie (feat.)'
-            : 'Współwykonawca',
-        [
-          for (final key in artist.keys)
-            _editableField('artists', artist, key, _artistLabels[key] ?? key),
-        ],
-      );
+  Widget _artistSection(String role, DbRow artist, {required bool first}) {
+    final row = _withLatinColumn(artist, 'name', 'name_latin');
+    return _Section(
+      first
+          ? 'Wykonawca'
+          : role == 'feat'
+          ? 'Gościnnie (feat.)'
+          : 'Współwykonawca',
+      [
+        for (final key in row.keys)
+          _editableField('artists', row, key, _artistLabels[key] ?? key),
+      ],
+    );
+  }
 
   Widget _albumSection(SongDetails details) {
-    final album = details.album!;
+    final album = _withLatinColumn(details.album!, 'title', 'title_latin');
     Uri? link(String key, String Function(Object id) url) =>
         album[key] == null ? null : Uri.parse(url(album[key]!));
     final links = {
@@ -498,6 +501,23 @@ String? _shown(_Kind? kind, Object? value) =>
 
 enum _Kind { text, required, number, albumType }
 
+/// [row] with its Latin form column ([latinColumn] of [column], `latin_names.dart`) only where
+/// it's of use: next to a name in another alphabet — even before music.db has the column, so
+/// the user can already send one — or when it's set; right after [column].
+DbRow _withLatinColumn(DbRow row, String column, String latinColumn) {
+  final wanted =
+      _text(row[latinColumn]) != null ||
+      hasNonLatinLetters(row[column] as String?);
+  if (wanted == row.containsKey(latinColumn)) return row;
+  return {
+    for (final MapEntry(:key, :value) in row.entries)
+      if (key != latinColumn) ...{
+        key: value,
+        if (key == column && wanted) latinColumn: row[latinColumn],
+      },
+  };
+}
+
 /// What can be corrected, by music.db table and column. Ids, links, service ids and the old
 /// mood columns stay as they are.
 const _editable = {
@@ -508,14 +528,17 @@ const _editable = {
     'language': _Kind.text,
     'track_number': _Kind.number,
     'disc_number': _Kind.number,
+    'title_latin': _Kind.text,
   },
   'artists': {
     'name': _Kind.required,
+    'name_latin': _Kind.text,
     'origin': _Kind.text,
     'synonyms': _Kind.text,
   },
   'albums': {
     'title': _Kind.required,
+    'title_latin': _Kind.text,
     'year': _Kind.number,
     'type': _Kind.albumType,
   },
@@ -530,6 +553,7 @@ String? _text(Object? value) => switch (value) {
 const _songLabels = {
   'id': 'ID w MusicDatabase',
   'title': 'Tytuł',
+  'title_latin': 'Tytuł alfabetem łacińskim',
   'album': 'Album',
   'year': 'Rok',
   'language': 'Język',
@@ -540,6 +564,7 @@ const _songLabels = {
 const _artistLabels = {
   'id': 'ID',
   'name': 'Nazwa',
+  'name_latin': 'Nazwa alfabetem łacińskim',
   'origin': 'Pochodzenie',
   'synonyms': 'Inne nazwy',
 };
@@ -547,6 +572,7 @@ const _artistLabels = {
 const _albumLabels = {
   'id': 'ID albumu',
   'title': 'Tytuł',
+  'title_latin': 'Tytuł alfabetem łacińskim',
   'year': 'Rok',
   'type': 'Rodzaj',
   'musicbrainz_release_group_id': 'MusicBrainz',

@@ -96,6 +96,12 @@ class SearchHit {
 
   bool get inMainDatabase => mainSong != null;
 
+  /// Latin forms of [title], [artistLabel] and [album] from music.db, for names in another
+  /// alphabet (`latin_names.dart`); `null` for songs music.db doesn't have.
+  String? get titleLatin => mainSong?.titleLatin;
+  String? get artistLatin => mainSong?.artistLatin;
+  String? get albumLatin => mainSong?.albumLatin;
+
   SearchHit._copy(
     SearchHit hit, {
     required this.phoneMatch,
