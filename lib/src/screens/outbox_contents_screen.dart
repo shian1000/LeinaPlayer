@@ -6,10 +6,12 @@ import '../data/outbox.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
+import '../widgets/song_info.dart';
 import '../widgets/song_tile.dart';
 
 /// "Czeka na wysłanie" in Ustawienia › Źródła muzyki › Baza danych: the songs reported in the
-/// requests still waiting in the outbox, with the video the phone found instead.
+/// requests still waiting in the outbox, with the video the phone found instead, and the fields
+/// the user corrected in "Informacje o utworze".
 class OutboxContentsScreen extends StatefulWidget {
   const OutboxContentsScreen({super.key});
 
@@ -30,6 +32,7 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    final corrections = OutboxScope.of(context).waitingCorrections;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
@@ -45,17 +48,27 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
           if (reports == null) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (reports.isEmpty) {
+          if (reports.isEmpty && corrections.isEmpty) {
             return const _Note('Wszystkie zgłoszenia zostały wysłane.');
           }
           return ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              const _Note(
-                'Linki z bazy danych, których YouTube już nie odtwarza. Do czasu poprawki w '
-                'MusicDatabase telefon gra film znaleziony w zamian.',
-              ),
-              for (final report in reports) _ReportTile(report),
+              if (reports.isNotEmpty) ...[
+                const _Note(
+                  'Linki z bazy danych, których YouTube już nie odtwarza. Do czasu poprawki w '
+                  'MusicDatabase telefon gra film znaleziony w zamian.',
+                ),
+                for (final report in reports) _ReportTile(report),
+              ],
+              if (corrections.isNotEmpty) ...[
+                const _Note(
+                  'Poprawki informacji o utworach. Do czasu ich przyjęcia w MusicDatabase '
+                  'telefon pokazuje wartości z bazy danych.',
+                ),
+                for (final correction in corrections)
+                  _CorrectionTile(correction),
+              ],
             ],
           );
         },
@@ -91,6 +104,37 @@ class _ReportTile extends StatelessWidget {
       YouTubeLibraryScope.of(context),
     );
     return SongTile(hit: hit, queue: [hit], subtitle: subtitle);
+  }
+}
+
+class _CorrectionTile extends StatelessWidget {
+  const _CorrectionTile(this.correction);
+
+  final FieldCorrection correction;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = correction;
+    String shown(Object? v) => fieldValue(c.table, c.column, v) ?? '(puste)';
+    final where = switch (c.table) {
+      'artists' => 'wykonawca',
+      'albums' => 'album',
+      _ => null,
+    };
+    return ListTile(
+      leading: const Icon(Icons.edit_outlined),
+      title: Text(
+        '${fieldLabel(c.table, c.column)}${where == null ? '' : ' ($where)'}: '
+        '${shown(c.oldValue)} → ${shown(c.newValue)}',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '${c.title} · ${c.artist}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
   }
 }
 

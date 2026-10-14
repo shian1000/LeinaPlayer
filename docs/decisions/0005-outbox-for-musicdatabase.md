@@ -49,6 +49,26 @@ should be fixed in MusicDatabase, and the phone can't do that.
   (`LINK_ALREADY_CHANGED` in its `inbox_requests.py`) without asking. A check on the phone could
   only drop a few rows from waiting files, so it was left out (user agreed, 2026-10-13).
 
+## Field corrections (2026-10-14)
+
+Second request type, the owner's decision: **`field_corrections`** — values the user corrects in
+"Informacje o utworze" under the full player (the pencil next to a field): the song's title,
+album, year, language, track and disc number; its artists' name, origin and other names; its
+album's title, year and type. Ids, links and service ids aren't editable. Format in
+[`../handoffs/musicdatabase-field-corrections.md`](../handoffs/musicdatabase-field-corrections.md).
+
+- **The phone keeps showing music.db's value** (server wins, ADR 0003), with "Poprawka czeka na
+  wysłanie: X" or "Wysłano poprawkę: X" under it while music.db still has the value the
+  correction was made against (owner's choice over showing the new value at once).
+- **Files hold one kind of report.** MusicDatabase keeps a whole file unprocessed while it doesn't
+  know one of its tables, so corrections go into request files of their own and dead links keep
+  being processed. The newest waiting file of the user that holds the table takes more.
+- Corrected again before it's sent, the newer value replaces the row; set back to music.db's
+  value, the row is dropped, and a file left empty is deleted (never sent, so its number may come
+  again).
+- "Czeka na wysłanie" lists waiting corrections next to the dead links.
+- MusicDatabase doesn't process them yet (owner's choice: hand-off first); they wait in its inbox.
+
 ## Sending (MusicDatabase's inbox)
 
 - `PUT <server>/inbox/<file name>` with `Content-Length`, to the same addresses as the download,
@@ -74,6 +94,8 @@ should be fixed in MusicDatabase, and the phone can't do that.
 - ~~User name~~ — settled by [ADR 0006](0006-musicdatabase-login.md): the logged-in MusicDatabase
   user; uploads carry its token.
 - Whether `outbox/sent/` is ever pruned (e.g. once music.db reflects its rows).
+- A sent correction the owner rejects keeps its "Wysłano poprawkę" note until the field changes
+  in music.db; MusicDatabase has no way to tell the phone yet.
 
 ## Consequences
 

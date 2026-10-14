@@ -103,7 +103,8 @@ and reloads after each successful download. Matching uses `text_normalizer.dart`
 MusicDatabase's `normalize()`; `tag.db` isn't read yet.
 
 Back to MusicDatabase: `lib/src/data/outbox.dart` (`Outbox`, `OutboxScope`) keeps requests — small
-SQLite files, so far dead music.db YouTube links with the phone's replacement — and sends them to
+SQLite files, so far dead music.db YouTube links with the phone's replacement and the user's
+corrections of music.db fields, one kind per file — and sends them to
 the inbox on MusicDatabase's sharing server (`PUT /inbox/<name>`, same addresses as the download;
 [ADR 0005](decisions/0005-outbox-for-musicdatabase.md)). `lib/src/data/account.dart` (`Account`,
 `AccountScope`) is the MusicDatabase user logged in on the phone (`POST /login` → a token sent with

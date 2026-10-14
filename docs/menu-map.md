@@ -81,7 +81,10 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     links (music.db's and the phone's or the playlist's when different), moods (global and own,
     from `MoodLibrary`) and the other tag.db tags, the files on the phone and what it plays
     from. Tapping a link opens it, a long press copies a value. Songs not in MusicDatabase show
-    only what the phone knows.
+    only what the phone knows. A pencil next to the song's, its artists' and its album's own
+    fields (empty ones shown as "—") corrects the value: the correction goes to the outbox for
+    MusicDatabase ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md), field corrections)
+    and shows under music.db's value until a downloaded music.db changes it.
   - `Odtwarzacz › Urządzenia`, Filtr nastrojów (**implemented**: filter icon, accent while on,
     **→ Filtr nastrojów**), **Nastrój** (**implemented**, only while the filter is on, in the
     middle of the row: the song's mood names, or "Nastrój" — tapping it **→ Dodaj do nastroju**),

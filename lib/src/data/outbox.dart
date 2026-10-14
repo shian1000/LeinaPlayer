@@ -115,6 +115,7 @@ class Outbox extends ChangeNotifier {
 
   Future<void> refresh() async {
     _waiting = (await pending()).length;
+    await _inTurn(_loadCorrections);
     notifyListeners();
   }
 
@@ -142,7 +143,8 @@ class Outbox extends ChangeNotifier {
         options: OpenDatabaseOptions(readOnly: true),
       );
       try {
-        for (final row in await db.query('dead_youtube_links')) {
+        if (!await _hasTable(db, _deadLinks)) continue;
+        for (final row in await db.query(_deadLinks)) {
           reports.add(DeadLinkReport._fromRow(row));
         }
       } finally {
@@ -197,6 +199,129 @@ class Outbox extends ChangeNotifier {
     );
   });
 
+  Map<({String table, int rowId, String column}), FieldCorrection> _known =
+      const {};
+
+  /// The user's correction of [column] in music.db's [table] row [rowId], waiting or sent,
+  /// while the downloaded music.db still has the value it corrects ([current]); `null` once
+  /// music.db's value changed (accepted, or settled otherwise) or when there's none.
+  FieldCorrection? correctionOf(
+    String table,
+    int rowId,
+    String column,
+    Object? current,
+  ) {
+    final correction = _known[(table: table, rowId: rowId, column: column)];
+    if (correction == null || !_same(correction.oldValue, current)) return null;
+    return correction;
+  }
+
+  /// The corrections in the requests waiting to be sent, in the order they were made.
+  List<FieldCorrection> get waitingCorrections {
+    final waiting = [
+      for (final c in _known.values)
+        if (!c.sent) c,
+    ];
+    DateTime when(FieldCorrection c) =>
+        DateTime.tryParse(c.correctedAt) ?? DateTime(0);
+    waiting.sort((a, b) => when(a).compareTo(when(b)));
+    return waiting;
+  }
+
+  /// The user corrected [column] of music.db's [table] row [rowId], which the downloaded
+  /// music.db has as [oldValue], to [newValue] (`null` empties it), looking at [song]. A
+  /// suggestion MusicDatabase's owner reviews; the phone keeps using music.db's value. Corrected
+  /// again before it's sent, the newer value replaces the older; set back to [oldValue], the
+  /// correction is dropped.
+  Future<void> correctField({
+    required String table,
+    required int rowId,
+    required String column,
+    required Object? oldValue,
+    required Object? newValue,
+    required CatalogSong song,
+  }) => _inTurn(() async {
+    final key = (table: table, rowId: rowId, column: column);
+    final dropping = _same(oldValue, newValue);
+    if (dropping && !(_known[key]?.sent == false)) return;
+    final db = await _openRequest(_corrections);
+    final file = File(db.path);
+    bool empty;
+    try {
+      if (dropping) {
+        await db.delete(
+          _corrections,
+          where: 'table_name = ? AND row_id = ? AND column_name = ?',
+          whereArgs: [table, rowId, column],
+        );
+      } else {
+        await db.insert(_corrections, {
+          'table_name': table,
+          'row_id': rowId,
+          'column_name': column,
+          'old_value': oldValue,
+          'new_value': newValue,
+          'song_id': song.id,
+          'title': song.title,
+          'artist': song.artistLabel,
+          'corrected_at': _timestamp(_now()),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      empty = (await db.query(_corrections, limit: 1)).isEmpty;
+    } finally {
+      await db.close();
+    }
+    // Never sent, so its number may be given again.
+    if (empty) {
+      await file.delete();
+      final journal = File('${file.path}-journal');
+      if (await journal.exists()) await journal.delete();
+    }
+    await _loadCorrections();
+    _waiting = (await pending()).length;
+    notifyListeners();
+    if (!empty) onReported?.call();
+  });
+
+  Future<void> _loadCorrections() async {
+    final dir = await directory();
+    final factory = factoryOverride ?? databaseFactory;
+    final files = <(File, bool)>[
+      for (final (folder, sent) in [
+        (Directory('${dir.path}/sent'), true),
+        (dir, false),
+      ])
+        if (await folder.exists())
+          await for (final f in folder.list())
+            if (f is File && _requestName.hasMatch(_baseName(f.path)))
+              (f, sent),
+    ];
+    files.sort((a, b) => _number(a.$1.path).compareTo(_number(b.$1.path)));
+    final known =
+        <({String table, int rowId, String column}), FieldCorrection>{};
+    for (final (file, sent) in files) {
+      final db = await factory.openDatabase(
+        file.path,
+        options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+      );
+      try {
+        if (!await _hasTable(db, _corrections)) continue;
+        for (final row in await db.query(_corrections)) {
+          final c = FieldCorrection._fromRow(row, sent: sent);
+          known[(table: c.table, rowId: c.rowId, column: c.column)] = c;
+        }
+      } catch (e) {
+        debugPrint('Outbox: reading corrections from ${file.path} failed: $e');
+      } finally {
+        await db.close();
+      }
+    }
+    _known = known;
+  }
+
+  static bool _same(Object? a, Object? b) =>
+      a == null || b == null ? a == b : '$a' == '$b';
+
   /// Folders holding requests that already have a number: waiting, sent and refused ones.
   List<Directory> _numbered(Directory dir) => [
     dir,
@@ -213,8 +338,9 @@ class Outbox extends ChangeNotifier {
         if (!_requestName.hasMatch(_baseName(f.path))) continue;
         final db = await factory.openDatabase(f.path);
         try {
+          if (!await _hasTable(db, _deadLinks)) continue;
           final rows = await db.query(
-            'dead_youtube_links',
+            _deadLinks,
             where: 'song_id = ? AND dead_video_id = ?',
             whereArgs: [songId, deadVideoId],
             limit: 1,
@@ -233,10 +359,11 @@ class Outbox extends ChangeNotifier {
   Future<bool> _write(
     Future<void> Function(Database db) change, {
     Future<bool> Function()? unless,
+    String table = _deadLinks,
   }) {
     return _inTurn(() async {
       if (unless != null && await unless()) return false;
-      final db = await _openRequest();
+      final db = await _openRequest(table);
       try {
         await change(db);
       } finally {
@@ -285,6 +412,7 @@ class Outbox extends ChangeNotifier {
     } finally {
       _sending = false;
       _waiting = (await pending()).length;
+      await _inTurn(_loadCorrections);
       notifyListeners();
     }
   }
@@ -409,13 +537,18 @@ class Outbox extends ChangeNotifier {
     if (await journal.exists()) await journal.delete();
   }
 
-  Future<Database> _openRequest() async {
+  /// The newest waiting request of the current user that holds [table], or a new one.
+  Future<Database> _openRequest(String table) async {
     final user = _safeUserName(_userName());
     final factory = factoryOverride ?? databaseFactory;
     // Only a request made by the same user (or, logged out, an unsigned one) takes more: the
     // name says who sent it, and the server checks it against the token.
     final own = (await pending()).where((f) => _userOf(f.path) == user);
-    if (own.isNotEmpty) return factory.openDatabase(own.last.path);
+    for (final file in own.toList().reversed) {
+      final db = await factory.openDatabase(file.path);
+      if (await _hasTable(db, table)) return db;
+      await db.close();
+    }
     final dir = await directory();
     final created = _now();
     final number = await _nextNumber(dir);
@@ -443,23 +576,51 @@ class Outbox extends ChangeNotifier {
             'user_name': user,
             'app': 'Leina Radio',
           });
-          await db.execute('''
-          CREATE TABLE dead_youtube_links (
-            song_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            artist TEXT NOT NULL,
-            dead_video_id TEXT NOT NULL,
-            detected_at TEXT NOT NULL,
-            replacement_video_id TEXT,
-            replacement_title TEXT,
-            replacement_channel TEXT,
-            replacement_found_at TEXT,
-            PRIMARY KEY (song_id, dead_video_id)
-          )''');
+          await db.execute(_schemas[table]!);
         },
       ),
     );
   }
+
+  static const _deadLinks = 'dead_youtube_links';
+  static const _corrections = 'field_corrections';
+
+  // Each kind of report gets files of its own: MusicDatabase keeps a whole file unprocessed
+  // while it doesn't know one of its tables, and corrections came after dead links.
+  static const _schemas = {
+    _deadLinks: '''
+    CREATE TABLE dead_youtube_links (
+      song_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      artist TEXT NOT NULL,
+      dead_video_id TEXT NOT NULL,
+      detected_at TEXT NOT NULL,
+      replacement_video_id TEXT,
+      replacement_title TEXT,
+      replacement_channel TEXT,
+      replacement_found_at TEXT,
+      PRIMARY KEY (song_id, dead_video_id)
+    )''',
+    _corrections: '''
+    CREATE TABLE field_corrections (
+      table_name TEXT NOT NULL,
+      row_id INTEGER NOT NULL,
+      column_name TEXT NOT NULL,
+      old_value,
+      new_value,
+      song_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      artist TEXT NOT NULL,
+      corrected_at TEXT NOT NULL,
+      PRIMARY KEY (table_name, row_id, column_name)
+    )''',
+  };
+
+  static Future<bool> _hasTable(Database db, String table) async =>
+      (await db.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        [table],
+      )).isNotEmpty;
 
   /// One more than any request ever numbered here, sent ones included, so a number isn't reused.
   Future<int> _nextNumber(Directory dir) async {
@@ -574,6 +735,42 @@ class DeadLinkReport {
   final String? replacementChannel;
 }
 
+/// A field of music.db the user corrected on the phone, for MusicDatabase to review.
+class FieldCorrection {
+  FieldCorrection._fromRow(Map<String, Object?> row, {required this.sent})
+    : table = row['table_name']! as String,
+      rowId = row['row_id']! as int,
+      column = row['column_name']! as String,
+      oldValue = row['old_value'],
+      newValue = row['new_value'],
+      songId = row['song_id']! as int,
+      title = row['title']! as String,
+      artist = row['artist']! as String,
+      correctedAt = row['corrected_at']! as String;
+
+  /// `songs`, `artists` or `albums`.
+  final String table;
+  final int rowId;
+  final String column;
+
+  /// What the phone's music.db had.
+  final Object? oldValue;
+
+  /// `null`: the user emptied the field.
+  final Object? newValue;
+
+  /// The song it was corrected from, as the phone showed it.
+  final int songId;
+  final String title;
+  final String artist;
+
+  /// ISO 8601 with offset.
+  final String correctedAt;
+
+  /// Already handed to MusicDatabase's inbox.
+  final bool sent;
+}
+
 class OutboxScope extends InheritedNotifier<Outbox> {
   const OutboxScope({
     super.key,
@@ -583,4 +780,7 @@ class OutboxScope extends InheritedNotifier<Outbox> {
 
   static Outbox of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<OutboxScope>()!.notifier!;
+
+  static Outbox? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<OutboxScope>()?.notifier;
 }

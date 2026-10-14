@@ -189,6 +189,98 @@ void main() {
     expect(await rows(files.single, 'dead_youtube_links'), hasLength(2));
   });
 
+  group('corrections', () {
+    Future<void> correctYear(Outbox outbox, Object? to) => outbox.correctField(
+      table: 'songs',
+      rowId: 4601,
+      column: 'year',
+      oldValue: 2019,
+      newValue: to,
+      song: chromatic,
+    );
+
+    test(
+      'go into a request of their own, a newer value replacing the older',
+      () async {
+        final outbox = newOutbox();
+        await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+        await correctYear(outbox, 2018);
+        now = now.add(const Duration(minutes: 1));
+        await correctYear(outbox, 2017);
+        await outbox.correctField(
+          table: 'artists',
+          rowId: 7,
+          column: 'origin',
+          oldValue: 'USA',
+          newValue: null,
+          song: chromatic,
+        );
+
+        final files = await outbox.pending();
+        expect(names(files), [
+          '2026-10-12_23-44-05_001.db',
+          '2026-10-12_23-44-05_002.db',
+        ]);
+        // Dead links stay where MusicDatabase already understands them.
+        await outbox.reportDeadYouTubeLink(losingSleep, 'ad5ukUkNjgw');
+        expect(await outbox.pending(), hasLength(2));
+        expect(await rows(files.first, 'dead_youtube_links'), hasLength(2));
+
+        final corrections = await rows(files.last, 'field_corrections');
+        expect(corrections, hasLength(2));
+        final year = corrections.firstWhere((r) => r['column_name'] == 'year');
+        expect(year, containsPair('old_value', 2019));
+        expect(year, containsPair('new_value', 2017));
+        expect(year, containsPair('title', 'Chromatic'));
+        expect(year['corrected_at'], startsWith('2026-10-12T23:45:05'));
+        final origin = corrections.firstWhere(
+          (r) => r['column_name'] == 'origin',
+        );
+        expect(origin['new_value'], isNull);
+
+        expect(
+          outbox.correctionOf('songs', 4601, 'year', 2019)?.newValue,
+          2017,
+        );
+        expect(outbox.waitingCorrections, hasLength(2));
+        // A downloaded music.db with another value settles it.
+        expect(outbox.correctionOf('songs', 4601, 'year', 2017), isNull);
+      },
+    );
+
+    test(
+      'set back to the old value, a correction is dropped with its request',
+      () async {
+        final outbox = newOutbox();
+        await correctYear(outbox, 2018);
+        expect(await outbox.pending(), hasLength(1));
+        await correctYear(outbox, 2019);
+        expect(await outbox.pending(), isEmpty);
+        expect(outbox.correctionOf('songs', 4601, 'year', 2019), isNull);
+        expect(outbox.waitingCorrections, isEmpty);
+      },
+    );
+
+    test('a sent one is still known, until music.db changes', () async {
+      final outbox = newOutbox();
+      await correctYear(outbox, 2018);
+      final sent = await Directory('${root.path}/outbox/sent').create();
+      final file = (await outbox.pending()).single;
+      await file.rename('${sent.path}/${file.path.split('/').last}');
+
+      final reloaded = newOutbox();
+      await reloaded.load();
+      final correction = reloaded.correctionOf('songs', 4601, 'year', 2019);
+      expect(correction?.sent, isTrue);
+      expect(correction?.newValue, 2018);
+      expect(reloaded.waitingCorrections, isEmpty);
+
+      await correctYear(reloaded, 2016);
+      expect(names(await reloaded.pending()), ['2026-10-12_23-44-05_002.db']);
+      expect(reloaded.correctionOf('songs', 4601, 'year', 2019)?.sent, isFalse);
+    });
+  });
+
   group('sending', () {
     late HttpServer server;
     late Map<String, List<int>> received;

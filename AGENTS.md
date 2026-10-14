@@ -27,7 +27,8 @@ was queued from, shuffle, the queue screen with reordering and swipe-to-remove, 
 songs ahead; remembered across restarts), dragging a song row right to queue it and a
 media notification with previous/next (keeps playing in the background); scrolled down, the full
 player shows everything music.db / tag.db / the phone know about the song (all of it for now,
-to be trimmed later — user's request); play history in
+to be trimmed later — user's request), and its own fields can be corrected there (the pencil),
+going to the outbox for MusicDatabase while the phone keeps showing music.db's value; play history in
 "Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
@@ -73,7 +74,8 @@ saves it for later with the person who sent it (Menu profilu › Wiadomości ›
 - The app gets MusicDatabase's data by downloading its SQLite files over HTTP
   ([ADR 0002](docs/decisions/0002-database-download.md)). What goes back is a request file in the
   phone's outbox ([ADR 0005](docs/decisions/0005-outbox-for-musicdatabase.md), `outbox.dart`; so
-  far dead music.db YouTube links), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
+  far dead music.db YouTube links and the user's corrections of song / artist / album fields, each
+  kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
   sharing server — the request format is a contract, see the
   [hand-off](docs/handoffs/musicdatabase-outbox.md)). The phone logs in with a MusicDatabase user
   (Ustawienia › Konto, `account.dart`; `POST /login` gives a token sent with the requests —

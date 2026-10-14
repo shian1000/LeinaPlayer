@@ -5,15 +5,20 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/moods.dart';
+import '../data/outbox.dart';
+import '../data/song_catalog.dart';
 import '../data/song_details.dart';
 import '../data/youtube_library.dart';
 import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
+import 'common.dart';
 
 /// "Informacje o utworze" under the full player: everything music.db, tag.db, the moods and the
 /// phone know about [hit] — for now all of it, to be trimmed once it's clear what's worth showing
-/// (user's request).
+/// (user's request). The song's, its artists' and its album's own fields can be corrected: the
+/// correction goes to the [Outbox] for MusicDatabase, and the field keeps music.db's value until
+/// a downloaded music.db changes it.
 class SongInfoCard extends StatefulWidget {
   const SongInfoCard({super.key, required this.hit, this.track});
 
@@ -137,9 +142,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
       'spotify_url',
     };
     return _Section('Utwór', [
-      for (final MapEntry(:key, :value) in song.entries)
+      for (final key in song.keys)
         if (!shownElsewhere.contains(key))
-          _Field(_songLabels[key] ?? key, _text(value)),
+          _editableField('songs', song, key, _songLabels[key] ?? key),
       for (final former in details.formerIds)
         _Field(
           'Dawne ID',
@@ -156,8 +161,8 @@ class _SongInfoCardState extends State<SongInfoCard> {
             ? 'Gościnnie (feat.)'
             : 'Współwykonawca',
         [
-          for (final MapEntry(:key, :value) in artist.entries)
-            _Field(_artistLabels[key] ?? key, _text(value)),
+          for (final key in artist.keys)
+            _editableField('artists', artist, key, _artistLabels[key] ?? key),
         ],
       );
 
@@ -187,12 +192,135 @@ class _SongInfoCardState extends State<SongInfoCard> {
       for (final MapEntry(:key, :value) in album.entries)
         if (key == 'artist_id')
           _Field('Wykonawca albumu', details.albumArtist ?? _text(value))
-        else if (key == 'type')
-          _Field('Rodzaj', _albumTypes[value] ?? _text(value))
         else
-          _Field(_albumLabels[key] ?? key, _text(value), link: links[key]),
+          _editableField(
+            'albums',
+            album,
+            key,
+            _albumLabels[key] ?? key,
+            link: links[key],
+          ),
       for (final cover in details.albumCovers) _coverField(cover),
     ]);
+  }
+
+  /// [column] of music.db's [table] [row], with a pencil when the user may correct it.
+  Widget _editableField(
+    String table,
+    DbRow row,
+    String column,
+    String label, {
+    Uri? link,
+  }) {
+    final value = row[column];
+    final kind = _editable[table]?[column];
+    final outbox = OutboxScope.maybeOf(context);
+    final song = widget.hit.mainSong;
+    final id = row['id'];
+    if (kind == null || outbox == null || song == null || id is! int) {
+      return _Field(label, _shown(kind, value), link: link);
+    }
+    final correction = outbox.correctionOf(table, id, column, value);
+    return _Field(
+      label,
+      _shown(kind, value) ?? '—',
+      link: link,
+      correction: correction == null
+          ? null
+          : '${correction.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie'}: '
+                '${_shown(kind, correction.newValue) ?? '(puste)'}',
+      onEdit: () => _edit(
+        outbox,
+        song,
+        table: table,
+        rowId: id,
+        column: column,
+        label: label,
+        kind: kind,
+        current: value,
+        shown: correction == null ? value : correction.newValue,
+      ),
+    );
+  }
+
+  Future<void> _edit(
+    Outbox outbox,
+    CatalogSong song, {
+    required String table,
+    required int rowId,
+    required String column,
+    required String label,
+    required _Kind kind,
+    required Object? current,
+    required Object? shown,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    Object? value;
+    if (kind == _Kind.albumType) {
+      final picked = await showDialog<String>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: Text(label),
+          children: [
+            for (final MapEntry(:key, value: name) in {
+              ..._albumTypes,
+              '': 'nie wiadomo',
+            }.entries)
+              SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(key),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(name)),
+                    if (key == '${shown ?? ''}')
+                      Icon(Icons.check, color: context.palette.accent),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+      if (picked == null) return;
+      value = picked.isEmpty ? null : picked;
+    } else {
+      final text = await showDialog<String>(
+        context: context,
+        builder: (_) => TextInputDialog(
+          title: label,
+          hint: kind == _Kind.required ? label : 'Puste — usuń wartość',
+          initial: _text(shown) ?? '',
+          number: kind == _Kind.number,
+        ),
+      );
+      if (text == null) return;
+      final trimmed = text.trim();
+      if (trimmed.isEmpty && kind == _Kind.required) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('„$label” nie może być puste.')),
+        );
+        return;
+      }
+      value = trimmed.isEmpty
+          ? null
+          : kind == _Kind.number
+          ? int.tryParse(trimmed)
+          : trimmed;
+    }
+    if (_sameValue(value, shown)) return;
+    await outbox.correctField(
+      table: table,
+      rowId: rowId,
+      column: column,
+      oldValue: current,
+      newValue: value,
+      song: song,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          _sameValue(value, current) ? 'Poprawka wycofana.' : 'Poprawka trafi do MusicDatabase (Zgłoszenia dla MusicDatabase).',
+        ),
+      ),
+    );
   }
 
   Widget _coverField(DbRow cover) {
@@ -329,6 +457,50 @@ class _SongInfoCardState extends State<SongInfoCard> {
   }
 }
 
+/// How "Informacje o utworze" names [column] of music.db's [table], and shows [value] of it.
+String fieldLabel(String table, String column) =>
+    switch (table) {
+      'songs' => _songLabels,
+      'artists' => _artistLabels,
+      'albums' => _albumLabels,
+      _ => const <String, String>{},
+    }[column] ??
+    column;
+
+String? fieldValue(String table, String column, Object? value) =>
+    _shown(_editable[table]?[column], value);
+
+bool _sameValue(Object? a, Object? b) =>
+    a == null || b == null ? a == b : '$a' == '$b';
+
+String? _shown(_Kind? kind, Object? value) =>
+    kind == _Kind.albumType ? _albumTypes[value] ?? _text(value) : _text(value);
+
+enum _Kind { text, required, number, albumType }
+
+/// What can be corrected, by music.db table and column. Ids, links, service ids and the old
+/// mood columns stay as they are.
+const _editable = {
+  'songs': {
+    'title': _Kind.required,
+    'album': _Kind.text,
+    'year': _Kind.number,
+    'language': _Kind.text,
+    'track_number': _Kind.number,
+    'disc_number': _Kind.number,
+  },
+  'artists': {
+    'name': _Kind.required,
+    'origin': _Kind.text,
+    'synonyms': _Kind.text,
+  },
+  'albums': {
+    'title': _Kind.required,
+    'year': _Kind.number,
+    'type': _Kind.albumType,
+  },
+};
+
 String? _text(Object? value) => switch (value) {
   null => null,
   final String s when s.trim().isEmpty => null,
@@ -356,6 +528,7 @@ const _albumLabels = {
   'id': 'ID albumu',
   'title': 'Tytuł',
   'year': 'Rok',
+  'type': 'Rodzaj',
   'musicbrainz_release_group_id': 'MusicBrainz',
   'itunes_collection_id': 'iTunes',
   'deezer_album_id': 'Deezer',
@@ -423,15 +596,26 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// One label and value; a long press copies the value, a tap opens [link].
+/// One label and value; a long press copies the value, a tap opens [link], the pencil (shown
+/// with [onEdit]) corrects it.
 class _Field extends StatelessWidget {
-  const _Field(this.label, this.value, {this.link});
+  const _Field(
+    this.label,
+    this.value, {
+    this.link,
+    this.onEdit,
+    this.correction,
+  });
 
   final String label;
 
   /// Not shown at all when `null`.
   final String? value;
   final Uri? link;
+  final VoidCallback? onEdit;
+
+  /// The user's correction waiting for MusicDatabase, under the value.
+  final String? correction;
 
   @override
   Widget build(BuildContext context) {
@@ -462,14 +646,44 @@ class _Field extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                value!,
-                style: TextStyle(
-                  fontSize: AppFontSize.small,
-                  color: link == null ? null : palette.accent,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value!,
+                    style: TextStyle(
+                      fontSize: AppFontSize.small,
+                      color: link == null ? null : palette.accent,
+                    ),
+                  ),
+                  if (correction != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        correction!,
+                        style: TextStyle(
+                          fontSize: AppFontSize.small,
+                          color: palette.accent,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
+            if (onEdit != null)
+              InkResponse(
+                onTap: onEdit,
+                radius: 18,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: palette.textSecondary,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
