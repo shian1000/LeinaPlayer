@@ -278,7 +278,11 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
   app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
   [`agent-notes/youtube.md`](agent-notes/youtube.md)).
-- `Ustawienia › Odtwarzanie`
+- Odtwarzanie **→ Odtwarzanie** (`playback_settings_screen.dart`) — **implemented**:
+  "Przenikanie utworów" — slider Wył.–12 s (1 s steps, default off, saved on release): the
+  next queue song starts that long before the current one ends, one fading out as the other
+  fades in; only when the queue moves on by itself ("Następny" and tapped songs switch at
+  once). See [`agent-notes/local-library.md`](agent-notes/local-library.md).
 - Historia odtwarzania **→ Historia odtwarzania** (`history_settings_screen.dart`) —
   **implemented**: "Przechowuj historię" (dialog: 7 / 30 / 90 — default / 180 dni, Rok, Bez
   limitu; older plays are deleted on start and with each new play, `PlayHistory.keepDays`;

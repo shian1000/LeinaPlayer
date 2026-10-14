@@ -11,6 +11,7 @@ import 'data_saver_screen.dart';
 import 'history_settings_screen.dart';
 import 'link_settings_screen.dart';
 import 'music_sources_screen.dart';
+import 'playback_settings_screen.dart';
 
 const _id = 'Ustawienia';
 
@@ -59,7 +60,8 @@ const _entries = [
   _SettingsEntry(
     Icons.volume_up_outlined,
     'Odtwarzanie',
-    'Odtwarzanie ciągłe • Autoodtwarzanie',
+    'Przenikanie utworów',
+    opens: _openPlayback,
   ),
   _SettingsEntry(
     Icons.history,
@@ -98,6 +100,8 @@ Widget _openCoverSources(BuildContext context) => const CoverSourcesScreen();
 Widget _openAbout(BuildContext context) => const AboutScreen();
 
 Widget _openDataSaver(BuildContext context) => const DataSaverScreen();
+
+Widget _openPlayback(BuildContext context) => const PlaybackSettingsScreen();
 
 Widget _openHistory(BuildContext context) => const HistorySettingsScreen();
 

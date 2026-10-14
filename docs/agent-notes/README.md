@@ -3,7 +3,7 @@
 - [`covers.md`](covers.md) — album covers: sources, matching, rate limits, the cover cache,
   filters, avoiding placeholder flashes, the MusicDatabase hand-off.
 - [`local-library.md`](local-library.md) — phone library scan, matching, `local.db`, search
-  availability, playback order, background playback.
+  availability, playback order, crossfade, background playback.
 - [`playlists.md`](playlists.md) — Biblioteka playlists: tables, YouTube and Spotify import,
   recognising songs, videos YouTube removed, searching YouTube/Spotify playlists and previews,
   Spotify albums and track links, sharing playlists and songs, adding songs, phone-only folders.

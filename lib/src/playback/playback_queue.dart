@@ -102,6 +102,14 @@ class PlaybackQueue extends ChangeNotifier {
       (skip) => skip == MediaSkip.next ? next() : previous(),
     );
     filter?.addListener(_filterChanged);
+    _tracks.player.onNearEnd = _nearEnd;
+  }
+
+  /// "Przenikanie utworów": the song is about to end, so the next one starts now and fades in.
+  bool _nearEnd() {
+    if (!hasNext) return false;
+    unawaited(_advance());
+    return true;
   }
 
   /// "Filtr nastrojów"; `null`: every song plays.
@@ -461,6 +469,8 @@ class PlaybackQueue extends ChangeNotifier {
     required bool allowExternal,
     void Function(String status)? onStatus,
   }) async {
+    // A user's pick (allowExternal) starts at once, even over a song already fading out.
+    if (allowExternal) _tracks.player.cancelFade();
     _current = entry;
     notifyListeners();
     final generation = _generation;
@@ -692,6 +702,7 @@ class PlaybackQueue extends ChangeNotifier {
     _prefetchRun++;
     _prefetchTimer?.cancel();
     filter?.removeListener(_filterChanged);
+    if (_tracks.player.onNearEnd == _nearEnd) _tracks.player.onNearEnd = null;
     _completions.cancel();
     _skips.cancel();
     _played.close();

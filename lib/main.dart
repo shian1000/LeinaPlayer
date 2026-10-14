@@ -148,6 +148,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     setLinkChooserLook(mode: mode, light: light, dark: dark);
   }
 
+  void _updateCrossfade() =>
+      _player.crossfade = Duration(seconds: _sourceSettings.crossfadeSeconds);
+
   /// Takes effect from the next song the notification shows.
   void _updateNotificationNames() =>
       widget.mediaSession?.latinNames = _themeController.latinNames;
@@ -240,6 +243,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _sourceSettings.load().catchError(
       (Object e) => debugPrint('Loading music source settings failed: $e'),
     );
+    _sourceSettings.addListener(_updateCrossfade);
     final localLoaded = _localLibrary.load().catchError(
       (Object e) => debugPrint('Loading local library failed: $e'),
     );
@@ -494,6 +498,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _libraryFolders.dispose();
     _playbackQueue.dispose();
     _moodFilter.dispose();
+    _sourceSettings.removeListener(_updateCrossfade);
     _player.dispose();
     _sourceSettings.dispose();
     _albumCovers.dispose();

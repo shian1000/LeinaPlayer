@@ -25,7 +25,8 @@ ticking several songs with a long press for a shared action (queue, playlist, mo
 playing phone files with a mini/full player, a play queue (playlists, "Dodaj do kolejki" /
 "Odtwórz jako następny" for songs and whole playlists, each entry remembering the playlist it
 was queued from, shuffle, the queue screen with reordering and swipe-to-remove, caching the next
-songs ahead; remembered across restarts), dragging a song row right to queue it and a
+songs ahead; remembered across restarts), crossfading into the next song (Ustawienia ›
+Odtwarzanie, 0–12 s), dragging a song row right to queue it and a
 media notification with previous/next (keeps playing in the background); scrolled down, the full
 player shows everything music.db / tag.db / the phone know about the song (all of it for now,
 to be trimmed later — user's request), and its own fields can be corrected there (the pencil),
@@ -150,7 +151,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   queue caching (`source_settings.dart`), telling "no connection" from other failures
   (`network_errors.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
   port of MusicDatabase's `normalize()` (`text_normalizer.dart`).
-- `lib/src/playback/` — `PlayerController` (`just_audio`, one song), `PlaybackQueue` (what plays
+- `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
+  crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
   (the queue and position saved across restarts) and `YouTubePlayback` (the user's ordered ways
   of playing a YouTube video). Never pause between songs — see
@@ -242,7 +244,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   one.
 - [`local-library.md`](docs/agent-notes/local-library.md) — phone music scan, matching files to
   MusicDatabase (tags first — user's decision), `local.db`, search availability (incl. YouTube
-  links), playback order, playback limits.
+  links), playback order, crossfade (two players), playback limits.
 - [`youtube.md`](docs/agent-notes/youtube.md) — YouTube search methods, the lite matcher and its
   benchmark, NewPipe playback (build requirements, 403s), remembered matches, "not found" and
   removed videos, server-wins rule, the audio cache (why it downloads in 1 MB ranges), links

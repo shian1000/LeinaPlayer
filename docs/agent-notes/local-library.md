@@ -73,6 +73,19 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   started FGS: Disallowed … ForegroundServiceStartNotAllowedException` at the next song, network
   cut off (`UnknownHostException`), then `freezing <pid> com.shian1000.music_database_app`. The
   Huawei (Android 10) never showed it — test background playback on Android 12+.
+- "Przenikanie utworów" (Ustawienia › Odtwarzanie, 0–12 s, `SourceSettings.crossfadeSeconds`,
+  0 = off). The media session owns two `AudioPlayer`s; `JustAudioBackend` forwards only the
+  active one's position / duration / state, and `MediaSession.active` follows it, so the
+  notification and the "playing" state never see the song fading out. `PlayerController` asks
+  `onNearEnd` (the queue) once per song when `crossfade` is left (at most half the song);
+  the queue runs its usual `_advance`, and the `play` it ends with becomes
+  `crossfadeTo(track, timeLeft)`: the next song loads on the other player, starts at volume 0,
+  takes over, and the volumes cross (sin/cos) until the old one is stopped. A YouTube song that
+  takes long to resolve fades over what's left, or not at all if the old song already ended
+  (its completion is swallowed while the queue is already moving on). Only automatic moves
+  fade: every user pick (`_play` with `allowExternal`) calls `cancelFade` and switches at once;
+  a pause ends a fade (old song stops). Checked on the Huawei: `dumpsys audio` shows two
+  started AudioTracks of the app for the fade, then one.
 - No connection while moving on by itself (`PlayOutcome.offline`, from `isNetworkError` in
   `network_errors.dart`): the queue tries the same song again after 5, 15 and 30 s
   (`PlaybackQueue.offlineRetries`) instead of skipping it — it used to race through dozens of

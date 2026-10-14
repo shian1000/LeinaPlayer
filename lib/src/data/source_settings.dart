@@ -104,6 +104,10 @@ class SourceSettings extends ChangeNotifier {
   static const _coverCacheLimitKey = 'covers.cache_limit_mb';
   static const defaultCoverCacheLimitMb = 100;
   static const _coverWifiOnlyKey = 'data_saver.covers_wifi_only';
+  static const _crossfadeKey = 'playback.crossfade_seconds';
+
+  /// The longest "Przenikanie utworów", as in the reference app.
+  static const maxCrossfadeSeconds = 12;
 
   bool _youTubeSearchEnabled = false;
   bool _playlistSearch = true;
@@ -125,6 +129,7 @@ class SourceSettings extends ChangeNotifier {
   Set<CoverSource> _coverSources = CoverSource.defaults;
   int _coverCacheLimitMb = defaultCoverCacheLimitMb;
   bool _coverWifiOnly = false;
+  int _crossfadeSeconds = 0;
 
   /// "Włącz szukanie w serwisie YouTube".
   bool get youTubeSearchEnabled => _youTubeSearchEnabled;
@@ -185,6 +190,9 @@ class SourceSettings extends ChangeNotifier {
 
   /// Songs to cache ahead right now; 0 = none (switched off).
   int get activeQueuePrefetch => _queuePrefetchEnabled ? _queuePrefetch : 0;
+
+  /// "Przenikanie utworów" (Ustawienia › Odtwarzanie), 0 = off.
+  int get crossfadeSeconds => _crossfadeSeconds;
 
   /// Cache ahead only on Wi-Fi (Oszczędzanie danych i tryb offline).
   bool get queuePrefetchWifiOnly => _queuePrefetchWifiOnly;
@@ -249,6 +257,8 @@ class SourceSettings extends ChangeNotifier {
     _coverCacheLimitMb =
         prefs.getInt(_coverCacheLimitKey) ?? _coverCacheLimitMb;
     _coverWifiOnly = prefs.getBool(_coverWifiOnlyKey) ?? _coverWifiOnly;
+    _crossfadeSeconds = (prefs.getInt(_crossfadeKey) ?? _crossfadeSeconds)
+        .clamp(0, maxCrossfadeSeconds);
     _playbackMethodOrder = _withAll(
       YouTubePlaybackMethod.values,
       prefs.getStringList(_playbackMethodOrderKey),
@@ -387,6 +397,15 @@ class SourceSettings extends ChangeNotifier {
     await (await SharedPreferences.getInstance()).setBool(
       _queuePrefetchEnabledKey,
       value,
+    );
+  }
+
+  Future<void> setCrossfadeSeconds(int seconds) async {
+    _crossfadeSeconds = seconds.clamp(0, maxCrossfadeSeconds);
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setInt(
+      _crossfadeKey,
+      _crossfadeSeconds,
     );
   }
 

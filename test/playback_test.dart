@@ -39,6 +39,8 @@ class FakeBackend implements AudioBackend {
   }
 
   @override
+  Future<void> crossfadeTo(NowPlaying track, Duration fade) async {}
+  @override
   Future<void> play() async => _state.add((playing: true, completed: false));
   @override
   Future<void> pause() async => _state.add((playing: false, completed: false));

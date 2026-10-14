@@ -31,6 +31,7 @@ import 'support/waiting.dart';
 
 class _Backend implements AudioBackend {
   final opened = <String>[];
+  final crossfades = <(String, Duration)>[];
   final seeks = <Duration>[];
   var pauses = 0;
   final _position = StreamController<Duration>.broadcast();
@@ -39,17 +40,26 @@ class _Backend implements AudioBackend {
 
   void at(Duration position) => _position.add(position);
   void finish() => _state.add((playing: true, completed: true));
+  void lasts(Duration duration) => _duration.add(duration);
+  final _duration = StreamController<Duration?>.broadcast();
 
   @override
   Stream<Duration> get position => _position.stream;
   @override
-  Stream<Duration?> get duration => const Stream.empty();
+  Stream<Duration?> get duration => _duration.stream;
   @override
   Stream<({bool playing, bool completed})> get state => _state.stream;
   @override
   Stream<MediaSkip> get skips => skipPresses.stream;
   @override
   Future<void> open(NowPlaying track) async => opened.add(track.source);
+  @override
+  Future<void> crossfadeTo(NowPlaying track, Duration fade) async {
+    opened.add(track.source);
+    crossfades.add((track.source, fade));
+    _state.add((playing: true, completed: false));
+  }
+
   @override
   Future<void> play() async => _state.add((playing: true, completed: false));
   @override
@@ -783,6 +793,84 @@ void main() {
     await flush();
     expect(backend.pauses, 1);
     expect(backend.seeks.last, Duration.zero);
+  });
+
+  group('"Przenikanie utworów"', () {
+    setUp(() => player.crossfade = const Duration(seconds: 5));
+
+    test('the next song starts that long before the end and fades in', () async {
+      await queue.start([_file('a'), _file('b')], 0);
+      backend.lasts(const Duration(minutes: 3));
+      await flush();
+      backend.at(const Duration(minutes: 2, seconds: 54));
+      await flush();
+      expect(backend.opened, ['/music/a.mp3']);
+
+      backend.at(const Duration(minutes: 2, seconds: 56));
+      await flush();
+      expect(backend.crossfades, [
+        ('/music/b.mp3', const Duration(seconds: 4)),
+      ]);
+      expect(queue.current?.title, 'b');
+      expect(player.current?.title, 'b');
+
+      // The song before ending under the fade doesn't move the queue on again.
+      backend.finish();
+      await flush();
+      expect(backend.opened, ['/music/a.mp3', '/music/b.mp3']);
+    });
+
+    test(
+      'nothing follows: the last song plays to its end, then stops',
+      () async {
+        await queue.start([_file('a')], 0);
+        backend.lasts(const Duration(minutes: 3));
+        await flush();
+        backend.at(const Duration(minutes: 2, seconds: 58));
+        await flush();
+        expect(backend.pauses, 0);
+
+        backend.finish();
+        await flush();
+        expect(backend.pauses, 1);
+        expect(backend.crossfades, isEmpty);
+      },
+    );
+
+    test('a short song fades over at most half of it', () async {
+      await queue.start([_file('a'), _file('b')], 0);
+      backend.lasts(const Duration(seconds: 6));
+      await flush();
+      backend.at(const Duration(seconds: 2));
+      await flush();
+      expect(backend.crossfades, isEmpty);
+      backend.at(const Duration(seconds: 3));
+      await flush();
+      expect(backend.crossfades.single.$2, const Duration(seconds: 3));
+    });
+
+    test('"Następny" switches at once', () async {
+      await queue.start([_file('a'), _file('b')], 0);
+      backend.lasts(const Duration(minutes: 3));
+      await flush();
+      await queue.next();
+      expect(backend.opened, ['/music/a.mp3', '/music/b.mp3']);
+      expect(backend.crossfades, isEmpty);
+    });
+
+    test('switched off, songs follow each other as before', () async {
+      player.crossfade = Duration.zero;
+      await queue.start([_file('a'), _file('b')], 0);
+      backend.lasts(const Duration(minutes: 3));
+      await flush();
+      backend.at(const Duration(minutes: 2, seconds: 59));
+      await flush();
+      expect(backend.opened, ['/music/a.mp3']);
+      backend.finish();
+      await flush();
+      expect(backend.opened.last, '/music/b.mp3');
+      expect(backend.crossfades, isEmpty);
+    });
   });
 
   group('no connection while moving on by itself', () {
