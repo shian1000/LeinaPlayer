@@ -82,7 +82,7 @@ const _entries = [
   _SettingsEntry(
     Icons.info_outline,
     'Informacje i pomoc',
-    'Użytek prywatny • Licencja • Kod źródłowy',
+    'Wersja • Użytek prywatny • Licencja • Kod źródłowy',
     opens: _openAbout,
   ),
 ];

@@ -5,11 +5,10 @@ import '../data/source_settings.dart';
 import '../data/spotify_playlist.dart';
 import '../data/youtube_playlist.dart';
 import '../data/youtube_search.dart';
-import '../dummy.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/playlist_picker.dart';
 
-/// "Utwórz › Playlista": make a new playlist (not built yet) or import one from YouTube or
-/// Spotify.
+/// "Utwórz › Playlista": make a new, empty playlist or import one from YouTube or Spotify.
 Future<void> showPlaylistSheet(
   BuildContext context, {
   required String idPrefix,
@@ -23,7 +22,7 @@ Future<void> showPlaylistSheet(
         Icons.add,
         'Utwórz nową playlistę',
         subtitle: 'Pusta playlista do uzupełnienia utworami',
-        onTap: () => showDummy(context, '$idPrefix › Utwórz nową playlistę'),
+        onTap: () => createEmptyPlaylist(context),
       ),
       MenuSheetEntry(
         Icons.smart_display_outlined,
@@ -32,6 +31,18 @@ Future<void> showPlaylistSheet(
         onTap: () => importPlaylist(context),
       ),
     ],
+  );
+}
+
+/// Asks for a name and makes an empty Biblioteka playlist, to fill from songs' menus.
+Future<void> createEmptyPlaylist(BuildContext context) async {
+  final library = PlaylistLibraryScope.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final name = await askPlaylistName(context);
+  if (name == null) return;
+  await library.create(name, const []);
+  messenger.showSnackBar(
+    SnackBar(content: Text('Utworzono playlistę „$name” w Bibliotece')),
   );
 }
 

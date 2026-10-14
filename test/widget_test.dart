@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:music_database_app/main.dart';
+import 'package:music_database_app/src/screens/about_screen.dart';
 import 'package:music_database_app/src/screens/database_source_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/theme_controller.dart';
@@ -23,6 +25,15 @@ void main() {
     await themes.load();
     await tester.pumpWidget(MusicDatabaseApp(themeController: themes));
   }
+
+  test('the version shows the build number and commit only when known', () {
+    expect(
+      versionLabel('1.0.0', '312', 'c11e6c4+zmiany'),
+      '1.0.0 (kompilacja 312, c11e6c4+zmiany)',
+    );
+    expect(versionLabel('1.0.0', '1', ''), '1.0.0 (kompilacja 1)');
+    expect(versionLabel('1.0.0', '', ''), '1.0.0');
+  });
 
   test('Lain is the dark theme until the user picks another', () async {
     SharedPreferences.setMockInitialValues({});
@@ -78,12 +89,9 @@ void main() {
     expect(find.text('Importuj playlistę'), findsOneWidget);
     await tester.tap(find.text('Utwórz nową playlistę'));
     await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'Atrapa: Biblioteka › Utwórz (+) › Playlista › Utwórz nową playlistę',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Nowa playlista'), findsOneWidget);
+    await tester.tap(find.text('Anuluj'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Utwórz (+)'));
     await tester.pumpAndSettle();
@@ -162,55 +170,64 @@ void main() {
     expect(find.text('Otwieraj linki w Leina Radio'), findsOneWidget);
   });
 
-  testWidgets('Informacje i pomoc: private use, licence and source link', (
-    tester,
-  ) async {
-    await pumpApp(tester);
-    await tester.tap(find.byType(CircleAvatar).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Ustawienia'));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Informacje i pomoc'), 200);
-    // Clear of the bottom bar, which would take the tap.
-    await tester.drag(find.byType(Scrollable).last, const Offset(0, -300));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Informacje i pomoc'));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Informacje i pomoc: version, private use, licence and source link',
+    (tester) async {
+      PackageInfo.setMockInitialValues(
+        appName: 'Leina Radio',
+        packageName: 'music_database_app',
+        version: '1.2.3',
+        buildNumber: '45',
+        buildSignature: '',
+      );
+      await pumpApp(tester);
+      await tester.tap(find.byType(CircleAvatar).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ustawienia'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Informacje i pomoc'), 200);
+      // Clear of the bottom bar, which would take the tap.
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, -300));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Informacje i pomoc'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
-    expect(find.text('Linki z YouTube i Spotify'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('https://github.com/shian1000/MusicDatabaseApp'),
-      200,
-    );
-    expect(find.textContaining('GPLv3'), findsOneWidget);
-    expect(
-      find.text('https://github.com/shian1000/MusicDatabaseApp'),
-      findsOneWidget,
-    );
-    String? copied;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copied = (call.arguments as Map)['text'] as String;
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      expect(find.text('1.2.3 (kompilacja 45)'), findsOneWidget);
+      expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
+      expect(find.text('Linki z YouTube i Spotify'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('https://github.com/shian1000/MusicDatabaseApp'),
+        200,
+      );
+      expect(find.textContaining('GPLv3'), findsOneWidget);
+      expect(
+        find.text('https://github.com/shian1000/MusicDatabaseApp'),
+        findsOneWidget,
+      );
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
-        null,
-      ),
-    );
-    await tester.ensureVisible(find.byTooltip('Kopiuj link'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Kopiuj link'));
-    await tester.pumpAndSettle();
-    expect(copied, 'https://github.com/shian1000/MusicDatabaseApp');
-    expect(find.text('Skopiowano link do kodu źródłowego'), findsOneWidget);
-  });
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.ensureVisible(find.byTooltip('Kopiuj link'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Kopiuj link'));
+      await tester.pumpAndSettle();
+      expect(copied, 'https://github.com/shian1000/MusicDatabaseApp');
+      expect(find.text('Skopiowano link do kodu źródłowego'), findsOneWidget);
+    },
+  );
 
   testWidgets('profile drawer opens settings inside current tab', (
     tester,

@@ -5,6 +5,7 @@ import '../data/local_library.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
+import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
 /// "Pamięć podręczna › Zajęte miejsce": the songs in the cache, most recently played first.
@@ -74,39 +75,41 @@ class _CacheContentsScreenState extends State<CacheContentsScreen> {
         backgroundColor: palette.surface,
         title: const Text('Utwory z YouTube'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              entries.isEmpty
-                  ? 'Pamięć podręczna jest pusta.'
-                  : 'Utwory: ${entries.length}, ${mb(library.cachedBytes)} MB • '
-                        'od ostatnio słuchanych',
-              style: TextStyle(
-                color: palette.textSecondary,
-                fontSize: AppFontSize.small,
-              ),
-            ),
-          ),
-          for (final (i, entry) in entries.indexed)
-            SongTile(
-              key: ValueKey(entry.videoId),
-              hit: hits[i],
-              queue: hits,
-              queueIndex: i,
-              subtitle: '${hits[i].artistLabel} • ${mb(entry.sizeBytes)} MB',
-              trailing: IconButton(
-                tooltip: 'Usuń z pamięci podręcznej',
-                icon: Icon(
-                  Icons.remove_circle_outline,
+      body: SongSelectionArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                entries.isEmpty
+                    ? 'Pamięć podręczna jest pusta.'
+                    : 'Utwory: ${entries.length}, ${mb(library.cachedBytes)} MB • '
+                          'od ostatnio słuchanych',
+                style: TextStyle(
                   color: palette.textSecondary,
+                  fontSize: AppFontSize.small,
                 ),
-                onPressed: () => library.removeFromCache(entry.videoId),
               ),
             ),
-        ],
+            for (final (i, entry) in entries.indexed)
+              SongTile(
+                key: ValueKey(entry.videoId),
+                hit: hits[i],
+                queue: hits,
+                queueIndex: i,
+                subtitle: '${hits[i].artistLabel} • ${mb(entry.sizeBytes)} MB',
+                trailing: IconButton(
+                  tooltip: 'Usuń z pamięci podręcznej',
+                  icon: Icon(
+                    Icons.remove_circle_outline,
+                    color: palette.textSecondary,
+                  ),
+                  onPressed: () => library.removeFromCache(entry.videoId),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

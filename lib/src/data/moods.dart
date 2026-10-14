@@ -26,6 +26,7 @@ class Mood {
     this.localId,
     this.phoneOnly = false,
     this.cover,
+    this.createdAt,
   });
 
   final String name;
@@ -47,6 +48,9 @@ class Mood {
   /// The picked cover's hash ([CustomCovers]) — for a global mood the user's own; `null`: a
   /// collage of its songs' covers.
   final String? cover;
+
+  /// When the user made it; `null` for a global mood (tag.db doesn't say).
+  final DateTime? createdAt;
 
   /// Tells moods apart across reloads (a user's mood may get another `uid` from MusicDatabase,
   /// never another local id).
@@ -240,7 +244,7 @@ class MoodLibrary extends ChangeNotifier {
       (songs[row['mood_id']! as int] ??= {}).add(row['song_id']! as int);
     }
     for (final row in await db.rawQuery(
-      'SELECT m.id, m.name, m.account, m.cover_sha256 FROM moods m '
+      'SELECT m.id, m.name, m.account, m.cover_sha256, m.created_at FROM moods m '
       'WHERE m.deleted_at IS NULL AND ${scope.where}',
       scope.args,
     )) {
@@ -252,6 +256,9 @@ class MoodLibrary extends ChangeNotifier {
           localId: id,
           phoneOnly: row['account'] == null,
           cover: row['cover_sha256'] as String?,
+          createdAt: DateTime.fromMillisecondsSinceEpoch(
+            row['created_at']! as int,
+          ),
         ),
       );
     }

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Exit 0 and print "fresh" when the release APK is newer than every input that
-# goes into it; otherwise exit 1 and print why ("missing" or "stale: <file>").
+# goes into it and carries the numbering the next build would get (tool/build_info.sh — a
+# commit made since changes it); otherwise exit 1 and print why ("missing", "stale: <file>"
+# or "stale: version <built> → <now>").
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
@@ -25,6 +27,13 @@ newer="$(find "${inputs[@]}" -type f -newer "$APK" \
 
 if [[ -n "$newer" ]]; then
   echo "stale: $newer"
+  exit 1
+fi
+
+built="$(cat "${APK%.apk}.version" 2>/dev/null || echo "nieznana")"
+now="$(tool/build_info.sh)"
+if [[ "$built" != "$now" ]]; then
+  echo "stale: version $built → $now"
   exit 1
 fi
 echo "fresh"

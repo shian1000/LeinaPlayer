@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
+import 'package:music_database_app/src/data/library_folders.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
@@ -34,6 +35,7 @@ void main() {
   late SourceSettings settings;
   late PlayerController player;
   late PlaybackQueue queue;
+  late LibraryFolders folders;
   late List<String> fetched;
 
   setUp(() {
@@ -43,6 +45,7 @@ void main() {
 
   tearDown(() async {
     queue.dispose();
+    folders.dispose();
     player.dispose();
     playlists.dispose();
     youTubeLibrary.dispose();
@@ -60,7 +63,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> pumpLibrary(WidgetTester tester) async {
+  /// [before] runs once the libraries are loaded, before Biblioteka is shown.
+  Future<void> pumpLibrary(
+    WidgetTester tester, {
+    Future<void> Function()? before,
+  }) async {
     await tester.runAsync(() async {
       storage = await Directory.systemTemp.createTemp('playlist_screen_test');
       sync = DatabaseSync(storageRoot: () async => storage);
@@ -76,6 +83,7 @@ void main() {
       );
       playlists = PlaylistLibrary(library.database, catalog, youTubeLibrary);
       settings = SourceSettings();
+      folders = LibraryFolders();
       player = PlayerController();
       await writeMusicDb((await sync.localFile('music.db')).path);
       await catalog.ensureLoaded();
@@ -83,6 +91,8 @@ void main() {
       await youTubeLibrary.load();
       await playlists.load();
       await settings.load();
+      await folders.load();
+      await before?.call();
     });
     queue = PlaybackQueue(
       prefetchDelay: Duration.zero,
@@ -139,9 +149,12 @@ void main() {
                             );
                           },
                         ),
-                        child: MaterialApp(
-                          theme: buildAppTheme(dummifyTheme),
-                          home: const Scaffold(body: LibraryScreen()),
+                        child: LibraryFoldersScope(
+                          notifier: folders,
+                          child: MaterialApp(
+                            theme: buildAppTheme(dummifyTheme),
+                            home: const Scaffold(body: LibraryScreen()),
+                          ),
                         ),
                       ),
                     ),
@@ -231,5 +244,135 @@ void main() {
     expect(find.text('Poza bazą danych: 1 z 2'), findsOneWidget);
     expect(find.text('Utwór'), findsOneWidget);
     expect(find.text('Małomiasteczkowy'), findsNothing);
+  });
+
+  /// A Biblioteka playlist of the two songs in [pumpLibrary]'s YouTube playlist.
+  Future<void> importDoAuta() async {
+    await playlists.importYouTube(
+      await YouTubePlaylists(
+        newPipeAvailable: false,
+        explode: (id) async => YouTubePlaylistData(
+          id: id,
+          name: 'Do auta',
+          owner: 'Shian',
+          videos: const [
+            YouTubeVideo(
+              id: 'X2XWBcd5jn0',
+              title: 'Dawid Podsiadło - Małomiasteczkowy',
+              channel: 'Dawid Podsiadło',
+            ),
+            YouTubeVideo(
+              id: 'nn',
+              title: 'Nieznany - Utwór (Official Video)',
+              channel: 'Nieznany',
+            ),
+          ],
+        ),
+      ).fetch('PLtest', settings),
+    );
+  }
+
+  testWidgets(
+    'holding a track ticks it; Back unticks; the ticked tracks go to a new '
+    'playlist',
+    (tester) async {
+      // Both tracks on screen above the selection bar.
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpLibrary(tester, before: importDoAuta);
+      await tester.tap(find.text('Do auta'));
+      await settle(tester, until: find.text('Utwór'));
+
+      await tester.longPress(find.text('Małomiasteczkowy'));
+      await tester.pumpAndSettle();
+      expect(find.text('Zaznaczono: 1'), findsOneWidget);
+      // While ticking, a tap ticks instead of playing.
+      await tester.tap(find.text('Utwór'));
+      await tester.pumpAndSettle();
+      expect(find.text('Zaznaczono: 2'), findsOneWidget);
+      expect(find.text('Odznacz'), findsOneWidget);
+      await tester.tap(find.text('Utwór'));
+      await tester.pumpAndSettle();
+      expect(find.text('Zaznaczono: 1'), findsOneWidget);
+
+      // Back unticks everything and stays on the playlist.
+      await tester.tap(find.byTooltip('Wstecz'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Zaznaczono'), findsNothing);
+      expect(find.text('Małomiasteczkowy'), findsOneWidget);
+
+      await tester.longPress(find.text('Utwór'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Wszystkie'));
+      await tester.pumpAndSettle();
+      expect(find.text('Zaznaczono: 2'), findsOneWidget);
+      await tester.tap(find.text('Do playlisty'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nowa playlista'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Wybrane');
+      await tester.tap(find.text('Zapisz'));
+      await settle(tester, until: find.text('Utworzono playlistę „Wybrane”'));
+      expect(find.textContaining('Zaznaczono'), findsNothing);
+
+      final made = playlists.playlists.firstWhere((p) => p.name == 'Wybrane');
+      final tracks = await tester.runAsync(() => playlists.tracks(made.id));
+      // In the order they were ticked.
+      expect([for (final t in tracks!) t.title], ['Utwór', 'Małomiasteczkowy']);
+    },
+  );
+
+  testWidgets('Biblioteka: a playlist moved into a new folder shows only inside it; sorting '
+      'is remembered', (tester) async {
+    await pumpLibrary(tester, before: importDoAuta);
+
+    await tester.longPress(find.text('Do auta'));
+    await tester.pumpAndSettle();
+    expect(find.text('Przenieś do folderu'), findsOneWidget);
+    await tester.tap(find.text('Nowy folder'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Podróże');
+    await tester.tap(find.text('Zapisz'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Podróże'), findsOneWidget);
+    expect(find.text('Folder • 1 playlista'), findsOneWidget);
+    expect(find.text('Do auta'), findsNothing);
+    // A filter lists every playlist, folders aside.
+    await tester.tap(find.text('Playlisty'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsOneWidget);
+    expect(find.text('Podróże'), findsNothing);
+    await tester.tap(find.text('Playlisty'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Podróże'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsOneWidget);
+    expect(folders.openedAt(folders.folders.single.key), isNotNull);
+
+    // Out of the folder again, from its own screen.
+    await tester.longPress(find.text('Do auta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bez folderu'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Pusty folder'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Menu folderu (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Usuń folder'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsOneWidget);
+    expect(folders.folders, isEmpty);
+
+    await tester.tap(find.text('Ostatnie'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Alfabetycznie'));
+    await tester.pumpAndSettle();
+    expect(find.text('Alfabetycznie'), findsOneWidget);
+    final reloaded = LibraryFolders();
+    await tester.runAsync(reloaded.load);
+    expect(reloaded.sort, LibrarySort.alphabetical);
   });
 }

@@ -17,6 +17,7 @@ import '../data/youtube_search.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
 import '../widgets/cover_art.dart';
+import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/swipe_actions.dart';
 import 'database_source_screen.dart';
@@ -148,10 +149,12 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
             ),
         ],
       ),
-      body: _Results(
-        query: _query.text,
-        online: _online,
-        onSearchOnline: _searchOnline,
+      body: SongSelectionArea(
+        child: _Results(
+          query: _query.text,
+          online: _online,
+          onSearchOnline: _searchOnline,
+        ),
       ),
     );
   }

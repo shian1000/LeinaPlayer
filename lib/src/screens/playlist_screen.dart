@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
+import '../data/library_folders.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_search.dart';
@@ -19,9 +20,12 @@ import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/folder_sheet.dart';
 import '../widgets/mood_sheet.dart';
+import '../widgets/playlist_picker.dart';
 import '../widgets/share_sheet.dart';
 import '../widgets/song_cover.dart';
+import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'missing_tracks_screen.dart';
 
@@ -81,6 +85,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.playlist case final playlist?) {
+      final folders = LibraryFoldersScope.read(context);
+      // Not while building: Biblioteka, under this screen, reorders itself.
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => folders?.opened(LibraryFolders.playlistKey(playlist.id)),
+      );
+    }
     _scroll.addListener(() {
       final hidden = _scroll.offset > 300;
       if (hidden != _headerHidden) setState(() => _headerHidden = hidden);
@@ -354,6 +365,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   Future<void> _delete() async {
     final library = PlaylistLibraryScope.of(context);
+    final folders = LibraryFoldersScope.maybeOf(context);
     final navigator = Navigator.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -381,6 +393,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
     if (!(confirmed ?? false)) return;
     await library.delete(_playlist.id);
+    // A local id may be given to a new playlist later.
+    await folders?.move(LibraryFolders.playlistKey(_playlist.id), null);
     navigator.pop();
   }
 
@@ -479,13 +493,18 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 'Wyświetl utwory, których nie ma w bazie danych',
                 onTap: _showMissing,
               ),
-              const MenuSheetEntry(
-                Icons.playlist_add,
-                'Dodaj do innej playlisty',
-              ),
-              const MenuSheetEntry(
-                Icons.drive_file_move_outline,
-                'Przenieś do folderu',
+              playlistMenuEntry(
+                    context,
+                    hits,
+                    label: 'Dodaj do innej playlisty',
+                  ) ??
+                  const MenuSheetEntry(
+                    Icons.playlist_add,
+                    'Dodaj do innej playlisty',
+                  ),
+              ?moveToFolderEntry(
+                context,
+                LibraryFolders.playlistKey(_saved!.id),
               ),
               const MenuSheetEntry(Icons.qr_code, 'Pokaż kod playlisty'),
             ],
@@ -515,7 +534,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           Icons.add_circle_outline,
           'Dodaj do Polubionych utworów',
         ),
-        const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
+        playlistMenuEntry(context, [hit]) ??
+            const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
         ?moodMenuEntry(context, hit),
         const MenuSheetEntry(
           Icons.remove_circle_outline,
@@ -609,6 +629,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       SongTile(
         key: key,
         hit: hit,
+        selectionKey: i,
         // Tapping a track queues the whole playlist, starting at that track.
         queue: hits,
         queueIndex: i,
@@ -674,224 +695,232 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ],
             ),
       // The playlist stays built under the search, so closing it returns to the same place.
-      body: IndexedStack(
-        index: _searching ? 1 : 0,
-        children: [
-          ListView(
-            controller: _scroll,
-            padding: EdgeInsets.zero,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [tint, palette.background],
+      body: SongSelectionArea(
+        all: () => {for (final (i, hit) in hits.indexed) i: hit},
+        child: IndexedStack(
+          index: _searching ? 1 : 0,
+          children: [
+            ListView(
+              controller: _scroll,
+              padding: EdgeInsets.zero,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [tint, palette.background],
+                    ),
                   ),
-                ),
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  MediaQuery.paddingOf(context).top + 56,
-                  16,
-                  0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(child: _cover(hits, 220)),
-                    const SizedBox(height: 20),
-                    Text(
-                      _playlist.name,
-                      style: const TextStyle(
-                        fontSize: AppFontSize.largeTitle,
-                        fontWeight: FontWeight.bold,
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    MediaQuery.paddingOf(context).top + 56,
+                    16,
+                    0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(child: _cover(hits, 220)),
+                      const SizedBox(height: 20),
+                      Text(
+                        _playlist.name,
+                        style: const TextStyle(
+                          fontSize: AppFontSize.largeTitle,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: palette.accent,
-                          child: Text(
-                            _owner.characters.first,
-                            style: TextStyle(
-                              color: palette.onAccent,
-                              fontWeight: FontWeight.bold,
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: palette.accent,
+                            child: Text(
+                              _owner.characters.first,
+                              style: TextStyle(
+                                color: palette.onAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _owner,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          _fromSpotify
-                              ? Icons.graphic_eq
-                              : Icons.smart_display_outlined,
-                          size: 18,
-                          color: palette.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          [
-                            trackCountLabel(_playlist.trackCount),
-                            if (_playlist.duration > Duration.zero)
-                              _length(_playlist.duration),
-                          ].join(' • '),
-                          style: TextStyle(color: palette.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
-                child: Row(
-                  children: [
-                    if (!_preview)
-                      IconButton(
-                        tooltip: 'Pobierz',
-                        icon: const Icon(
-                          Icons.download_for_offline_outlined,
-                          size: 30,
-                        ),
-                        onPressed: () => dummy('Pobierz (ikona)'),
-                      ),
-                    IconButton(
-                      tooltip: 'Udostępnij',
-                      icon: const Icon(Icons.share_outlined, size: 28),
-                      onPressed: () => _share(hits),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: 'Odtwarzanie losowe',
-                      icon: Icon(
-                        Icons.shuffle,
-                        color: palette.accent,
-                        size: 30,
-                      ),
-                      onPressed: hits.isEmpty
-                          ? null
-                          : () => runQueueAction(
-                              context,
-                              (onStatus) =>
-                                  PlaybackQueueScope.of(context).startShuffled(
-                                    hits,
-                                    playlistId: _savedId,
-                                    youTubeListId: _playlist.youTubeId,
-                                    playlistName: _playlist.name,
-                                    onStatus: onStatus,
-                                  ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _owner,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                    ),
-                    const SizedBox(width: 4),
-                    FloatingActionButton(
-                      heroTag: null,
-                      tooltip: 'Odtwórz playlistę',
-                      backgroundColor: palette.accent,
-                      foregroundColor: palette.onAccent,
-                      shape: palette.rounded
-                          ? const CircleBorder()
-                          : const RoundedRectangleBorder(),
-                      onPressed: hits.isEmpty
-                          ? null
-                          : () => runQueueAction(
-                              context,
-                              (onStatus) =>
-                                  PlaybackQueueScope.of(context).start(
-                                    hits,
-                                    0,
-                                    playlistId: _savedId,
-                                    youTubeListId: _playlist.youTubeId,
-                                    playlistName: _playlist.name,
-                                    shuffle: false,
-                                    onStatus: onStatus,
-                                  ),
-                            ),
-                      child: const Icon(Icons.play_arrow, size: 36),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Wrap(
-                  spacing: 8,
-                  children: _preview
-                      ? [
-                          _ActionChip(
-                            icon: Icons.add,
-                            label: _saving ? 'Zapisuję…' : _saveLabel(context),
-                            onTap: _fetched == null || _saving
-                                ? null
-                                : _saveToLibrary,
-                          ),
-                        ]
-                      : [
-                          _ActionChip(
-                            icon: Icons.add,
-                            label: 'Dodaj',
-                            onTap: () => dummy('Dodaj (do tej playlisty)'),
-                          ),
-                          _ActionChip(
-                            icon: Icons.menu,
-                            label: 'Edytuj',
-                            onTap: () => dummy('Edytuj (playlistę)'),
-                          ),
-                          _ActionChip(
-                            icon: Icons.swap_vert,
-                            label: 'Sortuj',
-                            onTap: () => dummy('Sortuj (playlistę)'),
                           ),
                         ],
-                ),
-              ),
-              if (_fetchError != null)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Text(
-                        _fetchError!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: palette.textSecondary),
                       ),
-                      const SizedBox(height: 12),
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: palette.textPrimary,
-                          shape: palette.pillShape,
-                        ),
-                        onPressed: _fetch,
-                        child: const Text('Spróbuj ponownie'),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            _fromSpotify
+                                ? Icons.graphic_eq
+                                : Icons.smart_display_outlined,
+                            size: 18,
+                            color: palette.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            [
+                              trackCountLabel(_playlist.trackCount),
+                              if (_playlist.duration > Duration.zero)
+                                _length(_playlist.duration),
+                            ].join(' • '),
+                            style: TextStyle(color: palette.textSecondary),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                )
-              else if (tracks == null)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else
-                for (final (i, hit) in hits.indexed)
-                  _trackTile(hits, i, hit, key: i == 0 ? _firstRowKey : null),
-              const SizedBox(height: 24),
-            ],
-          ),
-          if (_searching) _searchResults(hits),
-        ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
+                  child: Row(
+                    children: [
+                      if (!_preview)
+                        IconButton(
+                          tooltip: 'Pobierz',
+                          icon: const Icon(
+                            Icons.download_for_offline_outlined,
+                            size: 30,
+                          ),
+                          onPressed: () => dummy('Pobierz (ikona)'),
+                        ),
+                      IconButton(
+                        tooltip: 'Udostępnij',
+                        icon: const Icon(Icons.share_outlined, size: 28),
+                        onPressed: () => _share(hits),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Odtwarzanie losowe',
+                        icon: Icon(
+                          Icons.shuffle,
+                          color: palette.accent,
+                          size: 30,
+                        ),
+                        onPressed: hits.isEmpty
+                            ? null
+                            : () => runQueueAction(
+                                context,
+                                (onStatus) =>
+                                    PlaybackQueueScope.of(context)
+                                        .startShuffled(
+                                          hits,
+                                          playlistId: _savedId,
+                                          youTubeListId: _playlist.youTubeId,
+                                          playlistName: _playlist.name,
+                                          onStatus: onStatus,
+                                        ),
+                              ),
+                      ),
+                      const SizedBox(width: 4),
+                      FloatingActionButton(
+                        heroTag: null,
+                        tooltip: 'Odtwórz playlistę',
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.onAccent,
+                        shape: palette.rounded
+                            ? const CircleBorder()
+                            : const RoundedRectangleBorder(),
+                        onPressed: hits.isEmpty
+                            ? null
+                            : () => runQueueAction(
+                                context,
+                                (onStatus) =>
+                                    PlaybackQueueScope.of(context).start(
+                                      hits,
+                                      0,
+                                      playlistId: _savedId,
+                                      youTubeListId: _playlist.youTubeId,
+                                      playlistName: _playlist.name,
+                                      shuffle: false,
+                                      onStatus: onStatus,
+                                    ),
+                              ),
+                        child: const Icon(Icons.play_arrow, size: 36),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Wrap(
+                    spacing: 8,
+                    children: _preview
+                        ? [
+                            _ActionChip(
+                              icon: Icons.add,
+                              label: _saving
+                                  ? 'Zapisuję…'
+                                  : _saveLabel(context),
+                              onTap: _fetched == null || _saving
+                                  ? null
+                                  : _saveToLibrary,
+                            ),
+                          ]
+                        : [
+                            _ActionChip(
+                              icon: Icons.add,
+                              label: 'Dodaj',
+                              onTap: () => dummy('Dodaj (do tej playlisty)'),
+                            ),
+                            _ActionChip(
+                              icon: Icons.menu,
+                              label: 'Edytuj',
+                              onTap: () => dummy('Edytuj (playlistę)'),
+                            ),
+                            _ActionChip(
+                              icon: Icons.swap_vert,
+                              label: 'Sortuj',
+                              onTap: () => dummy('Sortuj (playlistę)'),
+                            ),
+                          ],
+                  ),
+                ),
+                if (_fetchError != null)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Text(
+                          _fetchError!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: palette.textSecondary),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: palette.textPrimary,
+                            shape: palette.pillShape,
+                          ),
+                          onPressed: _fetch,
+                          child: const Text('Spróbuj ponownie'),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (tracks == null)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else
+                  for (final (i, hit) in hits.indexed)
+                    _trackTile(hits, i, hit, key: i == 0 ? _firstRowKey : null),
+                const SizedBox(height: 24),
+              ],
+            ),
+            if (_searching) _searchResults(hits),
+          ],
+        ),
       ),
     );
   }

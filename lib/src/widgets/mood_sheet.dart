@@ -349,8 +349,8 @@ Future<void> _confirmForAll(
   required int changed,
 }) async {
   final question = add
-      ? 'Dodać $changed ${_songs(changed)} do nastroju „${mood.name}”?'
-      : 'Usunąć $changed ${_songs(changed)} z nastroju „${mood.name}”?';
+      ? 'Dodać $changed ${songsWord(changed)} do nastroju „${mood.name}”?'
+      : 'Usunąć $changed ${songsWord(changed)} z nastroju „${mood.name}”?';
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -369,12 +369,4 @@ Future<void> _confirmForAll(
     ),
   );
   if (confirmed ?? false) await moods.setSongs(mood, songIds, add);
-}
-
-/// "utwór" in the form that goes with [count].
-String _songs(int count) {
-  if (count == 1) return 'utwór';
-  final tens = count % 100 ~/ 10;
-  final last = count % 10;
-  return tens != 1 && last >= 2 && last <= 4 ? 'utwory' : 'utworów';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/library_folders.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/song_catalog.dart';
@@ -10,7 +11,10 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/collection_cover.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/folder_sheet.dart';
 import '../widgets/mood_sheet.dart';
+import '../widgets/playlist_picker.dart';
+import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
 const _id = 'Nastrój';
@@ -23,9 +27,11 @@ class MoodScreen extends StatelessWidget {
 
   final Mood mood;
 
-  static Future<void> open(BuildContext context, Mood mood) => Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (_) => MoodScreen(mood: mood)));
+  static Future<void> open(BuildContext context, Mood mood) {
+    LibraryFoldersScope.read(context)?.opened(mood.key);
+    return Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => MoodScreen(mood: mood)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,99 +72,102 @@ class MoodScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Row(
-              children: [
-                MoodCover(mood: mood, size: 96),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mood.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: AppFontSize.largeTitle,
-                          fontWeight: FontWeight.bold,
+      body: SongSelectionArea(
+        all: () => {for (final hit in hits) SongSelection.keyOf(hit): hit},
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  MoodCover(mood: mood, size: 96),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mood.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AppFontSize.largeTitle,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${mood.global ? 'Nastrój globalny' : 'Twój nastrój'} • '
-                        '${_songCount(hits.length)}',
-                        style: TextStyle(color: palette.textSecondary),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          '${mood.global ? 'Nastrój globalny' : 'Twój nastrój'} • '
+                          '${_songCount(hits.length)}',
+                          style: TextStyle(color: palette.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.shuffle),
+                  label: const Text('Odtwórz losowo'),
+                  onPressed: hits.isEmpty
+                      ? null
+                      : () {
+                          final queue = PlaybackQueueScope.of(context);
+                          runQueueAction(
+                            context,
+                            (onStatus) => queue.startShuffled(
+                              hits,
+                              playlistName: mood.name,
+                              onStatus: onStatus,
+                            ),
+                          );
+                        },
+                ),
+              ),
+            ),
+            if (missing > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  'Utworów, których nie ma w bazie danych na telefonie: $missing — '
+                  'pojawią się po pobraniu nowszej.',
+                  style: TextStyle(
+                    fontSize: AppFontSize.small,
+                    color: palette.textSecondary,
                   ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                icon: const Icon(Icons.shuffle),
-                label: const Text('Odtwórz losowo'),
-                onPressed: hits.isEmpty
-                    ? null
-                    : () {
-                        final queue = PlaybackQueueScope.of(context);
-                        runQueueAction(
-                          context,
-                          (onStatus) => queue.startShuffled(
-                            hits,
-                            playlistName: mood.name,
-                            onStatus: onStatus,
-                          ),
-                        );
-                      },
               ),
-            ),
-          ),
-          if (missing > 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                'Utworów, których nie ma w bazie danych na telefonie: $missing — '
-                'pojawią się po pobraniu nowszej.',
-                style: TextStyle(
-                  fontSize: AppFontSize.small,
-                  color: palette.textSecondary,
+            if (hits.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
+                child: Text(
+                  'Brak utworów. Dodaj je z menu ⋮ utworu: „Dodaj do nastroju”.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: palette.textSecondary),
                 ),
               ),
-            ),
-          if (hits.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
-              child: Text(
-                'Brak utworów. Dodaj je z menu ⋮ utworu: „Dodaj do nastroju”.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: palette.textSecondary),
+            for (final (i, hit) in hits.indexed)
+              SongTile(
+                key: ValueKey(hit.mainSong!.id),
+                hit: hit,
+                queue: hits,
+                queueIndex: i,
+                playlistName: mood.name,
+                trailing: IconButton(
+                  tooltip: 'Menu utworu (⋮)',
+                  icon: const Icon(Icons.more_vert),
+                  onPressed: () => _showSongMenu(context, mood, hit, editable),
+                ),
+                onLongPress: () => _showSongMenu(context, mood, hit, editable),
               ),
-            ),
-          for (final (i, hit) in hits.indexed)
-            SongTile(
-              key: ValueKey(hit.mainSong!.id),
-              hit: hit,
-              queue: hits,
-              queueIndex: i,
-              playlistName: mood.name,
-              trailing: IconButton(
-                tooltip: 'Menu utworu (⋮)',
-                icon: const Icon(Icons.more_vert),
-                onPressed: () => _showSongMenu(context, mood, hit, editable),
-              ),
-              onLongPress: () => _showSongMenu(context, mood, hit, editable),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -193,7 +202,9 @@ class MoodScreen extends StatelessWidget {
             onTap: () => queueSongs(context, hits, next: true, origin: origin),
           ),
           ?moodForAllEntry(context, hits, title: mood.name),
+          ?playlistMenuEntry(context, hits, label: 'Dodaj do playlisty'),
         ],
+        ?moveToFolderEntry(context, mood.key),
         ...customCoverEntries(
           context,
           current: mood.cover,
@@ -256,6 +267,7 @@ class MoodScreen extends StatelessWidget {
 
   Future<void> _delete(BuildContext context, Mood mood) async {
     final moods = MoodLibraryScope.of(context);
+    final folders = LibraryFoldersScope.maybeOf(context);
     final navigator = Navigator.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -281,6 +293,7 @@ class MoodScreen extends StatelessWidget {
     );
     if (!(confirmed ?? false)) return;
     await moods.delete(mood);
+    await folders?.move(mood.key, null);
     navigator.pop();
   }
 }

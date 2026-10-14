@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_name.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// "Ustawienia › Informacje i pomoc": the terms the app may be shared under. Mostly a reminder
-/// for the owner — the app is for private use only and must never go to an app store.
+/// "Ustawienia › Informacje i pomoc": the app's version and the terms it may be shared under.
+/// Mostly a reminder for the owner — the app is for private use only and must never go to an
+/// app store.
 class AboutScreen extends StatelessWidget {
-  const AboutScreen({super.key});
+  const AboutScreen({super.key, this.packageInfo});
+
+  /// Where the version comes from; tests pass their own.
+  final Future<PackageInfo> Function()? packageInfo;
 
   static final sourceUrl = Uri.parse(
     'https://github.com/shian1000/MusicDatabaseApp',
@@ -58,6 +63,7 @@ class AboutScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
+          _VersionTile(packageInfo: packageInfo ?? PackageInfo.fromPlatform),
           const SectionTitle('Tylko do użytku prywatnego'),
           paragraph(
             'Aplikacja pobiera i odtwarza dźwięk z YouTube poza jego oficjalnym '
@@ -105,4 +111,45 @@ class AboutScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The commit a build was made from (`tool/build_release_apk.sh`), with "+zmiany" when its
+/// files differed from it; empty for builds made otherwise (`flutter run`).
+const gitCommit = String.fromEnvironment('GIT_COMMIT');
+
+/// "1.0.0 (kompilacja 312, c11e6c4)": the build number and commit only when known.
+String versionLabel(String version, String buildNumber, String commit) {
+  final details = [
+    if (buildNumber.isNotEmpty) 'kompilacja $buildNumber',
+    if (commit.isNotEmpty) commit,
+  ];
+  return details.isEmpty ? version : '$version (${details.join(', ')})';
+}
+
+/// "Wersja": `version` from `pubspec.yaml`, the build number (the commit count when built with
+/// `tool/build_release_apk.sh`) and the commit.
+class _VersionTile extends StatefulWidget {
+  const _VersionTile({required this.packageInfo});
+
+  final Future<PackageInfo> Function() packageInfo;
+
+  @override
+  State<_VersionTile> createState() => _VersionTileState();
+}
+
+class _VersionTileState extends State<_VersionTile> {
+  late final Future<String> _version = widget
+      .packageInfo()
+      .then((info) => versionLabel(info.version, info.buildNumber, gitCommit))
+      .catchError((Object _) => 'nieznana');
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<String>(
+    future: _version,
+    builder: (context, snapshot) => ListTile(
+      leading: const Icon(Icons.info_outline),
+      title: Text('$appName — wersja'),
+      subtitle: Text(snapshot.data ?? '…'),
+    ),
+  );
 }

@@ -6,6 +6,7 @@ import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
+import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
 /// "Wyświetl utwory, których nie ma w bazie danych" from a playlist's ⋮: its tracks not
@@ -76,31 +77,33 @@ class MissingTracksScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              summary,
-              style: TextStyle(
-                color: palette.textSecondary,
-                fontSize: AppFontSize.small,
+      body: SongSelectionArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                summary,
+                style: TextStyle(
+                  color: palette.textSecondary,
+                  fontSize: AppFontSize.small,
+                ),
               ),
             ),
-          ),
-          if (catalog.status == CatalogStatus.ready)
-            for (final i in missing)
-              SongTile(
-                hit: hits[i],
-                queue: hits,
-                queueIndex: i,
-                playlistId: saved ? playlist.id : null,
-                youTubeListId: playlist.youTubeId,
-                playlistName: playlist.name,
-                subtitle: hits[i].artistLabel,
-              ),
-        ],
+            if (catalog.status == CatalogStatus.ready)
+              for (final i in missing)
+                SongTile(
+                  hit: hits[i],
+                  queue: hits,
+                  queueIndex: i,
+                  playlistId: saved ? playlist.id : null,
+                  youTubeListId: playlist.youTubeId,
+                  playlistName: playlist.name,
+                  subtitle: hits[i].artistLabel,
+                ),
+          ],
+        ),
       ),
     );
   }

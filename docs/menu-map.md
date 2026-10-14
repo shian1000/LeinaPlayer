@@ -313,7 +313,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   - "Wyczyść wszystko" — YouTube songs and covers (confirm dialog; the downloaded database and
     phone music stay).
 - `Ustawienia › Jakość zawartości multimedialnej`
-- Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: "Tylko do
+- Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: the
+  version at the top ("Leina Radio — wersja": `version` from `pubspec.yaml`, the build number
+  and commit, e.g. "1.0.0 (kompilacja 26, c11e6c4+zmiany)" — see `tool/build_release_apk.sh`), "Tylko do
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
@@ -386,17 +388,25 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     name or owner contain every word, as you type, above the songs; tapping one opens it.
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
     <pozycja>`: Dodaj do kolejki (**implemented**), Odtwórz jako następny (**implemented**),
-    `Dodaj do playlisty`, Dodaj do nastroju (**implemented**, MusicDatabase songs only, **→
+    Dodaj do playlisty (**implemented → sheet "Dodaj do playlisty"** below), Dodaj do nastroju
+    (**implemented**, MusicDatabase songs only, **→
     sheet "Dodaj do nastroju"** below), `Przejdź do albumu`,
     `Przejdź do wykonawców`, Udostępnij (**→ Udostępnij utwór**, below). The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`).
   - **The song menu** (`showSongMenu` in `song_tile.dart`): the same entries as this ⋮ — Dodaj do
     kolejki, Odtwórz jako następny, Dodaj do nastroju (for a song not in MusicDatabase it says
-    only database songs can be in a mood), the dummies, Udostępnij — open with a **long press on
-    any song row** (search, YouTube results, Ostatnie, Kolejka `Kolejka › Utwór › Menu (⋮)`,
-    Pamięć podręczna, Utwory spoza bazy danych, outbox contents), the full player's ⋮ (`Odtwarzacz ›
-    Menu (⋮)`, was a dummy) and a long press on the mini player (`Mini odtwarzacz › Menu
-    utworu`). In a playlist or a mood a long press opens that screen's own track menu.
+    only database songs can be in a mood), Dodaj do playlisty, the dummies, Udostępnij — open
+    with a long press on song rows outside a selection area (YouTube results, Kolejka
+    `Kolejka › Utwór › Menu (⋮)`, outbox contents), the full player's ⋮ (`Odtwarzacz › Menu
+    (⋮)`) and a long press on the mini player (`Mini odtwarzacz › Menu utworu`).
+  - **Ticking songs** (`SongSelectionArea` in `widgets/song_selection.dart`; song search,
+    playlists, moods, Ostatnie, Pamięć podręczna, Utwory spoza bazy danych): a **long press on a
+    song row** ticks it and starts ticking — taps then tick / untick instead of playing, the ⋮
+    and the swipe go away, and a bar under the list shows "Zaznaczono: N", ✕, "Wszystkie" /
+    "Odznacz" (playlists and moods) and Do kolejki, Jako następne, Do playlisty
+    (→ "Dodaj do playlisty"), Do nastroju (→ "Nastrój dla wszystkich utworów"); songs go in the
+    order they were ticked. Back (and ✕) unticks everything first. In search the ticks stay
+    while the query changes.
   - Gestures on song rows (search results — YouTube ones too —, playlists, Ostatnie, every
     `SongTile`; `SwipeActions` in `swipe_actions.dart`): dragging a row right adds the song to
     the queue, like the reference app — past a quarter of the row (at most 120 px) the strip
@@ -431,12 +441,24 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - Utwórz (+) **→ sheet "Utwórz"** with prefix `Biblioteka › Utwórz (+)` (see below)
 - Filtr: Playlisty (**implemented**: playlists only), Filtr: Nastroje (**implemented**: moods
   only; "Brak nastrojów" and how to add one when there are none), `Biblioteka › Filtr: Albumy` /
-  `Filtr: Wykonawcy`. No filter: playlists, then moods.
-- Sort button (shows current order) **→ sheet "Sortuj wg"**:
-  - `Biblioteka › Sortuj wg › Ostatnie`
-  - `Biblioteka › Sortuj wg › Ostatnio dodane`
-  - `Biblioteka › Sortuj wg › Alfabetycznie`
-  - `Biblioteka › Sortuj wg › Twórca`
+  `Filtr: Wykonawcy`. No filter: folders, playlists and moods outside folders, mixed in the
+  sort order; a working filter lists every playlist / mood on its own, folders aside.
+- Sort button (shows current order) **→ sheet "Sortuj wg"** — **implemented**
+  (`LibraryFolders` in `data/library_folders.dart`, remembered on the phone; also in a folder):
+  - Ostatnie: last opened (playlist, mood or folder; a folder also by its newest item), else
+    last changed; never-opened global moods last
+  - Ostatnio dodane: when saved on the phone / made (global moods last)
+  - Alfabetycznie: name, case and Polish letters aside
+  - Twórca: folders first, then the playlist's owner ("Ty" for ones made here; a mood: "Ty" or
+    "MusicDatabase"), then name
+- **Folders** — **implemented**, only on this phone (not synced with MusicDatabase): made from
+  Utwórz › Folder or "Nowy folder" in "Przenieś do folderu"; row "Folder • N playlist, M
+  nastrojów" **→ Folder** (`FolderScreen`: its items in the same order, sort button, ⋮ = the
+  folder menu, "Pusty folder…" when empty). A **long press** on a playlist / mood row (here or in
+  a folder) **→ sheet "Przenieś do folderu"** (`folder_sheet.dart`: Nowy folder, Bez folderu,
+  every folder by name, the current one ticked); on a folder row **→ folder menu**
+  (`Biblioteka › Folder › Menu (⋮)`: Zmień nazwę, Usuń folder — its items go back to
+  Biblioteka). Folders don't nest; an item is in one folder at most.
 - `Biblioteka › Widok siatki`
 - Library items: the user's playlists (`PlaylistLibrary`, newest first; cover — the picked one
   or the collage, see Playlista › Header — name,
@@ -449,7 +471,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 ## Nastrój (`mood_screen.dart`) — **implemented**
 
 - App bar with the name and ⋮ **→ sheet**, IDs `Nastrój › Menu (⋮) › <pozycja>`: Dodaj do
-  kolejki / Odtwórz jako następny (the whole mood), **Nastrój dla wszystkich utworów**, and for
+  kolejki / Odtwórz jako następny (the whole mood), **Nastrój dla wszystkich utworów**, Dodaj do
+  playlisty (every song), Przenieś do folderu (see Biblioteka), and for
   the user's own mood Zmień nazwę
   (dialog) and Usuń nastrój (asks first; deleted on every device of the account, MusicDatabase
   archives it). For every mood, global ones too: **Dodaj okładkę** / **Zmień okładkę** (an
@@ -460,6 +483,13 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - Songs by title (tapping one plays on through the mood); ⋮ **→ sheet**, IDs `Nastrój › Utwór ›
   Menu (⋮) › <pozycja>`: Dodaj do kolejki, Odtwórz jako następny, Dodaj do nastroju, Usuń z tego
   nastroju (own mood, or a global one with the `edit_global_moods` permission), Udostępnij.
+
+## Sheet "Dodaj do playlisty" (`playlist_picker.dart`)
+
+- Header with the song (or "N utworów"); "Nowa playlista" (name dialog; a new playlist of these
+  songs); then every playlist made on the phone (not imported — re-importing would replace the
+  added songs; a note says so when there are imported ones) — tapping one puts the songs at its
+  end, synced like any change.
 
 ## Sheet "Dodaj do nastroju" (`mood_sheet.dart`)
 
@@ -517,8 +547,9 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
   tracks not recognised as MusicDatabase songs, "Poza bazą danych: N z M", rows like the
   playlist's — tapping plays on through the playlist from there; a note instead when music.db
-  isn't downloaded; later the place to ask MusicDatabase to add them), `Dodaj do innej playlisty`, `Przenieś do folderu`, `Pokaż kod
-  playlisty`.
+  isn't downloaded; later the place to ask MusicDatabase to add them), Dodaj do innej playlisty
+  (**implemented**: every track → "Dodaj do playlisty"), Przenieś do folderu (**implemented**, see
+  Biblioteka), `Pokaż kod playlisty`.
 - `Playlista › Pobierz (ikona)`, Udostępnij (ikona, **implemented → Udostępnij sheet**,
   `share_sheet.dart`: a card with the playlist's mosaic, name and "Playlista • <owner>" over three
   round buttons — Kopiuj link, Otwórz w YouTube/Spotify, Więcej (the phone's share sheet). The
@@ -538,7 +569,7 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   list can scroll; the entry playing, when queued from this playlist, knows its place in it).
 - Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: Udostępnij (**→
   Udostępnij utwór**, see search), `Dodaj do
-  Polubionych utworów`, `Dodaj do playlisty`, Dodaj do nastroju (**implemented**, see search),
+  Polubionych utworów`, Dodaj do playlisty (**implemented**), Dodaj do nastroju (**implemented**, see search),
   `Usuń z tej playlisty`, Dodaj do kolejki and
   Odtwórz jako następny (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
 
@@ -548,7 +579,8 @@ Opened from the bottom-nav tab (prefix `Utwórz`) or the Library "+" (prefix
 `Biblioteka › Utwórz (+)`):
 
 - Playlista **→ sheet** (`playlist_import.dart`):
-  - `… › Playlista › Utwórz nową playlistę` (dummy)
+  - Utwórz nową playlistę (**implemented**): name dialog, then an empty Biblioteka playlist to
+    fill with "Dodaj do playlisty".
   - Importuj playlistę **→ dialog** for a YouTube playlist link (or bare id) or a Spotify one
     (`open.spotify.com/playlist/…`, `spotify:playlist:…`, `spotify.link/…`; anything else is
     refused in the dialog), then "Importuję playlistę…" and a snackbar
@@ -559,6 +591,7 @@ Opened from the bottom-nav tab (prefix `Utwórz`) or the Library "+" (prefix
     tracks; the snackbar then adds "Spotify pokazuje bez logowania tylko pierwsze 100 z N."
 - Nastrój (**implemented**): name dialog, then a new mood — the logged-in user's, or one only on
   this phone while logged out ([ADR 0008](decisions/0008-moods.md)).
+- Folder (**implemented**): name dialog, then an empty Biblioteka folder.
 - `… › Współtworzone playlisty`
 - `… › Blend`
 

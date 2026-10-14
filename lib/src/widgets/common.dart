@@ -252,3 +252,11 @@ class _TextInputDialogState extends State<TextInputDialog> {
     );
   }
 }
+
+/// "utwór" in the form that goes with [count]: 1 utwór, 2 utwory, 5 utworów.
+String songsWord(int count) {
+  if (count == 1) return 'utwór';
+  final tens = count % 100 ~/ 10;
+  final last = count % 10;
+  return tens != 1 && last >= 2 && last <= 4 ? 'utwory' : 'utworów';
+}

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/library_folders.dart';
 import '../data/moods.dart';
+import '../widgets/folder_sheet.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/mood_sheet.dart';
 import 'playlist_import.dart';
@@ -26,6 +28,13 @@ Future<void> showCreateSheet(BuildContext context, {required String idPrefix}) {
           'Nastrój',
           subtitle: 'Utwory o podobnym klimacie, np. do ćwiczeń',
           onTap: () => createMood(context),
+        ),
+      if (LibraryFoldersScope.maybeOf(context) != null)
+        MenuSheetEntry(
+          Icons.create_new_folder_outlined,
+          'Folder',
+          subtitle: 'Uporządkuj playlisty i nastroje w Bibliotece',
+          onTap: () => createFolder(context),
         ),
       const MenuSheetEntry(
         Icons.group_outlined,

@@ -12,7 +12,9 @@ import 'mood_sheet.dart';
 import 'playing_bars.dart';
 import 'queue_toast.dart';
 import '../screens/queue_screen.dart';
+import 'playlist_picker.dart';
 import 'share_sheet.dart';
+import 'song_selection.dart';
 import '../data/album_covers.dart';
 import 'song_cover.dart';
 import 'swipe_actions.dart';
@@ -178,6 +180,7 @@ class SongTile extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.onLongPress,
+    this.selectionKey,
     this.menuIdPrefix = 'Utwór › Menu (⋮)',
   });
 
@@ -207,8 +210,13 @@ class SongTile extends StatelessWidget {
   /// Instead of playing the song (e.g. "Ostatnie" opens the playlist it was played from).
   final VoidCallback? onTap;
 
-  /// Instead of the song's usual menu ([showSongMenu]), e.g. a playlist's own track menu.
+  /// Instead of the song's usual menu ([showSongMenu]), e.g. a playlist's own track menu —
+  /// only outside a [SongSelectionArea], where a long press starts ticking songs.
   final VoidCallback? onLongPress;
+
+  /// Tells this row apart in a [SongSelection] where the same song may be listed twice (e.g.
+  /// its position); [SongSelection.keyOf] otherwise.
+  final Object? selectionKey;
 
   /// What the menu's dummy entries report, as `<menuIdPrefix> › <label>`.
   final String menuIdPrefix;
@@ -247,12 +255,40 @@ class SongTile extends StatelessWidget {
           if (hit.album != null && hit.album!.isNotEmpty) hit.album!,
           if (hit.year != null) '${hit.year}',
         ].join(' • ');
-    final trailing = this.trailing;
+    final selection = SongSelectionScope.maybeOf(context);
+    final key = selectionKey ?? SongSelection.keyOf(hit);
+    final selecting = selection != null && selection.active;
+    final ticked = selecting && selection.contains(key);
+    final trailing = selecting ? null : this.trailing;
+    final palette = context.palette;
+    final cover = SongCover(
+      cover: CoverRequest.of(hit),
+      size: SongTile.coverSize,
+    );
     final tile = ListTile(
       contentPadding: trailing == null
           ? null
           : const EdgeInsets.only(left: 16, right: 4),
-      leading: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),
+      selected: ticked,
+      selectedTileColor: palette.accent.withValues(alpha: 0.15),
+      selectedColor: palette.textPrimary,
+      leading: selecting
+          ? Stack(
+              children: [
+                cover,
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: ticked
+                        ? palette.background.withValues(alpha: 0.55)
+                        : Colors.transparent,
+                    child: ticked
+                        ? Icon(Icons.check_circle, color: palette.accent)
+                        : null,
+                  ),
+                ),
+              ],
+            )
+          : cover,
       title: CurrentTitle(text: hit.title, isCurrent: isCurrent),
       subtitle: Text(details, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: trailing == null
@@ -264,11 +300,17 @@ class SongTile extends StatelessWidget {
                 trailing,
               ],
             ),
-      onTap: onTap ?? () => _onTap(context),
-      onLongPress:
-          onLongPress ??
-          () => showSongMenu(context, hit, idPrefix: menuIdPrefix),
+      onTap: selecting
+          ? () => selection.toggle(key, hit)
+          : onTap ?? () => _onTap(context),
+      onLongPress: selection != null
+          ? () => selecting
+                ? selection.toggle(key, hit)
+                : startSelection(selection, key, hit)
+          : onLongPress ??
+                () => showSongMenu(context, hit, idPrefix: menuIdPrefix),
     );
+    if (selecting) return tile;
     // Like the reference app: dragging a song to the right queues it.
     return SwipeActions(
       right: SwipeAction(
@@ -371,9 +413,9 @@ class SourceIcons extends StatelessWidget {
   }
 }
 
-/// The menu of a song — its ⋮, and a long press on its row anywhere: "Dodaj do kolejki",
-/// "Odtwórz jako następny", "Dodaj do nastroju", "Udostępnij"; the rest are dummies like in the
-/// reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
+/// The menu of a song — its ⋮, and a long press on its row outside a [SongSelectionArea]:
+/// "Dodaj do kolejki", "Odtwórz jako następny", "Dodaj do nastroju", "Dodaj do playlisty",
+/// "Udostępnij"; the rest are dummies like in the reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
 Future<void> showSongMenu(
   BuildContext context,
   SearchHit hit, {
@@ -402,7 +444,8 @@ Future<void> showSongMenu(
       ),
       ?moodMenuEntry(context, hit),
       ...extra,
-      const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
+      playlistMenuEntry(context, [hit]) ??
+          const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
       const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
       const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
       MenuSheetEntry(

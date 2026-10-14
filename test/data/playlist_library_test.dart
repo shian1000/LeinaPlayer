@@ -414,4 +414,25 @@ void main() {
       'yt1',
     );
   });
+
+  test('songs added to a playlist made on the phone go at its end', () async {
+    await catalog.ensureLoaded();
+    final saved = await playlists.create('Pusta', const []);
+    expect(saved.trackCount, 0);
+    expect(playlists.editable.single.id, saved.id);
+
+    await playlists.addSongs(saved.id, [
+      SearchHit.main(catalog.byId(2)!, const []),
+    ]);
+    await playlists.addSongs(saved.id, [
+      SearchHit.main(catalog.byId(1)!, const []),
+    ]);
+
+    final tracks = await playlists.tracks(saved.id);
+    expect(
+      [for (final t in tracks) (t.position, t.mainDbId)],
+      [(0, 2), (1, 1)],
+    );
+    expect(playlists.byId(saved.id)!.trackCount, 2);
+  });
 }

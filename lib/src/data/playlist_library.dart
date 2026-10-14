@@ -34,6 +34,7 @@ class PlaylistSummary {
     required this.trackCount,
     required this.duration,
     required this.updatedAt,
+    this.createdAt,
     this.source,
     this.sourceId,
     this.account,
@@ -48,6 +49,10 @@ class PlaylistSummary {
   /// Sum of the known track lengths.
   final Duration duration;
   final DateTime updatedAt;
+
+  /// When it was saved on the phone (or made on another device, for a synced one); `null` for a
+  /// preview not saved.
+  final DateTime? createdAt;
 
   /// Where it was imported from, and that playlist's id there.
   final PlaylistSource? source;
@@ -191,7 +196,7 @@ class PlaylistLibrary extends ChangeNotifier {
   Future<void> load() async {
     final scope = _scope('p.');
     final rows = await (await _database()).rawQuery('''
-      SELECT p.id, p.name, p.owner, p.updated_at, p.source, p.source_id, p.account,
+      SELECT p.id, p.name, p.owner, p.created_at, p.updated_at, p.source, p.source_id, p.account,
              p.cover_sha256,
              COUNT(t.position) AS tracks, COALESCE(SUM(t.duration_s), 0) AS seconds
       FROM playlists p LEFT JOIN playlist_tracks t ON t.playlist_id = p.id
@@ -207,6 +212,9 @@ class PlaylistLibrary extends ChangeNotifier {
           duration: Duration(seconds: row['seconds']! as int),
           updatedAt: DateTime.fromMillisecondsSinceEpoch(
             row['updated_at']! as int,
+          ),
+          createdAt: DateTime.fromMillisecondsSinceEpoch(
+            row['created_at']! as int,
           ),
           source: PlaylistSource.values.asNameMap()[row['source']],
           sourceId: row['source_id'] as String?,
@@ -458,29 +466,66 @@ class PlaylistLibrary extends ChangeNotifier {
         'account': _userName(),
         'dirty': 1,
       });
-      final batch = txn.batch();
-      for (final (position, hit) in songs.indexed) {
-        final song = hit.mainSong;
-        batch.insert('playlist_tracks', {
-          'playlist_id': playlistId,
-          'position': position,
-          'artist': song != null
-              ? song.artistLabel
-              : hit.onPhone
-              ? hit.phoneFiles.first.artist
-              : hit.artistLabel,
-          'title': hit.title,
-          'main_db_id': song?.id,
-          'youtube_video_id':
-              hit.playlistVideoId ?? (song == null ? hit.youtubeVideoId : null),
-          'spotify_track_id': hit.spotifyTrackId,
-        });
-      }
-      await batch.commit(noResult: true);
+      await _insertSongs(txn, playlistId, 0, songs);
     });
     await load();
     onChanged?.call();
     return _playlists.firstWhere((p) => p.id == playlistId);
+  }
+
+  /// Puts [songs] at the end of the playlist made on the phone [playlistId], kept like
+  /// [create] keeps them; synced like any change.
+  Future<void> addSongs(int playlistId, List<SearchHit> songs) async {
+    if (songs.isEmpty) return;
+    final db = await _database();
+    await db.transaction((txn) async {
+      final rows = await txn.rawQuery(
+        'SELECT COALESCE(MAX(position) + 1, 0) AS next FROM playlist_tracks '
+        'WHERE playlist_id = ?',
+        [playlistId],
+      );
+      await _insertSongs(txn, playlistId, rows.first['next']! as int, songs);
+      await txn.update(
+        'playlists',
+        {'updated_at': _now().millisecondsSinceEpoch, 'dirty': 1},
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+    });
+    await load();
+    onChanged?.call();
+  }
+
+  /// Playlists made on the phone (not imported, which re-importing would overwrite), the ones
+  /// songs can be added to.
+  List<PlaylistSummary> get editable =>
+      _playlists.where((p) => p.source == null).toList();
+
+  static Future<void> _insertSongs(
+    Transaction txn,
+    int playlistId,
+    int firstPosition,
+    List<SearchHit> songs,
+  ) async {
+    final batch = txn.batch();
+    for (final (i, hit) in songs.indexed) {
+      final song = hit.mainSong;
+      batch.insert('playlist_tracks', {
+        'playlist_id': playlistId,
+        'position': firstPosition + i,
+        'artist': song != null
+            ? song.artistLabel
+            : hit.onPhone
+            ? hit.phoneFiles.first.artist
+            : hit.artistLabel,
+        'title': hit.title,
+        'main_db_id': song?.id,
+        'youtube_video_id':
+            hit.playlistVideoId ?? (song == null ? hit.youtubeVideoId : null),
+        'spotify_track_id': hit.spotifyTrackId,
+      });
+    }
+    await batch.commit(noResult: true);
   }
 
   _NewTrack _spotifyTrack(SpotifyTrack track) => (

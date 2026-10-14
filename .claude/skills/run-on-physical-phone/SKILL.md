@@ -80,7 +80,7 @@ for hours after the user had moved on. This skill should leave nothing running a
 scrcpy.
 
 ```bash
-flutter build apk --release
+tool/build_release_apk.sh
 (cd android && JAVA_HOME=/snap/android-studio/current/jbr ./gradlew --stop)
 adb -s <device-id> install -r build/app/outputs/flutter-apk/app-release.apk
 ```
@@ -92,6 +92,12 @@ system Java it prints nothing useful and leaves the ~2 GB daemon alive. Confirm 
 
 Stop the Gradle daemon right after the build: it otherwise keeps ~2 GB resident in the background,
 which is exactly what squeezed the next build out of memory.
+
+`tool/build_release_apk.sh` is `flutter build apk --release` plus the numbering shown in
+Informacje i pomoc: build number = commit count, the short commit hash with "+zmiany" when
+`lib/`, `android/` or the pubspec files differ from it. Never build with a bare
+`flutter build apk` — that APK would show no commit and carry an older build number, so
+Android may refuse to install the next one over it.
 
 (`-r` reinstalls over any existing copy.) The project's application id is
 `com.shian1000.music_database_app` (from `android/app/build.gradle.kts`) — only re-check that file

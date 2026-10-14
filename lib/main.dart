@@ -10,6 +10,7 @@ import 'src/data/custom_covers.dart';
 import 'src/data/database_sync.dart';
 import 'src/data/incoming_links.dart';
 import 'src/data/later_links.dart';
+import 'src/data/library_folders.dart';
 import 'src/data/local_library.dart';
 import 'src/data/account.dart';
 import 'src/data/mood_filter.dart';
@@ -212,6 +213,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   late final StreamSubscription<QueuePlay> _historySub;
   final _incomingLinks = IncomingLinks();
   final _laterLinks = LaterLinks();
+  final _libraryFolders = LibraryFolders();
   late final AppLifecycleListener _lifecycle;
   late final Future<void> _youTubeLoaded;
 
@@ -243,6 +245,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       (Object e) => debugPrint('Loading play history failed: $e'),
     );
     _laterLinks.load();
+    _libraryFolders.load().catchError(
+      (Object e) => debugPrint('Loading Biblioteka folders failed: $e'),
+    );
     _coversLoaded = _customCovers.load().catchError(
       (Object e) => debugPrint('Loading custom covers failed: $e'),
     );
@@ -479,6 +484,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _queueSession.dispose();
     _playHistory.dispose();
     _laterLinks.dispose();
+    _libraryFolders.dispose();
     _playbackQueue.dispose();
     _moodFilter.dispose();
     _player.dispose();
@@ -521,52 +527,55 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
                           notifier: _playHistory,
                           child: LaterLinksScope(
                             notifier: _laterLinks,
-                            child: PlayerScope(
-                              notifier: _player,
-                              child: PlaybackQueueScope(
-                                notifier: _playbackQueue,
-                                child: SourceSettingsScope(
-                                  notifier: _sourceSettings,
-                                  child: AlbumCoversScope(
-                                    notifier: _albumCovers,
-                                    child: YouTubeScope(
-                                      search: _youTubeSearch,
-                                      audio: _youTubeAudio,
-                                      playlists: _youTubePlaylists,
-                                      child: ThemeScope(
-                                        notifier: _themeController,
-                                        child: ListenableBuilder(
-                                          listenable: _themeController,
-                                          builder: (context, _) => MaterialApp(
-                                            title: appName,
-                                            debugShowCheckedModeBanner: false,
-                                            theme: buildAppTheme(
-                                              _themeController.light,
-                                            ),
-                                            darkTheme: buildAppTheme(
-                                              _themeController.dark,
-                                            ),
-                                            themeMode:
-                                                _themeController.themeMode,
-                                            // Tab screens have no AppBar to set the status-bar icon colour, so
-                                            // match it to the active theme here (dark icons on light themes and
-                                            // vice versa).
-                                            builder: (context, child) =>
-                                                AnnotatedRegion<
-                                                  SystemUiOverlayStyle
-                                                >(
-                                                  value:
-                                                      Theme.of(context)
-                                                              .brightness ==
-                                                          Brightness.light
-                                                      ? SystemUiOverlayStyle
-                                                            .dark
-                                                      : SystemUiOverlayStyle
-                                                            .light,
-                                                  child: child!,
-                                                ),
-                                            home: AppShell(
-                                              links: _incomingLinks.links,
+                            child: LibraryFoldersScope(
+                              notifier: _libraryFolders,
+                              child: PlayerScope(
+                                notifier: _player,
+                                child: PlaybackQueueScope(
+                                  notifier: _playbackQueue,
+                                  child: SourceSettingsScope(
+                                    notifier: _sourceSettings,
+                                    child: AlbumCoversScope(
+                                      notifier: _albumCovers,
+                                      child: YouTubeScope(
+                                        search: _youTubeSearch,
+                                        audio: _youTubeAudio,
+                                        playlists: _youTubePlaylists,
+                                        child: ThemeScope(
+                                          notifier: _themeController,
+                                          child: ListenableBuilder(
+                                            listenable: _themeController,
+                                            builder: (context, _) => MaterialApp(
+                                              title: appName,
+                                              debugShowCheckedModeBanner: false,
+                                              theme: buildAppTheme(
+                                                _themeController.light,
+                                              ),
+                                              darkTheme: buildAppTheme(
+                                                _themeController.dark,
+                                              ),
+                                              themeMode:
+                                                  _themeController.themeMode,
+                                              // Tab screens have no AppBar to set the status-bar icon colour, so
+                                              // match it to the active theme here (dark icons on light themes and
+                                              // vice versa).
+                                              builder: (context, child) =>
+                                                  AnnotatedRegion<
+                                                    SystemUiOverlayStyle
+                                                  >(
+                                                    value:
+                                                        Theme.of(context)
+                                                                .brightness ==
+                                                            Brightness.light
+                                                        ? SystemUiOverlayStyle
+                                                              .dark
+                                                        : SystemUiOverlayStyle
+                                                              .light,
+                                                    child: child!,
+                                                  ),
+                                              home: AppShell(
+                                                links: _incomingLinks.links,
+                                              ),
                                             ),
                                           ),
                                         ),

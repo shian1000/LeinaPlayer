@@ -9,6 +9,7 @@ import '../data/youtube_library.dart';
 import '../dummy.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'history_settings_screen.dart';
 import 'playlist_screen.dart';
@@ -102,43 +103,45 @@ class _RecentsScreenState extends State<RecentsScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Row(
-              children: [
-                PillChip(
-                  label: 'Muzyka',
-                  onTap: () => showDummy(context, '$_id › Filtr: Muzyka'),
-                ),
-              ],
-            ),
-          ),
-          if (days.isEmpty)
+      body: SongSelectionArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
-              child: Text(
-                'Nic jeszcze nie odtworzono.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: palette.textSecondary),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Row(
+                children: [
+                  PillChip(
+                    label: 'Muzyka',
+                    onTap: () => showDummy(context, '$_id › Filtr: Muzyka'),
+                  ),
+                ],
               ),
             ),
-          for (final day in days) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                day.label,
-                style: const TextStyle(
-                  fontSize: AppFontSize.section,
-                  fontWeight: FontWeight.bold,
+            if (days.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+                child: Text(
+                  'Nic jeszcze nie odtworzono.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: palette.textSecondary),
                 ),
               ),
-            ),
-            for (final play in day.plays) _PlayRow(play: play),
+            for (final day in days) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  day.label,
+                  style: const TextStyle(
+                    fontSize: AppFontSize.section,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              for (final play in day.plays) _PlayRow(play: play),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

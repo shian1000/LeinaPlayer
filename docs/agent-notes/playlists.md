@@ -21,7 +21,7 @@ fetching, title cleanup), `screens/playlist_import.dart`, `screens/playlist_scre
   null, so `playlistHit` shows it with a dimmed icon and it's searched on YouTube like a Spotify
   track (the found video is remembered by artist + title).
 
-## Made on the phone (the queue saved)
+## Made on the phone (the queue saved, "Dodaj do playlisty", folders)
 
 Kolejka's app-bar button (`queue_screen.dart`) saves every song it lists, in its order: the shown
 "Poprzednie" (user's choice), the song playing, what comes next — songs the mood filter hides
@@ -31,6 +31,16 @@ stay out with `PlaylistLibrary.create`:
 music.db's own link stays music.db's. A phone file not in MusicDatabase has no column of its own
 — it's kept by title + artist and `playlistHit` finds it again (`LocalLibrary.pendingFile`); on
 another phone, or once renamed, it's searched on YouTube like a Spotify track.
+
+"Utwórz nową playlistę" makes an empty one the same way, and "Dodaj do playlisty"
+(`playlist_picker.dart`, also the selection bar's) appends with `PlaylistLibrary.addSongs`, kept
+like `create` keeps them. Only `source` NULL playlists are offered (`PlaylistLibrary.editable`):
+re-importing an imported one replaces all its tracks, which would silently drop what was added.
+
+Biblioteka's folders, sort order and "last opened" times (`LibraryFolders`, `shared_preferences`)
+are phone-only — syncing them would need a new MusicDatabase endpoint and an ADR, not decided.
+Items are keyed by local ids (`p<playlists.id>`, `Mood.key`); deleting a playlist or mood also
+takes it out of its folder, since SQLite may hand the id to a new one.
 
 ## Syncing with MusicDatabase ([ADR 0007](../decisions/0007-playlist-sync.md))
 

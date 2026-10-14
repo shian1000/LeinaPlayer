@@ -21,6 +21,7 @@ are still dummies that show `Atrapa: <ID>`, and Home shows static placeholder da
 far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `tag.db` from a remote
 or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)), scanning music
 folders on the phone into the phone's own `local.db`, song search over both databases, and
+ticking several songs with a long press for a shared action (queue, playlist, mood),
 playing phone files with a mini/full player, a play queue (playlists, "Dodaj do kolejki" /
 "Odtwórz jako następny" for songs and whole playlists, each entry remembering the playlist it
 was queued from, shuffle, the queue screen with reordering and swipe-to-remove, caching the next
@@ -38,7 +39,8 @@ MusicDatabase links to a video, matching songs without a link on the phone, and 
 audio on Android through NewPipeExtractor, with a cache of played songs — see
 [`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube or Spotify links or saved from the queue
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
-a share sheet; song search also finds Biblioteka playlists, and its online button YouTube and
+a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do playlisty");
+folders for playlists and moods and a working "Sortuj wg" (both phone only); song search also finds Biblioteka playlists, and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their
 MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).
@@ -85,7 +87,8 @@ saves it for later with the person who sent it (Menu profilu › Wiadomości ›
 moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and its permissions
 (`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Covers picked for playlists and moods go with them: the picture as
 `/users/<name>/covers/<sha256>`, global moods' own covers as `/users/<name>/global-mood-covers`
-([ADR 0009](docs/decisions/0009-cover-sync.md)). Any other way of talking to MusicDatabase is not decided — check with the user
+([ADR 0009](docs/decisions/0009-cover-sync.md)). Biblioteka's folders and sort order stay on the
+phone (`library_folders.dart`), not synced. Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands
@@ -95,8 +98,13 @@ flutter pub get              # install dependencies
 flutter run                  # run on a connected device/emulator
 flutter analyze              # static analysis — run before considering a change done
 flutter test                 # run widget/unit tests
-flutter build apk            # build a release Android APK
+tool/build_release_apk.sh    # build the release APK — always this, not a bare `flutter build apk`
 ```
+
+The release build is numbered by `tool/build_info.sh`: build number = commit count (Android needs
+it to grow), plus the short commit hash with "+zmiany" when `lib/`, `android/` or the pubspec
+files differ from it — shown in Informacje i pomoc (`GIT_COMMIT` dart-define). Only the "1.0.0"
+part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
 
 ## Project layout
 
@@ -105,8 +113,11 @@ flutter build apk            # build a release Android APK
   per-tab navigators.
 - `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers,
   `SongTile` — the song row with source icons used by search, playlists, the queue and history;
-  `showSongMenu` — a song's menu, opened by ⋮ and by a long press on any song row (new song
-  lists get it by using `SongTile`, or call it from their own `onLongPress`);
+  `showSongMenu` — a song's menu, opened by ⋮ (and a long press outside a selection area);
+  `SongSelectionArea` in `song_selection.dart` — wrap a song list's body in it and a long press on
+  a `SongTile` starts ticking songs, with a bar of actions for all of them (new song lists should
+  use it); `showAddToPlaylistSheet` in `playlist_picker.dart`; `folder_sheet.dart` — "Przenieś do
+  folderu" for Biblioteka;
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
   adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player; `SongCover` — a song's album cover, with the cover
@@ -121,7 +132,8 @@ flutter build apk            # build a release Android APK
   (`later_links.dart`), YouTube search / matching / audio
   (`youtube_search.dart`, `youtube_matcher.dart`, `youtube_audio.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
-  (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), syncing
+  (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
+  folders, sort order and "last opened" (`library_folders.dart`, phone only), syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
   mood filter (`mood_filter.dart`),
@@ -141,7 +153,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - `lib/src/dummy.dart` — `showDummy()`, used by every not-yet-implemented element.
 - `lib/src/sample_content.dart` — static placeholder content.
 - `test/` — widget/unit tests, mirrors `lib/`; `test/support/` holds shared test helpers.
-- `tool/` — scripts run on the computer: `youtube_match_benchmark.dart`, `generate_icons.py`
+- `tool/` — scripts run on the computer: `build_release_apk.sh` and `build_info.sh` (the numbered release build), `youtube_match_benchmark.dart`, `generate_icons.py`
   (draws the app icon and writes every Android/iOS size — rerun it instead of editing the PNGs).
 - `android/`, `ios/` — platform projects generated by `flutter create`. Avoid hand-editing
   generated platform files unless a specific platform integration requires it. Hand-written:
@@ -163,7 +175,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`, `LibraryFoldersScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
@@ -229,7 +241,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - [`playlists.md`](docs/agent-notes/playlists.md) — Biblioteka playlists: `local.db` tables,
   YouTube import (fetching, title parsing, recognising songs by video first), Spotify import (the
   embed page, 100-track limit, albums, track links), searching playlists (Spotify key / anonymous web-player search
-  and its changing hash), previews, sharing, R8 rules.
+  and its changing hash), previews, sharing, adding songs (phone-made playlists only), phone-only
+  folders, R8 rules.
 - [`covers.md`](docs/agent-notes/covers.md) — album covers: sources and their order, matching,
   rate limits, the cover cache, the MusicDatabase hand-off, playlist/mood collages and picked
   covers.
