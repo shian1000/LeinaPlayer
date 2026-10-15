@@ -46,7 +46,8 @@ MusicDatabase links to a video, matching songs without a link on the phone, and 
 audio on Android through NewPipeExtractor, with a cache of played songs — see
 [`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube or Spotify links or saved from the queue
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
-a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do playlisty");
+a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do playlisty"); songs removed from
+any saved playlist ("Usuń z tej playlisty"; an imported one's next import leaves them out, synced);
 folders for playlists and moods and a working "Sortuj wg" (both phone only); song search also finds Biblioteka playlists, and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their

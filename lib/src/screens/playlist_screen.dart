@@ -519,7 +519,18 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
-  void _showTrackMenu(SearchHit hit) {
+  Future<void> _removeTrack(int index) async {
+    final saved = _saved;
+    final tracks = _tracks;
+    if (saved == null || tracks == null || index >= tracks.length) return;
+    final playlists = PlaylistLibraryScope.of(context);
+    await playlists.removeTrack(saved.id, tracks[index].position);
+    if (!mounted) return;
+    setState(() => _saved = playlists.byId(saved.id) ?? saved);
+    await _load();
+  }
+
+  void _showTrackMenu(SearchHit hit, int index) {
     showMenuSheet(
       context,
       idPrefix: '$_id › Utwór › Menu (⋮)',
@@ -545,10 +556,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         playlistMenuEntry(context, [hit]) ??
             const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
         ?moodMenuEntry(context, hit),
-        const MenuSheetEntry(
-          Icons.remove_circle_outline,
-          'Usuń z tej playlisty',
-        ),
+        if (!_preview)
+          MenuSheetEntry(
+            Icons.remove_circle_outline,
+            'Usuń z tej playlisty',
+            onTap: () => _removeTrack(index),
+          ),
         MenuSheetEntry(
           Icons.queue_music,
           'Dodaj do kolejki',
@@ -649,9 +662,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         trailing: IconButton(
           tooltip: 'Menu utworu (⋮)',
           icon: Icon(Icons.more_vert, color: context.palette.textSecondary),
-          onPressed: () => _showTrackMenu(hit),
+          onPressed: () => _showTrackMenu(hit, i),
         ),
-        onLongPress: () => _showTrackMenu(hit),
+        onLongPress: () => _showTrackMenu(hit, i),
       );
 
   @override

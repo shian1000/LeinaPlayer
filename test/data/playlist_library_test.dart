@@ -435,4 +435,47 @@ void main() {
     );
     expect(playlists.byId(saved.id)!.trackCount, 2);
   });
+
+  test('a track removed from a playlist leaves no gap', () async {
+    await catalog.ensureLoaded();
+    final saved = await playlists.create('Trzy', [
+      SearchHit.main(catalog.byId(1)!, const []),
+      SearchHit.main(catalog.byId(2)!, const []),
+      SearchHit.main(catalog.byId(1)!, const []),
+    ]);
+
+    await playlists.removeTrack(saved.id, 0);
+
+    final tracks = await playlists.tracks(saved.id);
+    expect(
+      [for (final t in tracks) (t.position, t.mainDbId)],
+      [(0, 2), (1, 1)],
+    );
+    expect(playlists.byId(saved.id)!.trackCount, 2);
+  });
+
+  test('a track removed from an imported playlist stays out when it is imported again', () async {
+    final first = await playlists.importYouTube(
+      data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x'), v('c', 'C - 3', 'x')]),
+    );
+    await playlists.removeTrack(first.playlist.id, 1);
+
+    final again = await playlists.importYouTube(
+      data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x'), v('c', 'C - 3', 'x')]),
+    );
+    expect(
+      [
+        for (final t in await playlists.tracks(again.playlist.id))
+          t.youtubeVideoId,
+      ],
+      ['a', 'c'],
+    );
+
+    // Deleted and imported anew, it's whole again.
+    await playlists.delete(again.playlist.id);
+    final fresh = await playlists.importYouTube(
+      data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x')]),
+    );
+    expect(await playlists.tracks(fresh.playlist.id), hasLength(2));
+  });
 }

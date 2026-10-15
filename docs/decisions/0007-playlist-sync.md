@@ -55,6 +55,10 @@ no review (unlike the outbox, [ADR 0005](0005-outbox-for-musicdatabase.md)); the
   own `owner` (the username) isn't sent.
 - `YouTubeLibrary.markVideoRemoved` / `clearVideosRemoved` mark the account playlists with that
   video as changed (`youtube_removed` is synced), without touching `updated_at`.
+- `excluded_source_tracks` (2026-10-15): the source's ids of tracks the user removed from an
+  imported playlist, which re-importing leaves out; sent with every PUT, taken from an answer
+  only when it has the key (MusicDatabase always includes it for a live playlist, `[]` when
+  empty; [hand-off](../handoffs/musicdatabase-excluded-tracks.md), built on both sides).
 - 401 → log in again (like the outbox); 503 (drive, or that user's `user.db` not migrated yet)
   stops until the next try; a refused playlist (400/403/413) stays waiting.
 

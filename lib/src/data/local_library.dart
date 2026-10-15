@@ -236,7 +236,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 15,
+        version: 16,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -273,6 +273,7 @@ class LocalLibrary extends ChangeNotifier {
           await _createMoodTables(db);
           await _addCoverColumns(db);
           await _addYouTubeCopyColumns(db);
+          await _addExcludedTracksColumn(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -289,10 +290,17 @@ class LocalLibrary extends ChangeNotifier {
           if (from == 12) await _allowPhoneOnlyMoods(db);
           if (from < 14) await _addCoverColumns(db);
           if (from < 15) await _addYouTubeCopyColumns(db);
+          if (from < 16) await _addExcludedTracksColumn(db);
         },
       ),
     );
   }
+
+  /// Version 16: tracks the user removed from an imported playlist, which importing it again
+  /// leaves out (`playlist_library.dart`): a JSON list of the source's ids — YouTube video ids
+  /// or Spotify track ids. Synced as `excluded_source_tracks`.
+  static Future<void> _addExcludedTracksColumn(Database db) =>
+      db.execute('ALTER TABLE playlists ADD COLUMN excluded_tracks VARCHAR');
 
   /// Version 15: the YouTube playlist made from a phone playlist (`youtube_export.dart`) —
   /// phone only, not synced. `youtube_copy_done` counts the tracks handled so far; NULL once

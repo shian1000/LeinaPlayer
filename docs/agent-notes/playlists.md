@@ -37,6 +37,16 @@ another phone, or once renamed, it's searched on YouTube like a Spotify track.
 like `create` keeps them. Only `source` NULL playlists are offered (`PlaylistLibrary.editable`):
 re-importing an imported one replaces all its tracks, which would silently drop what was added.
 
+"Usuń z tej playlisty" (`PlaylistLibrary.removeTrack`) works in every saved playlist, imported
+ones too (user's decision): the tracks after it move up (through negative positions — the
+`(playlist_id, position)` key). From an imported playlist the track's video id (YouTube) or
+Spotify track id is also added to `playlists.excluded_tracks` (v16, a JSON list), and `_save`
+leaves those out of every later import; deleting the playlist clears it. The list syncs as
+`excluded_source_tracks` with the playlist, whole, the newer side winning
+([hand-off](../handoffs/musicdatabase-excluded-tracks.md); MusicDatabase's answer is its
+`docs/handoffs/excluded-tracks-for-musicdatabaseapp.md`). Always send a list, never `null` (a
+400); an answer without the key (an older server) keeps the phone's own list.
+
 Biblioteka's folders, sort order and "last opened" times (`LibraryFolders`, `shared_preferences`)
 are phone-only — syncing them would need a new MusicDatabase endpoint and an ADR, not decided.
 Items are keyed by local ids (`p<playlists.id>`, `Mood.key`); deleting a playlist or mood also

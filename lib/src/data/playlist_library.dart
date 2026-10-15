@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -537,6 +538,81 @@ class PlaylistLibrary extends ChangeNotifier {
     onChanged?.call();
   }
 
+  /// Takes the track at [position] out of the playlist [playlistId]; the tracks after it move
+  /// up. From an imported playlist the track's YouTube video / Spotify track is also excluded,
+  /// so importing the playlist again leaves it out. Synced like any change.
+  Future<void> removeTrack(int playlistId, int position) async {
+    final db = await _database();
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'playlist_tracks',
+        where: 'playlist_id = ? AND position = ?',
+        whereArgs: [playlistId, position],
+      );
+      if (rows.isEmpty) return;
+      final track = _track(rows.first);
+      await txn.delete(
+        'playlist_tracks',
+        where: 'playlist_id = ? AND position = ?',
+        whereArgs: [playlistId, position],
+      );
+      // Through negative positions: shifting in place could hit (playlist_id, position)'s
+      // uniqueness, SQLite doesn't promise the order rows are updated in.
+      await txn.rawUpdate(
+        'UPDATE playlist_tracks SET position = -position - 1 '
+        'WHERE playlist_id = ? AND position > ?',
+        [playlistId, position],
+      );
+      await txn.rawUpdate(
+        'UPDATE playlist_tracks SET position = -position - 2 '
+        'WHERE playlist_id = ? AND position < 0',
+        [playlistId],
+      );
+      final playlist = (await txn.query(
+        'playlists',
+        columns: ['source', 'excluded_tracks'],
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      )).first;
+      final source = PlaylistSource.values.asNameMap()[playlist['source']];
+      final key = _sourceKey(
+        source,
+        track.youtubeVideoId,
+        track.spotifyTrackId,
+      );
+      final excluded = _decodeExcluded(playlist['excluded_tracks']);
+      await txn.update(
+        'playlists',
+        {
+          'updated_at': _now().millisecondsSinceEpoch,
+          'dirty': 1,
+          if (key != null && excluded.add(key))
+            'excluded_tracks': jsonEncode([...excluded]),
+        },
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+    });
+    await load();
+    onChanged?.call();
+  }
+
+  /// What identifies a track in a playlist imported from [source], for leaving it out of the
+  /// next import; null for playlists that aren't imported.
+  static String? _sourceKey(
+    PlaylistSource? source,
+    String? videoId,
+    String? spotifyTrackId,
+  ) => switch (source) {
+    PlaylistSource.youtube => videoId,
+    PlaylistSource.spotify || PlaylistSource.spotifyAlbum => spotifyTrackId,
+    _ => null,
+  };
+
+  static Set<String> _decodeExcluded(Object? column) => column is String
+      ? {for (final id in jsonDecode(column) as List) id as String}
+      : {};
+
   /// Playlists made on the phone (not imported, which re-importing would overwrite), the ones
   /// songs can be added to.
   List<PlaylistSummary> get editable =>
@@ -590,16 +666,37 @@ class PlaylistLibrary extends ChangeNotifier {
     final now = _now().millisecondsSinceEpoch;
     final scope = _scope();
     late int playlistId;
+    late List<Object> saved;
     var updated = false;
     await db.transaction((txn) async {
       // A playlist deleted here but not yet on MusicDatabase comes back under its own id.
       final existing = await txn.query(
         'playlists',
-        columns: ['id', 'deleted_at'],
+        columns: ['id', 'deleted_at', 'excluded_tracks'],
         where: 'source = ? AND source_id = ? AND ${scope.where}',
         whereArgs: [source.name, sourceId, ...scope.args],
         orderBy: 'deleted_at IS NOT NULL',
       );
+      final excluded = existing.isEmpty
+          ? const <String>{}
+          : _decodeExcluded(existing.first['excluded_tracks']);
+      saved = [
+        for (final entry in tracks)
+          if (!excluded.contains(switch (entry) {
+            _NewTrack(:final videoId, :final spotifyTrackId) => _sourceKey(
+              source,
+              videoId,
+              spotifyTrackId,
+            ),
+            _KeptTrack(:final track) => _sourceKey(
+              source,
+              track.youtubeVideoId,
+              track.spotifyTrackId,
+            ),
+            _ => null,
+          }))
+            entry,
+      ];
       if (existing.isEmpty) {
         playlistId = await txn.insert('playlists', {
           'name': name,
@@ -634,7 +731,7 @@ class PlaylistLibrary extends ChangeNotifier {
         );
       }
       final batch = txn.batch();
-      for (final (position, entry) in tracks.indexed) {
+      for (final (position, entry) in saved.indexed) {
         batch.insert('playlist_tracks', {
           'playlist_id': playlistId,
           'position': position,
@@ -667,7 +764,7 @@ class PlaylistLibrary extends ChangeNotifier {
     onChanged?.call();
     return (
       playlist: _playlists.firstWhere((p) => p.id == playlistId),
-      recognised: tracks
+      recognised: saved
           .where(
             (t) => switch (t) {
               _NewTrack(:final song) => song != null,
@@ -724,7 +821,8 @@ class PlaylistLibrary extends ChangeNotifier {
         whereArgs: [playlistId],
       );
       await txn.rawUpdate(
-        'UPDATE playlists SET deleted_at = ?, dirty = 0, cover_sha256 = NULL '
+        'UPDATE playlists SET deleted_at = ?, dirty = 0, cover_sha256 = NULL, '
+        'excluded_tracks = NULL '
         'WHERE id = ? AND account IS NOT NULL',
         [_now().millisecondsSinceEpoch, playlistId],
       );
@@ -976,6 +1074,7 @@ class PlaylistLibrary extends ChangeNotifier {
     'source_id': row['source_id'],
     'source_owner': row['owner'],
     'cover': row['cover_sha256'],
+    'excluded_source_tracks': [..._decodeExcluded(row['excluded_tracks'])],
     'created_at': row['created_at'],
     'updated_at': row['updated_at'],
     'tracks': [
@@ -1047,6 +1146,9 @@ class PlaylistLibrary extends ChangeNotifier {
       'updated_at': remote['updated_at'],
       // A server from before covers says nothing about them.
       if (remote.containsKey('cover')) 'cover_sha256': remote['cover'],
+      // Nor a server from before excluded tracks about them: the phone's own stay.
+      if (remote['excluded_source_tracks'] case final List ids)
+        'excluded_tracks': ids.isEmpty ? null : jsonEncode(ids),
     };
     if (id != null) {
       await txn.update('playlists', values, where: 'id = ?', whereArgs: [id]);

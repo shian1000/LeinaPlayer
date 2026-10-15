@@ -43,6 +43,7 @@ class FakePlaylistServer {
       'source_id': null,
       'source_owner': null,
       'cover': null,
+      'excluded_source_tracks': const <String>[],
       'created_at': playlist['updated_at'],
       ...playlist,
       'revision': ++counter,
@@ -123,6 +124,8 @@ class FakePlaylistServer {
       final keptUid = stored?['uid'] ?? uid;
       final saved = {
         'cover': stored?['cover'],
+        'excluded_source_tracks':
+            stored?['excluded_source_tracks'] ?? const <String>[],
         ...sent..remove('base_revision'),
         'uid': keptUid,
         'revision': ++counter,
@@ -273,6 +276,36 @@ void main() {
     await syncNow();
     expect(server.requests, ['GET /users/owner/playlists']);
   });
+
+  test(
+    'a track removed from an imported playlist stays out on other phones too',
+    () async {
+      final id = (await playlists.importYouTube(data(['a', 'b']))).playlist.id;
+      await syncNow();
+
+      clock = clock.add(const Duration(minutes: 1));
+      await playlists.removeTrack(id, 0);
+      await syncNow();
+      expect(playlists.lastSync!.problem, isNull);
+      final stored = server.playlists.values.single;
+      expect(stored['excluded_source_tracks'], ['a']);
+      expect(
+        [for (final t in stored['tracks']! as List) t['youtube_video_id']],
+        ['b'],
+      );
+
+      // Another phone: the exclusion comes with the playlist and holds on its next import.
+      stored['excluded_source_tracks'] = ['a', 'b'];
+      stored['revision'] = ++server.counter;
+      await syncNow();
+      clock = clock.add(const Duration(minutes: 1));
+      await playlists.importYouTube(data(['a', 'b', 'c']));
+      expect(
+        [for (final t in await playlists.tracks(id)) t.youtubeVideoId],
+        ['c'],
+      );
+    },
+  );
 
   test('a picked cover goes with its playlist; the picture only when the server lacks it', () async {
     final picture = [1, 2, 3, 4];

@@ -591,7 +591,8 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
 - Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: Udostępnij (**→
   Udostępnij utwór**, see search), `Dodaj do
   Polubionych utworów`, Dodaj do playlisty (**implemented**), Dodaj do nastroju (**implemented**, see search),
-  `Usuń z tej playlisty`, Dodaj do kolejki and
+  Usuń z tej playlisty (**implemented**, every saved playlist; synced; an imported one's next
+  import leaves the track out), Dodaj do kolejki and
   Odtwórz jako następny (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
 
 ## Utwórz sheet (`create_sheet.dart`)
