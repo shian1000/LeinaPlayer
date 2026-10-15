@@ -131,7 +131,7 @@ class MoodEntry extends LibraryEntry {
   DateTime? get changedAt => mood.createdAt;
 }
 
-/// Biblioteka's folders, its sort order and when each playlist, mood and folder was last opened
+/// Biblioteka's folders, its sort order, its filter chip and when each playlist, mood and folder was last opened
 /// (for "Ostatnie"). Kept only on this phone, in `shared_preferences` — MusicDatabase knows
 /// nothing of folders (not synced, unlike the playlists and moods in them).
 ///
@@ -142,15 +142,20 @@ class LibraryFolders extends ChangeNotifier {
   static const _foldersKey = 'library.folders';
   static const _sortKey = 'library.sort';
   static const _openedKey = 'library.opened';
+  static const _filterKey = 'library.filter';
 
   final DateTime Function() _now;
 
   List<LibraryFolder> _folders = const [];
   LibrarySort _sort = LibrarySort.recent;
   Map<String, int> _opened = const {};
+  String? _filter;
 
   List<LibraryFolder> get folders => _folders;
   LibrarySort get sort => _sort;
+
+  /// The filter chip ticked in Biblioteka (its label), `null` for none.
+  String? get filter => _filter;
 
   static String playlistKey(int playlistId) => 'p$playlistId';
 
@@ -168,6 +173,7 @@ class LibraryFolders extends ChangeNotifier {
       debugPrint('Biblioteka folders unreadable, starting empty: $e');
     }
     _sort = LibrarySort.values.asNameMap()[prefs.getString(_sortKey)] ?? _sort;
+    _filter = prefs.getString(_filterKey);
     notifyListeners();
   }
 
@@ -184,6 +190,17 @@ class LibraryFolders extends ChangeNotifier {
       _sortKey,
       sort.name,
     );
+  }
+
+  Future<void> setFilter(String? filter) async {
+    _filter = filter;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (filter == null) {
+      await prefs.remove(_filterKey);
+    } else {
+      await prefs.setString(_filterKey, filter);
+    }
   }
 
   /// [key] (a playlist, mood or folder) was opened now.
@@ -250,24 +267,26 @@ class LibraryFolders extends ChangeNotifier {
     await _saveFolders();
   }
 
-  /// Biblioteka's rows: [playlists] and [moods] not in a folder, plus the folders (with what's in
-  /// them) when [withFolders]; otherwise every item, folder or not. Sorted by [sort].
+  /// Biblioteka's rows: [playlists] and [moods] not in a folder, plus the folders with what's in
+  /// them of these. A folder with none of them is left out unless [keepEmptyFolders] (a filter
+  /// passes [playlists] or [moods] only, and shows just the folders holding those). Sorted by
+  /// [sort].
   List<LibraryEntry> entries({
     required List<PlaylistSummary> playlists,
     required List<Mood> moods,
-    bool withFolders = true,
+    bool keepEmptyFolders = true,
   }) {
     final items = <LibraryEntry>[
       for (final p in playlists) PlaylistEntry(p),
       for (final m in moods) MoodEntry(m),
     ];
-    if (!withFolders) return sorted(items);
     final byKey = {for (final item in items) item.key: item};
     final inFolders = <String>{};
     final folders = <LibraryEntry>[];
     for (final folder in _folders) {
       final contents = [for (final key in folder.items) ?byKey[key]];
       inFolders.addAll(folder.items);
+      if (contents.isEmpty && !keepEmptyFolders) continue;
       folders.add(FolderEntry(folder, sorted(contents)));
     }
     return sorted([

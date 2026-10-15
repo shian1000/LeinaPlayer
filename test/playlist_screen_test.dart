@@ -389,13 +389,18 @@ void main() {
     expect(find.text('Podróże'), findsOneWidget);
     expect(find.text('Folder • 1 playlista'), findsOneWidget);
     expect(find.text('Do auta'), findsNothing);
-    // A filter lists every playlist, folders aside.
+    // A filter keeps the folder holding a playlist (and is remembered); moods hide it.
     await tester.tap(find.text('Playlisty'));
     await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsOneWidget);
+    expect(find.text('Podróże'), findsOneWidget);
+    expect(find.text('Do auta'), findsNothing);
+    expect(folders.filter, 'Playlisty');
+    await tester.tap(find.text('Nastroje'));
+    await tester.pumpAndSettle();
     expect(find.text('Podróże'), findsNothing);
-    await tester.tap(find.text('Playlisty'));
+    await tester.tap(find.text('Nastroje'));
     await tester.pumpAndSettle();
+    expect(folders.filter, isNull);
 
     await tester.tap(find.text('Podróże'));
     await tester.pumpAndSettle();

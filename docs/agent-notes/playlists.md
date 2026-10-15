@@ -47,8 +47,8 @@ leaves those out of every later import; deleting the playlist clears it. The lis
 `docs/handoffs/excluded-tracks-for-musicdatabaseapp.md`). Always send a list, never `null` (a
 400); an answer without the key (an older server) keeps the phone's own list.
 
-Biblioteka's folders, sort order and "last opened" times (`LibraryFolders`, `shared_preferences`)
-are phone-only — syncing them would need a new MusicDatabase endpoint and an ADR, not decided.
+Biblioteka's folders, sort order, ticked filter chip and "last opened" times (`LibraryFolders`,
+`shared_preferences`) are phone-only — syncing them would need a new MusicDatabase endpoint and an ADR, not decided.
 Items are keyed by local ids (`p<playlists.id>`, `Mood.key`); deleting a playlist or mood also
 takes it out of its folder, since SQLite may hand the id to a new one.
 

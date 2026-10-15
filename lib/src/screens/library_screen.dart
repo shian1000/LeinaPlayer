@@ -24,8 +24,37 @@ const _filters = ['Playlisty', 'Nastroje', 'Albumy', 'Wykonawcy'];
 const _playlistsFilter = 0;
 const _moodsFilter = 1;
 
-/// Biblioteka: the user's playlists and moods, in folders or not, ordered by "Sortuj wg". A
-/// working filter lists every playlist or mood on its own, folders aside.
+/// Biblioteka's rows for [filter] (an index of [_filters], `null` for none): its playlists and
+/// moods, with the folders holding them. A filter shows only the folders with something it
+/// lets through, and inside a folder the same.
+List<LibraryEntry> _libraryEntries(BuildContext context, int? filter) {
+  final showPlaylists = filter != _moodsFilter;
+  final showMoods = filter == null || filter == _moodsFilter;
+  final playlists = showPlaylists
+      ? PlaylistLibraryScope.of(context).playlists
+      : const <PlaylistSummary>[];
+  final moodLibrary = MoodLibraryScope.maybeOf(context);
+  final moods = showMoods && moodLibrary != null
+      ? [...moodLibrary.userMoods, ...moodLibrary.globalMoods]
+      : const <Mood>[];
+  return LibraryFoldersScope.maybeOf(context)?.entries(
+        playlists: playlists,
+        moods: moods,
+        keepEmptyFolders: filter == null,
+      ) ??
+      [
+        for (final p in playlists) PlaylistEntry(p),
+        for (final m in moods) MoodEntry(m),
+      ];
+}
+
+int? _filterIndex(String? label) {
+  final i = label == null ? -1 : _filters.indexOf(label);
+  return i < 0 ? null : i;
+}
+
+/// Biblioteka: the user's playlists and moods, in folders or not, ordered by "Sortuj wg". The
+/// ticked filter is remembered (in [LibraryFolders]).
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
@@ -34,31 +63,16 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
+  /// Only for widget tests without [LibraryFoldersScope].
   int? _selectedFilter;
 
   @override
   Widget build(BuildContext context) {
-    final filter = _selectedFilter;
-    final showPlaylists = filter != _moodsFilter;
-    final showMoods = filter == null || filter == _moodsFilter;
-    final playlists = showPlaylists
-        ? PlaylistLibraryScope.of(context).playlists
-        : const <PlaylistSummary>[];
-    final moodLibrary = MoodLibraryScope.maybeOf(context);
-    final moods = showMoods && moodLibrary != null
-        ? [...moodLibrary.userMoods, ...moodLibrary.globalMoods]
-        : const <Mood>[];
     final folders = LibraryFoldersScope.maybeOf(context);
-    final entries =
-        folders?.entries(
-          playlists: playlists,
-          moods: moods,
-          withFolders: filter == null,
-        ) ??
-        [
-          for (final p in playlists) PlaylistEntry(p),
-          for (final m in moods) MoodEntry(m),
-        ];
+    final filter = folders == null
+        ? _selectedFilter
+        : _filterIndex(folders.filter);
+    final entries = _libraryEntries(context, filter);
     return SafeArea(
       // Stretch: a centred Column would push the (narrower) filter-chip row inwards.
       child: Column(
@@ -91,11 +105,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   if (i > 0) const SizedBox(width: 8),
                   PillChip(
                     label: _filters[i],
-                    selected: i == _selectedFilter,
+                    selected: i == filter,
                     onTap: () {
-                      setState(
-                        () => _selectedFilter = i == _selectedFilter ? null : i,
-                      );
+                      final next = i == filter ? null : i;
+                      if (folders == null) {
+                        setState(() => _selectedFilter = next);
+                      } else {
+                        folders.setFilter(next == null ? null : _filters[next]);
+                      }
                       if (i != _playlistsFilter && i != _moodsFilter) {
                         showDummy(context, '$_id › Filtr: ${_filters[i]}');
                       }
@@ -330,7 +347,7 @@ Future<void> showFolderMenu(
   );
 }
 
-/// What's in a Biblioteka folder, in Biblioteka's order.
+/// What's in a Biblioteka folder that Biblioteka's filter lets through, in Biblioteka's order.
 class FolderScreen extends StatelessWidget {
   const FolderScreen({super.key, required this.folderId});
 
@@ -361,14 +378,12 @@ class FolderScreen extends StatelessWidget {
         ),
       );
     }
-    final moodLibrary = MoodLibraryScope.maybeOf(context);
-    final entries = folders
-        .entries(
-          playlists: PlaylistLibraryScope.of(context).playlists,
-          moods: [...?moodLibrary?.userMoods, ...?moodLibrary?.globalMoods],
-        )
+    final entries = _libraryEntries(context, _filterIndex(folders.filter))
         .whereType<FolderEntry>()
-        .firstWhere((e) => e.folder.id == folderId)
+        .firstWhere(
+          (e) => e.folder.id == folderId,
+          orElse: () => FolderEntry(folder, const []),
+        )
         .contents;
     return Scaffold(
       appBar: AppBar(

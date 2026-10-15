@@ -98,17 +98,19 @@ void main() {
     expect(names(top), isNot(contains('Żeglarskie')));
     final inB = top.whereType<FolderEntry>().firstWhere((f) => f.name == 'B');
     expect(names(inB.contents), ['Żeglarskie']);
-    // A filter's flat list: every playlist, no folders.
+    // A filter shows only the folders holding something it lets through.
     expect(
       names(
         folders.entries(
           playlists: playlists,
           moods: const [],
-          withFolders: false,
+          keepEmptyFolders: false,
         ),
       ),
-      hasLength(3),
+      unorderedEquals(['B', 'ambient', 'Ballady']),
     );
+    expect(folders.filter, isNull);
+    await folders.setFilter('Playlisty');
 
     await folders.rename(a.id, 'Nowe');
     await folders.setSort(LibrarySort.added);
@@ -117,6 +119,11 @@ void main() {
     expect([for (final f in reloaded.folders) f.name], ['Nowe', 'B']);
     expect(reloaded.folderOf(key)?.id, b.id);
     expect(reloaded.sort, LibrarySort.added);
+    expect(reloaded.filter, 'Playlisty');
+    await reloaded.setFilter(null);
+    final cleared = LibraryFolders();
+    await cleared.load();
+    expect(cleared.filter, isNull);
 
     await reloaded.delete(b.id);
     expect(reloaded.folderOf(key), isNull);

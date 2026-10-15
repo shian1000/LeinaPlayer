@@ -465,7 +465,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - Filtr: Playlisty (**implemented**: playlists only), Filtr: Nastroje (**implemented**: moods
   only; "Brak nastrojów" and how to add one when there are none), `Biblioteka › Filtr: Albumy` /
   `Filtr: Wykonawcy`. No filter: folders, playlists and moods outside folders, mixed in the
-  sort order; a working filter lists every playlist / mood on its own, folders aside.
+  sort order; a working filter shows its playlists / moods outside folders plus the folders
+  holding any of them (inside, only those). The ticked filter is remembered (`LibraryFolders`).
 - Sort button (shows current order) **→ sheet "Sortuj wg"** — **implemented**
   (`LibraryFolders` in `data/library_folders.dart`, remembered on the phone; also in a folder):
   - Ostatnie: last opened (playlist, mood or folder; a folder also by its newest item), else
