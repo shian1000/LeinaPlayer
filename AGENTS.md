@@ -124,7 +124,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
 - `lib/src/screens/` — one file per screen/sheet; `app_shell.dart` holds the bottom nav, drawer and
   per-tab navigators.
 - `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers,
-  `SongTile` — the song row with source icons used by search, playlists, the queue and history;
+  `SongTile` — the song row with its source icon (the first source in the playback order that has it, "*" when not in MusicDatabase, a pin when playable offline) used by search, playlists, the queue and history;
   `showSongMenu` — a song's menu, opened by ⋮ (and a long press outside a selection area);
   `SongSelectionArea` in `song_selection.dart` — wrap a song list's body in it and a long press on
   a `SongTile` starts ticking songs, with a bar of actions for all of them (new song lists should

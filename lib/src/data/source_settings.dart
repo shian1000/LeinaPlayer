@@ -523,7 +523,9 @@ class SourceSettingsScope extends InheritedNotifier<SourceSettings> {
     required super.child,
   });
 
-  static SourceSettings of(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<SourceSettingsScope>()!
-      .notifier!;
+  static SourceSettings of(BuildContext context) => maybeOf(context)!;
+
+  static SourceSettings? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<SourceSettingsScope>()
+      ?.notifier;
 }

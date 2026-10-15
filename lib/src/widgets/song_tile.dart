@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/combined_search.dart';
 import '../data/mood_filter.dart';
 import '../data/song_catalog.dart';
+import '../data/source_settings.dart';
+import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/track_player.dart';
@@ -327,97 +329,107 @@ class SongTile extends StatelessWidget {
   }
 }
 
-/// Column of three small icons next to a result, as tall as the cover and half as wide:
-/// in MusicDatabase, on the phone (with "*" when not in MusicDatabase yet), and on YouTube.
-/// Each icon keeps its slot even when hidden, so they line up from row to row.
+/// The one icon next to a result, as tall as the cover and half as wide: where tapping it
+/// plays from first — the first source in the user's "Kolejność odtwarzania" that has the song
+/// (a dimmed YouTube icon when none has it but searching YouTube may find it). A "*" marks a
+/// song not in MusicDatabase (it could be sent there one day), and a small pin a song kept on the
+/// phone — the user's own file, or its YouTube audio in Pamięć podręczna — so it plays offline.
 class SourceIcons extends StatelessWidget {
   const SourceIcons({super.key, required this.hit});
 
   final SearchHit hit;
 
-  static const _slot = SongTile.coverSize / 3;
-
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    Widget slot({
-      required bool visible,
-      required String tooltip,
-      required Widget child,
-    }) => SizedBox.square(
-      dimension: _slot,
-      child: visible
-          ? Tooltip(
-              message: tooltip,
-              child: Center(child: child),
-            )
-          : null,
-    );
+    final settings = SourceSettingsScope.maybeOf(context);
+    final order = settings?.activePlaybackOrder ?? PlaybackSource.values;
+    final source = order.where(hit.playableFrom).firstOrNull;
+    final videoId = hit.youtubeVideoId;
+    final cached =
+        videoId != null &&
+        (YouTubeLibraryScope.maybeOf(context)?.isCached(videoId) ?? false);
+    final offline = hit.onPhone || cached;
+    final searchable =
+        source == null &&
+        order.contains(PlaybackSource.youtube) &&
+        hit.youTube == YouTubeLink.unknown;
+
+    final (IconData? icon, String tooltip) = switch (source) {
+      PlaybackSource.phone => (Icons.smartphone, 'Na telefonie'),
+      PlaybackSource.server => (Icons.dns, 'Na serwerze'),
+      PlaybackSource.youtube => (
+        Icons.smart_display,
+        hit.phoneMatch != null
+            ? 'Na YouTube (znalezione przez telefon)'
+            : 'Na YouTube',
+      ),
+      null when searchable => (
+        Icons.smart_display,
+        'Do wyszukania na YouTube',
+      ),
+      null => (null, ''),
+    };
+    final color = source == null
+        ? palette.textSecondary.withValues(alpha: 0.35)
+        : palette.textSecondary;
 
     return SizedBox(
       width: SongTile.coverSize / 2,
       height: SongTile.coverSize,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          slot(
-            visible: hit.inMainDatabase,
-            tooltip: hit.serverFile != null
-                ? 'W bazie danych, z plikiem na serwerze'
-                : 'W bazie danych',
-            child: Icon(
-              hit.serverFile != null ? Icons.dns : Icons.storage,
-              size: 14,
-              color: palette.textSecondary,
+      child: Center(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            SizedBox.square(
+              dimension: 16,
+              child: icon == null
+                  ? null
+                  : Tooltip(
+                      message: tooltip,
+                      child: Icon(icon, size: 16, color: color),
+                    ),
             ),
-          ),
-          slot(
-            visible: hit.onPhone,
-            tooltip: hit.pending
-                ? 'Na telefonie, spoza bazy danych'
-                : 'Na telefonie',
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(Icons.smartphone, size: 14, color: palette.textSecondary),
-                if (hit.pending)
-                  Positioned(
-                    right: -5,
-                    top: -5,
-                    child: Text(
-                      '*',
-                      style: TextStyle(
-                        color: palette.accent,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        height: 1,
-                      ),
+            if (!hit.inMainDatabase)
+              Positioned(
+                right: -6,
+                top: -6,
+                child: Tooltip(
+                  message: 'Spoza bazy danych',
+                  child: Text(
+                    '*',
+                    style: TextStyle(
+                      color: palette.accent,
+                      fontSize: AppFontSize.small,
+                      fontWeight: FontWeight.bold,
+                      height: 1,
                     ),
                   ),
-              ],
-            ),
-          ),
-          // Full: MusicDatabase (or the phone) has the video. Dimmed: it doesn't, but searching
-          // YouTube may find it. None: marked in MusicDatabase as not on YouTube, or the phone
-          // searched lately and found nothing.
-          slot(
-            visible:
-                hit.youTube != YouTubeLink.notOnYouTube &&
-                hit.youTube != YouTubeLink.notFound,
-            tooltip: hit.youTube != YouTubeLink.linked
-                ? 'Do wyszukania na YouTube'
-                : hit.phoneMatch != null
-                ? 'Na YouTube (znalezione przez telefon)'
-                : 'Na YouTube',
-            child: Icon(
-              Icons.smart_display,
-              size: 16,
-              color: hit.youTube == YouTubeLink.linked
-                  ? palette.textSecondary
-                  : palette.textSecondary.withValues(alpha: 0.35),
-            ),
-          ),
-        ],
+                ),
+              ),
+            if (offline)
+              Positioned(
+                right: -5,
+                bottom: -5,
+                child: Tooltip(
+                  message: hit.onPhone
+                      ? 'Dostępne offline (plik na telefonie)'
+                      : 'Dostępne offline (pamięć podręczna)',
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: palette.background,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.offline_pin,
+                      size: 10,
+                      color: palette.accent,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

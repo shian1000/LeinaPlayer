@@ -362,14 +362,17 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   downloaded `music.db` and the phone's own `local.db` (`combined_search.dart`): MusicDatabase
   songs plus phone files not in MusicDatabase. Accents and case are ignored, like MusicDatabase's
   search. Shows a hint with a link to "Baza danych" settings when there's nothing to search.
-  - Each result has a column of three icons on the right (cover height, half its width), top to
-    bottom: database (song is in MusicDatabase), phone (a file on the phone; with a green "*" when
-    it isn't in MusicDatabase yet), and YouTube: full when MusicDatabase stores the song's
-    `youtube_video_id` or the phone found a video itself, dimmed when neither (phone-only songs
-    too), none when it's
-    marked "N/A" (no video on YouTube) or the phone searched YouTube in the last 30 days and found
-    nothing (`youtube_not_found`; tapping the song searches again, the queue skips it). All use the theme's secondary text colour. Hidden icons
-    keep their slot so the column lines up.
+  - Each result has one icon on the right (`SourceIcons`, in a slot of cover height and half its
+    width): where tapping it plays from first — the first switched-on source in "Kolejność
+    odtwarzania" that has the song (phone `smartphone`, server `dns`, YouTube `smart_display`;
+    full when MusicDatabase stores the `youtube_video_id` or the phone found a video itself). When
+    no source has it, a dimmed YouTube icon if searching YouTube may find it, else no icon: marked
+    "N/A" (no video on YouTube) or the phone searched in the last 30 days and found nothing
+    (`youtube_not_found`; tapping the song searches again, the queue skips it). Next to it (user's
+    design): a "*" in the accent colour at the top when the song isn't in MusicDatabase (later it
+    will be offered to be sent there for adding), and an `offline_pin` at the bottom when the song
+    plays offline — a file on the phone or its YouTube audio in Pamięć podręczna — whatever the
+    main icon is. Icons use the theme's secondary text colour.
   - Results are "Dostępne" (a phone file, pending or not, a file on the server, or a stored
     YouTube video),
     "Potencjalnie dostępne" (dimmed YouTube icon, not on the phone) or "Niedostępne"

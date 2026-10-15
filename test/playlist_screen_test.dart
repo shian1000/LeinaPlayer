@@ -220,8 +220,8 @@ void main() {
     expect(find.text('Dawid Podsiadło'), findsWidgets);
     expect(find.textContaining('•  Małomiasteczkowy'), findsNothing);
     expect(find.byTooltip('Menu utworu (⋮)'), findsNWidgets(2));
-    // Recognised track: in the database and on YouTube; the other one only on YouTube.
-    expect(find.byTooltip('W bazie danych'), findsOneWidget);
+    // Both play from YouTube; only the unrecognised one is marked as not in the database.
+    expect(find.byTooltip('Spoza bazy danych'), findsOneWidget);
     expect(find.byTooltip('Na YouTube'), findsOneWidget);
     expect(
       find.byTooltip('Na YouTube (znalezione przez telefon)'),
