@@ -114,6 +114,85 @@ void main() {
     expect(again.isVideoRemoved('gone'), isFalse);
   });
 
+  test(
+    'links the user set beat music.db\'s and the phone\'s, until taken away',
+    () async {
+      final library = newLibrary();
+      await library.load();
+      await library.saveMatch(
+        2,
+        const YouTubeVideo(id: 'phone', title: 'T', channel: 'C'),
+      );
+      final linked = SearchHit.main(
+        CatalogSong(id: 1, title: 'T', artistLabel: 'A', youtubeVideoId: 'mdb'),
+        const [],
+      );
+      final unlinked = SearchHit.main(
+        CatalogSong(id: 2, title: 'T', artistLabel: 'A'),
+        const [],
+      );
+      var notified = 0;
+      library.addListener(() => notified++);
+
+      library.useUserLinks({
+        1: const UserYouTubeLinks(video: 'mine', musicVideo: 'clip'),
+        2: const UserYouTubeLinks(video: 'N/A'),
+      });
+      expect(notified, 1);
+      var shown = withPhoneYouTube(linked, library);
+      expect(shown.youtubeVideoId, 'mine');
+      expect(shown.musicVideoId, 'clip');
+      expect(shown.mainSong!.fromMusicDb.youtubeVideoId, 'mdb');
+      // Applied once: the same row again is left as it is.
+      expect(identical(withPhoneYouTube(shown, library), shown), isTrue);
+      expect(
+        withPhoneYouTube(unlinked, library).youTube,
+        YouTubeLink.notOnYouTube,
+      );
+
+      // The same links again change nothing.
+      library.useUserLinks({
+        1: const UserYouTubeLinks(video: 'mine', musicVideo: 'clip'),
+        2: const UserYouTubeLinks(video: 'N/A'),
+      });
+      expect(notified, 1);
+
+      // Settled by music.db (or set back): a row made while they applied goes back to music.db's.
+      library.useUserLinks(const {});
+      shown = withPhoneYouTube(shown, library);
+      expect(shown.youtubeVideoId, 'mdb');
+      expect(shown.musicVideoId, isNull);
+      expect(withPhoneYouTube(unlinked, library).youtubeVideoId, 'phone');
+    },
+  );
+
+  test(
+    'a link the user set for a video YouTube removed brings the song back',
+    () async {
+      final library = newLibrary();
+      await library.load();
+      await library.markVideoRemoved('mdb');
+      final queued = withPhoneYouTube(
+        SearchHit.main(
+          CatalogSong(
+            id: 1,
+            title: 'T',
+            artistLabel: 'A',
+            youtubeVideoId: 'mdb',
+          ),
+          const [],
+        ),
+        library,
+      );
+      expect(queued.mainVideoRemoved, isTrue);
+
+      library.useUserLinks({1: const UserYouTubeLinks(video: 'mine')});
+      final shown = withPhoneYouTube(queued, library);
+      expect(shown.mainVideoRemoved, isFalse);
+      expect(shown.youtubeVideoId, 'mine');
+    },
+  );
+
   test('a match for a track known only by name is remembered', () async {
     final library = newLibrary();
     await library.load();

@@ -61,6 +61,29 @@ enum YouTubeLink {
   notFound,
 }
 
+/// YouTube links of a song the user set by hand in "Informacje o utworze" — sent to MusicDatabase
+/// as field corrections (`Outbox.correctField`), and used on the phone meanwhile
+/// ([CatalogSong.withUserLinks]). `null` leaves music.db's value; otherwise the value as music.db
+/// would store it: a video id, "" (no link) or, for [video] only, "N/A".
+class UserYouTubeLinks {
+  const UserYouTubeLinks({this.video, this.musicVideo});
+
+  /// For `songs.youtube_video_id`.
+  final String? video;
+
+  /// For `songs.music_video_youtube_id`.
+  final String? musicVideo;
+
+  @override
+  bool operator ==(Object other) =>
+      other is UserYouTubeLinks &&
+      other.video == video &&
+      other.musicVideo == musicVideo;
+
+  @override
+  int get hashCode => Object.hash(video, musicVideo);
+}
+
 /// The song's audio file in the music library on MusicDatabase's server: a row of the
 /// downloaded `files.db` (MusicDatabase's `files_index.py`), played over HTTP as
 /// `GET /library/<id>` (hand-off `musicdatabase-server-files.md`).
@@ -86,6 +109,7 @@ class CatalogSong {
     this.year,
     this.language,
     String? youtubeVideoId,
+    String? musicVideoId,
     this.spotifyTrackId,
     MatchTarget? youTubeTarget,
     List<String> artistNames = const [],
@@ -100,14 +124,11 @@ class CatalogSong {
        youTubeTarget =
            youTubeTarget ??
            MatchTarget(title: title, mainArtists: [MatchArtist(artistLabel)]),
-       youtubeVideoId = const {null, '', 'N/A'}.contains(youtubeVideoId)
-           ? null
-           : youtubeVideoId,
-       youTube = switch (youtubeVideoId) {
-         null || '' => YouTubeLink.unknown,
-         'N/A' => YouTubeLink.notOnYouTube,
-         _ => YouTubeLink.linked,
-       },
+       youtubeVideoId = _videoIdOf(youtubeVideoId),
+       youTube = _youTubeLinkOf(youtubeVideoId),
+       musicVideoId = _videoIdOf(musicVideoId),
+       userLinks = null,
+       _fromMusicDb = null,
        _normalizedTitle = normalizeForSearch(title),
        _normalizedArtists = {
          normalizeForSearch(artistLabel),
@@ -134,6 +155,59 @@ class CatalogSong {
            }),
        ];
 
+  /// [song] with the YouTube links the user set on the phone ([links]) in place of music.db's.
+  CatalogSong._withUserLinks(CatalogSong song, UserYouTubeLinks links)
+    : id = song.id,
+      title = song.title,
+      artistLabel = song.artistLabel,
+      album = song.album,
+      titleLatin = song.titleLatin,
+      artistLatin = song.artistLatin,
+      albumLatin = song.albumLatin,
+      year = song.year,
+      language = song.language,
+      youtubeVideoId = links.video == null
+          ? song.youtubeVideoId
+          : _videoIdOf(links.video),
+      youTube = links.video == null
+          ? song.youTube
+          : _youTubeLinkOf(links.video),
+      musicVideoId = links.musicVideo == null
+          ? song.musicVideoId
+          : _videoIdOf(links.musicVideo),
+      spotifyTrackId = song.spotifyTrackId,
+      serverFile = song.serverFile,
+      youTubeTarget = song.youTubeTarget,
+      userLinks = links,
+      _fromMusicDb = song,
+      _normalizedTitle = song._normalizedTitle,
+      _normalizedArtists = song._normalizedArtists,
+      _fieldTexts = song._fieldTexts;
+
+  static String? _videoIdOf(String? value) =>
+      const {null, '', 'N/A'}.contains(value) ? null : value;
+
+  static YouTubeLink _youTubeLinkOf(String? value) => switch (value) {
+    null || '' => YouTubeLink.unknown,
+    'N/A' => YouTubeLink.notOnYouTube,
+    _ => YouTubeLink.linked,
+  };
+
+  /// The song with the user's own YouTube links in place of music.db's, or as music.db has it
+  /// with `null`.
+  CatalogSong withUserLinks(UserYouTubeLinks? links) {
+    final song = fromMusicDb;
+    return links == null ? song : CatalogSong._withUserLinks(song, links);
+  }
+
+  /// The song as music.db has it, without [userLinks].
+  CatalogSong get fromMusicDb => _fromMusicDb ?? this;
+  final CatalogSong? _fromMusicDb;
+
+  /// The YouTube links the user set in "Informacje o utworze", used in place of music.db's
+  /// until a downloaded music.db changes the value they correct; `null` for music.db's own.
+  final UserYouTubeLinks? userLinks;
+
   final int id;
   final String title;
 
@@ -155,6 +229,14 @@ class CatalogSong {
 
   /// Set only when [youTube] is [YouTubeLink.linked].
   final String? youtubeVideoId;
+
+  /// `songs.youtube_video_id` as stored: the video id, "N/A" or `null`.
+  String? get youtubeValue =>
+      youtubeVideoId ?? (youTube == YouTubeLink.notOnYouTube ? 'N/A' : null);
+
+  /// The song's music video (`songs.music_video_youtube_id`), when it has one apart from
+  /// [youtubeVideoId] — which is the audio the phone plays. Only opened in YouTube.
+  final String? musicVideoId;
 
   /// The song's Spotify track, when MusicDatabase's `spotify_url` (set by hand) is a track page —
   /// it may also be an album page, which isn't the song.
@@ -391,7 +473,7 @@ class SongCatalog extends ChangeNotifier {
       options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
     );
     try {
-      // Older databases have no youtube_video_id / spotify_url column.
+      // Older databases have no youtube_video_id / spotify_url / music_video_youtube_id column.
       final columns = {
         for (final c in await db.rawQuery('PRAGMA table_info(songs)'))
           c['name'],
@@ -410,6 +492,7 @@ class SongCatalog extends ChangeNotifier {
       final rows = await db.rawQuery('''
         SELECT s.id, s.title, s.album, s.year, s.language,
                ${column('youtube_video_id')} AS youtube_video_id,
+               ${column('music_video_youtube_id')} AS music_video_youtube_id,
                ${column('spotify_url')} AS spotify_url,
                ${column('title_latin')} AS title_latin,
                $albumLatin AS album_latin,
@@ -444,6 +527,7 @@ class SongCatalog extends ChangeNotifier {
       year: row['year'] as int?,
       language: present(row['language'] as String?),
       youtubeVideoId: (row['youtube_video_id'] as String?)?.trim(),
+      musicVideoId: (row['music_video_youtube_id'] as String?)?.trim(),
       spotifyTrackId: _spotifyTrackId(row['spotify_url'] as String?),
       youTubeTarget: MatchTarget(
         title: row['title']! as String,

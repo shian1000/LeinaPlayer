@@ -333,6 +333,41 @@ void main() {
       expect(names(await reloaded.pending()), ['2026-10-12_23-44-05_002.db']);
       expect(reloaded.correctionOf('songs', 4601, 'year', 2019)?.sent, isFalse);
     });
+
+    test(
+      'a sent one set back to the old value is taken back with a newer one',
+      () async {
+        final outbox = newOutbox();
+        await correctYear(outbox, 2018);
+        final sent = await Directory('${root.path}/outbox/sent').create();
+        final file = (await outbox.pending()).single;
+        await file.rename('${sent.path}/${file.path.split('/').last}');
+        await outbox.load();
+
+        await correctYear(outbox, 2019);
+        final waiting = (await outbox.pending()).single;
+        final row = (await rows(waiting, 'field_corrections')).single;
+        expect(row, containsPair('old_value', 2019));
+        expect(row, containsPair('new_value', 2019));
+        expect(
+          outbox.correctionOf('songs', 4601, 'year', 2019)?.newValue,
+          2019,
+        );
+
+        // Corrected again before that is sent: the newer value replaces it.
+        await correctYear(outbox, 2017);
+        expect(await outbox.pending(), hasLength(1));
+        // And set back once more: the waiting one goes, and the sent one is taken back again.
+        await correctYear(outbox, 2019);
+        expect(
+          (await rows(
+            (await outbox.pending()).single,
+            'field_corrections',
+          )).single['new_value'],
+          2019,
+        );
+      },
+    );
   });
 
   group('sending', () {

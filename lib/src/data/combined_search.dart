@@ -108,7 +108,8 @@ class SearchHit {
     required this.notFoundOnYouTube,
     bool keepPlaylistVideo = true,
     bool? mainVideoRemoved,
-  }) : mainSong = hit.mainSong,
+    CatalogSong? mainSong,
+  }) : mainSong = mainSong ?? hit.mainSong,
        mainVideoRemoved = mainVideoRemoved ?? hit.mainVideoRemoved,
        phoneFiles = hit.phoneFiles,
        playlistVideoId = keepPlaylistVideo ? hit.playlistVideoId : null,
@@ -132,6 +133,16 @@ class SearchHit {
     mainVideoRemoved: mainVideo || mainVideoRemoved,
   );
 
+  /// The same song with the YouTube links the user set (`null`: music.db's again); a video
+  /// YouTube removed is looked for anew among them.
+  SearchHit withUserLinks(UserYouTubeLinks? links) => SearchHit._copy(
+    this,
+    phoneMatch: phoneMatch,
+    notFoundOnYouTube: notFoundOnYouTube,
+    mainVideoRemoved: false,
+    mainSong: mainSong!.withUserLinks(links),
+  );
+
   /// The same song, now with a video the phone found for it.
   SearchHit withPhoneMatch(String videoId) =>
       SearchHit._copy(this, phoneMatch: videoId, notFoundOnYouTube: false);
@@ -153,6 +164,10 @@ class SearchHit {
   /// found.
   String? get youtubeVideoId =>
       (mainVideoRemoved ? null : mainSong?.youtubeVideoId) ?? phoneMatch;
+
+  /// The song's music video, apart from the audio ([youtubeVideoId]); only MusicDatabase's
+  /// songs have one.
+  String? get musicVideoId => mainSong?.musicVideoId;
 
   /// Phone-only songs aren't in MusicDatabase, so nothing is known about them on YouTube.
   YouTubeLink get youTube {
@@ -198,9 +213,15 @@ class SearchHit {
 /// (`youtube_not_found`), and dropping a video YouTube removed (`youtube_removed_videos`) — a
 /// playlist's, a phone-found one, or music.db's own, which is then replaced by a phone-found one
 /// until MusicDatabase changes the link (ADR 0003: the phone only fills the gap) — and a video
-/// MusicDatabase turned down ([YouTubeLibrary.useBadVideos]). Queues and saved
+/// MusicDatabase turned down ([YouTubeLibrary.useBadVideos]) — and the links the user set by
+/// hand ([YouTubeLibrary.userLinksFor]), which beat music.db's until it changes. Queues and saved
 /// rows hold songs as they were, so they're shown and played through this.
 SearchHit withPhoneYouTube(SearchHit hit, YouTubeLibrary youTube) {
+  final song = hit.mainSong;
+  if (song != null) {
+    final links = youTube.userLinksFor(song.id);
+    if (links != song.userLinks) hit = hit.withUserLinks(links);
+  }
   final video = hit.youtubeVideoId;
   if (video != null) {
     final own = hit.mainSong;

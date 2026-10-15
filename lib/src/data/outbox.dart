@@ -260,6 +260,10 @@ class Outbox extends ChangeNotifier {
     return correction;
   }
 
+  /// Every correction known, waiting or sent, including those music.db has settled since
+  /// (see [correctionOf]).
+  Iterable<FieldCorrection> get corrections => _known.values;
+
   /// The corrections in the requests waiting to be sent, in the order they were made.
   List<FieldCorrection> get waitingCorrections {
     final waiting = [
@@ -274,9 +278,10 @@ class Outbox extends ChangeNotifier {
 
   /// The user corrected [column] of music.db's [table] row [rowId], which the downloaded
   /// music.db has as [oldValue], to [newValue] (`null` empties it), looking at [song]. A
-  /// suggestion MusicDatabase's owner reviews; the phone keeps using music.db's value. Corrected
-  /// again before it's sent, the newer value replaces the older; set back to [oldValue], the
-  /// correction is dropped.
+  /// suggestion MusicDatabase's owner reviews; the phone keeps using music.db's value (except
+  /// YouTube links, `main.dart`). Corrected again before it's sent, the newer value replaces the
+  /// older; set back to [oldValue], the correction is dropped — or, once sent, taken back with a
+  /// newer one giving [oldValue] again.
   Future<void> correctField({
     required String table,
     required int rowId,
@@ -286,30 +291,52 @@ class Outbox extends ChangeNotifier {
     required CatalogSong song,
   }) => _inTurn(() async {
     final key = (table: table, rowId: rowId, column: column);
-    final dropping = _same(oldValue, newValue);
-    if (dropping && !(_known[key]?.sent == false)) return;
+    if (_same(oldValue, newValue)) {
+      if (_known[key]?.sent == false) {
+        await _writeCorrection(key, null);
+      }
+      final sent = _known[key];
+      final takeBack =
+          sent != null &&
+          _same(sent.oldValue, oldValue) &&
+          !_same(sent.newValue, oldValue);
+      if (!takeBack) return;
+    }
+    await _writeCorrection(key, {
+      'table_name': table,
+      'row_id': rowId,
+      'column_name': column,
+      'old_value': oldValue,
+      'new_value': newValue,
+      'song_id': song.id,
+      'title': song.title,
+      'artist': song.artistLabel,
+      'corrected_at': _timestamp(_now()),
+    });
+  });
+
+  /// Puts [row] into the waiting corrections, replacing the one for [key]; with `null` only
+  /// deletes that one.
+  Future<void> _writeCorrection(
+    ({String table, int rowId, String column}) key,
+    Map<String, Object?>? row,
+  ) async {
     final db = await _openRequest(_corrections);
     final file = File(db.path);
     bool empty;
     try {
-      if (dropping) {
+      if (row == null) {
         await db.delete(
           _corrections,
           where: 'table_name = ? AND row_id = ? AND column_name = ?',
-          whereArgs: [table, rowId, column],
+          whereArgs: [key.table, key.rowId, key.column],
         );
       } else {
-        await db.insert(_corrections, {
-          'table_name': table,
-          'row_id': rowId,
-          'column_name': column,
-          'old_value': oldValue,
-          'new_value': newValue,
-          'song_id': song.id,
-          'title': song.title,
-          'artist': song.artistLabel,
-          'corrected_at': _timestamp(_now()),
-        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        await db.insert(
+          _corrections,
+          row,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
       empty = (await db.query(_corrections, limit: 1)).isEmpty;
     } finally {
@@ -325,7 +352,7 @@ class Outbox extends ChangeNotifier {
     _waiting = (await pending()).length;
     notifyListeners();
     if (!empty) onReported?.call();
-  });
+  }
 
   Future<void> _loadCorrections() async {
     final dir = await directory();

@@ -124,6 +124,12 @@ class TrackPlayer {
     return videoId == null ? null : youTubeWatchUri(videoId);
   }
 
+  /// [hit]'s music video, with the links the user set; `null` when it has none.
+  Uri? musicVideoUri(SearchHit hit) {
+    final videoId = _withRememberedVideo(hit).musicVideoId;
+    return videoId == null ? null : youTubeWatchUri(videoId);
+  }
+
   /// [onStatus] gets short progress messages ("Łączę z YouTube…"); [allowExternal] lets the
   /// YouTube app be the last resort (only when the user tapped something). [youTubeListId]: the
   /// YouTube playlist the song is played from, for the YouTube app ([youTubeUri]).
@@ -152,7 +158,7 @@ class TrackPlayer {
     await youTubeLibrary.markVideoRemoved(gone);
     await _reportIfMainLink(hit, gone);
     onStatus?.call(
-      hit.mainSong?.youtubeVideoId == gone
+      hit.mainSong?.fromMusicDb.youtubeVideoId == gone
           ? 'Link z MusicDatabase wygasł — szukam innego filmu…'
           : 'Tego filmu nie ma już na YouTube — szukam innego…',
     );
@@ -398,9 +404,10 @@ class TrackPlayer {
     return video;
   }
 
-  /// MusicDatabase's own link of [hit] is [gone]: worth telling MusicDatabase.
+  /// MusicDatabase's own link of [hit] is [gone]: worth telling MusicDatabase. Not one the
+  /// user set in its place ([CatalogSong.userLinks]).
   Future<void> _reportIfMainLink(SearchHit hit, String gone) async {
-    final song = hit.mainSong;
+    final song = hit.mainSong?.fromMusicDb;
     if (song == null || song.youtubeVideoId != gone) return;
     await _report(() => outbox?.reportDeadYouTubeLink(song, gone));
   }

@@ -13,6 +13,7 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
+import '../widgets/menu_sheet.dart';
 import '../widgets/queue_toast.dart';
 import '../theme_controller.dart';
 import '../widgets/song_tile.dart';
@@ -398,16 +399,50 @@ class NowPlayingScreen extends StatelessWidget {
   static Future<void> _openInYouTube(
     BuildContext context,
     PlayerController player,
-    Uri uri,
-  ) async {
+    Uri uri, {
+    bool fromHere = true,
+  }) async {
     final messenger = ScaffoldMessenger.of(context);
     final at = player.currentPosition;
     if (player.playing) await player.togglePlay();
-    if (!await openInYouTube(youTubeUriAt(uri, at))) {
+    if (!await openInYouTube(fromHere ? youTubeUriAt(uri, at) : uri)) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Nie udało się otworzyć YouTube.')),
       );
     }
+  }
+
+  /// With a music video as well as the song, asks which of them; the video from its start —
+  /// it doesn't run in step with the song.
+  static Future<void> _chooseOnYouTube(
+    BuildContext context,
+    PlayerController player, {
+    required Uri? song,
+    required Uri? musicVideo,
+  }) async {
+    if (musicVideo == null || song == null) {
+      final uri = (song ?? musicVideo)!;
+      return _openInYouTube(context, player, uri, fromHere: song != null);
+    }
+    await showMenuSheet(
+      context,
+      idPrefix: '$_id › Otwórz w YouTube',
+      entries: [
+        MenuSheetEntry(
+          Icons.music_note_outlined,
+          'Utwór na YouTube',
+          subtitle: 'Od miejsca, w którym jest odtwarzacz',
+          onTap: () => _openInYouTube(context, player, song),
+        ),
+        MenuSheetEntry(
+          Icons.movie_outlined,
+          'Teledysk na YouTube',
+          subtitle: 'Od początku',
+          onTap: () =>
+              _openInYouTube(context, player, musicVideo, fromHere: false),
+        ),
+      ],
+    );
   }
 
   @override
@@ -425,6 +460,7 @@ class NowPlayingScreen extends StatelessWidget {
     }
     void dummy(String label) => showDummy(context, '$_id › $label');
     final youTubeUri = queue.currentYouTubeUri;
+    final musicVideoUri = queue.currentMusicVideoUri;
     final coverSize = _fullCoverSize(context);
     final moodFilter = MoodFilterScope.maybeOf(context);
 
@@ -540,12 +576,14 @@ class NowPlayingScreen extends StatelessWidget {
                                 Icons.smart_display_outlined,
                                 size: 30,
                               ),
-                              onPressed: youTubeUri == null
+                              onPressed:
+                                  youTubeUri == null && musicVideoUri == null
                                   ? null
-                                  : () => _openInYouTube(
+                                  : () => _chooseOnYouTube(
                                       context,
                                       player,
-                                      youTubeUri,
+                                      song: youTubeUri,
+                                      musicVideo: musicVideoUri,
                                     ),
                             ),
                             IconButton(

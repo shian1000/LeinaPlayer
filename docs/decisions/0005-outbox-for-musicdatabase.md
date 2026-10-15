@@ -58,19 +58,27 @@ album, year, language, track and disc number; its artists' name, origin and othe
 album's title, year and type; and the Latin forms of names in other alphabets
 (`songs.title_latin`, `artists.name_latin`, `albums.title_latin` — offered only next to a name in
 another alphabet, even before music.db has the columns; hand-off
-[`../handoffs/musicdatabase-latin-names.md`](../handoffs/musicdatabase-latin-names.md)). Ids, links
-and service ids aren't editable. Format in
+[`../handoffs/musicdatabase-latin-names.md`](../handoffs/musicdatabase-latin-names.md)); and, since
+2026-10-15, the song's YouTube video (`songs.youtube_video_id`) and music video
+(`songs.music_video_youtube_id`, a new column — hand-off
+[`../handoffs/musicdatabase-youtube-links-by-hand.md`](../handoffs/musicdatabase-youtube-links-by-hand.md)).
+Ids, other links and service ids aren't editable. Format in
 [`../handoffs/musicdatabase-field-corrections.md`](../handoffs/musicdatabase-field-corrections.md).
 
 - **The phone keeps showing music.db's value** (server wins, ADR 0003), with "Poprawka czeka na
   wysłanie: X" or "Wysłano poprawkę: X" under it while music.db still has the value the
-  correction was made against (owner's choice over showing the new value at once).
+  correction was made against (owner's choice over showing the new value at once). **Except
+  the YouTube links** (2026-10-15, owner's request): the phone plays and opens the user's link
+  at once, while music.db still has the corrected value — the point is the right video playing
+  (`main.dart` `_useUserYouTubeLinks` → `YouTubeLibrary.useUserLinks` → `withPhoneYouTube`).
 - **Files hold one kind of report.** MusicDatabase keeps a whole file unprocessed while it doesn't
   know one of its tables, so corrections go into request files of their own and dead links keep
   being processed. The newest waiting file of the user that holds the table takes more.
 - Corrected again before it's sent, the newer value replaces the row; set back to music.db's
   value, the row is dropped, and a file left empty is deleted (never sent, so its number may come
-  again).
+  again). Set back after it was sent, a newer row with `new_value` = `old_value` takes it back
+  (2026-10-15; before, nothing happened — a YouTube link would have stayed in use). MusicDatabase
+  settles such a row as "already has that value" together with the older one.
 - "Czeka na wysłanie" lists waiting corrections next to the dead links.
 - MusicDatabase reviews them in "Resolve new requests" since 2026-10-14 (its
   `docs/handoffs/field-corrections-for-musicdatabaseapp.md`). Since 2026-10-14 an automatic

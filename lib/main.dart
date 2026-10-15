@@ -254,6 +254,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       (Object e) => debugPrint('Loading YouTube library failed: $e'),
     );
     _songCatalog.addListener(_forgetSettledMatches);
+    _songCatalog.addListener(_useUserYouTubeLinks);
+    _outbox.addListener(_useUserYouTubeLinks);
     _playHistory.load().catchError(
       (Object e) => debugPrint('Loading play history failed: $e'),
     );
@@ -378,6 +380,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       for (final id in _youTubeLibrary.matchedSongIds) {
         final song = catalog.byId(id);
         if (song == null || song.youTube != YouTubeLink.unknown) continue;
+        // The user picked the song's video by hand; that goes as a correction.
+        if (_youTubeLibrary.userLinksFor(id)?.video != null) continue;
         final found = await _youTubeLibrary.matchDetailsFor(id);
         if (found == null || _youTubeLibrary.isVideoRemoved(found.id)) continue;
         await _outbox.reportFoundYouTubeLink(song, found);
@@ -385,6 +389,33 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     } catch (e) {
       debugPrint('Forgetting settled YouTube findings failed: $e');
     }
+  }
+
+  /// The YouTube links the user set in "Informacje o utworze" are field corrections in the
+  /// outbox; the phone plays them in place of music.db's until a downloaded music.db changes the
+  /// value they correct (accepted, or settled otherwise).
+  void _useUserYouTubeLinks() {
+    final video = <int, String>{};
+    final musicVideo = <int, String>{};
+    for (final c in _outbox.corrections) {
+      if (c.table != 'songs') continue;
+      final song = _songCatalog.byId(c.rowId);
+      if (song == null) continue;
+      final (links, current) = switch (c.column) {
+        'youtube_video_id' => (video, song.youtubeValue),
+        'music_video_youtube_id' => (musicVideo, song.musicVideoId),
+        _ => (null, null),
+      };
+      if (links == null ||
+          _outbox.correctionOf(c.table, c.rowId, c.column, current) == null) {
+        continue;
+      }
+      links[c.rowId] = '${c.newValue ?? ''}';
+    }
+    _youTubeLibrary.useUserLinks({
+      for (final id in {...video.keys, ...musicVideo.keys})
+        id: UserYouTubeLinks(video: video[id], musicVideo: musicVideo[id]),
+    });
   }
 
   /// The last song and queue come back once the songs they refer to can be found.
@@ -489,6 +520,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.removeListener(_updateChooserLook);
     _themeController.removeListener(_updateNotificationNames);
     _songCatalog.removeListener(_forgetSettledMatches);
+    _songCatalog.removeListener(_useUserYouTubeLinks);
+    _outbox.removeListener(_useUserYouTubeLinks);
     _moodLibrary.removeListener(_songCatalog.moodsChanged);
     _outboxSendSoon?.cancel();
     _playlistSyncSoon?.cancel();

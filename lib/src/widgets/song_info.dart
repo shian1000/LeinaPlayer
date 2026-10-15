@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
+import '../data/incoming_links.dart';
 import '../data/latin_names.dart';
 import '../data/moods.dart';
 import '../data/outbox.dart';
@@ -140,6 +141,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
       'artist_id',
       'album_id',
       'youtube_video_id',
+      'music_video_youtube_id',
       'spotify_url',
     };
     return _Section('Utwór', [
@@ -349,25 +351,26 @@ class _SongInfoCardState extends State<SongInfoCard> {
   Widget _linksSection(SongDetails? details) {
     final hit = _hit;
     final mainSong = hit.mainSong;
-    final storedVideo = details?.song['youtube_video_id'] as String?;
+    final storedVideo = mainSong?.fromMusicDb.youtubeVideoId;
     final spotifyUrl = details?.song['spotify_url'] as String?;
     Uri video(String id) => youTubeWatchUri(id);
     final fromPlayer = widget.track != null;
     return _Section('Linki', [
-      if (mainSong != null)
-        switch (storedVideo?.trim() ?? mainSong.youtubeVideoId) {
-          null || '' => const _Field('YouTube (music.db)', 'brak'),
-          'N/A' => const _Field(
-            'YouTube (music.db)',
-            'oznaczony jako niedostępny na YouTube (N/A)',
-          ),
-          final id => _Field(
-            'YouTube (music.db)',
-            hit.mainVideoRemoved ? '$id — usunięty z YouTube' : id,
-            link: video(id),
-            fromPlayer: fromPlayer,
-          ),
-        },
+      if (mainSong != null) ...[
+        _youTubeField(
+          mainSong.fromMusicDb,
+          column: 'youtube_video_id',
+          label: 'YouTube (music.db)',
+          stored: mainSong.fromMusicDb.youtubeValue,
+          removed: hit.mainVideoRemoved && mainSong.userLinks?.video == null,
+        ),
+        _youTubeField(
+          mainSong.fromMusicDb,
+          column: 'music_video_youtube_id',
+          label: 'Teledysk (music.db)',
+          stored: mainSong.fromMusicDb.musicVideoId,
+        ),
+      ],
       if (mainSong != null)
         _Field(
           'Spotify (music.db)',
@@ -414,6 +417,95 @@ class _SongInfoCardState extends State<SongInfoCard> {
           fromPlayer: fromPlayer,
         ),
     ]);
+  }
+
+  /// A YouTube link of music.db's [song] ([column], stored as [stored]), with a pencil to set
+  /// another — a field correction like the others, but the phone plays (or opens) the user's
+  /// link meanwhile ([CatalogSong.userLinks]).
+  Widget _youTubeField(
+    CatalogSong song, {
+    required String column,
+    required String label,
+    required String? stored,
+    bool removed = false,
+  }) {
+    final outbox = OutboxScope.maybeOf(context);
+    final correction = outbox?.correctionOf('songs', song.id, column, stored);
+    final fromPlayer = widget.track != null;
+    String shown(Object? value) => switch (value) {
+      null || '' => 'brak',
+      'N/A' => 'oznaczony jako niedostępny na YouTube (N/A)',
+      _ => '$value',
+    };
+    final newValue = correction?.newValue as String?;
+    return _Field(
+      label,
+      removed ? '$stored — usunięty z YouTube' : shown(stored),
+      link: stored == null || stored == 'N/A' ? null : youTubeWatchUri(stored),
+      fromPlayer: fromPlayer && column == 'youtube_video_id',
+      correction: correction == null
+          ? null
+          : '${correction.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie'}, '
+                'telefon już używa: ${shown(newValue)}',
+      correctionLink: newValue == null || newValue.isEmpty || newValue == 'N/A'
+          ? null
+          : youTubeWatchUri(newValue),
+      onEdit: outbox == null
+          ? null
+          : () => _editYouTube(
+              outbox,
+              song,
+              column: column,
+              label: label,
+              stored: stored,
+              shown: correction == null ? stored : newValue,
+            ),
+    );
+  }
+
+  Future<void> _editYouTube(
+    Outbox outbox,
+    CatalogSong song, {
+    required String column,
+    required String label,
+    required String? stored,
+    required String? shown,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final musicVideo = column == 'music_video_youtube_id';
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => TextInputDialog(
+        title: label,
+        hint: musicVideo ? 'Link lub ID filmu' : 'Link, ID filmu lub N/A',
+        initial: shown == null || shown.isEmpty ? '' : shown,
+      ),
+    );
+    if (text == null) return;
+    final value = parseYouTubeLinkInput(text, allowNotOnYouTube: !musicVideo);
+    if (value == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('To nie jest link do filmu na YouTube.')),
+      );
+      return;
+    }
+    final newValue = value.isEmpty ? null : value;
+    if (_sameValue(newValue, shown)) return;
+    await outbox.correctField(
+      table: 'songs',
+      rowId: song.id,
+      column: column,
+      oldValue: stored,
+      newValue: newValue,
+      song: song,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          _sameValue(newValue, stored) ? 'Wrócono do linku z music.db.' : 'Telefon używa już tego linku; poprawka trafi do MusicDatabase.',
+        ),
+      ),
+    );
   }
 
   Widget _moodsSection(BuildContext context, SongDetails? details) {
@@ -483,6 +575,21 @@ class _SongInfoCardState extends State<SongInfoCard> {
     ]);
   }
 }
+
+/// The video id in [text] typed as a YouTube link or a bare id; "" for an empty text, "N/A"
+/// when [allowNotOnYouTube] and typed so; `null` when it's neither.
+String? parseYouTubeLinkInput(String text, {bool allowNotOnYouTube = true}) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return '';
+  if (allowNotOnYouTube && trimmed.toUpperCase() == 'N/A') return 'N/A';
+  if (_bareVideoId.hasMatch(trimmed)) return trimmed;
+  final link = parseYouTubeLink(
+    trimmed.contains('://') ? trimmed : 'https://$trimmed',
+  );
+  return link is YouTubeVideoLink ? link.videoId : null;
+}
+
+final _bareVideoId = RegExp(r'^[\w-]{11}$');
 
 /// How "Informacje o utworze" names [column] of music.db's [table], and shows [value] of it.
 String fieldLabel(String table, String column) =>
@@ -655,6 +762,7 @@ class _Field extends StatelessWidget {
     this.link,
     this.onEdit,
     this.correction,
+    this.correctionLink,
     this.fromPlayer = false,
   });
 
@@ -667,6 +775,9 @@ class _Field extends StatelessWidget {
 
   /// The user's correction waiting for MusicDatabase, under the value.
   final String? correction;
+
+  /// Opened by a tap on [correction].
+  final Uri? correctionLink;
 
   /// [link] is the playing song's video: it opens where the player is, and the player pauses
   /// (like "Otwórz w YouTube" above the card).
@@ -713,14 +824,19 @@ class _Field extends StatelessWidget {
                     ),
                   ),
                   if (correction != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        correction!,
-                        style: TextStyle(
-                          fontSize: AppFontSize.small,
-                          color: palette.accent,
-                          fontStyle: FontStyle.italic,
+                    GestureDetector(
+                      onTap: correctionLink == null
+                          ? null
+                          : () => _openLink(correctionLink!, player: player),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          correction!,
+                          style: TextStyle(
+                            fontSize: AppFontSize.small,
+                            color: palette.accent,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
                     ),

@@ -188,6 +188,13 @@ class PlaybackQueue extends ChangeNotifier {
     return _tracks.youTubeUri(entry.hit, listId: entry.origin?.youTubeListId);
   }
 
+  /// The current song's music video ([SearchHit.musicVideoId]), apart from its audio.
+  Uri? get currentMusicVideoUri {
+    final entry = _current;
+    if (entry == null) return null;
+    return _tracks.musicVideoUri(entry.hit);
+  }
+
   bool get shuffle => _shuffle;
 
   bool _shown(QueueEntry entry) => filter?.allows(entry.hit) ?? true;

@@ -91,6 +91,19 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   the list when the owner picks it, and a stored mark would then hide music.db's own link (and
   report it dead). Also never applied to a video that is some song's music.db link. Shown under
   "Linki" in "Informacje o utworze" (per-song rows, `SongDetails.badVideos`).
+- **Links the user set by hand** (2026-10-15): "Informacje o utworze" › Linki has a pencil on
+  "YouTube (music.db)" and "Teledysk (music.db)" (a link or a bare id; empty = none; "N/A" for
+  the song). They're field corrections in the outbox, and the only corrections the phone uses
+  at once: `main.dart` `_useUserYouTubeLinks` reads the corrections still against music.db's
+  current value (`Outbox.correctionOf`) into `YouTubeLibrary.useUserLinks` (in memory — the
+  outbox is the store), and `withPhoneYouTube` puts them into the row's song
+  (`CatalogSong.withUserLinks`; `fromMusicDb` gives music.db's own). They beat music.db's link
+  and phone matches, aren't subject to `isWrongFor`, and aren't reported as dead music.db links
+  (`TrackPlayer._reportIfMainLink` checks `fromMusicDb`) nor as `found_youtube_links`. A
+  downloaded music.db with another value drops them. [Hand-off](../handoffs/musicdatabase-youtube-links-by-hand.md).
+- **Music video** (`songs.music_video_youtube_id`, `CatalogSong.musicVideoId`): only opened —
+  the full player's YouTube button asks "Utwór na YouTube" (from the player's position) /
+  "Teledysk na YouTube" (from its start) when a song has both; never played or matched.
 - **Server values win, phone values fill gaps** (user agreed): a music.db link or "N/A" always
   beats anything the phone found. So after each new `music.db` is loaded,
   `YouTubeLibrary.forgetSettled` (called from `main.dart`, `_forgetSettledMatches`, once per

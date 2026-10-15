@@ -150,6 +150,105 @@ void main() {
     await tester.runAsync(() => root.delete(recursive: true));
   });
 
+  testWidgets(
+    'a YouTube link set by hand: a correction the phone uses at once',
+    (tester) async {
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({});
+      late Directory root;
+      late DatabaseSync sync;
+      late Outbox outbox;
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('song_info_test');
+        sync = DatabaseSync(storageRoot: () async => root);
+        await writeMusicDb((await sync.localFile('music.db')).path);
+        outbox = Outbox(
+          storageRoot: () async => root,
+          factoryOverride: databaseFactoryFfi,
+        );
+      });
+      final hit = SearchHit.main(
+        CatalogSong(id: 3, title: 'Pay Your Respect', artistLabel: 'Afina'),
+        const [],
+      );
+      await tester.pumpWidget(
+        app(
+          SongInfoCard(hit: hit),
+          sync: sync,
+          outbox: outbox,
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find.text('Teledysk (music.db)').evaluate().isNotEmpty,
+      );
+
+      Future<void> edit(String label, String text) async {
+        final row = find.ancestor(
+          of: find.text(label),
+          matching: find.byType(Row),
+        );
+        await tester.ensureVisible(row.first);
+        await tester.tap(
+          find.descendant(
+            of: row.first,
+            matching: find.byIcon(Icons.edit_outlined),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), text);
+        await tester.tap(find.text('Zapisz'));
+        await tester.pump();
+      }
+
+      await edit('Teledysk (music.db)', 'not a link');
+      await tester.pump();
+      expect(
+        find.text('To nie jest link do filmu na YouTube.'),
+        findsOneWidget,
+      );
+
+      await edit('Teledysk (music.db)', 'https://youtu.be/dQw4w9WgXcQ?si=abc');
+      await pumpUntil(
+        tester,
+        () => find
+            .text('Poprawka czeka na wysłanie, telefon już używa: dQw4w9WgXcQ')
+            .evaluate()
+            .isNotEmpty,
+      );
+      final corrections = await tester.runAsync(
+        () async => outbox.waitingCorrections,
+      );
+      expect(corrections!.single.column, 'music_video_youtube_id');
+      expect(corrections.single.oldValue, isNull);
+      expect(corrections.single.newValue, 'dQw4w9WgXcQ');
+
+      sync.dispose();
+      await tester.runAsync(() => root.delete(recursive: true));
+    },
+  );
+
+  test('a YouTube link typed by hand: a link, a bare id, empty or N/A', () {
+    expect(parseYouTubeLinkInput(' dQw4w9WgXcQ '), 'dQw4w9WgXcQ');
+    expect(
+      parseYouTubeLinkInput('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3'),
+      'dQw4w9WgXcQ',
+    );
+    expect(
+      parseYouTubeLinkInput('music.youtube.com/watch?v=dQw4w9WgXcQ'),
+      'dQw4w9WgXcQ',
+    );
+    expect(parseYouTubeLinkInput('youtu.be/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    expect(parseYouTubeLinkInput(''), '');
+    expect(parseYouTubeLinkInput('n/a'), 'N/A');
+    expect(parseYouTubeLinkInput('N/A', allowNotOnYouTube: false), isNull);
+    expect(
+      parseYouTubeLinkInput('https://www.youtube.com/playlist?list=PL1'),
+      isNull,
+    );
+    expect(parseYouTubeLinkInput('hello'), isNull);
+  });
+
   testWidgets('a Latin form can be sent for a name in another alphabet, '
       'even before music.db has the column', (tester) async {
     databaseFactory = databaseFactoryFfi;

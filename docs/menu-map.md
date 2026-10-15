@@ -46,7 +46,9 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   - Big cover, title, artist, Otwórz w YouTube (**implemented**: YouTube icon left of (+); opens
     the song in the YouTube app from where this player is (`t=` in the link) — inside its
     YouTube playlist when it plays from an imported one, so YouTube then has the whole playlist;
-    pauses this player; disabled when no video is known), `Odtwarzacz › Dodaj (+)`.
+    pauses this player; disabled when no video is known; with a music video as well —
+    `music_video_youtube_id` or one the user set — a sheet asks "Utwór na YouTube" /
+    "Teledysk na YouTube", the music video from its start), `Odtwarzacz › Dodaj (+)`.
   - Seek bar with elapsed/total time; tapping the total switches it to the time left (`-m:ss`) and back, remembered across restarts (**implemented**).
   - Losowo (**implemented**: toggles shuffle, green while on — see the queue below), Poprzedni (**implemented**: within the first 5 s the previous song
     in the queue, otherwise — or with nothing before it — the song from the start), play/pause
@@ -86,7 +88,9 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     only what the phone knows. A pencil next to the song's, its artists' and its album's own
     fields (empty ones shown as "—") corrects the value: the correction goes to the outbox for
     MusicDatabase ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md), field corrections)
-    and shows under music.db's value until a downloaded music.db changes it.
+    and shows under music.db's value until a downloaded music.db changes it. Under Linki the
+    song's YouTube video and music video ("Teledysk") have a pencil too (link or id); unlike
+    the other fields the phone uses the new link at once (see `youtube.md`).
   - `Odtwarzacz › Urządzenia`, Filtr nastrojów (**implemented**: filter icon, accent while on,
     **→ Filtr nastrojów**), **Nastrój** (**implemented**, only while the filter is on, in the
     middle of the row: the song's mood names, or "Nastrój" — tapping it **→ Dodaj do nastroju**),

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -109,6 +110,19 @@ class YouTubeLibrary extends ChangeNotifier {
     }
     notifyListeners();
     return forgotten;
+  }
+
+  // Kept in memory only: the outbox holds the corrections they come from (main.dart).
+  Map<int, UserYouTubeLinks> _userLinks = const {};
+
+  /// The YouTube links the user set for this MusicDatabase song, while music.db still has the
+  /// value they correct.
+  UserYouTubeLinks? userLinksFor(int mainDbId) => _userLinks[mainDbId];
+
+  void useUserLinks(Map<int, UserYouTubeLinks> links) {
+    if (mapEquals(links, _userLinks)) return;
+    _userLinks = Map.unmodifiable(links);
+    notifyListeners();
   }
 
   /// Every video found removed so far on the phone (not MusicDatabase's [useBadVideos]).
