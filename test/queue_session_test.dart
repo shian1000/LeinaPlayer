@@ -98,6 +98,7 @@ void main() {
         1,
         playlistId: 7,
         playlistName: 'Do auta',
+        moodKey: 'u3',
       );
       await before.queue.add([_file('x')]);
       before.backend.at(const Duration(seconds: 42));
@@ -124,6 +125,7 @@ void main() {
       );
       expect([for (final e in after.queue.upcoming) e.hit.title], ['x', 'c']);
       expect(after.queue.currentEntry?.origin?.playlistId, 7);
+      expect(after.queue.currentEntry?.origin?.moodKey, 'u3');
       expect(after.queue.hasPrevious, isTrue, reason: 'a played before b');
 
       await after.player.togglePlay();

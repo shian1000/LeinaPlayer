@@ -179,6 +179,7 @@ class SongTile extends StatelessWidget {
     this.playlistId,
     this.youTubeListId,
     this.playlistName,
+    this.moodKey,
     this.subtitle,
     this.trailing,
     this.onTap,
@@ -203,6 +204,9 @@ class SongTile extends StatelessWidget {
 
   /// The YouTube playlist the song is played from ([PlaylistSummary.youTubeId]).
   final String? youTubeListId;
+
+  /// The mood ([Mood.key]) the song is played from.
+  final String? moodKey;
 
   /// Replaces the default "artist • album • year".
   final String? subtitle;
@@ -237,6 +241,7 @@ class SongTile extends StatelessWidget {
         playlistId: playlistId,
         youTubeListId: youTubeListId,
         playlistName: playlistName,
+        moodKey: moodKey,
         searchQuery: searchQuery,
         onStatus: onStatus,
       ),
@@ -364,10 +369,7 @@ class SourceIcons extends StatelessWidget {
             ? 'Na YouTube (znalezione przez telefon)'
             : 'Na YouTube',
       ),
-      null when searchable => (
-        Icons.smart_display,
-        'Do wyszukania na YouTube',
-      ),
+      null when searchable => (Icons.smart_display, 'Do wyszukania na YouTube'),
       null => (null, ''),
     };
     final color = source == null

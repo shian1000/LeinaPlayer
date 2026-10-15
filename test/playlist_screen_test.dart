@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -19,6 +20,8 @@ import 'package:music_database_app/src/playback/player_controller.dart';
 import 'package:music_database_app/src/playback/track_player.dart';
 import 'package:music_database_app/src/screens/library_screen.dart';
 import 'package:music_database_app/src/theme.dart';
+import 'package:music_database_app/src/widgets/playing_bars.dart';
+import 'package:music_database_app/src/widgets/song_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -337,6 +340,38 @@ void main() {
       expect([for (final t in tracks!) t.title], ['Utwór', 'Małomiasteczkowy']);
     },
   );
+
+  testWidgets('Biblioteka highlights the playlist the playing song was queued '
+      'from', (tester) async {
+    await pumpLibrary(tester, before: importDoAuta);
+    final title = find.descendant(
+      of: find.byType(CurrentTitle),
+      matching: find.text('Do auta'),
+    );
+    expect(
+      tester.widget<Text>(title).style?.color,
+      isNot(dummifyTheme.palette.accent),
+    );
+    expect(find.byType(PlayingBars), findsNothing);
+
+    final playlist = playlists.playlists.single;
+    final hits = [
+      SearchHit.phoneOnly(
+        LocalSong(id: 1, filePath: '/music/a.mp3', title: 'a', pending: true),
+      ),
+    ];
+    unawaited(queue.start(hits, 0, playlistId: playlist.id + 1));
+    await tester.pump();
+    expect(find.byType(PlayingBars), findsNothing);
+
+    unawaited(queue.start(hits, 0, playlistId: playlist.id));
+    await tester.pump();
+    expect(
+      tester.widget<Text>(title).style?.color,
+      dummifyTheme.palette.accent,
+    );
+    expect(find.byType(PlayingBars), findsOneWidget);
+  });
 
   testWidgets('Biblioteka: a playlist moved into a new folder shows only inside it; sorting '
       'is remembered', (tester) async {

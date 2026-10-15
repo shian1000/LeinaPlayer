@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../dummy.dart';
+import '../playback/playback_queue.dart';
 import '../data/library_folders.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
@@ -10,6 +11,7 @@ import '../widgets/collection_cover.dart';
 import '../widgets/folder_sheet.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/mood_sheet.dart';
+import '../widgets/song_tile.dart';
 import 'app_shell.dart';
 import 'create_sheet.dart';
 import 'mood_screen.dart';
@@ -180,7 +182,8 @@ class _SortButton extends StatelessWidget {
 }
 
 /// A row of Biblioteka or a folder: tapping opens it, holding it moves a playlist or mood to a
-/// folder, or opens a folder's menu.
+/// folder, or opens a folder's menu. The playlist / mood the playing song was queued from is
+/// highlighted, like the playing song in a list.
 class LibraryEntryTile extends StatelessWidget {
   const LibraryEntryTile({super.key, required this.entry});
 
@@ -208,10 +211,17 @@ class LibraryEntryTile extends StatelessWidget {
       ),
     };
     final folders = LibraryFoldersScope.maybeOf(context);
+    final origin = PlaybackQueueScope.maybeOf(context)?.currentEntry?.origin;
+    final playing = switch (entry) {
+      PlaylistEntry(:final playlist) =>
+        origin?.isFrom(playlistId: playlist.id) ?? false,
+      MoodEntry(:final mood) => origin?.isFrom(moodKey: mood.key) ?? false,
+      FolderEntry() => false,
+    };
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: leading,
-      title: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: CurrentTitle(text: entry.name, isCurrent: playing),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       onTap: () => switch (entry) {
         FolderEntry(:final folder) => FolderScreen.open(context, folder),

@@ -124,6 +124,7 @@ class MoodScreen extends StatelessWidget {
                             (onStatus) => queue.startShuffled(
                               hits,
                               playlistName: mood.name,
+                              moodKey: mood.key,
                               onStatus: onStatus,
                             ),
                           );
@@ -159,6 +160,7 @@ class MoodScreen extends StatelessWidget {
                 queue: hits,
                 queueIndex: i,
                 playlistName: mood.name,
+                moodKey: mood.key,
                 trailing: IconButton(
                   tooltip: 'Menu utworu (⋮)',
                   icon: const Icon(Icons.more_vert),
@@ -180,7 +182,7 @@ class MoodScreen extends StatelessWidget {
   };
 
   void _showMoodMenu(BuildContext context, Mood mood, List<SearchHit> hits) {
-    final origin = QueueOrigin(playlistName: mood.name);
+    final origin = QueueOrigin(playlistName: mood.name, moodKey: mood.key);
     showMenuSheet(
       context,
       idPrefix: '$_id › Menu (⋮)',

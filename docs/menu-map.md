@@ -478,6 +478,10 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   every folder by name, the current one ticked); on a folder row **→ folder menu**
   (`Biblioteka › Folder › Menu (⋮)`: Zmień nazwę, Usuń folder — its items go back to
   Biblioteka). Folders don't nest; an item is in one folder at most.
+- **Playing playlist / mood** — **implemented**: the row of the playlist or mood the playing
+  song was queued from as a whole (its `QueueOrigin`: tapped there, or the whole playlist added
+  to the queue; not a single song added from its ⋮) has a green title with `PlayingBars`, like
+  the playing song in a list (also inside folders).
 - `Biblioteka › Widok siatki`
 - Library items: the user's playlists (`PlaylistLibrary`, newest first; cover — the picked one
   or the collage, see Playlista › Header — name,

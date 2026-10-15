@@ -24,6 +24,7 @@ class QueueOrigin {
     this.playlistId,
     this.youTubeListId,
     this.playlistName,
+    this.moodKey,
     this.searchQuery,
   });
 
@@ -31,6 +32,7 @@ class QueueOrigin {
     playlistId: json['playlist_id'] as int?,
     youTubeListId: json['youtube_list_id'] as String?,
     playlistName: json['playlist_name'] as String?,
+    moodKey: json['mood_key'] as String?,
     searchQuery: json['search_query'] as String?,
   );
 
@@ -40,12 +42,21 @@ class QueueOrigin {
   /// The YouTube playlist, so "Otwórz w YouTube" opens the video inside it.
   final String? youTubeListId;
   final String? playlistName;
+
+  /// The mood ([Mood.key]), so Biblioteka can mark it while its songs play.
+  final String? moodKey;
   final String? searchQuery;
+
+  /// Biblioteka's playlist / mood these songs were queued from as a whole.
+  bool isFrom({int? playlistId, String? moodKey}) =>
+      (playlistId != null && this.playlistId == playlistId) ||
+      (moodKey != null && this.moodKey == moodKey);
 
   Map<String, Object?> toJson() => {
     'playlist_id': playlistId,
     'youtube_list_id': youTubeListId,
     'playlist_name': playlistName,
+    'mood_key': moodKey,
     'search_query': searchQuery,
   };
 }
@@ -200,6 +211,7 @@ class PlaybackQueue extends ChangeNotifier {
     int? playlistId,
     String? youTubeListId,
     String? playlistName,
+    String? moodKey,
     String? searchQuery,
     bool? shuffle,
     void Function(String status)? onStatus,
@@ -209,6 +221,7 @@ class PlaybackQueue extends ChangeNotifier {
       playlistId: playlistId,
       youTubeListId: youTubeListId,
       playlistName: playlistName,
+      moodKey: moodKey,
       searchQuery: searchQuery,
     );
     _mainOrigin = origin;
@@ -235,6 +248,7 @@ class PlaybackQueue extends ChangeNotifier {
     int? playlistId,
     String? youTubeListId,
     String? playlistName,
+    String? moodKey,
     void Function(String status)? onStatus,
   }) => start(
     entries,
@@ -242,6 +256,7 @@ class PlaybackQueue extends ChangeNotifier {
     playlistId: playlistId,
     youTubeListId: youTubeListId,
     playlistName: playlistName,
+    moodKey: moodKey,
     shuffle: true,
     onStatus: onStatus,
   );
@@ -726,4 +741,8 @@ class PlaybackQueueScope extends InheritedNotifier<PlaybackQueue> {
   static PlaybackQueue of(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<PlaybackQueueScope>()!
       .notifier!;
+
+  static PlaybackQueue? maybeOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<PlaybackQueueScope>()
+      ?.notifier;
 }
