@@ -439,6 +439,38 @@ class PlaybackQueue extends ChangeNotifier {
     _prefetchAhead();
   }
 
+  /// A group of songs from one playlist (the queue screen's heading) in random order, where
+  /// they are; shuffle leaves them as they are after that, like songs moved by hand.
+  void shuffleGroup(List<QueueEntry> group) {
+    final places = [
+      for (final entry in group)
+        if (_upcoming.indexOf(entry) case final at when at >= 0) at,
+    ]..sort();
+    final mixed = [for (final at in places) _upcoming[at]]..shuffle(_random);
+    for (final (i, at) in places.indexed) {
+      _upcoming[at] = QueueEntry._pinnedFrom(mixed[i]);
+    }
+    notifyListeners();
+    _prefetchAhead();
+  }
+
+  /// A group of songs from one playlist plays once more: copies of them go right after it.
+  void repeatGroup(List<QueueEntry> group) {
+    final last = group.map(_upcoming.indexOf).fold(-1, max);
+    if (last < 0) return;
+    _upcoming.insertAll(last + 1, [
+      for (final entry in group)
+        QueueEntry._(
+          entry.hit,
+          origin: entry.origin,
+          index: entry.index,
+          pinned: true,
+        ),
+    ]);
+    notifyListeners();
+    _prefetchAhead();
+  }
+
   /// "Wyczyść kolejkę": drops every song added by hand.
   void clearAdded() {
     _upcoming.removeWhere((e) => !isMain(e));

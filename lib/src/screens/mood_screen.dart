@@ -5,6 +5,7 @@ import '../data/library_folders.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/song_catalog.dart';
+import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
@@ -22,7 +23,7 @@ const _id = 'Nastrój';
 /// One mood ("Nastrój", [ADR 0008](../../../docs/decisions/0008-moods.md)): its songs by title,
 /// "Odtwórz losowo", and — for the user's own mood, or a global one with the permission —
 /// taking songs out.
-class MoodScreen extends StatelessWidget {
+class MoodScreen extends StatefulWidget {
   const MoodScreen({super.key, required this.mood});
 
   final Mood mood;
@@ -34,13 +35,21 @@ class MoodScreen extends StatelessWidget {
   }
 
   @override
+  State<MoodScreen> createState() => _MoodScreenState();
+}
+
+class _MoodScreenState extends State<MoodScreen> {
+  /// `null` while the search field is closed.
+  String? _query;
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final moods = MoodLibraryScope.of(context);
-    final mood = moods.current(this.mood);
+    final mood = moods.current(widget.mood);
     if (mood == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(this.mood.name)),
+        appBar: AppBar(title: Text(widget.mood.name)),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -59,12 +68,38 @@ class MoodScreen extends StatelessWidget {
       LocalLibraryScope.of(context),
       YouTubeLibraryScope.of(context),
     );
+    final words = normalizeForSearch(_query).split(' ')
+      ..removeWhere((w) => w.isEmpty);
+    final shown = [
+      for (final (i, hit) in hits.indexed)
+        if (words.every(
+          normalizeForSearch('${hit.title} ${hit.artistLabel}').contains,
+        ))
+          (i, hit),
+    ];
     final editable = !mood.global || moods.canEditGlobal;
     final missing = mood.songIds.length - hits.length;
     return Scaffold(
       appBar: AppBar(
-        title: Text(mood.name),
+        title: _query == null
+            ? Text(mood.name)
+            : TextField(
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Szukaj w nastroju',
+                  border: InputBorder.none,
+                ),
+                onChanged: (text) => setState(() => _query = text),
+              ),
         actions: [
+          IconButton(
+            tooltip: _query == null
+                ? 'Szukaj w nastroju'
+                : 'Zamknij wyszukiwanie',
+            icon: Icon(_query == null ? Icons.search : Icons.close),
+            onPressed: () =>
+                setState(() => _query = _query == null ? '' : null),
+          ),
           IconButton(
             tooltip: 'Menu nastroju (⋮)',
             icon: const Icon(Icons.more_vert),
@@ -153,7 +188,7 @@ class MoodScreen extends StatelessWidget {
                   style: TextStyle(color: palette.textSecondary),
                 ),
               ),
-            for (final (i, hit) in hits.indexed)
+            for (final (i, hit) in shown)
               SongTile(
                 key: ValueKey(hit.mainSong!.id),
                 hit: hit,

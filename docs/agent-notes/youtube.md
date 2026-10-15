@@ -164,7 +164,7 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   the keyboard). Saved natively in SharedPreferences `later_links` (`LaterLinks.kt`) because
   Flutter isn't running; Dart (`later_links.dart`, `LaterLinks` notifier) reads and changes them
   over the links channel (`laterLinks`, `addLaterPerson`, `updateLaterLink`, …) and re-reads on
-  every resume. Shown in Menu profilu › Wiadomości › Na później (`later_links_screen.dart`),
+  every resume. Shown in Ja › Na później (`later_links_screen.dart`),
   which looks up titles for untitled links once per opening (`describeLaterLink`, the same
   recognition as opening the link) and stores them back. A remembered choice skips the sheet, so
   nothing can be saved then. Phone-only, not synced with MusicDatabase.

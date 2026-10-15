@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -86,6 +88,86 @@ class CollectionCover extends StatelessWidget {
   }
 }
 
+/// What a cover in a list stands for, told apart by its outline even without the picture
+/// (after Juxtopposed's Spotify redesign): an album has one sleeve edge above it, a playlist a
+/// stack of them, a mood rounder corners and a crescent in the corner.
+enum CollectionKind { album, playlist, mood }
+
+/// [CollectionKind]'s outline around a cover of [size] in all; [builder] draws the cover
+/// itself at the size left for it.
+class CollectionFrame extends StatelessWidget {
+  const CollectionFrame({
+    super.key,
+    required this.kind,
+    required this.size,
+    required this.builder,
+  });
+
+  final CollectionKind kind;
+  final double size;
+  final Widget Function(double coverSize) builder;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    // A ListTile's leading may be lower than asked for.
+    builder: (context, constraints) =>
+        _frame(context, min(size, constraints.maxHeight)),
+  );
+
+  Widget _frame(BuildContext context, double size) {
+    final palette = context.palette;
+    final edge = (size / 22).clamp(2.0, 4.0);
+    Widget sleeve(double widthFactor, double alpha) => Container(
+      width: size * widthFactor,
+      height: edge,
+      margin: EdgeInsets.only(bottom: edge / 2),
+      decoration: BoxDecoration(
+        color: palette.textSecondary.withValues(alpha: alpha),
+        borderRadius: palette.radius(edge),
+      ),
+    );
+    return SizedBox.square(
+      dimension: size,
+      child: switch (kind) {
+        CollectionKind.album => Column(
+          children: [sleeve(0.92, 0.5), builder(size - edge * 1.5)],
+        ),
+        CollectionKind.playlist => Column(
+          children: [
+            sleeve(0.76, 0.3),
+            sleeve(0.88, 0.55),
+            builder(size - edge * 3),
+          ],
+        ),
+        CollectionKind.mood => Stack(
+          children: [
+            ClipRRect(
+              borderRadius: palette.radius(size / 4),
+              child: builder(size),
+            ),
+            Positioned(
+              right: 2,
+              bottom: 2,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: palette.background.withValues(alpha: 0.75),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  moodIcon,
+                  size: (size / 4).clamp(10.0, 18.0),
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      },
+    );
+  }
+}
+
 /// A Biblioteka playlist's [CollectionCover] in a list, from its first tracks
 /// ([PlaylistLibrary.leadTracks]) rather than the whole playlist.
 class PlaylistCover extends StatelessWidget {
@@ -100,19 +182,19 @@ class PlaylistCover extends StatelessWidget {
     final library = LocalLibraryScope.of(context);
     final youTube = YouTubeLibraryScope.of(context);
     final tracks = PlaylistLibraryScope.of(context).leadTracks(playlist.id);
-    return CollectionCover(
-      cover: playlist.cover,
-      // An album is one cover, though its songs may each find it on their own.
-      songs:
-          (playlist.source == PlaylistSource.spotifyAlbum
-                  ? tracks.take(1)
-                  : tracks)
-              .map(
-                (t) =>
-                    CoverRequest.of(playlistHit(t, catalog, library, youTube)),
-              ),
-      seed: playlist.name,
+    final album = playlist.source == PlaylistSource.spotifyAlbum;
+    return CollectionFrame(
+      kind: album ? CollectionKind.album : CollectionKind.playlist,
       size: size,
+      builder: (coverSize) => CollectionCover(
+        cover: playlist.cover,
+        // An album is one cover, though its songs may each find it on their own.
+        songs: (album ? tracks.take(1) : tracks).map(
+          (t) => CoverRequest.of(playlistHit(t, catalog, library, youTube)),
+        ),
+        seed: playlist.name,
+        size: coverSize,
+      ),
     );
   }
 }
@@ -125,17 +207,21 @@ class MoodCover extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => CollectionCover(
-    cover: mood.cover,
-    songs: moodHits(
-      mood,
-      SongCatalogScope.of(context),
-      LocalLibraryScope.of(context),
-      YouTubeLibraryScope.of(context),
-    ).map(CoverRequest.of),
-    seed: mood.name,
+  Widget build(BuildContext context) => CollectionFrame(
+    kind: CollectionKind.mood,
     size: size,
-    icon: moodIcon,
+    builder: (coverSize) => CollectionCover(
+      cover: mood.cover,
+      songs: moodHits(
+        mood,
+        SongCatalogScope.of(context),
+        LocalLibraryScope.of(context),
+        YouTubeLibraryScope.of(context),
+      ).map(CoverRequest.of),
+      seed: mood.name,
+      size: coverSize,
+      icon: moodIcon,
+    ),
   );
 }
 

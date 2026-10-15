@@ -109,8 +109,6 @@ void main() {
       ),
       unorderedEquals(['B', 'ambient', 'Ballady']),
     );
-    expect(folders.filter, isNull);
-    await folders.setFilter('Playlisty');
 
     await folders.rename(a.id, 'Nowe');
     await folders.setSort(LibrarySort.added);
@@ -119,11 +117,6 @@ void main() {
     expect([for (final f in reloaded.folders) f.name], ['Nowe', 'B']);
     expect(reloaded.folderOf(key)?.id, b.id);
     expect(reloaded.sort, LibrarySort.added);
-    expect(reloaded.filter, 'Playlisty');
-    await reloaded.setFilter(null);
-    final cleared = LibraryFolders();
-    await cleared.load();
-    expect(cleared.filter, isNull);
 
     await reloaded.delete(b.id);
     expect(reloaded.folderOf(key), isNull);

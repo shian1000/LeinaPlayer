@@ -244,8 +244,41 @@ const dummifyLightTheme = AppThemeDef(
   brightness: Brightness.light,
 );
 
+/// After the light Home of Juxtopposed's Spotify redesign: a soft grey page with lighter grey
+/// cards and chips, near-black text and a deep green accent.
+const redesignLightTheme = AppThemeDef(
+  'Redesign',
+  AppPalette(
+    background: Color(0xFFF2F2F0),
+    surface: Color(0xFFE9E9E6),
+    surfaceHigh: Color(0xFFDFDFDB),
+    chip: Color(0xFFE2E2DE),
+    accent: Color(0xFF138A43),
+    onAccent: Colors.white,
+    textPrimary: Color(0xFF151515),
+    textSecondary: Color(0xFF646462),
+    badge: Color(0xFF2E5BBA),
+    divider: Colors.black12,
+    navBar: Color(0xFFE9E9E6),
+    snackBackground: Color(0xFF1C1C1C),
+    snackForeground: Colors.white,
+    coverColors: [
+      Color(0xFF5B6FD6),
+      Color(0xFF2BB39B),
+      Color(0xFFE2574C),
+      Color(0xFFE5A53A),
+      Color(0xFF8E6BC8),
+      Color(0xFF3D8FD1),
+      Color(0xFFD9578C),
+      Color(0xFF4FA35A),
+    ],
+    likedGradient: [Color(0xFF5B6FD6), Color(0xFF8FD6C7)],
+  ),
+  brightness: Brightness.light,
+);
+
 /// Themes offered under "Motyw jasny".
-const lightThemes = [dummifyLightTheme];
+const lightThemes = [dummifyLightTheme, redesignLightTheme];
 
 /// Themes offered under "Motyw ciemny".
 const darkThemes = [dummifyTheme, lainTheme];

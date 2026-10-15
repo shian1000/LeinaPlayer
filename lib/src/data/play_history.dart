@@ -150,4 +150,8 @@ class PlayHistoryScope extends InheritedNotifier<PlayHistory> {
 
   static PlayHistory of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<PlayHistoryScope>()!.notifier!;
+
+  /// `null` in widget tests that don't set it up.
+  static PlayHistory? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PlayHistoryScope>()?.notifier;
 }

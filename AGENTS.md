@@ -35,7 +35,7 @@ to be trimmed later — user's request), and its own fields can be corrected the
 going to the outbox for MusicDatabase while the phone keeps showing music.db's value — except
 its YouTube link and music video link, which the phone uses at once; with a music video the
 player's YouTube button asks song or music video; play history in
-"Ostatnie" (profile menu). Album covers from the phone file, iTunes, Deezer or the YouTube
+"Ostatnie" (the "Ja" tab). Album covers from the phone file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
 (synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Names in another
@@ -54,6 +54,18 @@ folders for playlists and moods and a working "Sortuj wg" (both phone only); son
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their
 MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).
+The layout follows Juxtopposed's Spotify redesign
+([`ideas/`](docs/ideas/spotify-redesign-juxtopposed.md)): tabs Home, Odkrywaj, Wyszukaj,
+Biblioteka, Ja (the profile, no avatar or drawer); Home's rows arranged by the user (pin, move,
+hide, rows from Biblioteka — `home_layout.dart`); Odkrywaj — one song at a time from all of
+MusicDatabase or a mood; Biblioteka as categories, with songs saved "Na później"
+(`saved_songs.dart`) and dynamic playlists — a saved search filter (`smart_playlists.dart`), all
+three phone only; the queue opens in place of the full player's cover, and lyrics (looked
+up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the player, above
+"Informacje o utworze" (user's layout: bottom row YouTube, mood filter, share, queue, ⋮; a mood
+button where "Polub" was); song menus unfold "Dodaj do playlisty ›" / "Przejdź do
+wykonawców ›" in place; Wyszukaj's "Przeglądaj" is grouped (moods, decades, languages,
+countries).
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
 while logged out), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
 permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)); a whole playlist,
@@ -66,7 +78,7 @@ made on YouTube from its share sheet — the phone signs in to Google and uses t
 itself, without MusicDatabase (unlisted, a one-off copy; [`youtube.md`](docs/agent-notes/youtube.md));
 a tapped link first shows a native sheet asking where to open it (Leina Radio,
 the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
-saves it for later with the person who sent it (Menu profilu › Wiadomości › Na później,
+saves it for later with the person who sent it (Ja › Na później,
 `later_links.dart`; kept natively in `LaterLinks.kt`).
 
 ## Read order
@@ -124,7 +136,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
 ## Project layout
 
 - `lib/main.dart` — app entry point.
-- `lib/src/screens/` — one file per screen/sheet; `app_shell.dart` holds the bottom nav, drawer and
+- `lib/src/screens/` — one file per screen/sheet; `app_shell.dart` holds the bottom nav and
   per-tab navigators.
 - `lib/src/widgets/` — shared widgets (placeholder cover art, menu bottom sheet, chips, headers,
   `SongTile` — the song row with its source icon (the first source in the playback order that has it, "*" when not in MusicDatabase, a pin when playable offline) used by search, playlists, the queue and history;
@@ -151,7 +163,9 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `youtube_export.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
-  folders, sort order and "last opened" (`library_folders.dart`, phone only), syncing
+  folders, sort order and "last opened" (`library_folders.dart`, phone only), songs saved for
+  later (`saved_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
+  (`home_layout.dart`) — all three phone only, syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
   mood filter (`mood_filter.dart`),
@@ -162,7 +176,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
   (`network_errors.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
-  port of MusicDatabase's `normalize()` (`text_normalizer.dart`).
+  port of MusicDatabase's `normalize()` (`text_normalizer.dart`), and lyrics from LRCLIB (`lyrics.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
@@ -195,7 +209,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`, `LibraryFoldersScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`, `LibraryFoldersScope`, `SavedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
@@ -210,13 +224,19 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - System Back in `AppShell` pops tab routes directly (bypassing their `PopScope`), so a pushed
   sub-screen can't hand a result back through `pop` — pass a callback instead. Keep Flutter's
   `PredictiveBackPageTransitionsBuilder` out of the theme: on Android 16+ it lets a hidden tab
-  route take the back gesture from whatever covers it (full player, root sheets, drawer).
+  route take the back gesture from whatever covers it (full player, root sheets).
 - Anything new the phone stores to work offline (a cache) gets its settings in the
   `cache_settings_screen.dart` ("Pamięć podręczna" — the only name for it in the UI, not
   "cache"), not on the screen of the feature that fills it (user's decision).
 - A `SnackBar` with an `action` stays until closed by hand in this Flutter version (`persist`
   defaults to true) and floats over whatever is pushed on top — pass `persist: false`. Notes about
   the queue use `QueueToast` above the mini player instead (Spotify-like, user's choice).
+- `Scrollable.ensureVisible` scrolls every scrollable above the widget too — inside a card that
+  scrolls on its own within a page (the lyrics under the full player) it drags the whole page
+  along; scroll the inner controller to `RenderAbstractViewport.getOffsetToReveal` instead.
+- Context menus are `showMenuSheet`: rare options go in `quickEntries` (a small block on top),
+  and options with choices of their own unfold in place via `MenuSheetEntry.submenu` rather than
+  opening a second sheet (Juxtopposed's redesign, user's choice).
 - No comments explaining *what* code does; only *why*, when non-obvious.
 
 ## Testing & verification

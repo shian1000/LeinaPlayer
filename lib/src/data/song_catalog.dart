@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -119,7 +120,15 @@ class CatalogSong {
     String? albumLatin,
     this.artistLatin,
     this.serverFile,
-  }) : titleLatin = latinFormOf(title, titleLatin),
+  }) : countries = [
+         ...{
+           for (final origin in origins)
+             if (origin.split(' - ').first.trim() case final country
+                 when country.isNotEmpty)
+               country,
+         },
+       ],
+       titleLatin = latinFormOf(title, titleLatin),
        albumLatin = latinFormOf(album, albumLatin),
        youTubeTarget =
            youTubeTarget ??
@@ -166,6 +175,7 @@ class CatalogSong {
       albumLatin = song.albumLatin,
       year = song.year,
       language = song.language,
+      countries = song.countries,
       youtubeVideoId = links.video == null
           ? song.youtubeVideoId
           : _videoIdOf(links.video),
@@ -226,6 +236,10 @@ class CatalogSong {
   final String? albumLatin;
   final int? year;
   final String? language;
+
+  /// The countries its artists come from: the first part of each `artists.origin` ("Kraj -
+  /// Region - Miasto"), for Wyszukaj's "Przeglądaj".
+  final List<String> countries;
 
   /// Set only when [youTube] is [YouTubeLink.linked].
   final String? youtubeVideoId;
@@ -336,6 +350,9 @@ class SongCatalog extends ChangeNotifier {
   /// When the `music.db` now loaded was downloaded (`DatabaseSync.lastSync` at load time).
   DateTime? get loadedSyncTime => _loadedSyncTime;
   int get songCount => _songs.length;
+
+  /// Every song of music.db, in no particular order (Odkrywaj picks from them).
+  List<CatalogSong> get songs => UnmodifiableListView(_songs);
 
   /// Fields the search looks at; never empty.
   Set<SearchField> get searchFields => _searchFields;
@@ -706,21 +723,22 @@ class SongCatalog extends ChangeNotifier {
 
   /// Songs whose selected [searchFields] together contain every word of [query] (after
   /// normalization), best matches first: exact title, then title starting with the query, then
-  /// title containing it, then the rest; alphabetical within each group.
-  List<CatalogSong> search(String query) {
+  /// title containing it, then the rest; alphabetical within each group. [fields] instead of
+  /// [searchFields] (a dynamic playlist's own) aren't cached.
+  List<CatalogSong> search(String query, {Set<SearchField>? fields}) {
     final normalizedQuery = normalizeForSearch(query);
     if (normalizedQuery.isEmpty) return const [];
     final words = normalizedQuery.split(' ');
-    final moodNames = _searchFields.contains(SearchField.mood)
-        ? _moodNames
-        : null;
-    final texts = _searchTexts ??= [
+    final searched = fields ?? _searchFields;
+    final moodNames = searched.contains(SearchField.mood) ? _moodNames : null;
+    List<String> textsFor() => [
       for (final song in _songs)
         moodNames == null
-            ? song._textFor(_searchFields)
-            : '${song._textFor(_searchFields)} '
+            ? song._textFor(searched)
+            : '${song._textFor(searched)} '
                   '${normalizeForSearch(moodNames(song.id))}',
     ];
+    final texts = fields == null ? _searchTexts ??= textsFor() : textsFor();
     final hits = [
       for (var i = 0; i < _songs.length; i++)
         if (words.every(texts[i].contains)) _songs[i],
@@ -762,4 +780,8 @@ class SongCatalogScope extends InheritedNotifier<SongCatalog> {
 
   static SongCatalog of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<SongCatalogScope>()!.notifier!;
+
+  /// `null` in widget tests that don't set it up.
+  static SongCatalog? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SongCatalogScope>()?.notifier;
 }

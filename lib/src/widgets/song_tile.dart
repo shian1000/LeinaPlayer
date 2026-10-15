@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../data/saved_songs.dart';
 import '../data/combined_search.dart';
+import '../data/local_library.dart';
 import '../data/mood_filter.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
+import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
@@ -14,6 +17,7 @@ import 'mood_sheet.dart';
 import 'playing_bars.dart';
 import 'queue_toast.dart';
 import '../screens/queue_screen.dart';
+import '../screens/song_list_screen.dart';
 import 'playlist_picker.dart';
 import 'share_sheet.dart';
 import 'song_selection.dart';
@@ -439,7 +443,8 @@ class SourceIcons extends StatelessWidget {
 
 /// The menu of a song — its ⋮, and a long press on its row outside a [SongSelectionArea]:
 /// "Dodaj do kolejki", "Odtwórz jako następny", "Dodaj do nastroju", "Dodaj do playlisty",
-/// "Udostępnij"; the rest are dummies like in the reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
+/// "Zapisz na później", "Udostępnij"; the rest are dummies like in the reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
+/// "Pobierz utwór", "Wyłącznik czasowy" and "Ukryj utwór" (dummies) sit in a smaller block above.
 Future<void> showSongMenu(
   BuildContext context,
   SearchHit hit, {
@@ -455,6 +460,11 @@ Future<void> showSongMenu(
       title: hit.shownTitle(context),
       subtitle: hit.shownArtist(context),
     ),
+    quickEntries: const [
+      MenuSheetEntry(Icons.download_outlined, 'Pobierz utwór'),
+      MenuSheetEntry(Icons.timer_outlined, 'Wyłącznik czasowy'),
+      MenuSheetEntry(Icons.block, 'Ukryj utwór'),
+    ],
     entries: [
       MenuSheetEntry(
         Icons.queue_music,
@@ -468,10 +478,40 @@ Future<void> showSongMenu(
       ),
       ?moodMenuEntry(context, hit),
       ...extra,
-      playlistMenuEntry(context, [hit]) ??
+      playlistSubmenuEntry(context, [hit]) ??
           const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
-      const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
-      const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
+      if (SavedSongsScope.maybeOf(context) case final saved?)
+        saved.contains(hit)
+            ? MenuSheetEntry(
+                Icons.bookmark_remove_outlined,
+                'Usuń z „Na później”',
+                onTap: () => saved.toggle(hit),
+              )
+            : MenuSheetEntry(
+                Icons.bookmark_border,
+                'Zapisz na później',
+                onTap: () => saved.toggle(hit),
+              ),
+      if (hit.album case final album? when album.isNotEmpty)
+        MenuSheetEntry(
+          Icons.album_outlined,
+          'Przejdź do albumu',
+          onTap: () => openAlbumSongs(context, album),
+        )
+      else
+        const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
+      MenuSheetEntry(
+        Icons.person_outline,
+        'Przejdź do wykonawców',
+        submenu: () => [
+          for (final artist in artistNamesOf(hit.artistLabel))
+            MenuSheetEntry(
+              Icons.person_outline,
+              artist,
+              onTap: () => openArtistSongs(context, artist),
+            ),
+        ],
+      ),
       MenuSheetEntry(
         Icons.share_outlined,
         'Udostępnij',
@@ -497,3 +537,54 @@ class SongMenuButton extends StatelessWidget {
     onPressed: () => showSongMenu(context, hit, idPrefix: idPrefix),
   );
 }
+
+/// The artists in a song's label ("A, B feat. C" → A, B, C).
+List<String> artistNamesOf(String label) => [
+  ...{
+    for (final part in label.split(
+      RegExp(r',| feat\. | ft\. | & ', caseSensitive: false),
+    ))
+      if (part.trim() case final name when name.isNotEmpty) name,
+  },
+];
+
+/// A lite artist page: every song (music.db and the phone) with [artist] among its artists.
+Future<void> openArtistSongs(BuildContext context, String artist) =>
+    SongListScreen.open(
+      context,
+      title: artist,
+      subtitle: 'Wykonawca',
+      songs: (context) {
+        final wanted = normalizeForSearch(artist);
+        return [
+          for (final hit in searchEverywhere(
+            artist,
+            SongCatalogScope.of(context),
+            LocalLibraryScope.of(context),
+            youTube: YouTubeLibraryScope.of(context),
+            fields: const {SearchField.artist},
+          ))
+            if (artistNamesOf(hit.artistLabel)
+                .any((name) => normalizeForSearch(name) == wanted))
+              hit,
+        ];
+      },
+    );
+
+/// The songs of the album called [album] (a lite album page).
+Future<void> openAlbumSongs(BuildContext context, String album) =>
+    SongListScreen.open(
+      context,
+      title: album,
+      subtitle: 'Album',
+      songs: (context) => [
+        for (final hit in searchEverywhere(
+          album,
+          SongCatalogScope.of(context),
+          LocalLibraryScope.of(context),
+          youTube: YouTubeLibraryScope.of(context),
+          fields: const {SearchField.album},
+        ))
+          if (hit.album == album) hit,
+      ],
+    );

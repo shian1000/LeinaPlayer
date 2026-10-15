@@ -212,7 +212,7 @@ class MemoryLaterStore implements LaterStore {
       _links.removeWhere((l) => l['id'] == id);
 }
 
-/// "Na później" (Menu profilu › Wiadomości): links people sent, saved from the link sheet.
+/// "Na później" (Ja › Na później): links people sent, saved from the link sheet.
 /// Phone-only, not synced with MusicDatabase. Re-read whenever the app comes back to the front,
 /// since the sheet saves while the app is in the background.
 class LaterLinks extends ChangeNotifier {

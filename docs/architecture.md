@@ -4,7 +4,7 @@
 
 A Spotify-style UI where most leaves are still dummies (see [`menu-map.md`](menu-map.md)) around
 real search, playback and playlists. `AppShell` (`lib/src/screens/app_shell.dart`)
-is the root: a `Scaffold` with the profile drawer, a custom bottom bar, and an `IndexedStack` of one
+is the root: a `Scaffold` with a custom bottom bar (Home, Odkrywaj, Wyszukaj, Biblioteka, Ja) and an `IndexedStack` of one
 nested `Navigator` per tab, so pushed screens (playlist, settings) keep the bottom bar visible and
 each tab keeps its own back stack. Back is handled centrally in `AppShell` via `PopScope`.
 Context menus are modal bottom sheets built by `showMenuSheet()` (`lib/src/widgets/menu_sheet.dart`)

@@ -253,17 +253,19 @@ SearchHit withPhoneYouTube(SearchHit hit, YouTubeLibrary youTube) {
 
 /// Song search over both databases: MusicDatabase's songs (each marked with the phone files that
 /// are that song) plus phone songs MusicDatabase doesn't have. Ordered like
-/// [SongCatalog.search]: best title matches first, alphabetical within a group.
+/// [SongCatalog.search]: best title matches first, alphabetical within a group. [fields] —
+/// instead of the ones chosen in "Szukaj w" (a dynamic playlist's).
 List<SearchHit> searchEverywhere(
   String query,
   SongCatalog catalog,
   LocalLibrary library, {
   YouTubeLibrary? youTube,
+  Set<SearchField>? fields,
 }) {
   final normalizedQuery = normalizeForSearch(query);
   if (normalizedQuery.isEmpty) return const [];
   final hits = [
-    for (final song in catalog.search(query))
+    for (final song in catalog.search(query, fields: fields))
       if (youTube == null)
         SearchHit.main(song, library.filesOf(song.id))
       else
@@ -271,7 +273,10 @@ List<SearchHit> searchEverywhere(
           SearchHit.main(song, library.filesOf(song.id)),
           youTube,
         ),
-    for (final file in library.searchPending(query, catalog.searchFields))
+    for (final file in library.searchPending(
+      query,
+      fields ?? catalog.searchFields,
+    ))
       SearchHit.phoneOnly(file),
   ];
   final keys = {

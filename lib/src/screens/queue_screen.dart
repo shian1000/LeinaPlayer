@@ -226,15 +226,85 @@ class QueueScreen extends StatelessWidget {
                   );
                 }
                 final heading = item as ({String text, bool clear, int at});
-                return _Heading(
-                  key: ValueKey('heading ${heading.at}'),
+                final origin = upcoming[heading.at].origin;
+                final group = upcoming
+                    .skip(heading.at)
+                    .takeWhile((entry) => identical(entry.origin, origin))
+                    .toList();
+                final playlistGroup = origin?.playlistName != null;
+                void removeGroup() {
+                  final removed = [
+                    for (final entry in group) (entry, queue.remove(entry)),
+                  ];
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Usunięto z kolejki: ${removed.length} utw.',
+                        ),
+                        persist: false,
+                        action: SnackBarAction(
+                          label: 'Cofnij',
+                          onPressed: () {
+                            for (final (entry, at) in removed.reversed) {
+                              queue.reinsert(entry, at);
+                            }
+                          },
+                        ),
+                      ),
+                    );
+                }
+
+                final tile = _Heading(
                   heading.text,
-                  action: heading.clear
-                      ? TextButton(
+                  action: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // A playlist's songs as a group of their own: shuffled, played once
+                      // more or taken out at once (Juxtopposed's redesign).
+                      if (playlistGroup) ...[
+                        IconButton(
+                          tooltip: 'Losowo w tej grupie',
+                          icon: const Icon(Icons.shuffle, size: 20),
+                          onPressed: () => queue.shuffleGroup(group),
+                        ),
+                        IconButton(
+                          tooltip: 'Powtórz tę grupę',
+                          icon: const Icon(Icons.repeat, size: 20),
+                          onPressed: () => queue.repeatGroup(group),
+                        ),
+                        IconButton(
+                          tooltip: 'Usuń tę grupę z kolejki',
+                          icon: const Icon(Icons.playlist_remove, size: 22),
+                          onPressed: removeGroup,
+                        ),
+                      ],
+                      if (heading.clear)
+                        TextButton(
                           onPressed: queue.clearAdded,
                           child: const Text('Wyczyść kolejkę'),
-                        )
-                      : null,
+                        ),
+                    ],
+                  ),
+                );
+                final key = ValueKey('heading ${heading.at}');
+                if (!playlistGroup) return KeyedSubtree(key: key, child: tile);
+                // Dragged left, the whole group goes, like a single row.
+                return Dismissible(
+                  key: key,
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    color: Theme.of(context).colorScheme.error,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: Icon(
+                      Icons.playlist_remove,
+                      color: Theme.of(context).colorScheme.onError,
+                    ),
+                  ),
+                  onDismissed: (_) => removeGroup(),
+                  child: tile,
                 );
               },
             ),
@@ -286,7 +356,7 @@ class QueueScreen extends StatelessWidget {
 }
 
 class _Heading extends StatelessWidget {
-  const _Heading(this.text, {super.key, this.action});
+  const _Heading(this.text, {this.action});
 
   final String text;
   final Widget? action;

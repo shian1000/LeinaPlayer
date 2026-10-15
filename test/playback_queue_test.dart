@@ -177,6 +177,35 @@ void main() {
     for (final e in entries) e.hit.title,
   ];
 
+  test(
+    'a playlist group in the queue: shuffled in place, played once more',
+    () async {
+      await queue.start([_file('a')], 0);
+      final origin = QueueOrigin(playlistName: 'P', playlistId: 7);
+      await queue.add([_file('x')]);
+      await queue.add([_file('p1'), _file('p2'), _file('p3')], origin: origin);
+      final group = [
+        for (final e in queue.upcoming)
+          if (identical(e.origin, origin)) e,
+      ];
+
+      queue.shuffleGroup(group);
+      expect(queue.upcoming.first.hit.title, 'x');
+      expect(
+        titles(queue.upcoming.skip(1).toList()),
+        unorderedEquals(['p1', 'p2', 'p3']),
+      );
+
+      final mixed = titles(queue.upcoming.skip(1).toList());
+      queue.repeatGroup(queue.upcoming.skip(1).toList());
+      expect(titles(queue.upcoming), ['x', ...mixed, ...mixed]);
+      expect(
+        queue.upcoming.skip(1).every((e) => identical(e.origin, origin)),
+        isTrue,
+      );
+    },
+  );
+
   test('"Dodaj do kolejki" plays after the songs added before, ahead of the playlist', () async {
     await queue.start([_file('a'), _file('b'), _file('c')], 0);
     await queue.add([_file('x')]);

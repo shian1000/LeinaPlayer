@@ -9,7 +9,7 @@ import '../data/youtube_account.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// "Ustawienia › Konto" (also "Menu profilu › Dodaj konto"): logging in with a MusicDatabase
+/// "Ustawienia › Konto" (also the profile card in "Ja"): logging in with a MusicDatabase
 /// user, or who is logged in and "Wyloguj" ([ADR 0006](../../../docs/decisions/0006-musicdatabase-login.md)).
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});

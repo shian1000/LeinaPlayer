@@ -131,7 +131,7 @@ class MoodEntry extends LibraryEntry {
   DateTime? get changedAt => mood.createdAt;
 }
 
-/// Biblioteka's folders, its sort order, its filter chip and when each playlist, mood and folder was last opened
+/// Biblioteka's folders, its sort order and when each playlist, mood and folder was last opened
 /// (for "Ostatnie"). Kept only on this phone, in `shared_preferences` — MusicDatabase knows
 /// nothing of folders (not synced, unlike the playlists and moods in them).
 ///
@@ -142,20 +142,15 @@ class LibraryFolders extends ChangeNotifier {
   static const _foldersKey = 'library.folders';
   static const _sortKey = 'library.sort';
   static const _openedKey = 'library.opened';
-  static const _filterKey = 'library.filter';
 
   final DateTime Function() _now;
 
   List<LibraryFolder> _folders = const [];
   LibrarySort _sort = LibrarySort.recent;
   Map<String, int> _opened = const {};
-  String? _filter;
 
   List<LibraryFolder> get folders => _folders;
   LibrarySort get sort => _sort;
-
-  /// The filter chip ticked in Biblioteka (its label), `null` for none.
-  String? get filter => _filter;
 
   static String playlistKey(int playlistId) => 'p$playlistId';
 
@@ -173,7 +168,6 @@ class LibraryFolders extends ChangeNotifier {
       debugPrint('Biblioteka folders unreadable, starting empty: $e');
     }
     _sort = LibrarySort.values.asNameMap()[prefs.getString(_sortKey)] ?? _sort;
-    _filter = prefs.getString(_filterKey);
     notifyListeners();
   }
 
@@ -190,17 +184,6 @@ class LibraryFolders extends ChangeNotifier {
       _sortKey,
       sort.name,
     );
-  }
-
-  Future<void> setFilter(String? filter) async {
-    _filter = filter;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    if (filter == null) {
-      await prefs.remove(_filterKey);
-    } else {
-      await prefs.setString(_filterKey, filter);
-    }
   }
 
   /// [key] (a playlist, mood or folder) was opened now.

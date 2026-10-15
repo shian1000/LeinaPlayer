@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
+import '../data/lyrics.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
 import '../dummy.dart';
@@ -19,6 +21,7 @@ import '../theme_controller.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/share_sheet.dart';
 import '../widgets/mood_sheet.dart';
+import '../widgets/playlist_picker.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_info.dart';
 import 'queue_screen.dart';
@@ -159,7 +162,7 @@ class _FullCoverReadyState extends State<_FullCoverReady> {
 }
 
 /// Card above the bottom bar showing what's playing; tap to open [NowPlayingScreen], long press
-/// for the song's menu.
+/// for quick actions ([_showQuickActions]).
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
 
@@ -185,11 +188,7 @@ class MiniPlayer extends StatelessWidget {
               onLongPress: () {
                 final hit = PlaybackQueueScope.of(context).current;
                 if (hit == null) return;
-                showSongMenu(
-                  context,
-                  hit,
-                  idPrefix: 'Mini odtwarzacz › Menu utworu',
-                );
+                _showQuickActions(context, hit);
               },
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -235,6 +234,21 @@ class MiniPlayer extends StatelessWidget {
                           ),
                         ),
                         IconButton(
+                          tooltip: 'Dodaj do playlisty',
+                          icon: const Icon(Icons.add_circle_outline),
+                          onPressed: () {
+                            final hit = PlaybackQueueScope.of(context).current;
+                            final entry = hit == null
+                                ? null
+                                : playlistMenuEntry(context, [hit]);
+                            (entry?.onTap ??
+                                () => showDummy(
+                                  context,
+                                  'Mini odtwarzacz › Dodaj do playlisty',
+                                ))();
+                          },
+                        ),
+                        IconButton(
                           tooltip: player.playing ? 'Pauza' : 'Odtwórz',
                           icon: Icon(
                             player.playing ? Icons.pause : Icons.play_arrow,
@@ -254,6 +268,84 @@ class MiniPlayer extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Held mini player: a few buttons just above it, so the common things need no menu
+/// (Juxtopposed's redesign); "Menu utworu" opens the full song menu.
+Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
+  const id = 'Mini odtwarzacz › Szybkie akcje';
+  final box = context.findRenderObject() as RenderBox?;
+  final top = box == null
+      ? MediaQuery.sizeOf(context).height / 2
+      : box.localToGlobal(Offset.zero).dy;
+  return showGeneralDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: true,
+    barrierLabel: 'Zamknij',
+    barrierColor: Colors.black38,
+    transitionDuration: const Duration(milliseconds: 120),
+    pageBuilder: (dialogContext, _, _) {
+      final palette = dialogContext.palette;
+      Widget action(IconData icon, String label, [VoidCallback? onTap]) =>
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Material(
+                color: palette.surfaceHigh,
+                shape: palette.boxShape(12),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(dialogContext).pop();
+                    (onTap ?? () => showDummy(context, '$id › $label'))();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon),
+                        const SizedBox(height: 4),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: AppFontSize.badge),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+      return Stack(
+        children: [
+          Positioned(
+            left: 8,
+            right: 8,
+            top: max(top - 80, 0),
+            child: Row(
+              children: [
+                action(Icons.block, 'Ukryj'),
+                action(Icons.devices_other, 'Urządzenia'),
+                action(Icons.favorite_border, 'Polub'),
+                action(
+                  Icons.more_horiz,
+                  'Więcej',
+                  () => showSongMenu(
+                    context,
+                    hit,
+                    idPrefix: 'Mini odtwarzacz › Menu utworu',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 /// The mini player's song: dragged sideways like in the reference app — left for the next song,
@@ -375,7 +467,7 @@ const _infoPeek = 44.0;
 
 /// Full-screen player ("Teraz odtwarzane"), slid up from the mini player; scrolled down, the
 /// song's details ([SongInfoCard]).
-class NowPlayingScreen extends StatelessWidget {
+class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
 
   /// Opens on the root navigator, so it covers the bottom bar like in the reference app.
@@ -444,6 +536,20 @@ class NowPlayingScreen extends StatelessWidget {
       ],
     );
   }
+
+  @override
+  State<NowPlayingScreen> createState() => _NowPlayingScreenState();
+}
+
+/// What the full player shows where the cover is.
+enum _Stage { cover, queue }
+
+class _NowPlayingScreenState extends State<NowPlayingScreen> {
+  _Stage _stage = _Stage.cover;
+
+  /// Tapping the shown one's button again brings the cover back.
+  void _toggle(_Stage stage) =>
+      setState(() => _stage = _stage == stage ? _Stage.cover : stage);
 
   @override
   Widget build(BuildContext context) {
@@ -525,24 +631,25 @@ class NowPlayingScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            IconButton(
-                              tooltip: 'Menu odtwarzacza (⋮)',
-                              icon: const Icon(Icons.more_vert),
-                              onPressed: () {
-                                final hit = queue.current;
-                                if (hit == null) return dummy('Menu (⋮)');
-                                showSongMenu(
-                                  context,
-                                  hit,
-                                  idPrefix: '$_id › Menu (⋮)',
-                                );
-                              },
-                            ),
+                            // Balances "Zwiń"; the menu is down by the thumb.
+                            const SizedBox(width: 48),
                           ],
                         ),
-                        const Spacer(),
-                        SongCover(cover: track.cover, size: coverSize),
-                        const Spacer(),
+                        // Lyrics and the queue open here, so the controls stay where they
+                        // are, under the thumb (Juxtopposed's Spotify redesign).
+                        Expanded(
+                          child: switch (_stage) {
+                            _Stage.cover => Center(
+                              child: SongCover(
+                                cover: track.cover,
+                                size: coverSize,
+                              ),
+                            ),
+                            _Stage.queue => _QueuePanel(
+                              onClose: () => _toggle(_Stage.queue),
+                            ),
+                          },
+                        ),
                         Row(
                           children: [
                             Expanded(
@@ -570,29 +677,22 @@ class NowPlayingScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
+                            if (queue.current case final hit?)
+                              _MoodButton(hit: hit),
                             IconButton(
-                              tooltip: 'Otwórz w YouTube',
-                              icon: const Icon(
-                                Icons.smart_display_outlined,
-                                size: 30,
-                              ),
-                              onPressed:
-                                  youTubeUri == null && musicVideoUri == null
-                                  ? null
-                                  : () => _chooseOnYouTube(
-                                      context,
-                                      player,
-                                      song: youTubeUri,
-                                      musicVideo: musicVideoUri,
-                                    ),
-                            ),
-                            IconButton(
-                              tooltip: 'Dodaj (+)',
+                              tooltip: 'Dodaj do playlisty',
                               icon: const Icon(
                                 Icons.add_circle_outline,
                                 size: 30,
                               ),
-                              onPressed: () => dummy('Dodaj (+)'),
+                              onPressed: () {
+                                final hit = queue.current;
+                                final entry = hit == null
+                                    ? null
+                                    : playlistMenuEntry(context, [hit]);
+                                (entry?.onTap ??
+                                    () => dummy('Dodaj do playlisty'))();
+                              },
                             ),
                           ],
                         ),
@@ -652,43 +752,44 @@ class NowPlayingScreen extends StatelessWidget {
                                     )
                                   : null,
                             ),
+                            // The sleep timer moved to the song's menu.
                             IconButton(
-                              tooltip: 'Wyłącznik czasowy',
-                              icon: const Icon(Icons.timer_outlined, size: 28),
-                              onPressed: () => dummy('Wyłącznik czasowy'),
+                              tooltip: 'Powtarzaj',
+                              icon: const Icon(Icons.repeat, size: 28),
+                              onPressed: () => dummy('Powtarzaj'),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             IconButton(
-                              tooltip: 'Urządzenia',
-                              icon: const Icon(Icons.devices_other),
-                              onPressed: () => dummy('Urządzenia'),
+                              tooltip: 'Otwórz w YouTube',
+                              icon: const Icon(Icons.smart_display_outlined),
+                              onPressed:
+                                  youTubeUri == null && musicVideoUri == null
+                                  ? null
+                                  : () => NowPlayingScreen._chooseOnYouTube(
+                                      context,
+                                      player,
+                                      song: youTubeUri,
+                                      musicVideo: musicVideoUri,
+                                    ),
                             ),
-                            if (moodFilter != null)
-                              IconButton(
-                                tooltip: moodFilter.active
-                                    ? 'Filtr nastrojów: wł.'
-                                    : 'Filtr nastrojów: wył.',
-                                icon: Icon(
-                                  Icons.filter_list,
-                                  color: moodFilter.active
-                                      ? palette.accent
-                                      : null,
-                                ),
-                                onPressed: () => showMoodFilterSheet(context),
+                            IconButton(
+                              tooltip: moodFilter?.active ?? false
+                                  ? 'Filtr nastrojów: wł.'
+                                  : 'Filtr nastrojów: wył.',
+                              icon: Icon(
+                                Icons.filter_list,
+                                color: moodFilter?.active ?? false
+                                    ? palette.accent
+                                    : null,
                               ),
-                            Expanded(
-                              child:
-                                  moodFilter != null &&
-                                      moodFilter.active &&
-                                      queue.current != null
-                                  ? Center(
-                                      child: _MoodButton(hit: queue.current!),
-                                    )
-                                  : const SizedBox.shrink(),
+                              onPressed: moodFilter == null
+                                  ? null
+                                  : () => showMoodFilterSheet(context),
                             ),
                             IconButton(
                               tooltip: 'Udostępnij',
@@ -703,8 +804,26 @@ class NowPlayingScreen extends StatelessWidget {
                             ),
                             IconButton(
                               tooltip: 'Kolejka',
-                              icon: const Icon(Icons.queue_music),
-                              onPressed: () => QueueScreen.open(context),
+                              icon: Icon(
+                                Icons.queue_music,
+                                color: _stage == _Stage.queue
+                                    ? palette.accent
+                                    : null,
+                              ),
+                              onPressed: () => _toggle(_Stage.queue),
+                            ),
+                            IconButton(
+                              tooltip: 'Menu odtwarzacza (⋮)',
+                              icon: const Icon(Icons.more_vert),
+                              onPressed: () {
+                                final hit = queue.current;
+                                if (hit == null) return dummy('Menu (⋮)');
+                                showSongMenu(
+                                  context,
+                                  hit,
+                                  idPrefix: '$_id › Menu (⋮)',
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -712,8 +831,12 @@ class NowPlayingScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (queue.current != null)
+                  // The lyrics peek out under the player; the song's details below them.
+                  if (queue.current != null) ...[
+                    const _LyricsCard(),
+                    const SizedBox(height: 16),
                     SongInfoCard(hit: queue.current!, track: track),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -725,7 +848,304 @@ class NowPlayingScreen extends StatelessWidget {
   }
 }
 
-/// "Nastrój" while the mood filter is on: the moods the song is in, tapped to change them.
+/// The song's lyrics in a card under the player, from LRCLIB ([LyricsFinder]) while
+/// MusicDatabase has none: time-synced lines follow the song (the current one highlighted,
+/// kept in view inside the card), else the plain text.
+class _LyricsCard extends StatefulWidget {
+  const _LyricsCard();
+
+  @override
+  State<_LyricsCard> createState() => _LyricsCardState();
+}
+
+class _LyricsCardState extends State<_LyricsCard> {
+  SearchHit? _hit;
+  Future<Lyrics?>? _lyrics;
+  final _lineKeys = <int, GlobalKey>{};
+  final _scroll = ScrollController();
+  int _shownLine = -1;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final hit = PlaybackQueueScope.of(context).current;
+    if (hit != null && !identical(hit, _hit)) {
+      _hit = hit;
+      _lyrics = LyricsFinder.instance.find(hit);
+      _lineKeys.clear();
+      _shownLine = -1;
+    }
+  }
+
+  void _keepInView(int line) {
+    if (line == _shownLine) return;
+    _shownLine = line;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Only the card scrolls: Scrollable.ensureVisible would move the whole player too.
+      final row = _lineKeys[_shownLine]?.currentContext?.findRenderObject();
+      if (row == null || !_scroll.hasClients) return;
+      final offset = RenderAbstractViewport.of(row)
+          .getOffsetToReveal(row, 0.35)
+          .offset;
+      _scroll.animateTo(
+        offset.clamp(0, _scroll.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final player = PlayerScope.of(context);
+    Widget note(String text, {Widget? action}) => Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lyrics_outlined, size: 48, color: palette.textSecondary),
+          const SizedBox(height: 12),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: palette.textSecondary),
+          ),
+          if (action != null) ...[const SizedBox(height: 12), action],
+        ],
+      ),
+    );
+    return Container(
+      height: 360,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: BoxDecoration(
+        color: palette.surfaceHigh.withValues(alpha: 0.7),
+        borderRadius: palette.radius(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Tekst',
+              style: TextStyle(
+                fontSize: AppFontSize.listTitle,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<Lyrics?>(
+              future: _lyrics,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return note('Szukam tekstu…');
+                }
+                if (snapshot.hasError) {
+                  return note(
+                    'Nie udało się pobrać tekstu. Brak połączenia?',
+                    action: OutlinedButton.icon(
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Spróbuj ponownie'),
+                      onPressed: () => setState(() {
+                        _lyrics = LyricsFinder.instance.find(_hit!);
+                      }),
+                    ),
+                  );
+                }
+                final lyrics = snapshot.data;
+                if (lyrics == null) {
+                  return note('Nie znalazłem tekstu tego utworu.');
+                }
+                if (lyrics.instrumental) return note('Utwór instrumentalny.');
+                if (lyrics.synced.isEmpty) {
+                  return SingleChildScrollView(
+                    child: Text(
+                      lyrics.plain!,
+                      style: const TextStyle(
+                        fontSize: AppFontSize.listTitle,
+                        height: 1.5,
+                      ),
+                    ),
+                  );
+                }
+                return StreamBuilder<Duration>(
+                  stream: player.position,
+                  initialData: player.currentPosition,
+                  builder: (context, position) {
+                    final at = position.data ?? Duration.zero;
+                    final current = lyrics.synced.lastIndexWhere(
+                      (line) => line.at <= at,
+                    );
+                    _keepInView(current);
+                    return SingleChildScrollView(
+                      controller: _scroll,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (final (i, line) in lyrics.synced.indexed)
+                            GestureDetector(
+                              key: _lineKeys.putIfAbsent(i, GlobalKey.new),
+                              // Tapping a line jumps the song there.
+                              onTap: () => player.seek(line.at),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: Text(
+                                  line.text.isEmpty ? '♪' : line.text,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.listTitle,
+                                    fontWeight: i == current
+                                        ? FontWeight.bold
+                                        : null,
+                                    color: i == current
+                                        ? palette.textPrimary
+                                        : i < current
+                                        ? palette.textSecondary
+                                        : palette.textPrimary.withValues(
+                                            alpha: 0.75,
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          Text(
+            'Teksty: LRCLIB',
+            style: TextStyle(
+              fontSize: AppFontSize.badge,
+              color: palette.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What plays next, in place of the cover: tapping a song plays it; the whole queue
+/// (reordering, removing, "Poprzednie") is one tap away.
+class _QueuePanel extends StatelessWidget {
+  const _QueuePanel({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final queue = PlaybackQueueScope.of(context);
+    final upcoming = queue.upcoming;
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
+      decoration: BoxDecoration(
+        color: palette.surfaceHigh.withValues(alpha: 0.7),
+        borderRadius: palette.radius(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: _PanelHeader(
+              title: 'Następne',
+              onClose: onClose,
+              action: TextButton(
+                onPressed: () => QueueScreen.open(context),
+                child: const Text('Cała kolejka'),
+              ),
+            ),
+          ),
+          Expanded(
+            child: upcoming.isEmpty
+                ? Center(
+                    child: Text(
+                      'Po tym utworze nic więcej nie zagra.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: palette.textSecondary),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: upcoming.length,
+                    itemBuilder: (context, i) {
+                      final entry = upcoming[i];
+                      return ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                        ),
+                        leading: SongCover(
+                          cover: CoverRequest.of(entry.hit),
+                          size: 40,
+                        ),
+                        title: Text(
+                          entry.hit.shownTitle(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          entry.hit.shownArtist(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => runQueueAction(
+                          context,
+                          (onStatus) => queue.jumpTo(entry, onStatus: onStatus),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PanelHeader extends StatelessWidget {
+  const _PanelHeader({required this.title, required this.onClose, this.action});
+
+  final String title;
+  final VoidCallback onClose;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: AppFontSize.listTitle,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      ?action,
+      IconButton(
+        tooltip: 'Pokaż okładkę',
+        icon: const Icon(Icons.close),
+        onPressed: onClose,
+      ),
+    ],
+  );
+}
+
+/// The song's moods (accent when it's in any), tapped to change them; in place of "Polub".
 class _MoodButton extends StatelessWidget {
   const _MoodButton({required this.hit});
 
@@ -737,19 +1157,14 @@ class _MoodButton extends StatelessWidget {
     final names = songId == null
         ? const <String>[]
         : MoodLibraryScope.of(context).moodNameListOf(songId);
-    return OutlinedButton.icon(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: context.palette.textPrimary,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        visualDensity: VisualDensity.compact,
+    return IconButton(
+      tooltip: names.isEmpty ? 'Nastrój' : 'Nastrój: ${names.join(', ')}',
+      icon: Icon(
+        moodIcon,
+        size: 28,
+        color: names.isEmpty ? null : context.palette.accent,
       ),
       onPressed: () => openMoodPicker(context, hit),
-      icon: const Icon(moodIcon, size: 20),
-      label: Text(
-        names.isEmpty ? 'Nastrój' : names.join(', '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
     );
   }
 }

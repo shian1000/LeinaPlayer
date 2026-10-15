@@ -45,7 +45,7 @@ void main() {
   testWidgets('shows bottom navigation with all tabs', (tester) async {
     await pumpApp(tester);
 
-    for (final label in ['Home', 'Wyszukaj', 'Biblioteka', 'Utwórz']) {
+    for (final label in ['Home', 'Odkrywaj', 'Wyszukaj', 'Biblioteka', 'Ja']) {
       expect(find.text(label), findsWidgets);
     }
     expect(find.text('Popularne radio'), findsOneWidget);
@@ -61,15 +61,20 @@ void main() {
     expect(find.text('Atrapa: Home › Filtr: Muzyka'), findsOneWidget);
   });
 
-  testWidgets('Utwórz tab opens create sheet', (tester) async {
+  testWidgets('Biblioteka\'s + opens the create sheet', (tester) async {
     await pumpApp(tester);
 
-    await tester.tap(find.text('Utwórz'));
+    await tester.tap(find.text('Biblioteka'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Utwórz (+)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Blend'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Atrapa: Utwórz › Blend'), findsOneWidget);
+    expect(
+      find.text('Atrapa: Biblioteka › Utwórz (+) › Blend'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('empty Biblioteka; "+" › Playlista offers new and import', (
@@ -112,12 +117,12 @@ void main() {
     'predictive back gesture closes a root sheet, not the tab screen under it',
     (tester) async {
       await pumpApp(tester);
-      // A pushed tab route (Ustawienia) with a root sheet (Utwórz) over it.
-      await tester.tap(find.byType(CircleAvatar).first);
+      // A pushed tab route (a Biblioteka category) with a root sheet (Utwórz) over it.
+      await tester.tap(find.text('Biblioteka'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Ustawienia'));
+      await tester.tap(find.text('Albumy'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Utwórz'));
+      await tester.tap(find.byTooltip('Utwórz (+)'));
       await tester.pumpAndSettle();
       expect(find.text('Blend'), findsOneWidget);
 
@@ -138,7 +143,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Blend'), findsNothing);
-      expect(find.text('Źródła muzyki'), findsOneWidget);
+      expect(find.textContaining('Brak albumów'), findsOneWidget);
     },
   );
 
@@ -146,8 +151,9 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester);
-    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Otwieranie linków'));
@@ -181,8 +187,9 @@ void main() {
         buildSignature: '',
       );
       await pumpApp(tester);
-      await tester.tap(find.byType(CircleAvatar).first);
+      await tester.tap(find.text('Ja'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
       await tester.tap(find.text('Ustawienia'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('Informacje i pomoc'), 200);
@@ -229,13 +236,13 @@ void main() {
     },
   );
 
-  testWidgets('profile drawer opens settings inside current tab', (
-    tester,
-  ) async {
+  testWidgets('Ja opens settings inside its tab', (tester) async {
     await pumpApp(tester);
 
-    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
 
@@ -247,8 +254,10 @@ void main() {
     (tester) async {
       await pumpApp(tester);
 
-      await tester.tap(find.byType(CircleAvatar).first);
+      await tester.tap(find.text('Ja'));
       await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
       await tester.tap(find.text('Ustawienia'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Wygląd'));
@@ -296,8 +305,10 @@ void main() {
   ) async {
     await pumpApp(tester);
 
-    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Źródła muzyki'));
@@ -322,8 +333,10 @@ void main() {
   ) async {
     await pumpApp(tester);
 
-    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Źródła muzyki'));
@@ -380,8 +393,10 @@ void main() {
   ) async {
     await pumpApp(tester);
 
-    await tester.tap(find.byType(CircleAvatar).first);
+    await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Źródła muzyki'));
@@ -432,22 +447,21 @@ void main() {
     );
   });
 
-  testWidgets('profile avatar stays at the same spot on every tab', (
-    tester,
-  ) async {
+  testWidgets('tab titles stay at the same spot on every tab', (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await pumpApp(tester);
     await tester.pumpAndSettle();
 
-    Rect avatar() =>
-        tester.getRect(find.byType(ProfileAvatar).hitTestable().first);
-    final onHome = avatar();
-    for (final tab in ['Wyszukaj', 'Biblioteka', 'Home']) {
+    Rect header() => tester.getRect(find.byType(TabHeader).hitTestable());
+    await tester.tap(find.text('Wyszukaj').last);
+    await tester.pumpAndSettle();
+    final onSearch = header();
+    for (final tab in ['Biblioteka', 'Home']) {
       await tester.tap(find.text(tab).last);
       await tester.pumpAndSettle();
-      expect(avatar(), onHome, reason: 'avatar moved on $tab');
+      expect(header().top, onSearch.top, reason: 'header moved on $tab');
     }
   });
 

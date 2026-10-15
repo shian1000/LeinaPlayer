@@ -76,22 +76,43 @@ class PillChip extends StatelessWidget {
 }
 
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key});
+  const SectionTitle(this.text, {super.key, this.icon, this.trailing});
 
   final String text;
+
+  /// Before the text, e.g. the pin of a pinned Home section.
+  final IconData? icon;
+
+  /// At the right end, e.g. a section's "⋯".
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    if (palette.panelHeaders) return _PanelTitleBar(text);
+    if (palette.panelHeaders) {
+      return _PanelTitleBar(text, icon: icon, trailing: trailing);
+    }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: AppFontSize.section,
-          fontWeight: FontWeight.bold,
-        ),
+      padding: EdgeInsets.fromLTRB(16, 20, trailing == null ? 16 : 4, 10),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 20, color: palette.accent),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: AppFontSize.section,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ?trailing,
+        ],
       ),
     );
   }
@@ -99,9 +120,11 @@ class SectionTitle extends StatelessWidget {
 
 /// Section heading styled as the title bar of a retro desktop window ("NAZWA ×").
 class _PanelTitleBar extends StatelessWidget {
-  const _PanelTitleBar(this.text);
+  const _PanelTitleBar(this.text, {this.icon, this.trailing});
 
   final String text;
+  final IconData? icon;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +135,10 @@ class _PanelTitleBar extends StatelessWidget {
       color: palette.outline ?? palette.surfaceHigh,
       child: Row(
         children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: palette.textPrimary),
+            const SizedBox(width: 6),
+          ],
           Expanded(
             child: Text(
               text.toUpperCase(),
@@ -125,28 +152,28 @@ class _PanelTitleBar extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            '×',
-            style: TextStyle(
-              fontSize: AppFontSize.listTitle,
-              color: palette.textPrimary,
-            ),
-          ),
+          trailing ??
+              Text(
+                '×',
+                style: TextStyle(
+                  fontSize: AppFontSize.listTitle,
+                  color: palette.textPrimary,
+                ),
+              ),
         ],
       ),
     );
   }
 }
 
-/// Top bar of each bottom-nav tab: avatar opening the profile menu, then a title (or other
-/// [content], e.g. Home's filter chips), then optional actions. Every tab uses it, so the avatar
-/// sits at exactly the same spot when switching tabs.
+/// Top bar of each bottom-nav tab: a title (or other [content], e.g. Home's filter chips), then
+/// optional actions. No avatar: the profile is the "Ja" tab, down by the thumb (Juxtopposed's
+/// Spotify redesign).
 class TabHeader extends StatelessWidget {
   const TabHeader({
     super.key,
     this.title,
     this.content,
-    required this.onAvatarTap,
     this.actions = const [],
   }) : assert(
          (title == null) != (content == null),
@@ -155,21 +182,18 @@ class TabHeader extends StatelessWidget {
 
   final String? title;
   final Widget? content;
-  final VoidCallback onAvatarTap;
   final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-      // Same height with or without action icons, so the avatar sits at the same spot on every
+      // Same height with or without action icons, so the titles sit at the same spot on every
       // tab.
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
         child: Row(
           children: [
-            ProfileAvatar(onTap: onAvatarTap),
-            const SizedBox(width: 12),
             Expanded(
               child:
                   content ??

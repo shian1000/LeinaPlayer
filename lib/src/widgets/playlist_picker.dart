@@ -23,6 +23,46 @@ MenuSheetEntry? playlistMenuEntry(
   );
 }
 
+/// "Dodaj do playlisty ›" unfolding the playlists in the same sheet ([MenuSheetEntry.submenu]):
+/// "Nowa playlista", then every playlist made on the phone; `null` like [playlistMenuEntry].
+MenuSheetEntry? playlistSubmenuEntry(
+  BuildContext context,
+  List<SearchHit> hits,
+) {
+  final library = PlaylistLibraryScope.maybeOf(context);
+  if (library == null || hits.isEmpty) return null;
+  final messenger = ScaffoldMessenger.of(context);
+  void said(String text) => messenger
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(content: Text(text)));
+  return MenuSheetEntry(
+    Icons.playlist_add,
+    'Dodaj do playlisty',
+    submenu: () => [
+      MenuSheetEntry(
+        Icons.add,
+        'Nowa playlista',
+        onTap: () async {
+          final name = await askPlaylistName(context);
+          if (name == null) return;
+          await library.create(name, hits);
+          said('Utworzono playlistę „$name”');
+        },
+      ),
+      for (final playlist in library.editable)
+        MenuSheetEntry(
+          Icons.queue_music,
+          playlist.name,
+          subtitle: '${playlist.trackCount} ${songsWord(playlist.trackCount)}',
+          onTap: () async {
+            await library.addSongs(playlist.id, hits);
+            said('Dodano do playlisty „${playlist.name}”');
+          },
+        ),
+    ],
+  );
+}
+
 /// Asks for a name; `null` when cancelled or left empty.
 Future<String?> askPlaylistName(BuildContext context) async {
   final name = await showDialog<String>(

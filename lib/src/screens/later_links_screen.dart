@@ -20,7 +20,7 @@ import 'app_shell.dart';
 
 const _id = 'Na później';
 
-/// "Na później" (Menu profilu › Wiadomości): links people sent, saved from the "Otwórz w…"
+/// "Na później" (Ja › Na później): links people sent, saved from the "Otwórz w…"
 /// sheet with who sent them. Tapping one opens it like a link given to the app.
 class LaterLinksScreen extends StatefulWidget {
   const LaterLinksScreen({super.key, this.onOpen});

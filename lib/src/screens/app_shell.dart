@@ -1,5 +1,3 @@
-import 'account_screen.dart';
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -19,17 +17,14 @@ import '../playback/track_player.dart';
 import '../theme.dart';
 import '../widgets/queue_toast.dart';
 import '../widgets/song_tile.dart';
-import 'create_sheet.dart';
+import 'discover_screen.dart';
 import 'home_screen.dart';
-import 'later_links_screen.dart';
 import 'library_screen.dart';
 import 'now_playing.dart';
 import 'playlist_import.dart';
 import 'playlist_screen.dart';
-import 'profile_drawer.dart';
-import 'recents_screen.dart';
+import 'profile_screen.dart';
 import 'search_screen.dart';
-import 'settings_screen.dart';
 
 class _TabSpec {
   const _TabSpec(this.label, this.icon, this.activeIcon);
@@ -39,18 +34,20 @@ class _TabSpec {
   final IconData activeIcon;
 }
 
+// After Juxtopposed's Spotify redesign: "Odkrywaj" and the profile ("Ja") are tabs; "Utwórz"
+// is Biblioteka's "+".
 const _tabs = [
   _TabSpec('Home', Icons.home_outlined, Icons.home),
+  _TabSpec('Odkrywaj', Icons.auto_awesome_outlined, Icons.auto_awesome),
   _TabSpec('Wyszukaj', Icons.search, Icons.search),
   _TabSpec('Biblioteka', Icons.library_music_outlined, Icons.library_music),
-  _TabSpec('Utwórz', Icons.add, Icons.add),
+  _TabSpec('Ja', Icons.person_outline, Icons.person),
 ];
 
-const _libraryTabIndex = 2;
-const _createTabIndex = 3;
+const _libraryTabIndex = 3;
 
-/// Root layout: bottom navigation, the profile drawer, and one nested navigator per tab so the
-/// bottom bar stays visible when drilling into e.g. a playlist (same as the reference app).
+/// Root layout: bottom navigation and one nested navigator per tab so the bottom bar stays
+/// visible when drilling into e.g. a playlist (same as the reference app).
 class AppShell extends StatefulWidget {
   const AppShell({super.key, this.links});
 
@@ -65,9 +62,8 @@ class AppShell extends StatefulWidget {
 }
 
 class AppShellState extends State<AppShell> {
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _navigatorKeys = List.generate(
-    _createTabIndex,
+    _tabs.length,
     (_) => GlobalKey<NavigatorState>(),
   );
   int _currentTab = 0;
@@ -215,45 +211,13 @@ class AppShellState extends State<AppShell> {
 
   static const _tabRoots = <Widget>[
     HomeScreen(),
+    DiscoverScreen(),
     SearchScreen(),
     LibraryScreen(),
+    ProfileScreen(),
   ];
 
-  void openDrawer() => _scaffoldKey.currentState!.openDrawer();
-
-  void _openSettings() {
-    _scaffoldKey.currentState!.closeDrawer();
-    _navigatorKeys[_currentTab].currentState!.push(
-      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-    );
-  }
-
-  void _openAccount() {
-    _scaffoldKey.currentState!.closeDrawer();
-    _navigatorKeys[_currentTab].currentState!.push(
-      MaterialPageRoute<void>(builder: (_) => const AccountScreen()),
-    );
-  }
-
-  void _openRecents() {
-    _scaffoldKey.currentState!.closeDrawer();
-    _navigatorKeys[_currentTab].currentState!.push(
-      MaterialPageRoute<void>(builder: (_) => const RecentsScreen()),
-    );
-  }
-
-  void _openLater() {
-    _scaffoldKey.currentState!.closeDrawer();
-    _navigatorKeys[_currentTab].currentState!.push(
-      MaterialPageRoute<void>(builder: (_) => const LaterLinksScreen()),
-    );
-  }
-
   void _onTabTapped(int index) {
-    if (index == _createTabIndex) {
-      showCreateSheet(context, idPrefix: 'Utwórz');
-      return;
-    }
     if (index == _currentTab) {
       _navigatorKeys[index].currentState!.popUntil((route) => route.isFirst);
     } else {
@@ -262,11 +226,6 @@ class AppShellState extends State<AppShell> {
   }
 
   void _onBack() {
-    final scaffold = _scaffoldKey.currentState!;
-    if (scaffold.isDrawerOpen) {
-      scaffold.closeDrawer();
-      return;
-    }
     final navigator = _navigatorKeys[_currentTab].currentState!;
     if (navigator.canPop()) {
       navigator.pop();
@@ -287,13 +246,6 @@ class AppShellState extends State<AppShell> {
       child: QueueToastScope(
         notifier: _toast,
         child: Scaffold(
-          key: _scaffoldKey,
-          drawer: ProfileDrawer(
-            onOpenSettings: _openSettings,
-            onOpenRecents: _openRecents,
-            onOpenLater: _openLater,
-            onOpenAccount: _openAccount,
-          ),
           body: Stack(
             children: [
               IndexedStack(

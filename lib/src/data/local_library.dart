@@ -590,6 +590,9 @@ class LocalLibrary extends ChangeNotifier {
   List<LocalSong> _songs = const [];
   Map<int, List<LocalSong>> _byMainId = const {};
 
+  /// Every song file the phone knows (Biblioteka › Wykonawcy counts their artists).
+  List<LocalSong> get songs => _songs;
+
   /// The phone song stored at [path], if it's still known.
   LocalSong? fileAt(String path) =>
       _songs.where((s) => s.filePath == path).firstOrNull;
@@ -780,4 +783,8 @@ class LocalLibraryScope extends InheritedNotifier<LocalLibrary> {
   static LocalLibrary of(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<LocalLibraryScope>()!
       .notifier!;
+
+  /// `null` in widget tests that don't set it up.
+  static LocalLibrary? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<LocalLibraryScope>()?.notifier;
 }

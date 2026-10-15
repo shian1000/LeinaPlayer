@@ -10,6 +10,7 @@ class MenuSheetEntry {
     this.subtitle,
     this.premium = false,
     this.onTap,
+    this.submenu,
   });
 
   final IconData icon;
@@ -17,15 +18,22 @@ class MenuSheetEntry {
   final String? subtitle;
   final bool premium;
 
-  /// When null the entry is a dummy reporting `<idPrefix> › <label>`.
+  /// When null (and no [submenu]) the entry is a dummy reporting `<idPrefix> › <label>`.
   final VoidCallback? onTap;
+
+  /// Its own options, unfolded under it in the same sheet ("Dodaj do playlisty ›") instead of
+  /// opening another sheet (Juxtopposed's Spotify redesign); built when unfolded.
+  final List<MenuSheetEntry> Function()? submenu;
 }
 
 /// Bottom-sheet menu used for all context menus (⋮), the "Utwórz" sheet and sort options.
+/// [quickEntries] — options used now and then, in a smaller block above the main ones (after
+/// Juxtopposed's Spotify redesign), so the main ones stay at the bottom, near the thumb.
 Future<void> showMenuSheet(
   BuildContext context, {
   required String idPrefix,
   required List<MenuSheetEntry> entries,
+  List<MenuSheetEntry> quickEntries = const [],
   Widget? header,
   bool largeIcons = false,
 }) {
@@ -34,46 +42,122 @@ Future<void> showMenuSheet(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,
-    builder: (sheetContext) => ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
-      ),
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.only(bottom: 16),
-        children: [
-          if (header != null) ...[header, const Divider()],
-          for (final entry in entries)
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 0,
-              ),
-              leading: largeIcons
-                  ? CircleAvatar(
-                      radius: 24,
-                      backgroundColor: palette.chip,
-                      child: Icon(entry.icon, color: palette.textPrimary),
-                    )
-                  : Icon(entry.icon, color: palette.textSecondary, size: 26),
-              title: Text(
-                entry.label,
-                style: TextStyle(
-                  fontSize: AppFontSize.listTitle,
-                  fontWeight: largeIcons ? FontWeight.bold : null,
+    builder: (sheetContext) {
+      String? open;
+      return StatefulBuilder(
+        builder: (sheetContext, setState) => ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 16),
+            children: [
+              if (header != null) ...[header, const Divider()],
+              if (quickEntries.isNotEmpty) ...[
+                for (final entry in quickEntries)
+                  ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    leading: Icon(
+                      entry.icon,
+                      color: palette.textSecondary,
+                      size: 22,
+                    ),
+                    title: Text(entry.label),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      (entry.onTap ??
+                          () => showDummy(
+                            context,
+                            '$idPrefix › ${entry.label}',
+                          ))();
+                    },
+                  ),
+                const Divider(),
+              ],
+              for (final entry in entries) ...[
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 0,
+                  ),
+                  leading: largeIcons
+                      ? CircleAvatar(
+                          radius: 24,
+                          backgroundColor: palette.chip,
+                          child: Icon(entry.icon, color: palette.textPrimary),
+                        )
+                      : Icon(
+                          entry.icon,
+                          color: palette.textSecondary,
+                          size: 26,
+                        ),
+                  title: Text(
+                    entry.label,
+                    style: TextStyle(
+                      fontSize: AppFontSize.listTitle,
+                      fontWeight: largeIcons ? FontWeight.bold : null,
+                    ),
+                  ),
+                  subtitle: entry.subtitle == null
+                      ? null
+                      : Text(entry.subtitle!),
+                  trailing: entry.premium
+                      ? const PremiumBadge()
+                      : entry.submenu == null
+                      ? null
+                      : Icon(
+                          open == entry.label
+                              ? Icons.expand_less
+                              : Icons.chevron_right,
+                        ),
+                  onTap: entry.submenu != null
+                      ? () => setState(
+                          () => open = open == entry.label ? null : entry.label,
+                        )
+                      : () {
+                          Navigator.of(sheetContext).pop();
+                          (entry.onTap ??
+                              () => showDummy(
+                                context,
+                                '$idPrefix › ${entry.label}',
+                              ))();
+                        },
                 ),
-              ),
-              subtitle: entry.subtitle == null ? null : Text(entry.subtitle!),
-              trailing: entry.premium ? const PremiumBadge() : null,
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                (entry.onTap ??
-                    () => showDummy(context, '$idPrefix › ${entry.label}'))();
-              },
-            ),
-        ],
-      ),
-    ),
+                if (entry.submenu != null && open == entry.label)
+                  for (final inner in entry.submenu!())
+                    ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.only(
+                        left: 56,
+                        right: 20,
+                      ),
+                      leading: Icon(inner.icon, color: palette.textSecondary),
+                      title: Text(
+                        inner.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: inner.subtitle == null
+                          ? null
+                          : Text(inner.subtitle!),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        (inner.onTap ??
+                            () => showDummy(
+                              context,
+                              '$idPrefix › ${entry.label} › ${inner.label}',
+                            ))();
+                      },
+                    ),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 
