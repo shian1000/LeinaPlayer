@@ -12,9 +12,16 @@ import 'player_controller.dart';
 import 'track_player.dart';
 import '../data/album_covers.dart';
 
-/// A song that started playing from the queue, for the history; [playlistId] / [playlistName]
-/// are set when it played as part of a playlist.
-typedef QueuePlay = ({SearchHit hit, int? playlistId, String? playlistName});
+/// A song that started playing from the queue, for the history and the listening stats;
+/// [playlistId] / [playlistName] are set when it played as part of a playlist, [moodKey] as part
+/// of a mood; [external]: handed to the YouTube app.
+typedef QueuePlay = ({
+  SearchHit hit,
+  int? playlistId,
+  String? playlistName,
+  String? moodKey,
+  bool external,
+});
 
 /// Where songs in the queue were queued from as a whole: a playlist (played, or added with
 /// "Odtwórz jako następny" / "Dodaj do kolejki") or a search. Entries queued together share
@@ -546,6 +553,8 @@ class PlaybackQueue extends ChangeNotifier {
         hit: entry.hit,
         playlistId: entry.origin?.playlistId,
         playlistName: entry.origin?.playlistName,
+        moodKey: entry.origin?.moodKey,
+        external: outcome.external,
       ));
       if (generation == _generation) _prefetchAhead();
     }

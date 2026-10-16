@@ -236,7 +236,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 16,
+        version: 17,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -274,6 +274,7 @@ class LocalLibrary extends ChangeNotifier {
           await _addCoverColumns(db);
           await _addYouTubeCopyColumns(db);
           await _addExcludedTracksColumn(db);
+          await _createListensTable(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -291,9 +292,42 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 14) await _addCoverColumns(db);
           if (from < 15) await _addYouTubeCopyColumns(db);
           if (from < 16) await _addExcludedTracksColumn(db);
+          if (from < 17) await _createListensTable(db);
         },
       ),
     );
+  }
+
+  /// Version 17: every play with how long it was really listened to, for the listening stats
+  /// (`listening_log.dart`); kept for good, unlike `play_history`, and synced with MusicDatabase.
+  static Future<void> _createListensTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE listens (
+        uid VARCHAR PRIMARY KEY,
+        -- The MusicDatabase user logged in when it played; NULL: nobody (goes to the next one).
+        account VARCHAR,
+        started_at INTEGER NOT NULL,
+        listened_ms INTEGER NOT NULL DEFAULT 0,
+        duration_ms INTEGER,
+        title VARCHAR NOT NULL,
+        artist VARCHAR,
+        album VARCHAR,
+        -- music.db's songs.id.
+        song_id INTEGER,
+        youtube_video_id VARCHAR,
+        spotify_track_id VARCHAR,
+        -- 'phone', 'server' or 'youtube'.
+        source VARCHAR NOT NULL,
+        playlist_uid VARCHAR,
+        playlist_name VARCHAR,
+        -- The user's own mood (moods.uid) or a global one (tag.db's tags.id).
+        mood_uid VARCHAR,
+        global_mood_id INTEGER,
+        mood_name VARCHAR,
+        -- listened_ms as MusicDatabase last got it; NULL: never sent.
+        sent_ms INTEGER
+      )''');
+    await db.execute('CREATE INDEX listens_started ON listens (started_at)');
   }
 
   /// Version 16: tracks the user removed from an imported playlist, which importing it again

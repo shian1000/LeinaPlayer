@@ -52,8 +52,15 @@ class PlaylistSyncClient {
       .resolve('/users/${Uri.encodeComponent(userName)}/$collection$path')
       .replace(queryParameters: query);
 
-  Future<SyncAnswer> changedSince(int revision) =>
-      _call('GET', _uri('', {'since': '$revision'}));
+  /// With [limit], at most that many (MusicDatabase says whether `more` are left).
+  Future<SyncAnswer> changedSince(int revision, {int? limit}) => _call(
+    'GET',
+    _uri('', {'since': '$revision', if (limit != null) 'limit': '$limit'}),
+  );
+
+  /// Several items at once (the listening stats' plays).
+  Future<SyncAnswer> post(Map<String, Object?> body) =>
+      _call('POST', _uri(''), body);
 
   Future<SyncAnswer> put(String uid, Map<String, Object?> playlist) =>
       _call('PUT', _uri('/$uid'), playlist);

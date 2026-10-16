@@ -100,6 +100,16 @@ class ServerFile {
   String get fileName => path.split('/').last;
 }
 
+/// The artists in a song's label ("A, B feat. C" → A, B, C).
+List<String> artistNamesOf(String label) => [
+  ...{
+    for (final part in label.split(
+      RegExp(r',| feat\. | ft\. | & ', caseSensitive: false),
+    ))
+      if (part.trim() case final name when name.isNotEmpty) name,
+  },
+];
+
 /// One row of MusicDatabase's `songs` table, with its artists already joined in.
 class CatalogSong {
   CatalogSong({
@@ -420,6 +430,7 @@ class SongCatalog extends ChangeNotifier {
           await _readServerFiles(await _sync.localFile('files.db')),
         );
         _badVideos = await _readBadVideos(file);
+        _idChanges = await _readIdChanges(file);
         _status = CatalogStatus.ready;
       }
       _loadedSyncTime = syncTime;
@@ -617,6 +628,31 @@ class SongCatalog extends ChangeNotifier {
     nameLatin: row['name_latin'] as String?,
   );
 
+  /// `song_id_changes`: what each old id became when MusicDatabase merged or renumbered a song
+  /// (`null`: deleted); empty for databases before that table.
+  Future<Map<int, int?>> _readIdChanges(File file) async {
+    final db = await (factoryOverride ?? databaseFactory).openDatabase(
+      file.path,
+      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+    );
+    try {
+      final hasTable = await db.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'song_id_changes'",
+      );
+      if (hasTable.isEmpty) return const {};
+      return {
+        for (final row in await db.rawQuery(
+          'SELECT old_song_id, new_song_id FROM song_id_changes '
+          'ORDER BY changed_at',
+        ))
+          row['old_song_id']! as int: row['new_song_id'] as int?,
+      };
+    } finally {
+      await db.close();
+    }
+  }
+
   /// `bad_youtube_videos`; none in a music.db from before MusicDatabase's migration 0010.
   Future<BadVideos> _readBadVideos(File file) async {
     final db = await (factoryOverride ?? databaseFactory).openDatabase(
@@ -701,6 +737,21 @@ class SongCatalog extends ChangeNotifier {
   CatalogSong? byId(int id) =>
       (_byId ??= {for (final song in _songs) song.id: song})[id];
   Map<int, CatalogSong>? _byId;
+  Map<int, int?> _idChanges = const {};
+
+  /// The song that has, or once had, this `songs.id` (MusicDatabase merged or renumbered it
+  /// since — kept by plays and other phone data); `null` when it's gone.
+  CatalogSong? current(int id) {
+    for (var hops = 0; hops < 10; hops++) {
+      if (byId(id) case final song?) return song;
+      if (_idChanges[id] case final next?) {
+        id = next;
+      } else {
+        return null;
+      }
+    }
+    return null;
+  }
 
   /// The song with exactly this title and artist (both compared after normalization, so case,
   /// accents and punctuation don't matter), or `null`. The artist may be any of the song's

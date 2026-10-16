@@ -50,7 +50,8 @@ Playlists ([`agent-notes/playlists.md`](agent-notes/playlists.md)): `PlaylistLib
 `local.db`; their tracks render with the same `SongTile` (`lib/src/widgets/song_tile.dart`) as
 search results. `local.db` schema versions live in `LocalLibrary._open` (v2 YouTube tables, v3
 playlists, v4 `play_history`, v5 cover lookups and cache, v6 `youtube_track_matches`, v7 `youtube_not_found`, v8 `spotify_track_id` in `playlist_tracks` and `play_history`, v9 `playlist_tracks.youtube_removed`, v10 `youtube_removed_videos`, v11 playlist sync columns,
-v12 moods, v13 phone-only moods).
+v12 moods, v13 phone-only moods, v14 picked covers, v15 YouTube copies, v16 excluded tracks,
+v17 `listens`).
 
 Moods ([ADR 0008](decisions/0008-moods.md)): `MoodLibrary` (`moods.dart`, `MoodLibraryScope`)
 reads global moods from the downloaded `tag.db` and keeps the user's own in `local.db`, synced like
@@ -74,6 +75,14 @@ the queue starts (`PlaybackQueue.played`) in `local.db`, shown by `recents_scree
 in `shared_preferences` and restores them on start. Both keep songs as `TrackRef`s
 (`track_ref.dart`: MusicDatabase id / file / video + title), turned back into rows with
 `resolveTrack`.
+
+Listening stats ([ADR 0012](decisions/0012-listening-stats.md)): `ListeningTracker`
+(`lib/src/playback/`) turns `PlaybackQueue.played` and the player's positions into plays with
+their listened time, kept by `ListeningLog` (`listening_log.dart`, `ListeningLogScope`) in
+`local.db`'s `listens` and synced with the account (`/users/<name>/listens`). Everything shown is
+computed on the phone from those rows: `ListeningStats` (periods), `ListeningHighlights` (the
+week), `ListeningSummary` (years and seasons), by `listening_stats_screen.dart` and
+`listening_summary_screen.dart`.
 
 Links from outside (Android): a tapped YouTube/Spotify link opens the native
 `LinkChooserActivity.kt` sheet (Leina Radio / the service's app / a browser, or a remembered

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/account.dart';
 import '../data/database_sync.dart';
 import '../data/library_folders.dart';
+import '../data/listening_log.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_sync.dart';
@@ -147,6 +148,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 const _PlaylistSyncTile(),
                 const _MoodSyncTile(),
                 const _FolderSyncTile(),
+                const _ListenSyncTile(),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: const LogOutButton(),
@@ -428,6 +430,25 @@ class _FolderSyncTile extends StatelessWidget {
           onTap: folders.addPhoneOnlyToAccount,
         ),
       ],
+    );
+  }
+}
+
+/// How the account's plays (the listening stats) last synced with MusicDatabase, and "sync
+/// now".
+class _ListenSyncTile extends StatelessWidget {
+  const _ListenSyncTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final listens = ListeningLogScope.maybeOf(context);
+    if (listens == null) return const SizedBox.shrink();
+    return _SyncTile(
+      title: 'Statystyki słuchania',
+      syncing: listens.syncing,
+      last: listens.lastSync,
+      onSync: () async =>
+          listens.sync(await DatabaseSyncScope.of(context).serverAddresses()),
     );
   }
 }

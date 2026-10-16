@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+export '../data/song_catalog.dart' show artistNamesOf;
+
 import '../data/saved_songs.dart';
 import '../data/combined_search.dart';
 import '../data/local_library.dart';
@@ -543,16 +545,6 @@ class SongMenuButton extends StatelessWidget {
     onPressed: () => showSongMenu(context, hit, idPrefix: idPrefix),
   );
 }
-
-/// The artists in a song's label ("A, B feat. C" → A, B, C).
-List<String> artistNamesOf(String label) => [
-  ...{
-    for (final part in label.split(
-      RegExp(r',| feat\. | ft\. | & ', caseSensitive: false),
-    ))
-      if (part.trim() case final name when name.isNotEmpty) name,
-  },
-];
 
 /// A lite artist page: every song (music.db and the phone) with [artist] among its artists.
 Future<void> openArtistSongs(BuildContext context, String artist) =>

@@ -414,6 +414,7 @@ class PlayerController extends ChangeNotifier {
   StreamSubscription<MediaSkip>? _skipSub;
   final _completions = StreamController<void>.broadcast();
   final _skips = StreamController<MediaSkip>.broadcast();
+  final _positionChanges = StreamController<Duration>.broadcast();
   bool _completed = false;
 
   /// "Przenikanie utworów": how long a song's end overlaps the next one's start; zero = off.
@@ -465,6 +466,10 @@ class PlayerController extends ChangeNotifier {
   /// "Previous"/"next" pressed in the media notification, on the lock screen or a headset.
   Stream<MediaSkip> get skips => _skips.stream;
 
+  /// Each position the playing song reports, from whichever song is loaded at the time
+  /// (unlike [position], one stream for the controller's whole life).
+  Stream<Duration> get positionChanges => _positionChanges.stream;
+
   AudioBackend _ensureBackend() {
     final existing = _backend;
     if (existing != null) return existing;
@@ -496,6 +501,7 @@ class PlayerController extends ChangeNotifier {
     });
     _positionSub = backend.position.listen((p) {
       _position = p;
+      _positionChanges.add(p);
       _checkNearEnd();
     });
     _skipSub = backend.skips.listen(_skips.add);
@@ -651,6 +657,7 @@ class PlayerController extends ChangeNotifier {
     _skipSub?.cancel();
     _completions.close();
     _skips.close();
+    _positionChanges.close();
     _backend?.dispose();
     super.dispose();
   }

@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import 'account_screen.dart';
 import 'later_links_screen.dart';
+import 'listening_stats_screen.dart';
 import 'recents_screen.dart';
 import 'settings_screen.dart';
 
@@ -145,7 +146,7 @@ class ProfileScreen extends StatelessWidget {
           _Row(
             icon: Icons.show_chart,
             label: 'Statystyki słuchania',
-            onTap: () => dummy('Statystyki słuchania'),
+            onTap: () => push(const ListeningStatsScreen()),
           ),
           _Row(
             icon: Icons.settings_outlined,
@@ -157,12 +158,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  static String _count(int n, String one, String few, String many) {
-    if (n == 1) return '1 $one';
-    final tens = n % 100 ~/ 10;
-    final last = n % 10;
-    return '$n ${tens != 1 && last >= 2 && last <= 4 ? few : many}';
-  }
+  static String _count(int n, String one, String few, String many) =>
+      '$n ${pluralWord(n, one, few, many)}';
 }
 
 class _Card extends StatelessWidget {

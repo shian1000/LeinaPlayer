@@ -35,7 +35,11 @@ to be trimmed later — user's request), and its own fields can be corrected the
 going to the outbox for MusicDatabase while the phone keeps showing music.db's value — except
 its YouTube link and music video link, which the phone uses at once; with a music video the
 player's YouTube button asks song or music video; play history in
-"Ostatnie" (the "Ja" tab). Album covers from the phone file, iTunes, Deezer or the YouTube
+"Ostatnie" (the "Ja" tab). Listening stats like Spotify's (Ja › Statystyki słuchania,
+[ADR 0012](docs/decisions/0012-listening-stats.md)): every play with how long it was really
+heard, counted from that version on and synced with the account; top songs / artists / albums
+and shares over 4 weeks – everything, the week's highlights, and Wrapped-like cards for each
+year and season (meteorological), the last one shared as a picture. Album covers from the phone file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
 (synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Names in another
@@ -153,7 +157,8 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
   adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player (also from a song's menu, `showSongInfoSheet`); `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
-  collage); `color_picker.dart`; `TextInputDialog` in `common.dart`;
+  collage); `color_picker.dart`; `TextInputDialog`, `pluralWord` (Polish plurals) and
+  `dayMonthLabel` in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
   `showShareSheet` in `share_sheet.dart`; `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
@@ -177,15 +182,18 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   playlists and moods (`custom_covers.dart`),
   album covers and their cache
   (`album_covers.dart`), play history (`play_history.dart`,
-  songs kept as `TrackRef`s from `track_ref.dart`), music source settings, playback order and
+  songs kept as `TrackRef`s from `track_ref.dart`), the listening stats — plays with their
+  listened time, synced (`listening_log.dart`), and what's computed from them
+  (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
   (`network_errors.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
   port of MusicDatabase's `normalize()` (`text_normalizer.dart`), and lyrics from LRCLIB (`lyrics.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
-  (the queue and position saved across restarts) and `YouTubePlayback` (the user's ordered ways
-  of playing a YouTube video). Never pause between songs — see
+  (the queue and position saved across restarts), `YouTubePlayback` (the user's ordered ways
+  of playing a YouTube video) and `ListeningTracker` (the listened time of each play, from
+  `PlayerController.positionChanges`, for the stats). Never pause between songs — see
   [`local-library.md`](docs/agent-notes/local-library.md) (Android 12+ freezes the app).
 - `lib/src/theme.dart`, `lib/src/theme_controller.dart` — themes and the appearance settings.
 - `lib/src/dummy.dart` — `showDummy()`, used by every not-yet-implemented element.
@@ -213,13 +221,16 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `LaterLinksScope`, `LibraryFoldersScope`, `SavedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `SavedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
   `YouTubeScope`, an `InheritedWidget` so tests can swap YouTube search, audio and playlist
   fetching); no
   state-management package. Settings persist via `shared_preferences`.
+- A music.db song id kept by the phone or synced (plays, saved data) may be one MusicDatabase
+  has since merged or deleted: look it up with `SongCatalog.current` (follows music.db's
+  `song_id_changes`), not `byId`. MusicDatabase never remaps ids in what it stores for the phone.
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
   reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.

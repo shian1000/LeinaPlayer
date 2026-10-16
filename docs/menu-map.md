@@ -170,7 +170,16 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   "Nie zalogowano" — tapping **→ Konto** (`account_screen.dart`); `Ja › Edytuj profil`,
   `Ja › Udostępnij profil`.
 - Konto MusicDatabase card (synced or phone only) **→ Konto**.
-- `Ja › Statystyki słuchania`, Ustawienia **→ Ustawienia**.
+- Statystyki słuchania **→ Statystyki słuchania** (`listening_stats_screen.dart`) —
+  **implemented** (ADR 0012): "Ten tydzień" on top — the week's highlights as cards (milestones,
+  Nowe odkrycie, Powrót, Utwór tygodnia, Na zapętleniu; a song's card plays it, an artist's opens
+  their songs); "Podsumowania" — a tile per year and season with plays, opening their summary
+  (`listening_summary_screen.dart`: Wrapped-like cards, the last one shared as a picture); chips 4 tygodnie / 6 miesięcy / Rok / Od początku (rolling, ending
+  now); a card with the minutes listened, plays (from 30 s), songs and artists, and since when
+  it counts when that's inside the period; Utwory (top 5, "Pokaż więcej" up to 50, "Odtwórz"
+  queues them), Wykonawcy and Albumy (top 10, sideways, opening the artist's / album's songs),
+  Pory dnia (listened time per hour), Dekady, Języki, Kraje wykonawców, Skąd grało (shares).
+  Ustawienia **→ Ustawienia**.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
   app: 🗑 "Wyczyść historię" in the app bar (confirm dialog), `Ostatnie › Filtr: Muzyka` chip
   (dummy), then the history by day ("Dzisiaj", "Wczoraj",
