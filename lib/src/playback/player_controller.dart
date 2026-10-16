@@ -422,6 +422,9 @@ class PlayerController extends ChangeNotifier {
   NowPlaying? _current;
   bool _playing = false;
   Future<void> Function()? _resume;
+
+  /// Where the restored song was: while its [_resume] runs, [play] opens it there.
+  Duration? _resumeAt;
   Duration? _duration;
   String? _lastError;
 
@@ -567,12 +570,17 @@ class PlayerController extends ChangeNotifier {
         await backend.crossfadeTo(track, left);
       } else {
         await backend.open(track);
+        // Seeking before play, not after: the playing state arrives from the platform a while
+        // after play() returns, and the song shouldn't be heard from its start first.
+        final at = _resumeAt;
+        if (at != null && at > Duration.zero) await backend.seek(at);
         await backend.play();
       }
       _fadePending = false;
       _nearEndAsked = false;
       _completed = false;
-      _position = Duration.zero;
+      _position = _resumeAt ?? Duration.zero;
+      _resumeAt = null;
       return true;
     } catch (e) {
       debugPrint('Playing ${track.source} failed: $e');
@@ -602,7 +610,12 @@ class PlayerController extends ChangeNotifier {
     final resume = _resume;
     if (resume != null) {
       _resume = null;
-      return resume();
+      _resumeAt = _position;
+      try {
+        return await resume();
+      } finally {
+        _resumeAt = null;
+      }
     }
     final backend = _backend;
     if (backend == null || _current == null) return;

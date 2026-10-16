@@ -17,6 +17,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _Backend implements AudioBackend {
   final opened = <String>[];
   final seeks = <Duration>[];
+  final calls = <String>[];
+
+  /// Like just_audio: the playing state comes a while after play() returns.
+  bool playingStateLater = false;
   final _position = StreamController<Duration>.broadcast();
   final _state = StreamController<({bool playing, bool completed})>.broadcast();
 
@@ -31,15 +35,30 @@ class _Backend implements AudioBackend {
   @override
   Stream<MediaSkip> get skips => const Stream.empty();
   @override
-  Future<void> open(NowPlaying track) async => opened.add(track.source);
+  Future<void> open(NowPlaying track) async {
+    opened.add(track.source);
+    calls.add('open');
+  }
+
   @override
   Future<void> crossfadeTo(NowPlaying track, Duration fade) async {}
   @override
-  Future<void> play() async => _state.add((playing: true, completed: false));
+  Future<void> play() async {
+    calls.add('play');
+    void report() => _state.add((playing: true, completed: false));
+    playingStateLater
+        ? Timer(const Duration(milliseconds: 20), report)
+        : report();
+  }
+
   @override
   Future<void> pause() async => _state.add((playing: false, completed: false));
   @override
-  Future<void> seek(Duration position) async => seeks.add(position);
+  Future<void> seek(Duration position) async {
+    seeks.add(position);
+    calls.add('seek ${position.inSeconds}');
+  }
+
   @override
   Future<void> dispose() async {}
 }
@@ -128,9 +147,15 @@ void main() {
       expect(after.queue.currentEntry?.origin?.moodKey, 'u3');
       expect(after.queue.hasPrevious, isTrue, reason: 'a played before b');
 
+      after.backend.playingStateLater = true;
       await after.player.togglePlay();
       expect(after.backend.opened, ['/music/b.mp3']);
-      expect(after.backend.seeks, [const Duration(seconds: 42)]);
+      expect(after.backend.calls, [
+        'open',
+        'seek 42',
+        'play',
+      ], reason: 'starts where it was, without the song\'s start heard first');
+      expect(after.player.currentPosition, const Duration(seconds: 42));
       expect(after.player.restored, isFalse);
     },
   );

@@ -58,14 +58,8 @@ class QueueSession {
     );
   }
 
-  /// "Odtwórz" on the restored song: play it and jump to where it was.
-  Future<void> _resume() async {
-    final at = player.currentPosition;
-    final outcome = await queue.playCurrent();
-    if (outcome?.played == true && at > Duration.zero && player.playing) {
-      await player.seek(at);
-    }
-  }
+  /// "Odtwórz" on the restored song: play it — [PlayerController] starts it where it was.
+  Future<void> _resume() => queue.playCurrent();
 
   void _start() {
     if (_started) return;

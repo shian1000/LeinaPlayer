@@ -68,7 +68,9 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   song that can be played; moving on by itself never opens the YouTube app. "Poprzedni" uses
   `PlayerController.currentPosition` (5 s rule). Entries are `SearchHit`s, resolved only when
   played (YouTube stream URLs expire). `just_audio`'s `play()` future completes only when
-  playback stops — never await it.
+  playback stops — never await it. So `PlayerController.playing` turns true only a while after
+  `play()` returns (when just_audio reports it): don't check it right after starting a song (test
+  fakes report it at once and hide this).
 - Never pause between songs. A finished song stays "playing" (just_audio keeps `playing` true in
   the completed state) until the queue has started the next one, or calls
   `PlayerController.stopAtEnd` at the end of the queue. audio_service holds the foreground service
@@ -109,7 +111,9 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   app is hidden; restored once `local.db`, the YouTube matches and music.db are loaded. The
   player only shows the song (`PlayerController.showRestored`) — nothing is loaded until play,
   since a YouTube stream would need the network just to start the app; play goes through
-  `PlaybackQueue.playCurrent` and then seeks to the saved position.
+  `PlaybackQueue.playCurrent`, and `PlayerController.play` seeks to the saved position between
+  opening the song and starting it (seeking after the start once depended on `playing` and
+  silently restarted every restored song from 0:00).
 - Caching ahead (`TrackPlayer.prefetch`) resolves a stream with the switched-on stream methods
   and downloads it with `YouTubeLibrary.download` (1 MB Range chunks, like the cache while
   streaming). The cache limit used everywhere is `SourceSettings.cacheKeep` (≥ N + 2), so songs
