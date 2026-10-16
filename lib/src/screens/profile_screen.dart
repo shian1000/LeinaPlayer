@@ -14,7 +14,7 @@ import 'settings_screen.dart';
 
 const _id = 'Ja';
 
-/// The "Ja" tab: the profile, friends, the MusicDatabase account, then history, "Na później"
+/// The "Ja" tab: the profile, the MusicDatabase account, then history, "Na później"
 /// and settings — what used to hide behind the avatar in the top corner, now down by the thumb
 /// (Juxtopposed's Spotify redesign).
 class ProfileScreen extends StatelessWidget {
@@ -99,39 +99,6 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _Card(
-            color: palette.surface,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Znajomi',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Dodaj znajomego',
-                      icon: const Icon(Icons.person_add_alt),
-                      onPressed: () => dummy('Dodaj znajomego'),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Center(
-                    child: Text(
-                      'Nie masz jeszcze znajomych.',
-                      style: TextStyle(color: palette.textSecondary),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _Card(
             color: palette.accent.withValues(alpha: 0.18),
             onTap: () => push(const AccountScreen()),
             child: Row(
@@ -181,19 +148,9 @@ class ProfileScreen extends StatelessWidget {
             onTap: () => dummy('Statystyki słuchania'),
           ),
           _Row(
-            icon: Icons.chat_bubble_outline,
-            label: 'Wiadomości',
-            onTap: () => dummy('Wiadomości'),
-          ),
-          _Row(
             icon: Icons.settings_outlined,
             label: 'Ustawienia',
             onTap: () => push(const SettingsScreen()),
-          ),
-          _Row(
-            icon: Icons.campaign_outlined,
-            label: 'Co nowego',
-            onTap: () => dummy('Co nowego'),
           ),
         ],
       ),

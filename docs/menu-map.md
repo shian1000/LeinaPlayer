@@ -169,9 +169,8 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
 - Profile card: avatar, the logged-in MusicDatabase user ("N playlist • M własnych nastrojów") or
   "Nie zalogowano" — tapping **→ Konto** (`account_screen.dart`); `Ja › Edytuj profil`,
   `Ja › Udostępnij profil`.
-- Znajomi card: "Nie masz jeszcze znajomych.", `Ja › Dodaj znajomego`.
 - Konto MusicDatabase card (synced or phone only) **→ Konto**.
-- `Ja › Statystyki słuchania`, `Ja › Wiadomości`, `Ja › Co nowego`, Ustawienia **→ Ustawienia**.
+- `Ja › Statystyki słuchania`, Ustawienia **→ Ustawienia**.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
   app: 🗑 "Wyczyść historię" in the app bar (confirm dialog), `Ostatnie › Filtr: Muzyka` chip
   (dummy), then the history by day ("Dzisiaj", "Wczoraj",

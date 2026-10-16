@@ -121,6 +121,7 @@ strona „Redesign”, sekcja *Mobile*). Brane pod uwagę tylko ekrany telefonu.
 ## Nadal nie zrobione (wymaga decyzji albo danych)
 
 - Znajomi i ich aktywność — potrzebny nowy sposób rozmowy z MusicDatabase (decyzja użytkownika,
-  ADR); zostaje atrapa w Ja.
+  ADR). Karta Znajomi oraz Wiadomości i Co nowego zostały z Ja usunięte na prośbę użytkownika —
+  nie dodawać ich z powrotem bez pytania.
 - Łączny czas playlisty pod tytułem — music.db nie ma długości utworów.
 - Gatunki w „Przeglądaj” — MusicDatabase ich nie ma.
