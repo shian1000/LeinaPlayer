@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/source_settings.dart';
 import '../theme.dart';
 
-/// "Ustawienia › Źródła okładek": where album covers come from and in what order (drag to
+/// "Ustawienia › Okładki albumów": where album covers come from and in what order (drag to
 /// reorder).
 class CoverSourcesScreen extends StatefulWidget {
   const CoverSourcesScreen({super.key});
@@ -39,7 +39,7 @@ class _CoverSourcesScreenState extends State<CoverSourcesScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Źródła okładek'),
+        title: const Text('Okładki albumów'),
       ),
       body: ReorderableListView(
         buildDefaultDragHandles: false,

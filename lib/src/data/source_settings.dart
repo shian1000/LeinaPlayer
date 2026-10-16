@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'spotify_playlist.dart';
 
-/// Where a song can be played from; the user orders them in "Ustawienia › Źródła muzyki ›
+/// Where a song can be played from; the user orders them in "Ustawienia › Odtwarzanie ›
 /// Kolejność odtwarzania".
 enum PlaybackSource {
   phone('Telefon'),
@@ -54,7 +54,7 @@ enum YouTubePlaybackMethod {
 }
 
 /// Where an album cover can come from; the user switches them on and orders them in
-/// "Ustawienia › Źródła okładek". The first one that has a cover wins.
+/// "Ustawienia › Okładki albumów". The first one that has a cover wins.
 enum CoverSource {
   /// MusicDatabase's server — it has no covers yet (dummy).
   server('Serwer'),
@@ -77,7 +77,7 @@ enum CoverSource {
   bool get available => this != server;
 }
 
-/// "Ustawienia › Źródła muzyki": the YouTube settings and the playback order. Saved in
+/// The music source settings (Ustawienia › YouTube, Spotify, Odtwarzanie). Saved in
 /// `shared_preferences`.
 class SourceSettings extends ChangeNotifier {
   static const _searchEnabledKey = 'youtube.search_enabled';

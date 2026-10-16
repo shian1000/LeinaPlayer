@@ -4,10 +4,9 @@ import '../data/source_settings.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import 'youtube_playback_screen.dart';
 
-/// "Ustawienia › Źródła muzyki › YouTube": searching YouTube ([YouTubeMethod]s) and playing it
-/// ([YouTubePlaybackMethod]s). Methods are tried top to bottom.
+/// "Ustawienia › YouTube": searching YouTube ([YouTubeMethod]s, tried top to bottom). Playing it
+/// is in Ustawienia › Odtwarzanie.
 class YouTubeSourceScreen extends StatelessWidget {
   const YouTubeSourceScreen({super.key});
 
@@ -99,29 +98,12 @@ class YouTubeSourceScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _editApiKey(context, settings),
           ),
-          const SectionTitle('Odtwarzanie'),
-          ListTile(
-            leading: const Icon(Icons.low_priority),
-            title: const Text('Sposoby odtwarzania'),
-            subtitle: Text(
-              [
-                for (final (i, m) in settings.activePlaybackMethods.indexed)
-                  '${i + 1}. ${shortPlaybackLabel(m)}',
-              ].join(', '),
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const YouTubePlaybackScreen(),
-              ),
-            ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
               'Używany jest pierwszy włączony sposób od góry, a kolejne tylko wtedy, gdy '
-              'poprzedni zawiedzie. Zapisane utwory: Oszczędzanie danych i tryb offline › '
-              'Pamięć podręczna.',
+              'poprzedni zawiedzie. Odtwarzanie z YouTube: Odtwarzanie › Sposoby '
+              'odtwarzania YouTube.',
               style: hint,
             ),
           ),

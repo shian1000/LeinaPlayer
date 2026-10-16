@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/source_settings.dart';
 import '../theme.dart';
 
-/// "Ustawienia › Źródła muzyki › Kolejność odtwarzania": which source plays a song that more
+/// "Ustawienia › Odtwarzanie › Kolejność odtwarzania": which source plays a song that more
 /// than one source has, and which sources are used at all (switches). Rows are reordered by
 /// dragging.
 class PlaybackOrderScreen extends StatelessWidget {

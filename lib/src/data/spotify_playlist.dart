@@ -249,7 +249,7 @@ typedef HttpCall = Future<HttpReply> Function(
   String? body,
 });
 
-/// The user's own Spotify app (Ustawienia › Źródła muzyki › Spotify › Spotify API), from
+/// The user's own Spotify app (Ustawienia › Spotify › Spotify API), from
 /// developer.spotify.com: the Web API with its client-credentials token, no user login.
 typedef SpotifyApiKey = ({String clientId, String clientSecret});
 

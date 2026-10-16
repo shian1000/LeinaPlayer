@@ -21,7 +21,7 @@ file under `Settings.local_library_dir` (a path relative to that folder) to its 
 the sharing server already serves `files.db` with `music.db` and `tag.db`.
 
 The phone now downloads `files.db` too. A song with a file there gets a new source, "Serwer", in
-Ustawienia › Źródła muzyki › Kolejność odtwarzania (default order: Telefon, Serwer, YouTube).
+Ustawienia › Odtwarzanie › Kolejność odtwarzania (default order: Telefon, Serwer, YouTube).
 What's missing is a way to get the file's bytes. The sharing server serves nothing but the three
 databases, so the phone needs one more endpoint.
 

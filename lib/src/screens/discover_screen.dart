@@ -135,7 +135,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       child: Text(
                         catalog.songCount == 0
                             ? 'Nie ma jeszcze bazy danych MusicDatabase na telefonie '
-                                  '(Ustawienia › Źródła muzyki › Baza danych).'
+                                  '(Ustawienia › Serwer).'
                             : 'Brak utworów w tej kategorii.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: palette.textSecondary),

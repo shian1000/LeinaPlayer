@@ -8,7 +8,7 @@ import '../widgets/common.dart';
 import '../data/album_covers.dart';
 import '../widgets/song_cover.dart';
 
-/// "Ustawienia › Źródła muzyki › Muzyka lokalna" — folders on the phone that hold music, the
+/// "Ustawienia › Muzyka na telefonie" — folders on the phone that hold music, the
 /// scan that records their files in the phone's `local.db`, and the files not yet in
 /// MusicDatabase ("Nowe utwory spoza bazy danych").
 class LocalMusicScreen extends StatelessWidget {
@@ -86,7 +86,7 @@ class LocalMusicScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Muzyka lokalna'),
+        title: const Text('Muzyka na telefonie'),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),

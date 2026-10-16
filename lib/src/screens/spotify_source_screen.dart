@@ -5,7 +5,7 @@ import '../data/spotify_playlist.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// "Ustawienia › Źródła muzyki › Spotify": searching for Spotify playlists and where they come
+/// "Ustawienia › Spotify": searching for Spotify playlists and where they come
 /// from. Spotify isn't a place to play from — its tracks are found in MusicDatabase, on the phone
 /// or on YouTube.
 class SpotifySourceScreen extends StatelessWidget {

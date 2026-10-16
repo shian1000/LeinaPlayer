@@ -9,7 +9,7 @@ import '../theme.dart';
 import '../widgets/song_info.dart';
 import '../widgets/song_tile.dart';
 
-/// "Czeka na wysłanie" in Ustawienia › Źródła muzyki › Baza danych: the songs reported in the
+/// "Czeka na wysłanie" in Ustawienia › Zgłoszenia poprawek: the songs reported in the
 /// requests still waiting in the outbox, with the video the phone found instead, the videos found
 /// for songs without a link, and the fields the user corrected in "Informacje o utworze".
 class OutboxContentsScreen extends StatefulWidget {

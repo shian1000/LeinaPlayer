@@ -16,7 +16,9 @@ fetching, title cleanup), `screens/playlist_import.dart`, `screens/playlist_scre
   `songs.id` when recognised), `youtube_video_id` (always for YouTube imports, never for Spotify
   ones), `duration_s`.
 - Re-importing the same playlist replaces its tracks instead of adding a duplicate — except
-  YouTube tracks whose video YouTube removed (below).
+  YouTube tracks whose video YouTube removed (below). Its name stays as it is on the phone (the
+  user may have renamed it, ⋮ › Zmień nazwę); there's no flag telling a renamed one apart, so a
+  name changed at the source doesn't come through either.
 - `youtube_removed` (v9): such a track's video is gone; `PlaylistTrack.playableVideoId` is then
   null, so `playlistHit` shows it with a dimmed icon and it's searched on YouTube like a Spotify
   track (the found video is remembered by artist + title).
@@ -47,11 +49,14 @@ leaves those out of every later import; deleting the playlist clears it. The lis
 `docs/handoffs/excluded-tracks-for-musicdatabaseapp.md`). Always send a list, never `null` (a
 400); an answer without the key (an older server) keeps the phone's own list.
 
-Biblioteka's folders, sort order and "last opened" times (`LibraryFolders`,
-`shared_preferences`) are phone-only, and so are songs saved "Na później", dynamic playlists and
-Home's layout — syncing them would need a new MusicDatabase endpoint and an ADR, not decided.
-Items are keyed by local ids (`p<playlists.id>`, `Mood.key`); deleting a playlist or mood also
-takes it out of its folder, since SQLite may hand the id to a new one.
+Biblioteka's folders (`LibraryFolders`, `shared_preferences`) sync with the account like
+playlists ([ADR 0011](../decisions/0011-folder-sync.md)): on the phone items are keyed by local
+ids (`p<playlists.id>`, `Mood.key`), on the wire by the playlist's / mood's `uid` (a global
+mood by its tag.db id) — `updateItems` keeps the mapping, refs not on the phone yet wait in
+`pending`. Deleting a playlist or mood also takes it out of its folder, since SQLite may hand
+the id to a new one. The sort order and "last opened" times stay phone-only, and so do songs
+saved "Na później", dynamic playlists and Home's layout — syncing those would need a new
+MusicDatabase endpoint and an ADR, not decided.
 
 ## Syncing with MusicDatabase ([ADR 0007](../decisions/0007-playlist-sync.md))
 

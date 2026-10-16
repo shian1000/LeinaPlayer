@@ -134,7 +134,8 @@ void main() {
     );
     expect(again.updated, isTrue);
     expect(playlists.playlists, hasLength(1));
-    expect(playlists.playlists.single.name, 'Nowa nazwa');
+    // The name the phone has stays (the user may have renamed it).
+    expect(playlists.playlists.single.name, 'Moja');
     expect((await playlists.tracks(again.playlist.id)).single.title, '3');
 
     await playlists.delete(again.playlist.id);
@@ -434,6 +435,23 @@ void main() {
       [(0, 2), (1, 1)],
     );
     expect(playlists.byId(saved.id)!.trackCount, 2);
+  });
+
+  test('a renamed playlist keeps its name when imported again and is sent '
+      'to MusicDatabase', () async {
+    final first = await playlists.importYouTube(data([v('a', 'A - 1', 'x')]));
+    var changed = 0;
+    playlists.onChanged = () => changed++;
+
+    await playlists.rename(first.playlist.id, '  Po zmianie ');
+    expect(playlists.byId(first.playlist.id)!.name, 'Po zmianie');
+    expect(changed, 1);
+
+    await playlists.rename(first.playlist.id, '   ');
+    expect(playlists.byId(first.playlist.id)!.name, 'Po zmianie');
+
+    await playlists.importYouTube(data([v('a', 'A - 1', 'x')]));
+    expect(playlists.byId(first.playlist.id)!.name, 'Po zmianie');
   });
 
   test('a track removed from a playlist leaves no gap', () async {

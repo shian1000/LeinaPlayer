@@ -451,7 +451,7 @@ void main() {
       'revision': ++server.counter,
     };
     clock = DateTime(2026, 10, 13, 12, 5);
-    await playlists.importYouTube(data(['a', 'b'], name: 'Nowsza'));
+    await playlists.rename(playlists.playlists.single.id, 'Nowsza');
     await syncNow();
 
     expect(server.playlists[uid]!['name'], 'Nowsza');

@@ -19,6 +19,7 @@ import '../dummy.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
+import '../widgets/common.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/folder_sheet.dart';
 import '../widgets/mood_sheet.dart';
@@ -371,6 +372,24 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     );
   }
 
+  Future<void> _rename() async {
+    final saved = _saved;
+    if (saved == null) return;
+    final playlists = PlaylistLibraryScope.of(context);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => TextInputDialog(
+        title: 'Zmień nazwę playlisty',
+        hint: 'Nazwa',
+        initial: saved.name,
+      ),
+    );
+    if (name == null) return;
+    await playlists.rename(saved.id, name);
+    if (!mounted) return;
+    setState(() => _saved = playlists.byId(saved.id) ?? saved);
+  }
+
   Future<void> _delete() async {
     final library = PlaylistLibraryScope.of(context);
     final folders = LibraryFoldersScope.maybeOf(context);
@@ -485,6 +504,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 Icons.check_circle,
                 'Usuń z Biblioteki',
                 onTap: _delete,
+              ),
+              MenuSheetEntry(
+                Icons.drive_file_rename_outline,
+                'Zmień nazwę',
+                onTap: _rename,
               ),
               const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
               const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),

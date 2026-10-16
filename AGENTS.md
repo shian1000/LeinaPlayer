@@ -50,7 +50,9 @@ audio on Android through NewPipeExtractor, with a cache of played songs — see
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
 a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do playlisty"); songs removed from
 any saved playlist ("Usuń z tej playlisty"; an imported one's next import leaves them out, synced);
-folders for playlists and moods and a working "Sortuj wg" (both phone only); song search also finds Biblioteka playlists, and its online button YouTube and
+folders for playlists and moods (synced with the account like playlists —
+[ADR 0011](docs/decisions/0011-folder-sync.md)) and a working
+"Sortuj wg" (phone only); song search also finds Biblioteka playlists, and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their
 MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).
@@ -114,7 +116,9 @@ moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and
 (`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Covers picked for playlists and moods go with them: the picture as
 `/users/<name>/covers/<sha256>`, global moods' own covers as `/users/<name>/global-mood-covers`
 ([ADR 0009](docs/decisions/0009-cover-sync.md)). The music library's files are streamed from
-`GET /library/<files.id>` ([ADR 0010](docs/decisions/0010-server-files.md)). Biblioteka's folders and sort order stay on the
+`GET /library/<files.id>` ([ADR 0010](docs/decisions/0010-server-files.md)). Biblioteka's folders go as JSON too
+(`/users/<name>/folders`, [ADR 0011](docs/decisions/0011-folder-sync.md); server side in a
+[hand-off](docs/handoffs/musicdatabase-folders.md)); its sort order and "last opened" stay on the
 phone (`library_folders.dart`), not synced. Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
@@ -163,7 +167,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `youtube_export.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
-  folders, sort order and "last opened" (`library_folders.dart`, phone only), songs saved for
+  folders (synced), sort order and "last opened" (`library_folders.dart`), songs saved for
   later (`saved_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
   (`home_layout.dart`) — all three phone only, syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
@@ -245,7 +249,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Tests waiting for real background work (files, SQLite, isolates, a local HTTP server) wait
   for the condition with `waitUntil` / `pumpUntil` from `test/support/waiting.dart` — never a
   fixed number of short sleeps: with the whole suite in parallel on this machine those timed out
-  at random (a different test failing each full run).
+  at random (a different test failing each full run). In a widget test wait for what the screen
+  shows, not for a notifier's field: `PlaylistLibrary.load` sets `playlists` before its second
+  query and its `notifyListeners`, so waiting on the field let the test check the screen too
+  early (and `find.text` also matches an open dialog's `TextField`).
 - For UI changes, actually run the app and look at it — a green test suite does not confirm the
   screen looks right. Use the `run-on-physical-phone` skill (release build on the USB Huawei, with
   the Gradle memory precautions) or `share-build-tailscale` for the user's Pixel 7a; check screens

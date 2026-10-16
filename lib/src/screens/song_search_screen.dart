@@ -263,7 +263,7 @@ class _Results extends StatelessWidget {
             icon: Icons.storage_outlined,
             title: 'Brak pobranej bazy danych',
             details: !sync.hasSource
-                ? 'Ustaw adres bazy w Ustawienia › Źródła muzyki › Baza danych.'
+                ? 'Ustaw adres bazy w Ustawienia › Serwer.'
                 : (sync.lastError ?? 'Baza nie została jeszcze pobrana.'),
             action: _OpenDatabaseSettings(),
           );

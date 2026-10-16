@@ -71,7 +71,7 @@ class Account extends ChangeNotifier {
   ) async {
     if (_busy) return 'Logowanie już trwa';
     if (servers.isEmpty) {
-      return 'Najpierw ustaw adres serwera (Źródła muzyki › Baza danych)';
+      return 'Najpierw ustaw adres serwera (Ustawienia › Serwer)';
     }
     _busy = true;
     notifyListeners();

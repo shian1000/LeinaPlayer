@@ -254,6 +254,12 @@ void main() {
     // ⋮ › the tracks MusicDatabase doesn't have: only the unrecognised one.
     await tester.tap(find.byTooltip('Menu playlisty (⋮)'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.text('Wyświetl utwory, których nie ma w bazie danych'),
     );
@@ -340,6 +346,24 @@ void main() {
       expect([for (final t in tracks!) t.title], ['Utwór', 'Małomiasteczkowy']);
     },
   );
+
+  testWidgets('⋮ › Zmień nazwę renames the playlist', (tester) async {
+    await pumpLibrary(tester, before: importDoAuta);
+    await tester.tap(find.text('Do auta'));
+    await settle(tester, until: find.text('Utwór'));
+
+    await tester.tap(find.byTooltip('Menu playlisty (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zmień nazwę'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'W trasę');
+    await tester.tap(find.text('Zapisz'));
+    await pumpUntil(tester, () => find.text('Do auta').evaluate().isEmpty);
+    await tester.pumpAndSettle();
+
+    expect(find.text('W trasę'), findsOneWidget);
+    expect(playlists.playlists.single.name, 'W trasę');
+  });
 
   testWidgets('Biblioteka highlights the playlist the playing song was queued '
       'from', (tester) async {

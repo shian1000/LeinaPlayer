@@ -119,7 +119,7 @@ phone only. Format in
   best first (`DatabaseSync.serverAddresses`: local on the home Wi-Fi, then remote), at most
   1 MiB per file. Tried on start (after the daily download), on return to the app, and a minute
   after a new report (so the replacement found right after a dead link joins the same file).
-  The state and "Wyślij teraz" are in Ustawienia › Źródła muzyki › Baza danych. "Czeka na wysłanie"
+  The state and "Wyślij teraz" are in Ustawienia › Zgłoszenia poprawek. "Czeka na wysłanie"
   there opens the songs reported in the waiting requests.
 - 201 / 200 (stored / this exact file already received) → the file moves to `outbox/sent/`.
 - 400 / 409 / 411 / 413 (malformed, number reused, no length, too big — bugs on the phone) →

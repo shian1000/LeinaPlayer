@@ -13,7 +13,7 @@ searching the user's library on the phone. MusicDatabase keeps everything in two
 ## Decision
 
 - The app downloads `music.db` and `tag.db` as whole files from an address the user types in
-  under "Ustawienia › Źródła muzyki › Baza danych" (`lib/src/data/database_sync.dart`). The
+  under "Ustawienia › Serwer" (`lib/src/data/database_sync.dart`). The
   address is the folder the files sit in; the app appends the file names. Nothing about the
   server is hard-coded — e.g. `python3 -m http.server` in that folder, reached over Tailscale.
 - Two addresses can be set: a remote one (e.g. over Tailscale) and a local one for the home

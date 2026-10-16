@@ -1,121 +1,178 @@
 import 'package:flutter/material.dart';
 
-import '../data/account.dart';
 import '../dummy.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
 import 'about_screen.dart';
 import 'account_screen.dart';
 import 'appearance_screen.dart';
 import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
+import 'database_source_screen.dart';
 import 'history_settings_screen.dart';
 import 'link_settings_screen.dart';
-import 'music_sources_screen.dart';
+import 'local_music_screen.dart';
+import 'outbox_settings_screen.dart';
 import 'playback_settings_screen.dart';
+import 'spotify_source_screen.dart';
+import 'youtube_source_screen.dart';
 
 const _id = 'Ustawienia';
 
 class _SettingsEntry {
-  const _SettingsEntry(this.icon, this.title, this.subtitle, {this.opens});
+  const _SettingsEntry(this.icon, this.title, this.subtitle, this.opens);
 
   final IconData icon;
   final String title;
   final String subtitle;
-
-  /// Sub-screen opened by the entry; null means the entry is still a dummy.
-  final WidgetBuilder? opens;
+  final WidgetBuilder opens;
 }
 
-const _entries = [
-  _SettingsEntry(
-    Icons.account_circle_outlined,
-    'Konto',
-    'Logowanie do MusicDatabase • Wyloguj',
-    opens: _openAccount,
+/// The entries under their section headers.
+const _sections = <(String, List<_SettingsEntry>)>[
+  (
+    'MusicDatabase',
+    [
+      _SettingsEntry(
+        Icons.account_circle_outlined,
+        'Konto',
+        'Logowanie • Synchronizacja playlist i nastrojów • Konto Google',
+        _openAccount,
+      ),
+      _SettingsEntry(
+        Icons.storage,
+        'Serwer',
+        'Adresy serwera • Wi-Fi sieci lokalnej • Pobieranie bazy',
+        _openServer,
+      ),
+      _SettingsEntry(
+        Icons.forward_to_inbox_outlined,
+        'Zgłoszenia poprawek',
+        'Wysyłanie automatyczne • Czeka na wysłanie',
+        _openOutbox,
+      ),
+    ],
   ),
-  _SettingsEntry(
-    Icons.library_music_outlined,
-    'Źródła muzyki',
-    'Muzyka lokalna • YouTube • Spotify • Kolejność odtwarzania',
-    opens: _openMusicSources,
+  (
+    'Słuchanie',
+    [
+      _SettingsEntry(
+        Icons.volume_up_outlined,
+        'Odtwarzanie',
+        'Kolejność źródeł • Sposoby odtwarzania YouTube • Przenikanie',
+        _openPlayback,
+      ),
+      _SettingsEntry(
+        Icons.folder_outlined,
+        'Muzyka na telefonie',
+        'Foldery z muzyką • Skanowanie',
+        _openLocalMusic,
+      ),
+      _SettingsEntry(
+        Icons.history,
+        'Historia odtwarzania',
+        'Przechowywanie • Wyczyść historię',
+        _openHistory,
+      ),
+    ],
   ),
-  _SettingsEntry(
-    Icons.album_outlined,
-    'Źródła okładek',
-    'Plik na telefonie • iTunes • Deezer • YouTube',
-    opens: _openCoverSources,
+  (
+    'Wyszukiwanie i import',
+    [
+      _SettingsEntry(
+        Icons.smart_display_outlined,
+        'YouTube',
+        'Szukanie utworów i playlist • Kod YouTube API',
+        _openYouTube,
+      ),
+      _SettingsEntry(
+        Icons.graphic_eq,
+        'Spotify',
+        'Szukanie i importowanie playlist • Spotify API',
+        _openSpotify,
+      ),
+    ],
   ),
-  _SettingsEntry(
-    Icons.link,
-    'Otwieranie linków',
-    'YouTube • Spotify • Pytaj, czym otworzyć',
-    opens: _openLinks,
+  (
+    'Wyświetlanie',
+    [
+      _SettingsEntry(
+        Icons.palette_outlined,
+        'Wygląd',
+        'Motywy • Tryb ciemny • Nazwy łacińskie • Filtry do albumów',
+        _openAppearance,
+      ),
+      _SettingsEntry(
+        Icons.album_outlined,
+        'Okładki albumów',
+        'Plik na telefonie • iTunes • Deezer • YouTube',
+        _openCoverSources,
+      ),
+    ],
   ),
-  _SettingsEntry(
-    Icons.palette_outlined,
-    'Wygląd',
-    'Motyw jasny i ciemny • Tryb ciemny',
-    opens: _openAppearance,
+  (
+    'Dane',
+    [
+      _SettingsEntry(
+        Icons.download_for_offline_outlined,
+        'Oszczędzanie danych i tryb offline',
+        'Tylko przez Wi-Fi • Pamięć podręczna',
+        _openDataSaver,
+      ),
+    ],
   ),
-  _SettingsEntry(
-    Icons.volume_up_outlined,
-    'Odtwarzanie',
-    'Przenikanie utworów',
-    opens: _openPlayback,
-  ),
-  _SettingsEntry(
-    Icons.history,
-    'Historia odtwarzania',
-    'Przechowywanie • Wyczyść historię',
-    opens: _openHistory,
-  ),
-  _SettingsEntry(Icons.notifications_none, 'Powiadomienia', 'Push • E-mail'),
-  _SettingsEntry(
-    Icons.download_for_offline_outlined,
-    'Oszczędzanie danych i tryb offline',
-    'Tylko przez Wi-Fi • Pamięć podręczna',
-    opens: _openDataSaver,
-  ),
-  _SettingsEntry(
-    Icons.equalizer,
-    'Jakość zawartości multimedialnej',
-    'Jakość odtwarzania przez Wi-Fi • Jakość pobranych plików audio',
-  ),
-  _SettingsEntry(
-    Icons.info_outline,
-    'Informacje i pomoc',
-    'Wersja • Użytek prywatny • Licencja • Kod źródłowy',
-    opens: _openAbout,
+  (
+    'Aplikacja',
+    [
+      _SettingsEntry(
+        Icons.link,
+        'Otwieranie linków',
+        'YouTube • Spotify • Pytaj, czym otworzyć',
+        _openLinks,
+      ),
+      _SettingsEntry(
+        Icons.info_outline,
+        'Informacje i pomoc',
+        'Wersja • Użytek prywatny • Licencja • Kod źródłowy',
+        _openAbout,
+      ),
+    ],
   ),
 ];
 
 Widget _openAccount(BuildContext context) => const AccountScreen();
 
-Widget _openAppearance(BuildContext context) => const AppearanceScreen();
+Widget _openServer(BuildContext context) => const DatabaseSourceScreen();
 
-Widget _openMusicSources(BuildContext context) => const MusicSourcesScreen();
-
-Widget _openCoverSources(BuildContext context) => const CoverSourcesScreen();
-
-Widget _openAbout(BuildContext context) => const AboutScreen();
-
-Widget _openDataSaver(BuildContext context) => const DataSaverScreen();
+Widget _openOutbox(BuildContext context) => const OutboxSettingsScreen();
 
 Widget _openPlayback(BuildContext context) => const PlaybackSettingsScreen();
 
+Widget _openLocalMusic(BuildContext context) => const LocalMusicScreen();
+
 Widget _openHistory(BuildContext context) => const HistorySettingsScreen();
+
+Widget _openYouTube(BuildContext context) => const YouTubeSourceScreen();
+
+Widget _openSpotify(BuildContext context) => const SpotifySourceScreen();
+
+Widget _openAppearance(BuildContext context) => const AppearanceScreen();
+
+Widget _openCoverSources(BuildContext context) => const CoverSourcesScreen();
+
+Widget _openDataSaver(BuildContext context) => const DataSaverScreen();
 
 Widget _openLinks(BuildContext context) => const LinkSettingsScreen();
 
-/// "Ustawienia", opened from the profile drawer.
+Widget _openAbout(BuildContext context) => const AboutScreen();
+
+/// "Ustawienia", opened from "Ja".
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    void dummy(String label) => showDummy(context, '$_id › $label');
     final palette = context.palette;
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
@@ -124,138 +181,31 @@ class SettingsScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Wyszukaj ustawienie',
             icon: const Icon(Icons.search),
-            onPressed: () => dummy('Wyszukaj ustawienie'),
+            onPressed: () => showDummy(context, '$_id › Wyszukaj ustawienie'),
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _QuickTile(
-                      icon: Icons.signal_cellular_alt,
-                      title: 'Tryb oszczędzania danych',
-                      value: 'Automatyczne',
-                      onTap: () => dummy('Tryb oszczędzania danych (kafelek)'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _QuickTile(
-                      icon: Icons.visibility_off_outlined,
-                      title: 'Sesja prywatna',
-                      value: 'Wył.',
-                      onTap: () => dummy('Sesja prywatna (kafelek)'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (final entry in _entries)
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 0,
-              ),
-              visualDensity: const VisualDensity(vertical: -1),
-              leading: Icon(entry.icon, size: 28),
-              title: Text(entry.title),
-              subtitle: Text(entry.subtitle),
-              onTap: entry.opens == null
-                  ? () => dummy(entry.title)
-                  : () => Navigator.of(context)
-                        .push(MaterialPageRoute<void>(builder: entry.opens!)),
-            ),
-          const SizedBox(height: 16),
-          if (AccountScope.maybeOf(context)?.loggedIn ?? false)
-            const LogOutButton()
-          else
-            Center(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.textPrimary,
-                  side: BorderSide(
-                    color: palette.outline ?? palette.textSecondary,
-                  ),
-                  shape: palette.pillShape,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 8,
-                  ),
+          for (final (header, entries) in _sections) ...[
+            SectionTitle(header),
+            for (final entry in entries)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 0,
                 ),
-                onPressed: () =>
+                visualDensity: const VisualDensity(vertical: -1),
+                leading: Icon(entry.icon, size: 28),
+                title: Text(entry.title),
+                subtitle: Text(entry.subtitle),
+                onTap: () =>
                     Navigator.of(context)
-                        .push(MaterialPageRoute<void>(builder: _openAccount)),
-                child: const Text(
-                  'Zaloguj się',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                        .push(MaterialPageRoute<void>(builder: entry.opens)),
               ),
-            ),
+          ],
         ],
-      ),
-    );
-  }
-}
-
-class _QuickTile extends StatelessWidget {
-  const _QuickTile({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Material(
-      color: palette.surfaceHigh,
-      shape: palette.boxShape(8),
-      child: InkWell(
-        customBorder: palette.boxShape(8),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 26),
-              const SizedBox(height: 8),
-              // Roboto (and Lain's monospace) is wider than the reference font; shrink instead of
-              // wrapping to two lines.
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  style: const TextStyle(fontSize: AppFontSize.caption),
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: AppFontSize.caption,
-                  color: palette.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

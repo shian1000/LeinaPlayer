@@ -112,7 +112,7 @@ class YouTubeAudio {
     throw YouTubeAudioException(
       errors.isEmpty
           ? 'Brak włączonego sposobu odtwarzania z YouTube na tym urządzeniu '
-                '(Ustawienia › Źródła muzyki › YouTube).'
+                '(Ustawienia › Odtwarzanie › Sposoby odtwarzania YouTube).'
           : 'Nie udało się pobrać dźwięku z YouTube (${errors.join('; ')}).',
     );
   }

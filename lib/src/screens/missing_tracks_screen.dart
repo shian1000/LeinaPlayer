@@ -51,8 +51,8 @@ class MissingTracksScreen extends StatelessWidget {
             : 'Poza bazą danych: ${missing.length} z ${hits.length}';
       case CatalogStatus.noDatabase:
         summary =
-            'Baza danych nie jest jeszcze pobrana (Ustawienia › Źródła muzyki › '
-            'Baza danych), więc żaden utwór nie został rozpoznany.';
+            'Baza danych nie jest jeszcze pobrana (Ustawienia › '
+            'Serwer), więc żaden utwór nie został rozpoznany.';
       case CatalogStatus.error:
         summary = 'Nie udało się wczytać bazy danych.';
       case CatalogStatus.notLoaded || CatalogStatus.loading:

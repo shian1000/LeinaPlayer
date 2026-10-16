@@ -192,9 +192,13 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
 
 ## Ustawienia (`settings_screen.dart`)
 
+One list under section headers (user's choice): MusicDatabase, Słuchanie, Wyszukiwanie i
+import, Wyświetlanie, Dane, Aplikacja.
+
 - `Ustawienia › Wyszukaj ustawienie` (magnifier in the app bar)
-- `Ustawienia › Tryb oszczędzania danych (kafelek)`
-- `Ustawienia › Sesja prywatna (kafelek)`
+
+### MusicDatabase
+
 - Konto **→ Konto** (`account_screen.dart`) — **implemented**: logging in with a MusicDatabase
   user ("Nazwa użytkownika", "Hasło", "Zaloguj"; checked by the server, which hands back a
   token), or the logged-in user and "Wyloguj" (asks first)
@@ -205,57 +209,44 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
 telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)). A
   "Nastroje" row below it does the same for the account's moods, the login offer covers
   phone-only moods too ("Dodać playlisty i nastroje z telefonu do konta?"), and a "Nastroje tylko
-  na tym telefonie: N" row adds them ([ADR 0008](decisions/0008-moods.md)).
+  na tym telefonie: N" row adds them ([ADR 0008](decisions/0008-moods.md)). A "Foldery" row
+  does the same for Biblioteka's folders ("Foldery tylko na tym telefonie: N"; the login offer
+  lists them too — [ADR 0011](decisions/0011-folder-sync.md)).
   Below everything, once signed in for "Utwórz na YouTube": "Konto Google (playlisty na
   YouTube)" — the Google account's e-mail with **Wyloguj** (the next playlist asks for an
   account again).
-- Źródła muzyki **→ Źródła muzyki** (`music_sources_screen.dart`), list of music sources:
-  - Muzyka lokalna **→ Muzyka lokalna** (`local_music_screen.dart`) — **implemented**:
-    - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
-      and opens Android's folder picker (`file_picker`).
-    - "Ostatnie skanowanie" and "Skanuj teraz": finds audio files in the folders (recursively),
-      adds new ones to the phone's `local.db` — artist/title from tags, else from the
-      "Artist - Title" file name — and links each to MusicDatabase (`main_db_id`) or marks it
-      `pending`; drops files that are gone and re-checks earlier pending ones.
-    - "Utwory zapisane na urządzeniu: X" and "Nowe utwory spoza bazy danych: X" — the latter
-      **→ list of pending files** (`PendingSongsScreen`).
-  - Baza danych **→ Baza danych** (`database_source_screen.dart`) — **implemented**:
-    - "Adres serwera (połączenie zdalne)" and "Adres serwera (sieć lokalna)" — two addresses of
-      MusicDatabase's `music.db` / `tag.db` / `files.db` (the server's music files, ADR 0010),
-      validated and saved with "Zapisz" (saving downloads
-      right away).
-    - "Wi-Fi sieci lokalnej" — the saved home Wi-Fi name (× clears it) and "Użyj bieżącego
-      połączenia", which asks for location permission (Android's requirement for reading the
-      SSID), saves the current Wi-Fi, then scans the phone's /24 subnet for a server answering
-      `music.db` (SQLite) on the remote address's port and path, and saves the first hit as the
-      local address (`DatabaseSync.discoverLocalServer`).
-    - "Ostatnie pobranie" (with which address was used), the last error if any, "Pobierz teraz".
-    - "Zgłoszenia dla MusicDatabase": "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by
-      default), "Czeka na wysłanie" (requests in the outbox; tapped, the reported songs with the phone's
-      replacement — `outbox_contents_screen.dart`), "Ostatnie wysyłanie" (sent /
-      refused / why not, "kolejna próba jutro" after the server refused), "Wyślij teraz"
-      ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
+- Serwer **→ Serwer** (`database_source_screen.dart`) — **implemented**:
+  - "Adres serwera (połączenie zdalne)" and "Adres serwera (sieć lokalna)" — two addresses of
+    MusicDatabase's `music.db` / `tag.db` / `files.db` (the server's music files, ADR 0010),
+    validated and saved with "Zapisz" (saving downloads
+    right away).
+  - "Wi-Fi sieci lokalnej" — the saved home Wi-Fi name (× clears it) and "Użyj bieżącego
+    połączenia", which asks for location permission (Android's requirement for reading the
+    SSID), saves the current Wi-Fi, then scans the phone's /24 subnet for a server answering
+    `music.db` (SQLite) on the remote address's port and path, and saves the first hit as the
+    local address (`DatabaseSync.discoverLocalServer`).
+  - "Ostatnie pobranie" (with which address was used), the last error if any, "Pobierz teraz".
 
-    On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
-    answer), elsewhere the remote one. The download also runs automatically once a day on start —
-    see [`decisions/0002-database-download.md`](decisions/0002-database-download.md).
-  - YouTube **→ YouTube** (`youtube_source_screen.dart`, state in `SourceSettings`), three
-    sections — *Wyszukiwanie*:
-    - "Włącz szukanie w serwisie YouTube" — turns on the "Wyszukaj na YouTubie" button and
-      looking up songs on YouTube when tapped (see song search below).
-    - "Wyszukuj playlisty na YouTube" (on) — the button also searches YouTube playlists; only
-      selectable while search is on, and only acts while "Wyszukuj playlisty" (search filters)
-      is on (the subtitle says so otherwise).
-    - "Korzystaj z NewPipeExtractor" (on; Android only), "Korzystaj z pakietu youtube_explode"
-      (on), "Korzystaj z yt-dlp przez serwer", "Korzystaj z API" — the search methods, tried top
-      to bottom, the next one only when the previous fails (`YouTubeSearch`). Only selectable while search is on. **yt-dlp przez
-      serwer is not implemented** (MusicDatabase's server has no search endpoint; that needs an
-      ADR) — it's skipped with a note in the error message.
-    - "Kod YouTube API" — dialog for the Data API key, used by "Korzystaj z API"; the tile shows
-      only its last four characters, empty input clears it. Stored in plain
-      `shared_preferences`.
+  On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
+  answer), elsewhere the remote one. The download also runs automatically once a day on start —
+  see [`decisions/0002-database-download.md`](decisions/0002-database-download.md).
+- Zgłoszenia poprawek **→ Zgłoszenia poprawek** (`outbox_settings_screen.dart`) — **implemented**:
+  "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by default), "Czeka na wysłanie"
+  (requests in the outbox; tapped, the reported songs with the phone's replacement —
+  `outbox_contents_screen.dart`), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
+  jutro" after the server refused), "Wyślij teraz"
+  ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
 
-    *Odtwarzanie* — "Sposoby odtwarzania" **→ Sposoby odtwarzania** (`youtube_playback_screen.dart`):
+### Słuchanie
+
+- Odtwarzanie **→ Odtwarzanie** (`playback_settings_screen.dart`) — **implemented**, section *Źródła*:
+  - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
+    reorder the playback sources (default: 1. Telefon, 2. Serwer, 3. YouTube; Serwer = the song's
+    file in MusicDatabase's music library, streamed — [ADR 0010](decisions/0010-server-files.md)),
+    and a switch per source (all on by default; a switched-off source is never used, and with
+    YouTube off a song no other source has isn't searched there either). When a song is playable
+    from several, the first one in this order is used.
+  - "Sposoby odtwarzania YouTube" **→ Sposoby odtwarzania YouTube** (`youtube_playback_screen.dart`):
     every `YouTubePlaybackMethod` with a switch and a drag handle; the first switched-on one that
     works plays the video (`YouTubePlayback`). Default order and state: "Pamięć podręczna" (on),
     "Korzystaj z NewPipeExtractor" (on; disabled with "Dostępne tylko na Androidzie"
@@ -263,22 +254,54 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     yt-dlp przez serwer" (off, not implemented), "Otwórz w aplikacji YouTube" (on — the last
     resort: opens the video in the YouTube app — inside its YouTube playlist when the song plays
     from an imported one — or the browser without it, and pauses this app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
+  Then a note (the cache of played songs is in Oszczędzanie danych › Pamięć podręczna) and section
+  *Przejścia między utworami*:
+  "Przenikanie utworów" — slider Wył.–12 s (1 s steps, default off, saved on release): the
+  next queue song starts that long before the current one ends, one fading out as the other
+  fades in; only when the queue moves on by itself ("Następny" and tapped songs switch at
+  once). See [`agent-notes/local-library.md`](agent-notes/local-library.md).
+- Muzyka na telefonie **→ Muzyka na telefonie** (`local_music_screen.dart`) — **implemented**:
+  - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
+    and opens Android's folder picker (`file_picker`).
+  - "Ostatnie skanowanie" and "Skanuj teraz": finds audio files in the folders (recursively),
+    adds new ones to the phone's `local.db` — artist/title from tags, else from the
+    "Artist - Title" file name — and links each to MusicDatabase (`main_db_id`) or marks it
+    `pending`; drops files that are gone and re-checks earlier pending ones.
+  - "Utwory zapisane na urządzeniu: X" and "Nowe utwory spoza bazy danych: X" — the latter
+    **→ list of pending files** (`PendingSongsScreen`).
+- Historia odtwarzania **→ Historia odtwarzania** (`history_settings_screen.dart`) —
+  **implemented**: "Przechowuj historię" (dialog: 7 / 30 / 90 — default / 180 dni, Rok, Bez
+  limitu; older plays are deleted on start and with each new play, `PlayHistory.keepDays`;
+  never more than 1000 kept), "Wyczyść historię" (confirm dialog, same as in Ostatnie).
 
-    The cache of played songs is in Oszczędzanie danych › Pamięć podręczna.
-  - Spotify **→ Spotify** (`spotify_source_screen.dart`) — section *Wyszukiwanie*: "Wyszukuj
-    playlisty na Spotify" (on; the search button also searches Spotify playlists, while
-    "Wyszukuj playlisty" in the search filters is on), **Spotify API** (implemented: dialog for
-    the Client ID and Client Secret of the user's own Spotify app — with them playlists are
-    searched through the Web API, without them or when it fails the way the web player does;
-    blank clears; stored in plain `shared_preferences`; the tile shows the id's last four
-    characters) and a note on both ways. Section *Importowanie playlist*: a note on the embed
-    page's 100-track limit (the key doesn't lift it yet). Spotify is not a playback source.
-  - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
-    reorder the playback sources (default: 1. Telefon, 2. Serwer, 3. YouTube; Serwer = the song's
-    file in MusicDatabase's music library, streamed — [ADR 0010](decisions/0010-server-files.md)),
-    and a switch per source (all on by default; a switched-off source is never used, and with
-    YouTube off a song no other source has isn't searched there either). When a song is playable
-    from several, the first one in this order is used.
+### Wyszukiwanie i import
+
+- YouTube **→ YouTube** (`youtube_source_screen.dart`, state in `SourceSettings`)
+  section *Wyszukiwanie*:
+  - "Włącz szukanie w serwisie YouTube" — turns on the "Wyszukaj na YouTubie" button and
+    looking up songs on YouTube when tapped (see song search below).
+  - "Wyszukuj playlisty na YouTube" (on) — the button also searches YouTube playlists; only
+    selectable while search is on, and only acts while "Wyszukuj playlisty" (search filters)
+    is on (the subtitle says so otherwise).
+  - "Korzystaj z NewPipeExtractor" (on; Android only), "Korzystaj z pakietu youtube_explode"
+    (on), "Korzystaj z yt-dlp przez serwer", "Korzystaj z API" — the search methods, tried top
+    to bottom, the next one only when the previous fails (`YouTubeSearch`). Only selectable while search is on. **yt-dlp przez
+    serwer is not implemented** (MusicDatabase's server has no search endpoint; that needs an
+    ADR) — it's skipped with a note in the error message.
+  - "Kod YouTube API" — dialog for the Data API key, used by "Korzystaj z API"; the tile shows
+    only its last four characters, empty input clears it. Stored in plain
+    `shared_preferences`.
+- Spotify **→ Spotify** (`spotify_source_screen.dart`) — section *Wyszukiwanie*: "Wyszukuj
+  playlisty na Spotify" (on; the search button also searches Spotify playlists, while
+  "Wyszukuj playlisty" in the search filters is on), **Spotify API** (implemented: dialog for
+  the Client ID and Client Secret of the user's own Spotify app — with them playlists are
+  searched through the Web API, without them or when it fails the way the web player does;
+  blank clears; stored in plain `shared_preferences`; the tile shows the id's last four
+  characters) and a note on both ways. Section *Importowanie playlist*: a note on the embed
+  page's 100-track limit (the key doesn't lift it yet). Spotify is not a playback source.
+
+### Wyświetlanie
+
 - Wygląd **→ Wygląd** (`appearance_screen.dart`) — **implemented**, everything applies at once
   and is remembered after restart:
   - Motyw jasny **→ list of light themes** (Dummify, Redesign) — used while dark mode is off.
@@ -305,27 +328,13 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     [`agent-notes/covers.md`](agent-notes/covers.md)).
 
   Themes are defined in `lib/src/theme.dart` (see [`agent-notes/theming.md`](agent-notes/theming.md)).
-- Źródła okładek **→ Źródła okładek** (`cover_sources_screen.dart`) — **implemented**: the cover
+- Okładki albumów **→ Okładki albumów** (`cover_sources_screen.dart`) — **implemented**: the cover
   sources with switches, drag to reorder (Serwer — dummy, always off; Plik na telefonie; iTunes;
   Deezer; Miniatura z YouTube); the cover cache is in Oszczędzanie danych › Pamięć podręczna. See
   [`agent-notes/covers.md`](agent-notes/covers.md).
-- Otwieranie linków **→ Otwieranie linków** (`link_settings_screen.dart`) — **implemented**:
-  "Linki z YouTube" / "Linki ze Spotify" (dialog: Pytaj za każdym razem — default, Leina Radio,
-  Aplikacja YouTube/Spotify, Przeglądarka; the same choice "Zapamiętaj wybór" in the link sheet
-  sets; the sheet also has "Zapisz na później" → "Od kogo?", see Ja › Na później), what a link does in the app, how to give the links to the app in the phone settings,
-  "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
-  app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
-  [`agent-notes/youtube.md`](agent-notes/youtube.md)).
-- Odtwarzanie **→ Odtwarzanie** (`playback_settings_screen.dart`) — **implemented**:
-  "Przenikanie utworów" — slider Wył.–12 s (1 s steps, default off, saved on release): the
-  next queue song starts that long before the current one ends, one fading out as the other
-  fades in; only when the queue moves on by itself ("Następny" and tapped songs switch at
-  once). See [`agent-notes/local-library.md`](agent-notes/local-library.md).
-- Historia odtwarzania **→ Historia odtwarzania** (`history_settings_screen.dart`) —
-  **implemented**: "Przechowuj historię" (dialog: 7 / 30 / 90 — default / 180 dni, Rok, Bez
-  limitu; older plays are deleted on start and with each new play, `PlayHistory.keepDays`;
-  never more than 1000 kept), "Wyczyść historię" (confirm dialog, same as in Ostatnie).
-- `Ustawienia › Powiadomienia`
+
+### Dane
+
 - Oszczędzanie danych i tryb offline **→ Oszczędzanie danych i tryb offline**
   (`data_saver_screen.dart`) — **implemented**: "Zapisuj następne utwory z kolejki tylko przez
   Wi-Fi" (off by default; Wi-Fi = the phone has a Wi-Fi IP address), "Pobieraj okładki tylko
@@ -358,7 +367,16 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     (MB used and image count; confirm dialog).
   - "Wyczyść wszystko" — YouTube songs and covers (confirm dialog; the downloaded database and
     phone music stay).
-- `Ustawienia › Jakość zawartości multimedialnej`
+
+### Aplikacja
+
+- Otwieranie linków **→ Otwieranie linków** (`link_settings_screen.dart`) — **implemented**:
+  "Linki z YouTube" / "Linki ze Spotify" (dialog: Pytaj za każdym razem — default, Leina Radio,
+  Aplikacja YouTube/Spotify, Przeglądarka; the same choice "Zapamiętaj wybór" in the link sheet
+  sets; the sheet also has "Zapisz na później" → "Od kogo?", see Ja › Na później), what a link does in the app, how to give the links to the app in the phone settings,
+  "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
+  app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
+  [`agent-notes/youtube.md`](agent-notes/youtube.md)).
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: the
   version at the top ("Leina Radio — wersja": `version` from `pubspec.yaml`, the build number
   and commit, e.g. "1.0.0 (kompilacja 26, c11e6c4+zmiany)" — see `tool/build_release_apk.sh`), "Tylko do
@@ -366,8 +384,6 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
   Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków.
-- Wyloguj — **implemented**: logs out (asks first); reads "Zaloguj się" and opens Konto when
-  logged out.
 
 ## Home (`home_screen.dart`)
 
@@ -404,7 +420,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   **implemented**: searches as you type, over the fields chosen in "Szukaj w", in both the
   downloaded `music.db` and the phone's own `local.db` (`combined_search.dart`): MusicDatabase
   songs plus phone files not in MusicDatabase. Accents and case are ignored, like MusicDatabase's
-  search. Shows a hint with a link to "Baza danych" settings when there's nothing to search.
+  search. Shows a hint with a link to the "Serwer" settings when there's nothing to search.
   - Each result has one icon on the right (`SourceIcons`, in a slot of cover height and half its
     width): where tapping it plays from first — the first switched-on source in "Kolejność
     odtwarzania" that has the song (phone `smartphone`, server `dns`, YouTube `smart_display`;
@@ -536,7 +552,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   - Alfabetycznie: name, case and Polish letters aside
   - Twórca: folders first, then the playlist's owner ("Ty" for ones made here; a mood: "Ty" or
     "MusicDatabase"), then name
-- **Folders** — **implemented**, only on this phone (not synced with MusicDatabase): made from
+- **Folders** — **implemented**, synced with the MusicDatabase account like playlists
+  ([ADR 0011](decisions/0011-folder-sync.md); phone-only while logged out; Konto shows "Foldery"
+  with ⟳ and offers to add phone-only ones); made from
   Utwórz › Folder or "Nowy folder" in "Przenieś do folderu"; row "Folder • N playlist, M
   nastrojów" **→ Folder** (`FolderScreen`: its items in the same order, sort button, ⋮ = the
   folder menu, "Pusty folder…" when empty). A **long press** on a playlist / mood row (here or in
@@ -634,8 +652,9 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   the whole playlist into the queue, remembered as played from it; also in a preview's ⋮),
   **Nastrój dla wszystkich utworów** (also in a preview's ⋮),
   **`Usuń z
-  Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), `Dodaj do tej
-  playlisty`, `Edytuj playlistę`, **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**
+  Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), **Zmień
+  nazwę** (implemented: synced like any change; importing the playlist again keeps the phone's
+  name), `Dodaj do tej playlisty`, `Edytuj playlistę`, **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**
   (implemented, like a mood's), **Wyświetl utwory, których nie ma w bazie danych**
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
   tracks not recognised as MusicDatabase songs, "Poza bazą danych: N z M", rows like the
@@ -701,6 +720,6 @@ Opened from Biblioteka's "+" (prefix `Biblioteka › Utwórz (+)`), also on a ca
   "Prywatność i funkcje społecznościowe", "Wyświetlane treści", "Aplikacje i urządzenia", the
   "Darmowe konto" header with its Premium button, the camera icon on Wyszukaj and the whole
   Premium tab. Never built: ads and the reaction (emoji) button on tracks.
-- Deeper levels below the first settings screen; apart from "Wygląd", "Źródła muzyki", "Historia
-  odtwarzania", "Oszczędzanie danych i tryb offline" and "Informacje i pomoc", each settings
-  entry is a single dummy.
+- Ustawienia: only "Wyszukaj ustawienie" is still a dummy. Spotify's quick tiles (Tryb
+  oszczędzania danych, Sesja prywatna), Powiadomienia, Jakość zawartości multimedialnej and the
+  "Wyloguj" button at the bottom were removed (user's decision; logging out is in Konto).

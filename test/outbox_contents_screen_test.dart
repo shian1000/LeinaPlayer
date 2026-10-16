@@ -13,7 +13,7 @@ import 'package:music_database_app/src/data/youtube_search.dart';
 import 'package:music_database_app/src/playback/playback_queue.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
 import 'package:music_database_app/src/playback/track_player.dart';
-import 'package:music_database_app/src/screens/database_source_screen.dart';
+import 'package:music_database_app/src/screens/outbox_settings_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -130,7 +130,7 @@ void main() {
                         notifier: settings,
                         child: MaterialApp(
                           theme: buildAppTheme(dummifyTheme),
-                          home: const DatabaseSourceScreen(),
+                          home: const OutboxSettingsScreen(),
                         ),
                       ),
                     ),

@@ -1,6 +1,6 @@
 # YouTube: search, matching, playback
 
-Settings: Ustawienia › Źródła muzyki › YouTube (`SourceSettings`). Decisions: the phone may find
+Settings: Ustawienia › YouTube (search) and Ustawienia › Odtwarzanie (playback) (`SourceSettings`). Decisions: the phone may find
 missing links itself ([ADR 0003](../decisions/0003-app-supports-musicdatabase.md)); GPLv3 /
 private use only ([ADR 0004](../decisions/0004-license-and-distribution.md)).
 
@@ -123,7 +123,7 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   left by interrupted downloads are deleted on start.
 
 Playback (`lib/src/playback/youtube_playback.dart`, `YouTubePlayback`): the switched-on
-`YouTubePlaybackMethod`s in the user's order (Ustawienia › … › YouTube › Sposoby odtwarzania;
+`YouTubePlaybackMethod`s in the user's order (Ustawienia › Odtwarzanie › Sposoby odtwarzania YouTube;
 default cache → NewPipe → youtube_explode → yt-dlp server → YouTube app), first that works wins.
 The YouTube app method opens `https://www.youtube.com/watch?v=<id>` — on Android by naming the
 YouTube app's package (`openInYouTubeApp` → `MainActivity.kt`, then a browser that isn't this

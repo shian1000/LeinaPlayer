@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/account.dart';
 import '../data/database_sync.dart';
+import '../data/library_folders.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_sync.dart';
@@ -68,15 +69,24 @@ class _AccountScreenState extends State<AccountScreen> {
   Future<void> _offerPhonePlaylists() async {
     final playlists = PlaylistLibraryScope.maybeOf(context);
     final moods = MoodLibraryScope.maybeOf(context);
+    final folders = LibraryFoldersScope.maybeOf(context);
     final user = AccountScope.of(context).userName;
     if (user == null) return;
     final playlistCount = await playlists?.phoneOnlyCount() ?? 0;
     final moodCount = moods?.phoneOnlyCount ?? 0;
-    if ((playlistCount == 0 && moodCount == 0) || !mounted) return;
-    final what = [
+    final folderCount = folders?.phoneOnlyCount ?? 0;
+    if ((playlistCount == 0 && moodCount == 0 && folderCount == 0) ||
+        !mounted) {
+      return;
+    }
+    final kinds = [
       if (playlistCount > 0) 'playlisty',
       if (moodCount > 0) 'nastroje',
-    ].join(' i ');
+      if (folderCount > 0) 'foldery',
+    ];
+    final what = kinds.length == 1
+        ? kinds.single
+        : '${kinds.sublist(0, kinds.length - 1).join(', ')} i ${kinds.last}';
     final add = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -86,6 +96,8 @@ class _AccountScreenState extends State<AccountScreen> {
             if (playlistCount > 0)
               'Playlisty tylko na tym telefonie: $playlistCount.',
             if (moodCount > 0) 'Nastroje tylko na tym telefonie: $moodCount.',
+            if (folderCount > 0)
+              'Foldery tylko na tym telefonie: $folderCount.',
             'Dodane do konta $user będą też w MusicDatabase i na innych telefonach tego '
                 'konta. Bez dodania zostaną tylko tutaj.',
           ].join(' '),
@@ -105,6 +117,7 @@ class _AccountScreenState extends State<AccountScreen> {
     if (!(add ?? false)) return;
     await playlists?.addPhoneOnlyToAccount();
     await moods?.addPhoneOnlyToAccount();
+    await folders?.addPhoneOnlyToAccount();
   }
 
   @override
@@ -133,6 +146,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 const _PlaylistSyncTile(),
                 const _MoodSyncTile(),
+                const _FolderSyncTile(),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: const LogOutButton(),
@@ -381,6 +395,37 @@ class _MoodSyncTile extends StatelessWidget {
           title: Text('Nastroje tylko na tym telefonie: $phoneOnly'),
           subtitle: const Text('Dotknij, aby dodać je do konta'),
           onTap: moods.addPhoneOnlyToAccount,
+        ),
+      ],
+    );
+  }
+}
+
+/// How the account's Biblioteka folders last synced with MusicDatabase, and "sync now".
+class _FolderSyncTile extends StatelessWidget {
+  const _FolderSyncTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final folders = LibraryFoldersScope.maybeOf(context);
+    if (folders == null) return const SizedBox.shrink();
+    final syncTile = _SyncTile(
+      title: 'Foldery',
+      syncing: folders.syncing,
+      last: folders.lastSync,
+      onSync: () async =>
+          folders.sync(await DatabaseSyncScope.of(context).serverAddresses()),
+    );
+    final phoneOnly = folders.phoneOnlyCount;
+    if (phoneOnly == 0) return syncTile;
+    return Column(
+      children: [
+        syncTile,
+        ListTile(
+          leading: const Icon(Icons.phone_android),
+          title: Text('Foldery tylko na tym telefonie: $phoneOnly'),
+          subtitle: const Text('Dotknij, aby dodać je do konta'),
+          onTap: folders.addPhoneOnlyToAccount,
         ),
       ],
     );

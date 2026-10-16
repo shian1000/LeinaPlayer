@@ -227,7 +227,11 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   late final StreamSubscription<QueuePlay> _historySub;
   final _incomingLinks = IncomingLinks();
   final _laterLinks = LaterLinks();
-  final _libraryFolders = LibraryFolders();
+  late final _libraryFolders = LibraryFolders(
+    userName: () => _account.userName,
+    authToken: () => _account.token,
+  )..onUnauthorized = _account.tokenRejected;
+  Timer? _folderSyncSoon;
   final _savedSongs = SavedSongs();
   final _smartPlaylists = SmartPlaylists();
   final _homeLayout = HomeLayout(defaults: HomeScreen.defaultSections);
@@ -312,6 +316,12 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       _moodSyncSoon?.cancel();
       _moodSyncSoon = Timer(const Duration(seconds: 3), _syncMoods);
     };
+    _libraryFolders.onChanged = () {
+      _folderSyncSoon?.cancel();
+      _folderSyncSoon = Timer(const Duration(seconds: 3), _syncFolders);
+    };
+    _playlistLibrary.addListener(_updateFolderItems);
+    _moodLibrary.addListener(_updateFolderItems);
     _account.addListener(_accountChanged);
     // Android often keeps the app alive for days, so "once a day on start" also has to cover
     // coming back to an app that was only in the background.
@@ -323,6 +333,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         await _sendOutbox();
         await _syncPlaylists();
         await _syncMoods();
+        await _syncFolders();
       },
       onHide: _queueSession.save,
     );
@@ -478,7 +489,32 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         .load()
         .then((_) => _syncMoods())
         .catchError((Object e) => debugPrint('Loading moods failed: $e'));
-    if (first) Future.wait([playlists, moods]).then((_) => _pruneCovers());
+    // Folders after both: their items have to be on the phone first.
+    Future.wait([playlists, moods]).then((_) async {
+      if (first) await _pruneCovers();
+      await _syncFolders();
+    });
+  }
+
+  /// Lets folders name their playlists and moods for MusicDatabase.
+  void _updateFolderItems() {
+    _libraryFolders
+        .updateItems(
+          playlists: _playlistLibrary.playlists,
+          moods: [..._moodLibrary.userMoods, ..._moodLibrary.globalMoods],
+        )
+        .catchError(
+          (Object e) => debugPrint('Updating folder items failed: $e'),
+        );
+  }
+
+  /// Exchanges the account's Biblioteka folders with MusicDatabase.
+  Future<void> _syncFolders() async {
+    try {
+      await _libraryFolders.sync(await _databaseSync.serverAddresses());
+    } catch (e) {
+      debugPrint('Syncing folders failed: $e');
+    }
   }
 
   /// Deletes the cover pictures no playlist or mood refers to any more (replaced, removed or
@@ -542,6 +578,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _outboxSendSoon?.cancel();
     _playlistSyncSoon?.cancel();
     _moodSyncSoon?.cancel();
+    _folderSyncSoon?.cancel();
+    _playlistLibrary.removeListener(_updateFolderItems);
+    _moodLibrary.removeListener(_updateFolderItems);
     _account.removeListener(_accountChanged);
     _coverLook.dispose();
     _lifecycle.dispose();

@@ -42,9 +42,13 @@ class PlaylistSummary {
     this.cover,
     this.youTubeCopyId,
     this.youTubeCopyDone,
+    this.uid,
   });
 
   final int id;
+
+  /// The id shared with MusicDatabase (`playlists.uid`); `null` for a preview not saved.
+  final String? uid;
   final String name;
   final String? owner;
   final int trackCount;
@@ -217,7 +221,7 @@ class PlaylistLibrary extends ChangeNotifier {
   Future<void> load() async {
     final scope = _scope('p.');
     final rows = await (await _database()).rawQuery('''
-      SELECT p.id, p.name, p.owner, p.created_at, p.updated_at, p.source, p.source_id, p.account,
+      SELECT p.id, p.uid, p.name, p.owner, p.created_at, p.updated_at, p.source, p.source_id, p.account,
              p.cover_sha256, p.youtube_copy_id, p.youtube_copy_done,
              COUNT(t.position) AS tracks, COALESCE(SUM(t.duration_s), 0) AS seconds
       FROM playlists p LEFT JOIN playlist_tracks t ON t.playlist_id = p.id
@@ -227,6 +231,7 @@ class PlaylistLibrary extends ChangeNotifier {
       for (final row in rows)
         PlaylistSummary(
           id: row['id']! as int,
+          uid: row['uid'] as String?,
           name: row['name']! as String,
           owner: row['owner'] as String?,
           trackCount: row['tracks']! as int,
@@ -314,6 +319,25 @@ class PlaylistLibrary extends ChangeNotifier {
       whereArgs: [playlistId],
     );
     if (reload) await load();
+  }
+
+  /// Gives the playlist the name [name] (trimmed; an empty one changes nothing). Importing it
+  /// again keeps this name. Synced like any change.
+  Future<void> rename(int playlistId, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    await (await _database()).update(
+      'playlists',
+      {
+        'name': trimmed,
+        'updated_at': _now().millisecondsSinceEpoch,
+        'dirty': 1,
+      },
+      where: 'id = ?',
+      whereArgs: [playlistId],
+    );
+    await load();
+    onChanged?.call();
   }
 
   /// Gives the playlist the picked cover [hash] (`null`: back to the collage); synced like a
@@ -712,10 +736,10 @@ class PlaylistLibrary extends ChangeNotifier {
       } else {
         updated = existing.first['deleted_at'] == null;
         playlistId = existing.first['id']! as int;
+        // The name stays: the user may have renamed it on the phone.
         await txn.update(
           'playlists',
           {
-            'name': name,
             'owner': owner,
             'updated_at': now,
             'dirty': 1,

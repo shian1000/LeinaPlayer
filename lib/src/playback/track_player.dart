@@ -244,7 +244,7 @@ class TrackPlayer {
         if (!settings.enabledSources.contains(PlaybackSource.youtube)) {
           return const PlayOutcome.failed(
             'Tego utworu nie ma w żadnym włączonym źródle '
-            '(Ustawienia › Źródła muzyki › Kolejność odtwarzania).',
+            '(Ustawienia › Odtwarzanie › Kolejność odtwarzania).',
           );
         }
         // Not found lately: the queue moves on, but a tap (allowExternal) searches again.
@@ -341,7 +341,7 @@ class TrackPlayer {
     if (!settings.youTubeSearchEnabled) {
       return const PlayOutcome.failed(
         'Utworu nie ma na telefonie, a szukanie w serwisie YouTube jest wyłączone '
-        '(Ustawienia › Źródła muzyki › YouTube).',
+        '(Ustawienia › YouTube).',
       );
     }
     onStatus?.call('Szukam na YouTube…');

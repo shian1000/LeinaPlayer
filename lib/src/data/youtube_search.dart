@@ -118,7 +118,7 @@ class YouTubeSearch {
     ];
     if (methods.isEmpty) {
       throw const YouTubeSearchException(
-        'Nie wybrano sposobu wyszukiwania w Ustawienia › Źródła muzyki › YouTube.',
+        'Nie wybrano sposobu wyszukiwania w Ustawienia › YouTube.',
       );
     }
     final errors = <String>[];
@@ -424,8 +424,8 @@ class YouTubePlaylists {
     }
     throw YouTubeSearchException(
       errors.isEmpty
-          ? 'Włącz NewPipeExtractor albo youtube_explode w Ustawienia › Źródła muzyki › '
-                'YouTube, żeby importować playlisty.'
+          ? 'Włącz NewPipeExtractor albo youtube_explode w Ustawienia › YouTube, '
+                'żeby importować playlisty.'
           : 'Nie udało się odczytać playlisty (${errors.join('; ')}). Sprawdź, czy jest '
                 'publiczna lub niepubliczna (nie prywatna) i czy nie jest pusta.',
     );

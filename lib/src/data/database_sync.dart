@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum DatabaseSource { remote, local }
 
 /// Keeps a local copy of MusicDatabase's SQLite files, downloaded from the addresses set under
-/// "Ustawienia › Źródła muzyki › Baza danych". See `docs/decisions/0002-database-download.md`.
+/// "Ustawienia › Serwer". See `docs/decisions/0002-database-download.md`.
 ///
 /// Two addresses can be set: a remote one (reachable from anywhere, e.g. over Tailscale) and a
 /// local one, used only while the phone is on the saved home Wi-Fi ([localWifi]). If the local

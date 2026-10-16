@@ -220,7 +220,7 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
             leading: const Icon(Icons.library_music_outlined),
             title: const Text('Liczba utworów'),
             subtitle: Text(
-              songsOn ? '${settings.cacheLimit}' : 'Wyłączone (YouTube › Sposoby odtwarzania › Pamięć podręczna)',
+              songsOn ? '${settings.cacheLimit}' : 'Wyłączone (Odtwarzanie › Sposoby odtwarzania YouTube › Pamięć podręczna)',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _editSongLimit(settings),

@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:music_database_app/main.dart';
+import 'package:music_database_app/src/screens/settings_screen.dart';
 import 'package:music_database_app/src/screens/about_screen.dart';
 import 'package:music_database_app/src/screens/database_source_screen.dart';
 import 'package:music_database_app/src/theme.dart';
@@ -156,6 +157,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
+    await scrollSettingsTo(tester, 'Otwieranie linków');
     await tester.tap(find.text('Otwieranie linków'));
     await tester.pumpAndSettle();
 
@@ -246,7 +248,8 @@ void main() {
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Źródła muzyki'), findsOneWidget);
+    expect(find.text('MusicDatabase'), findsOneWidget);
+    expect(find.text('Serwer'), findsOneWidget);
   });
 
   testWidgets(
@@ -260,6 +263,7 @@ void main() {
       await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
       await tester.tap(find.text('Ustawienia'));
       await tester.pumpAndSettle();
+      await scrollSettingsTo(tester, 'Wygląd');
       await tester.tap(find.text('Wygląd'));
       await tester.pumpAndSettle();
 
@@ -300,7 +304,7 @@ void main() {
     },
   );
 
-  testWidgets('Muzyka lokalna shows folders, scan button and counters', (
+  testWidgets('Muzyka na telefonie shows folders, scan button and counters', (
     tester,
   ) async {
     await pumpApp(tester);
@@ -311,9 +315,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Źródła muzyki'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Muzyka lokalna'));
+    await tester.tap(find.text('Muzyka na telefonie'));
     await tester.pumpAndSettle();
 
     expect(find.text('Nie dodano folderów'), findsOneWidget);
@@ -328,9 +330,7 @@ void main() {
     expect(find.text('Najpierw dodaj folder z muzyką.'), findsOneWidget);
   });
 
-  testWidgets('YouTube settings and playback order under Źródła muzyki', (
-    tester,
-  ) async {
+  testWidgets('YouTube search settings and playback order', (tester) async {
     await pumpApp(tester);
 
     await tester.tap(find.text('Ja'));
@@ -339,9 +339,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Źródła muzyki'));
-    await tester.pumpAndSettle();
-    expect(find.text('1. Telefon, 2. Serwer, 3. YouTube'), findsOneWidget);
+    await scrollSettingsTo(tester, 'YouTube');
     await tester.tap(find.text('YouTube'));
     await tester.pumpAndSettle();
 
@@ -371,6 +369,10 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await scrollSettingsTo(tester, 'Odtwarzanie', delta: -200);
+    await tester.tap(find.text('Odtwarzanie'));
+    await tester.pumpAndSettle();
+    expect(find.text('1. Telefon, 2. Serwer, 3. YouTube'), findsOneWidget);
     await tester.tap(find.text('Kolejność odtwarzania'));
     await tester.pumpAndSettle();
     await tester.drag(
@@ -388,7 +390,7 @@ void main() {
     ]);
   });
 
-  testWidgets('database address is validated and saved under Źródła muzyki', (
+  testWidgets('database address is validated and saved under Serwer', (
     tester,
   ) async {
     await pumpApp(tester);
@@ -399,9 +401,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Źródła muzyki'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Baza danych'));
+    await tester.tap(find.text('Serwer'));
     await tester.pumpAndSettle();
 
     final settingsList = find
@@ -494,3 +494,19 @@ void main() {
     expect(ticked('Rok'), isFalse);
   });
 }
+
+/// Scrolls Ustawienia's list until [label] is on screen (the list is longer than the test view).
+Future<void> scrollSettingsTo(
+  WidgetTester tester,
+  String label, {
+  double delta = 200,
+}) => tester.scrollUntilVisible(
+  find.text(label),
+  delta,
+  scrollable: find
+      .descendant(
+        of: find.byType(SettingsScreen),
+        matching: find.byType(Scrollable),
+      )
+      .first,
+);

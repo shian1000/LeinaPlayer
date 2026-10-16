@@ -24,6 +24,7 @@ class Mood {
     required this.songIds,
     this.globalId,
     this.localId,
+    this.uid,
     this.phoneOnly = false,
     this.cover,
     this.createdAt,
@@ -39,6 +40,9 @@ class Mood {
 
   /// `moods.id` in `local.db` of the user's own mood.
   final int? localId;
+
+  /// The user's own mood's id shared with MusicDatabase (`moods.uid`).
+  final String? uid;
 
   bool get global => globalId != null;
 
@@ -244,7 +248,7 @@ class MoodLibrary extends ChangeNotifier {
       (songs[row['mood_id']! as int] ??= {}).add(row['song_id']! as int);
     }
     for (final row in await db.rawQuery(
-      'SELECT m.id, m.name, m.account, m.cover_sha256, m.created_at FROM moods m '
+      'SELECT m.id, m.uid, m.name, m.account, m.cover_sha256, m.created_at FROM moods m '
       'WHERE m.deleted_at IS NULL AND ${scope.where}',
       scope.args,
     )) {
@@ -254,6 +258,7 @@ class MoodLibrary extends ChangeNotifier {
           name: row['name']! as String,
           songIds: songs[id] ?? const {},
           localId: id,
+          uid: row['uid'] as String?,
           phoneOnly: row['account'] == null,
           cover: row['cover_sha256'] as String?,
           createdAt: DateTime.fromMillisecondsSinceEpoch(

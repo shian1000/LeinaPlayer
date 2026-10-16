@@ -159,8 +159,8 @@ class ScanResult {
   final bool mainDatabaseAvailable;
 }
 
-/// Music files kept on the phone: the folders to scan ("Ustawienia › Źródła muzyki › Muzyka
-/// lokalna") and the phone's own `local.db` describing every file found, linked to
+/// Music files kept on the phone: the folders to scan ("Ustawienia › Muzyka na
+/// telefonie") and the phone's own `local.db` describing every file found, linked to
 /// MusicDatabase (`main_db_id`) or marked `pending` when the song isn't there yet.
 class LocalLibrary extends ChangeNotifier {
   LocalLibrary(
