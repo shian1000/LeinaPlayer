@@ -43,14 +43,15 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   After the app restarts it shows the last song paused where it
   was (like the reference app); play carries on from there, with the same queue
   (`QueueSession`). ⊕ before play/pause — Dodaj do playlisty (**implemented**, the same sheet as
-  in the song's menu). Holding it shows four buttons just above it (`Mini odtwarzacz › Szybkie
+  in the song's menu; an accent ✓ when the song is liked). Holding it shows four buttons just above it (`Mini odtwarzacz › Szybkie
   akcje › …`), all **implemented**: Nastrój (**→ Dodaj do nastroju**), Na później / Zapisane
   (toggles "Na później"), Playlista (**→ Dodaj do playlisty**) and Więcej (**→ the song's menu**). Tapping it **→ full player** (slides up, covers the bottom bar):
   - Header: ⌄ (collapse), "Odtwarzanie z wyników wyszukiwania / „<query>” w wyszukiwarce" (the
     menu ⋮ is in the bottom row, by the thumb).
   - Big cover, title, artist, Nastrój (**implemented**: the moon, accent when the song is in a
     mood — tapping it **→ Dodaj do nastroju**; where "Polub" was), Dodaj do playlisty (⊕,
-    **implemented**: the song menu's sheet).
+    **implemented**: the song menu's sheet, where the song is also liked — like Spotify's, an
+    accent ✓ instead of ⊕ when it is liked).
   - Otwórz w YouTube (**implemented**, first in the bottom row; opens
     the song in the YouTube app from where this player is (`t=` in the link) — inside its
     YouTube playlist when it plays from an imported one, so YouTube then has the whole playlist;
@@ -414,14 +415,14 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 ## Home (`home_screen.dart`)
 
 - Filters (**implemented**, not remembered): Wszystko, Utwory (the rows of songs: Ostatnio
-  odtwarzane, Na później, Nowe w bazie, Zapomniane), Playlisty (Twoje playlisty, rows added from
+  odtwarzane, Polubione utwory, Na później, Nowe w bazie, Zapomniane), Playlisty (Twoje playlisty, rows added from
   a playlist), Nastroje (Twoje nastroje, rows added from a mood); the artists', albums' and
   genres' rows show only with Wszystko. ⚙ (tune icon)
   "Dostosuj stronę główną" **→ Dostosuj stronę główną**.
 - Rows in the user's order (`HomeLayout` in `data/home_layout.dart`, phone only): pinned ones
   first (a pin before the title), hidden ones left out. Every row scrolls sideways with all its
   cards (no "Pokaż wszystko"). From the phone (**implemented**; left out while empty):
-  Ostatnio odtwarzane (the history's last 12 songs), Twoje playlisty, Twoje nastroje, Na później
+  Ostatnio odtwarzane (the history's last 12 songs), Polubione utwory (the 12 last liked), Twoje playlisty, Twoje nastroje, Na później
   (saved songs); rows added from Biblioteka (a playlist's / mood's first 12 songs). Song cards
   play the row from the tapped song; playlist / mood cards open it. Then the recommendations
   (**implemented**, ids `rec:…`, `HomeRecommendations` in `data/home_recommendations.dart` from
@@ -533,8 +534,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     in Ustawienia › Odtwarzanie › Ukryte utwory, `hidden_songs_screen.dart`).
     The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`). Entries with › unfold their options under them in
-    the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Nowa playlista, then every
-    playlist made on the phone) and Przejdź do wykonawców › (each artist of the song — **→ its
+    the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Polub / Usuń z polubionych,
+    Nowa playlista, then every playlist made on the phone) and Przejdź do wykonawców › (each artist of the song — **→ its
     songs**: `openArtistSongs`, every song in music.db and on the phone with that artist, a song
     list with Odtwórz / Losowo; `song_list_screen.dart`).
   - **The song menu** (`showSongMenu` in `song_tile.dart`): the same entries as this ⋮ — Dodaj do
@@ -598,7 +599,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   those in folders) and dynamic playlists whose name holds every word typed.
 - Utwórz (+) **→ sheet "Utwórz"** with prefix `Biblioteka › Utwórz (+)` (see below)
 - Categories (rows with counts, each **→ its own list**, `LibraryCategoryScreen` with the sort
-  button and "+"): Playlisty (not albums), Albumy (Spotify album imports), Nastroje ("Brak
+  button and "+"): Polubione utwory **→ Polubione utwory** (`SavedSongsScreen.liked`: liked songs
+  newest first, "Odtwórz", song rows — like Na później below), Playlisty (not albums), Albumy (Spotify album imports), Nastroje ("Brak
   nastrojów" and how to add one when there are none), Foldery (only folders), Wykonawcy
   (**implemented**, `ArtistsScreen`: every artist in music.db and of the phone's songs not in it,
   with song counts, alphabetically, a field to narrow it — **→ the artist's songs**), Na później **→ Na później** (`saved_songs_screen.dart`: saved songs newest first,
@@ -668,8 +670,10 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 
 ## Sheet "Dodaj do playlisty" (`playlist_picker.dart`)
 
-- Header with the song (or "N utworów"); "Nowa playlista" (name dialog; a new playlist of these
-  songs); then every playlist made on the phone (not imported — re-importing would replace the
+- Header with the song (or "N utworów"); "Polubione utwory" (heart cover, song count; ⊕, or an
+  accent ✓ when all these songs are liked — tapping likes them, or unlikes them when all are
+  liked; `LikedSongs`, phone only — the only place a song is liked, user's decision); "Nowa
+  playlista" (name dialog; a new playlist of these songs); then every playlist made on the phone (not imported — re-importing would replace the
   added songs; a note says so when there are imported ones) — tapping one puts the songs at its
   end, synced like any change.
 

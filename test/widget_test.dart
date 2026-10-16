@@ -83,6 +83,9 @@ void main() {
   testWidgets('empty Biblioteka; "+" › Playlista offers new and import', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
     await pumpApp(tester);
     await tester.tap(find.text('Biblioteka'));
     await tester.pumpAndSettle();
@@ -294,6 +297,9 @@ void main() {
   });
 
   testWidgets('Biblioteka\'s grid switch is remembered', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
     await pumpApp(tester);
     await tester.tap(find.text('Biblioteka'));
     await tester.pumpAndSettle();

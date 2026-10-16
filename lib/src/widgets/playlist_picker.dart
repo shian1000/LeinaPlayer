@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
 import '../data/playlist_library.dart';
+import '../data/saved_songs.dart';
 import '../theme.dart';
 import 'collection_cover.dart';
 import 'common.dart';
@@ -24,13 +25,15 @@ MenuSheetEntry? playlistMenuEntry(
 }
 
 /// "Dodaj do playlisty ›" unfolding the playlists in the same sheet ([MenuSheetEntry.submenu]):
-/// "Nowa playlista", then every playlist made on the phone; `null` like [playlistMenuEntry].
+/// "Polubione utwory", "Nowa playlista", then every playlist made on the phone; `null` like
+/// [playlistMenuEntry].
 MenuSheetEntry? playlistSubmenuEntry(
   BuildContext context,
   List<SearchHit> hits,
 ) {
   final library = PlaylistLibraryScope.maybeOf(context);
   if (library == null || hits.isEmpty) return null;
+  final liked = LikedSongsScope.maybeOf(context);
   final messenger = ScaffoldMessenger.of(context);
   void said(String text) => messenger
     ..clearSnackBars()
@@ -39,6 +42,19 @@ MenuSheetEntry? playlistSubmenuEntry(
     Icons.playlist_add,
     'Dodaj do playlisty',
     submenu: () => [
+      if (liked != null)
+        liked.containsAll(hits)
+            ? MenuSheetEntry(
+                Icons.favorite,
+                'Usuń z polubionych',
+                onTap: () async => said(await toggleLiked(liked, hits)),
+              )
+            : MenuSheetEntry(
+                Icons.favorite_border,
+                'Polub',
+                subtitle: likedSongsLabel,
+                onTap: () async => said(await toggleLiked(liked, hits)),
+              ),
       MenuSheetEntry(
         Icons.add,
         'Nowa playlista',
@@ -63,6 +79,38 @@ MenuSheetEntry? playlistSubmenuEntry(
   );
 }
 
+const likedSongsLabel = 'Polubione utwory';
+
+/// Likes [hits], or takes them out of the liked songs when all of them are liked already;
+/// returns what to tell the user.
+Future<String> toggleLiked(LikedSongs liked, List<SearchHit> hits) async {
+  final like = !liked.containsAll(hits);
+  await liked.setAll(hits, like);
+  return like ? 'Dodano do polubionych' : 'Usunięto z polubionych';
+}
+
+/// The liked songs' cover: a heart on the accent colour, like Spotify's.
+class LikedSongsCover extends StatelessWidget {
+  const LikedSongsCover({super.key, this.size = 48});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return SizedBox.square(
+      dimension: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette.accent,
+          borderRadius: palette.radius(4),
+        ),
+        child: Icon(Icons.favorite, color: palette.onAccent, size: size / 2),
+      ),
+    );
+  }
+}
+
 /// Asks for a name; `null` when cancelled or left empty.
 Future<String?> askPlaylistName(BuildContext context) async {
   final name = await showDialog<String>(
@@ -84,6 +132,7 @@ Future<void> showAddToPlaylistSheet(
   List<SearchHit> hits,
 ) {
   final library = PlaylistLibraryScope.of(context);
+  final liked = LikedSongsScope.maybeOf(context);
   final messenger = ScaffoldMessenger.of(context);
   final what = hits.length == 1
       ? hits.single.title
@@ -114,6 +163,29 @@ Future<void> showAddToPlaylistSheet(
               subtitle: what,
             ),
             const Divider(),
+            if (liked != null)
+              ListenableBuilder(
+                listenable: liked,
+                builder: (_, _) {
+                  final all = liked.containsAll(hits);
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    leading: const LikedSongsCover(),
+                    title: const Text(likedSongsLabel),
+                    subtitle: Text(
+                      '${liked.songs.length} ${songsWord(liked.songs.length)}',
+                    ),
+                    trailing: Icon(
+                      all ? Icons.check_circle : Icons.add_circle_outline,
+                      color: all ? palette.accent : palette.textSecondary,
+                    ),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      said(await toggleLiked(liked, hits));
+                    },
+                  );
+                },
+              ),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               leading: Icon(Icons.add, color: palette.textSecondary),

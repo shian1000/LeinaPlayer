@@ -65,9 +65,10 @@ The layout follows Juxtopposed's Spotify redesign
 ([`ideas/`](docs/ideas/spotify-redesign-juxtopposed.md)): tabs Home, Odkrywaj, Wyszukaj,
 Biblioteka, Ja (the profile, no avatar or drawer); Home's rows arranged by the user (pin, move,
 hide, rows from Biblioteka — `home_layout.dart`); Odkrywaj — one song at a time from all of
-MusicDatabase or a mood; Biblioteka as categories, with songs saved "Na później"
-(`saved_songs.dart`) and dynamic playlists — a saved search filter (`smart_playlists.dart`), all
-three phone only; the queue opens in place of the full player's cover, and lyrics (looked
+MusicDatabase or a mood; Biblioteka as categories, with "Polubione utwory" (liked in the
+"Dodaj do playlisty" sheet / submenu — the full player's ⊕ turns into an accent ✓, Spotify-like),
+songs saved "Na później" (both `saved_songs.dart`) and dynamic playlists — a saved search filter
+(`smart_playlists.dart`), all phone only; the queue opens in place of the full player's cover, and lyrics (looked
 up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the player, above
 "Informacje o utworze" (user's layout: bottom row YouTube, mood filter, share, queue, ⋮; a mood
 button where "Polub" was); song menus unfold "Dodaj do playlisty ›" / "Przejdź do
@@ -185,7 +186,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
   folders (synced), sort order and "last opened" (`library_folders.dart`), songs saved for
-  later (`saved_songs.dart`), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
+  later and liked songs (`saved_songs.dart`), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
   (`home_layout.dart`) — all three phone only, syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
@@ -232,7 +233,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `SavedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `SavedSongsScope`, `LikedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus

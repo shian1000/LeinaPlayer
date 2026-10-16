@@ -49,6 +49,31 @@ void main() {
     expect(reloaded.songs, isEmpty);
   });
 
+  test(
+    'liked songs: several at once, newest first, apart from saved songs',
+    () async {
+      SearchHit song(int id) => SearchHit.phoneOnly(
+        LocalSong(id: id, filePath: '/m/$id.mp3', title: '$id', pending: true),
+      );
+      final liked = LikedSongs();
+      await liked.setAll([song(1)], true);
+      await liked.setAll([song(2), song(1)], true);
+      expect(liked.songs.map((s) => s.title), ['2', '1']);
+      expect(liked.containsAll([song(1), song(2)]), isTrue);
+      expect(liked.containsAll([song(1), song(3)]), isFalse);
+
+      final reloaded = LikedSongs();
+      await reloaded.load();
+      expect(reloaded.songs.map((s) => s.title), ['2', '1']);
+      await reloaded.setAll([song(2)], false);
+      expect(reloaded.songs.map((s) => s.title), ['1']);
+
+      final saved = SavedSongs();
+      await saved.load();
+      expect(saved.songs, isEmpty);
+    },
+  );
+
   test('dynamic playlists are saved with their rule', () async {
     final playlists = SmartPlaylists();
     final made = await playlists.add(

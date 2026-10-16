@@ -8,6 +8,7 @@ import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/library_folders.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
+import 'package:music_database_app/src/data/saved_songs.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/youtube_account.dart';
@@ -45,6 +46,7 @@ void main() {
   late List<String> fetched;
   late FakeYouTubeApi youTubeApi;
   late YouTubeAccount youTubeAccount;
+  late LikedSongs liked;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -59,6 +61,7 @@ void main() {
 
   tearDown(() async {
     queue.dispose();
+    liked.dispose();
     youTubeAccount.dispose();
     folders.dispose();
     player.dispose();
@@ -99,6 +102,7 @@ void main() {
       playlists = PlaylistLibrary(library.database, catalog, youTubeLibrary);
       settings = SourceSettings();
       folders = LibraryFolders();
+      liked = LikedSongs();
       player = PlayerController();
       await writeMusicDb((await sync.localFile('music.db')).path);
       await catalog.ensureLoaded();
@@ -107,6 +111,7 @@ void main() {
       await playlists.load();
       await settings.load();
       await folders.load();
+      await liked.load();
       await before?.call();
     });
     queue = PlaybackQueue(
@@ -168,9 +173,12 @@ void main() {
                           notifier: folders,
                           child: YouTubeAccountScope(
                             notifier: youTubeAccount,
-                            child: MaterialApp(
-                              theme: buildAppTheme(dummifyTheme),
-                              home: const Scaffold(body: LibraryScreen()),
+                            child: LikedSongsScope(
+                              notifier: liked,
+                              child: MaterialApp(
+                                theme: buildAppTheme(dummifyTheme),
+                                home: const Scaffold(body: LibraryScreen()),
+                              ),
                             ),
                           ),
                         ),
@@ -435,6 +443,36 @@ void main() {
     await tester.pageBack();
     await settle(tester, until: find.text('Pusty'));
     expect(shown(), ['California Dreaming', 'Małomiasteczkowy', 'Pusty']);
+  });
+
+  testWidgets('Polubione utwory lists liked songs; a song is unliked from '
+      '⋮ › Dodaj do playlisty', (tester) async {
+    await pumpLibrary(
+      tester,
+      before: () => liked.setAll([
+        SearchHit.phoneOnly(
+          LocalSong(
+            id: 1,
+            filePath: '/m/a.mp3',
+            title: 'Lubiany',
+            pending: true,
+          ),
+        ),
+      ], true),
+    );
+    await tester.tap(find.text('Polubione utwory'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lubiany'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Menu utworu (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dodaj do playlisty'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nowa playlista'), findsOneWidget);
+    await tester.tap(find.text('Usuń z polubionych'));
+    await tester.pumpAndSettle();
+    expect(liked.songs, isEmpty);
+    expect(find.text('Lubiany'), findsNothing);
   });
 
   testWidgets('an imported playlist can be sorted, not edited', (tester) async {

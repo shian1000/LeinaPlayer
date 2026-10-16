@@ -15,6 +15,7 @@ import '../widgets/common.dart';
 import '../widgets/folder_sheet.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/mood_sheet.dart';
+import '../widgets/playlist_picker.dart';
 import '../widgets/song_tile.dart';
 import 'create_sheet.dart';
 import 'mood_screen.dart';
@@ -178,6 +179,7 @@ class _Categories extends StatelessWidget {
     final moods = MoodLibraryScope.maybeOf(context);
     final folders = LibraryFoldersScope.maybeOf(context)?.folders.length;
     final saved = SavedSongsScope.maybeOf(context);
+    final liked = LikedSongsScope.maybeOf(context);
     final smart = SmartPlaylistsScope.maybeOf(context);
     void open(LibraryCategory category) => Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -186,6 +188,13 @@ class _Categories extends StatelessWidget {
     );
     return Column(
       children: [
+        if (liked != null)
+          _CategoryRow(
+            icon: Icons.favorite_border,
+            label: likedSongsLabel,
+            count: liked.songs.length,
+            onTap: () => SavedSongsScreen.openLiked(context),
+          ),
         _CategoryRow(
           icon: Icons.queue_music,
           label: LibraryCategory.playlists.label,

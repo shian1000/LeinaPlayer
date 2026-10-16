@@ -46,6 +46,7 @@ const _recommendations = {
 /// Home's rows made from what's on the phone.
 const _librarySections = {
   'lib:recent': 'Ostatnio odtwarzane',
+  'lib:liked': 'Polubione utwory',
   'lib:playlists': 'Twoje playlisty',
   'lib:moods': 'Twoje nastroje',
   'lib:saved': 'Na później',
@@ -67,6 +68,7 @@ enum _HomeFilter {
     all => true,
     songs => const {
       'lib:recent',
+      'lib:liked',
       'lib:saved',
       'rec:newest',
       'rec:forgotten',
@@ -231,8 +233,10 @@ class _HomeSection {
           songHeight,
           (_) => _songCards(hits),
         );
-      case 'lib:saved':
-        final saved = SavedSongsScope.maybeOf(context);
+      case 'lib:saved' || 'lib:liked':
+        final StoredSongList? saved = id == 'lib:liked'
+            ? LikedSongsScope.maybeOf(context)
+            : SavedSongsScope.maybeOf(context);
         if (saved == null || saved.songs.isEmpty) return null;
         if (catalog == null || library == null || youTube == null) return null;
         final hits = [

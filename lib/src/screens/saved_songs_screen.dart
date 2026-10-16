@@ -7,22 +7,34 @@ import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
+import '../widgets/playlist_picker.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
-const _id = 'Na później';
-
-/// Biblioteka › Na później: songs saved to listen to later ([SavedSongs]), newest first.
+/// Biblioteka › Na później ([SavedSongs]) and Polubione utwory ([LikedSongs]): the songs,
+/// newest first.
 class SavedSongsScreen extends StatelessWidget {
-  const SavedSongsScreen({super.key});
+  const SavedSongsScreen({super.key}) : liked = false;
+
+  const SavedSongsScreen.liked({super.key}) : liked = true;
+
+  final bool liked;
 
   static Future<void> open(BuildContext context) => Navigator.of(context)
       .push(MaterialPageRoute<void>(builder: (_) => const SavedSongsScreen()));
 
+  static Future<void> openLiked(BuildContext context) => Navigator.of(context)
+      .push(
+        MaterialPageRoute<void>(builder: (_) => const SavedSongsScreen.liked()),
+      );
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final saved = SavedSongsScope.maybeOf(context);
+    final StoredSongList? saved = liked
+        ? LikedSongsScope.maybeOf(context)
+        : SavedSongsScope.maybeOf(context);
+    final id = liked ? likedSongsLabel : 'Na później';
     final catalog = SongCatalogScope.of(context);
     final library = LocalLibraryScope.of(context);
     final youTube = YouTubeLibraryScope.of(context);
@@ -31,7 +43,7 @@ class SavedSongsScreen extends StatelessWidget {
         resolveTrack(ref, catalog, library, youTube),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('Na później')),
+      appBar: AppBar(title: Text(id)),
       body: SongSelectionArea(
         all: () => {for (final hit in hits) SongSelection.keyOf(hit): hit},
         child: ListView(
@@ -41,8 +53,12 @@ class SavedSongsScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Text(
-                  'Nic tu jeszcze nie ma. Zapisz utwór zakładką w „Odkrywaj” albo '
-                  'z menu ⋮ utworu: „Zapisz na później”.',
+                  liked
+                      ? 'Nic tu jeszcze nie ma. Polub utwór w „Dodaj do playlisty” '
+                            '— przyciskiem ⊕ przy tytule w odtwarzaczu albo z menu ⋮ '
+                            'utworu.'
+                      : 'Nic tu jeszcze nie ma. Zapisz utwór zakładką w „Odkrywaj” '
+                            'albo z menu ⋮ utworu: „Zapisz na później”.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.textSecondary),
                 ),
@@ -62,7 +78,7 @@ class SavedSongsScreen extends StatelessWidget {
                         (onStatus) => queue.start(
                           hits,
                           0,
-                          playlistName: _id,
+                          playlistName: id,
                           onStatus: onStatus,
                         ),
                       );
@@ -75,14 +91,14 @@ class SavedSongsScreen extends StatelessWidget {
                 hit: hit,
                 queue: hits,
                 queueIndex: i,
-                playlistName: _id,
+                playlistName: id,
                 trailing: IconButton(
                   tooltip: 'Menu utworu (⋮)',
                   icon: const Icon(Icons.more_vert),
                   onPressed: () => showSongMenu(
                     context,
                     hit,
-                    idPrefix: '$_id › Utwór › Menu (⋮)',
+                    idPrefix: '$id › Utwór › Menu (⋮)',
                   ),
                 ),
               ),

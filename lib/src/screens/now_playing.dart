@@ -237,16 +237,8 @@ class MiniPlayer extends StatelessWidget {
                             ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Dodaj do playlisty',
-                          icon: const Icon(Icons.add_circle_outline),
-                          onPressed: () {
-                            final hit = PlaybackQueueScope.of(context).current;
-                            final entry = hit == null
-                                ? null
-                                : playlistMenuEntry(context, [hit]);
-                            entry?.onTap?.call();
-                          },
+                        _AddToPlaylistButton(
+                          hit: PlaybackQueueScope.of(context).current,
                         ),
                         IconButton(
                           tooltip: player.playing ? 'Pauza' : 'Odtwórz',
@@ -266,6 +258,35 @@ class MiniPlayer extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "Dodaj do playlisty" by the song's title; like Spotify's, an accent tick when the song is
+/// liked (liking is in the sheet it opens).
+class _AddToPlaylistButton extends StatelessWidget {
+  const _AddToPlaylistButton({required this.hit, this.size});
+
+  final SearchHit? hit;
+  final double? size;
+
+  @override
+  Widget build(BuildContext context) {
+    final hit = this.hit;
+    final liked =
+        hit != null &&
+        (LikedSongsScope.maybeOf(context)?.contains(hit) ?? false);
+    return IconButton(
+      tooltip: liked ? 'Polubione · Dodaj do playlisty' : 'Dodaj do playlisty',
+      icon: Icon(
+        liked ? Icons.check_circle : Icons.add_circle_outline,
+        size: size,
+        color: liked ? context.palette.accent : null,
+      ),
+      onPressed: () {
+        final entry = hit == null ? null : playlistMenuEntry(context, [hit]);
+        entry?.onTap?.call();
+      },
     );
   }
 }
@@ -700,20 +721,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             ),
                             if (queue.current case final hit?)
                               _MoodButton(hit: hit),
-                            IconButton(
-                              tooltip: 'Dodaj do playlisty',
-                              icon: const Icon(
-                                Icons.add_circle_outline,
-                                size: 30,
-                              ),
-                              onPressed: () {
-                                final hit = queue.current;
-                                final entry = hit == null
-                                    ? null
-                                    : playlistMenuEntry(context, [hit]);
-                                entry?.onTap?.call();
-                              },
-                            ),
+                            _AddToPlaylistButton(hit: queue.current, size: 30),
                           ],
                         ),
                         const SizedBox(height: 12),
