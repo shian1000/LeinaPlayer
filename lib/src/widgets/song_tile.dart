@@ -24,6 +24,7 @@ import 'song_selection.dart';
 import '../data/album_covers.dart';
 import 'song_cover.dart';
 import 'swipe_actions.dart';
+import 'song_info.dart';
 import 'song_names.dart';
 
 /// Result title; the song in the player is highlighted like in the reference app.
@@ -443,7 +444,7 @@ class SourceIcons extends StatelessWidget {
 
 /// The menu of a song — its ⋮, and a long press on its row outside a [SongSelectionArea]:
 /// "Dodaj do kolejki", "Odtwórz jako następny", "Dodaj do nastroju", "Dodaj do playlisty",
-/// "Zapisz na później", "Udostępnij"; the rest are dummies like in the reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
+/// "Zapisz na później", "Udostępnij", "Wyświetl informacje o utworze"; the rest are dummies like in the reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
 /// "Pobierz utwór", "Wyłącznik czasowy" and "Ukryj utwór" (dummies) sit in a smaller block above.
 Future<void> showSongMenu(
   BuildContext context,
@@ -516,6 +517,11 @@ Future<void> showSongMenu(
         Icons.share_outlined,
         'Udostępnij',
         onTap: () => showSongShareSheet(context, hit, idPrefix: idPrefix),
+      ),
+      MenuSheetEntry(
+        Icons.info_outline,
+        'Wyświetl informacje o utworze',
+        onTap: () => showSongInfoSheet(context, hit),
       ),
     ],
   );

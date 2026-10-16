@@ -470,7 +470,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     (**implemented**, MusicDatabase songs only, **→
     sheet "Dodaj do nastroju"** below), Zapisz na później / Usuń z „Na później” (**implemented**),
     Przejdź do albumu (**implemented**: the album's songs in a song list — `openAlbumSongs`; a
-    dummy for songs with no album), Przejdź do wykonawców ›, Udostępnij (**→ Udostępnij utwór**, below); above them, in a smaller
+    dummy for songs with no album), Przejdź do wykonawców ›, Udostępnij (**→ Udostępnij utwór**, below), Wyświetl informacje o utworze (**implemented**: the
+    full player's "Informacje o utworze" card in a sheet — `showSongInfoSheet` in `song_info.dart`); above them, in a smaller
     block, `Pobierz utwór`, `Wyłącznik czasowy`, `Ukryj utwór`. The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`). Entries with › unfold their options under them in
     the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Nowa playlista, then every

@@ -9,6 +9,7 @@ import 'package:music_database_app/src/data/outbox.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/widgets/song_info.dart';
+import 'package:music_database_app/src/widgets/song_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -43,6 +44,41 @@ void main() {
     expect(find.text('Tego utworu nie ma w MusicDatabase.'), findsOneWidget);
     expect(find.text('/music/a.mp3'), findsOneWidget);
     expect(find.text('A · B'), findsOneWidget);
+  });
+
+  testWidgets('the song menu shows the same card in a sheet', (tester) async {
+    final hit = SearchHit.phoneOnly(
+      LocalSong(
+        id: 1,
+        filePath: '/music/a.mp3',
+        title: 'A',
+        artist: 'B',
+        pending: true,
+      ),
+    );
+    await tester.pumpWidget(
+      app(
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showSongMenu(context, hit, idPrefix: 'Test'),
+            child: const Text('⋮'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('⋮'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Wyświetl informacje o utworze'),
+      100,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Wyświetl informacje o utworze'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SongInfoCard), findsOneWidget);
+    expect(find.text('Tego utworu nie ma w MusicDatabase.'), findsOneWidget);
+    expect(find.text('/music/a.mp3'), findsOneWidget);
   });
 
   testWidgets('a MusicDatabase song: its row, artists, links and tags', (

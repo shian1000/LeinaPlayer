@@ -151,7 +151,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   folderu" for Biblioteka;
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
-  adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player; `SongCover` — a song's album cover, with the cover
+  adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player (also from a song's menu, `showSongInfoSheet`); `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog` in `common.dart`;
   `showShareSheet` in `share_sheet.dart`; `song_names.dart` — `shownTitle` / `shownArtist` /

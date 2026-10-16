@@ -16,6 +16,27 @@ import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import 'common.dart';
 
+/// "Wyświetl informacje o utworze" from a song's menu: the same [SongInfoCard] as under the
+/// full player, in a sheet that can be dragged up to the whole screen.
+Future<void> showSongInfoSheet(BuildContext context, SearchHit hit) =>
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.75,
+          maxChildSize: 1,
+          builder: (sheetContext, controller) => ListView(
+            controller: controller,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            children: [SongInfoCard(hit: hit)],
+          ),
+        ),
+      ),
+    );
+
 /// "Informacje o utworze" under the full player: everything music.db, tag.db, the moods and the
 /// phone know about [hit] — for now all of it, to be trimmed once it's clear what's worth showing
 /// (user's request). The song's, its artists' and its album's own fields can be corrected: the
