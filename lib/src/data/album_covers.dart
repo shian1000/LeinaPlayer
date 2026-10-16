@@ -532,21 +532,31 @@ class AlbumCovers extends ChangeNotifier {
     return null;
   }
 
-  /// Written out one at a time — the notification shows one song. A new name each time, so the
-  /// notification doesn't keep showing a picture it loaded before under the same address.
+  /// A new name each time, so the notification doesn't keep showing a picture it loaded before
+  /// under the same address. The last few stay: Android reads the file a moment after it's
+  /// given, and a cover still being made for the song before (skipped quickly) mustn't delete
+  /// the one the notification is about to read.
   Future<Uri> _writeArt(Uint8List bytes) async {
     final dir = await Directory(
       '${(await _storageRoot()).path}/now_playing_art',
     ).create(recursive: true);
-    await for (final old in dir.list()) {
-      if (old is File) await old.delete();
-    }
     final file = File(
       '${dir.path}/${_now().microsecondsSinceEpoch}_${_fileCounter++}.img',
     );
     await file.writeAsBytes(bytes, flush: true);
+    _artFiles.add(file.path);
+    if (_artFiles.length > 3) _artFiles.removeAt(0);
+    await for (final old in dir.list()) {
+      if (old is File && !_artFiles.contains(old.path)) {
+        try {
+          await old.delete();
+        } on FileSystemException catch (_) {}
+      }
+    }
     return file.uri;
   }
+
+  final _artFiles = <String>[];
 
   /// Deletes the downloaded images and what the services said (so they're asked again).
   Future<void> clear() async {

@@ -52,6 +52,10 @@ Future<void> main() async {
         androidNotificationOngoing: true,
         // White-on-transparent, as Android draws small notification icons as a mask.
         androidNotificationIcon: 'drawable/ic_stat_leina',
+        // Covers are decoded whole otherwise (an iTunes one is 1000+ px): slower to hand over
+        // and fewer fit in audio_service's bitmap cache.
+        artDownscaleWidth: 512,
+        artDownscaleHeight: 512,
       ),
     );
   } catch (e) {

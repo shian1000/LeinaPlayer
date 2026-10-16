@@ -130,10 +130,17 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 - Background playback and the media notification come from `audio_service` directly, not
   `just_audio_background` (which shows previous/next only for its own playlist sources, while
   the queue resolves songs one by one): `MediaSession` (`player_controller.dart`, a
-  `BaseAudioHandler` owning the app's one `AudioPlayer`) is created by `AudioService.init` in
+  `BaseAudioHandler` owning the app's two `AudioPlayer`s) is created by `AudioService.init` in
   `main()`; it pipes just_audio's events into the notification state and sends previous/next
   presses (`MediaSkip`) through `PlayerController.skips` to the queue. `JustAudioBackend.open`
-  sets the notification's `MediaItem` (re-sent with the duration once known, for its seek bar).
+  sets the notification's `MediaItem` (re-sent with the duration once known, for its seek bar,
+  and with the cover once found). audio_service 0.18 hands every `setMediaItem` to Android on a
+  new thread of its own, so a burst of items can land out of order — an earlier item without
+  the cover landing last left the Pixel's media player black for the whole song.
+  `MediaSession.show` therefore re-sends the last item alone 0.8 s after the burst; keep that
+  (or serialise the sends) when touching it. Covers are downscaled to 512 px
+  (`artDownscaleWidth/Height` in `main.dart`), and `AlbumCovers._writeArt` keeps its last three
+  files, since Android reads the file only a moment after getting its path.
   `MainActivity` extends `AudioServiceActivity`; the service/receiver/permissions are in
   `AndroidManifest.xml`. If `AudioService.init` fails, music still plays without a
   notification. While music plays, the

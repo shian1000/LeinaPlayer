@@ -124,9 +124,11 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
 
   Stream<MediaSkip> get skips => _skips.stream;
 
+  Timer? _settle;
+
   /// What the notification shows.
-  void show(NowPlaying track, Duration? duration, Uri? art) => mediaItem.add(
-    MediaItem(
+  void show(NowPlaying track, Duration? duration, Uri? art) {
+    final item = MediaItem(
       id: track.youtubeVideoId ?? track.source,
       title: latinNames
           ? withLatin(track.title, track.titleLatin)
@@ -136,8 +138,16 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
           : track.artist,
       duration: duration,
       artUri: art,
-    ),
-  );
+    );
+    mediaItem.add(item);
+    // audio_service hands each item to Android on a thread of its own, so the song's first
+    // items (no cover yet, then the duration) can land after the one with the cover and leave
+    // the notification black. Sent once more alone after the burst, it's the one that stays.
+    _settle?.cancel();
+    _settle = Timer(_settleAfter, () => mediaItem.add(item));
+  }
+
+  static const _settleAfter = Duration(milliseconds: 800);
 
   @override
   Future<void> play() => _active.play();
@@ -153,6 +163,7 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> stop() async {
+    _settle?.cancel();
     beforePause?.call();
     await _active.stop();
     await super.stop();
