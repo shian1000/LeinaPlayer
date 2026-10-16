@@ -52,7 +52,7 @@ a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do p
 any saved playlist ("Usuń z tej playlisty"; an imported one's next import leaves them out, synced);
 folders for playlists and moods (synced with the account like playlists —
 [ADR 0011](docs/decisions/0011-folder-sync.md)) and a working
-"Sortuj wg" (phone only); song search also finds Biblioteka playlists, and its online button YouTube and
+"Sortuj wg" (phone only); song search also finds Biblioteka playlists and albums (grouped by name, as "Przejdź do albumu" does), and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their
 MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).

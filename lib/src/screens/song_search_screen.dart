@@ -25,10 +25,11 @@ import 'playlist_screen.dart';
 import 'search_fields_sheet.dart';
 import '../data/album_covers.dart';
 import '../widgets/song_cover.dart';
+import '../widgets/song_names.dart';
 
 /// Song search over the downloaded MusicDatabase (`music.db`), opened from the
-/// "Czego chcesz posłuchać?" field on the Wyszukaj tab. Results — songs and Biblioteka
-/// playlists — update on every keystroke; YouTube (videos, playlists) and Spotify (playlists)
+/// "Czego chcesz posłuchać?" field on the Wyszukaj tab. Results — songs, Biblioteka
+/// playlists and albums — update on every keystroke; YouTube (videos, playlists) and Spotify (playlists)
 /// are searched only with the button.
 class SongSearchScreen extends StatefulWidget {
   const SongSearchScreen({super.key});
@@ -311,7 +312,13 @@ class _Results extends StatelessWidget {
             PlaylistLibraryScope.of(context).playlists,
           )
         : const <PlaylistSummary>[];
-    if (results.isEmpty && playlists.isEmpty && onlineSection == null) {
+    final albums = settings.albumSearch
+        ? searchAlbums(query, catalog, library)
+        : const <FoundAlbum>[];
+    if (results.isEmpty &&
+        playlists.isEmpty &&
+        albums.isEmpty &&
+        onlineSection == null) {
       return _Message(
         icon: Icons.search_off,
         title: 'Brak wyników dla „${query.trim()}”',
@@ -334,6 +341,10 @@ class _Results extends StatelessWidget {
       if (playlists.isNotEmpty) ...[
         _SectionLabel('Playlisty w Bibliotece: ${playlists.length}'),
         for (final playlist in playlists) _SavedPlaylistTile(playlist),
+      ],
+      if (albums.isNotEmpty) ...[
+        _SectionLabel('Albumy: ${albums.length}'),
+        _AlbumRow(albums),
       ],
       header,
     ];
@@ -563,6 +574,79 @@ class _PlaylistRow extends StatelessWidget {
                       color: palette.textSecondary,
                     ),
                   ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Albums found, sideways like [_PlaylistRow]; a tap opens the album's songs.
+class _AlbumRow extends StatelessWidget {
+  const _AlbumRow(this.albums);
+
+  final List<FoundAlbum> albums;
+
+  static const _cover = 132.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return SizedBox(
+      height: _cover + 84,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: albums.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final album = albums[i];
+          final first = album.songs.first;
+          final artists = {
+            for (final hit in album.songs)
+              artistNamesOf(hit.shownArtist(context)).firstOrNull ??
+                  hit.shownArtist(context),
+          };
+          final count = album.songs.length;
+          return InkWell(
+            borderRadius: palette.radius(4),
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              openAlbumSongs(context, album.name);
+            },
+            child: SizedBox(
+              width: _cover,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SongCover(cover: CoverRequest.of(first), size: _cover),
+                  const SizedBox(height: 6),
+                  Text(
+                    first.shownAlbum(context) ?? album.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.small,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  // Count on a line of its own: after a long artist it got cut off.
+                  for (final line in [
+                    artists.length == 1 ? artists.first : 'Różni wykonawcy',
+                    '$count utw.',
+                  ])
+                    Text(
+                      line,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppFontSize.small,
+                        color: palette.textSecondary,
+                      ),
+                    ),
                 ],
               ),
             ),

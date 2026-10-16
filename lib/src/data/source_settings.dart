@@ -82,6 +82,7 @@ enum CoverSource {
 class SourceSettings extends ChangeNotifier {
   static const _searchEnabledKey = 'youtube.search_enabled';
   static const _playlistSearchKey = 'search.playlists';
+  static const _albumSearchKey = 'search.albums';
   static const _youTubePlaylistSearchKey = 'youtube.search_playlists';
   static const _spotifyPlaylistSearchKey = 'spotify.search_playlists';
   static const _spotifyClientIdKey = 'spotify.client_id';
@@ -115,6 +116,7 @@ class SourceSettings extends ChangeNotifier {
 
   bool _youTubeSearchEnabled = false;
   bool _playlistSearch = true;
+  bool _albumSearch = true;
   bool _youTubePlaylistSearch = true;
   bool _spotifyPlaylistSearch = true;
   String? _spotifyClientId;
@@ -142,6 +144,9 @@ class SourceSettings extends ChangeNotifier {
   /// "Wyszukuj playlisty" (search filters): Biblioteka playlists while typing, and YouTube /
   /// Spotify ones with the online search, as their own switches allow.
   bool get playlistSearch => _playlistSearch;
+
+  /// "Wyszukuj albumy" (search filters): music.db's and the phone's albums whose name matches.
+  bool get albumSearch => _albumSearch;
 
   /// "Wyszukuj playlisty na YouTube" (YouTube settings).
   bool get youTubePlaylistSearch => _youTubePlaylistSearch;
@@ -239,6 +244,7 @@ class SourceSettings extends ChangeNotifier {
     _youTubeSearchEnabled =
         prefs.getBool(_searchEnabledKey) ?? _youTubeSearchEnabled;
     _playlistSearch = prefs.getBool(_playlistSearchKey) ?? _playlistSearch;
+    _albumSearch = prefs.getBool(_albumSearchKey) ?? _albumSearch;
     _youTubePlaylistSearch =
         prefs.getBool(_youTubePlaylistSearchKey) ?? _youTubePlaylistSearch;
     _spotifyPlaylistSearch =
@@ -319,6 +325,15 @@ class SourceSettings extends ChangeNotifier {
     notifyListeners();
     await (await SharedPreferences.getInstance()).setBool(
       _playlistSearchKey,
+      value,
+    );
+  }
+
+  Future<void> setAlbumSearch(bool value) async {
+    _albumSearch = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _albumSearchKey,
       value,
     );
   }

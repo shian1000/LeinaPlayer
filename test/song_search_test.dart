@@ -376,6 +376,32 @@ void main() {
   );
 
   testWidgets(
+    'albums show while typing and open their songs; Singles is no album',
+    (tester) async {
+      await pumpSearch(tester);
+
+      await type(tester, 'zeppelin iv');
+      expect(find.text('Albumy: 1'), findsOneWidget);
+      expect(find.text('Led Zeppelin IV'), findsOneWidget);
+      expect(find.text('1 utw.'), findsOneWidget);
+
+      await tester.tap(find.text('Led Zeppelin IV'));
+      await tester.pumpAndSettle();
+      expect(find.text('Going to California'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await type(tester, 'singles');
+      expect(find.textContaining('Albumy'), findsNothing);
+
+      await type(tester, 'zeppelin iv');
+      await tester.runAsync(() => settings.setAlbumSearch(false));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Albumy'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'Biblioteka playlists show while typing, unless switched off in filters',
     (tester) async {
       await pumpSearch(tester);

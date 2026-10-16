@@ -414,8 +414,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   default), Rok, Język, Pochodzenie wykonawcy — plus "Przywróć
   domyślne". At least one stays ticked; the choice is remembered. Below them the switch
   "Wyszukuj playlisty" (on): Biblioteka playlists while typing, and with the button YouTube /
-  Spotify playlists as their own settings allow. A dot on the icon means the selection differs
-  from the default (playlists off counts).
+  Spotify playlists as their own settings allow; and "Wyszukuj albumy" (on). A dot on the icon
+  means the selection differs from the default (playlists or albums off counts).
 - "Czego chcesz posłuchać?" field **→ song search** (`song_search_screen.dart`) —
   **implemented**: searches as you type, over the fields chosen in "Szukaj w", in both the
   downloaded `music.db` and the phone's own `local.db` (`combined_search.dart`): MusicDatabase
@@ -464,6 +464,11 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     first, like tapping a song does for one.
   - "Playlisty w Bibliotece: N" (while "Wyszukuj playlisty" is on): Biblioteka playlists whose
     name or owner contain every word, as you type, above the songs; tapping one opens it.
+  - "Albumy: N" (while "Wyszukuj albumy" is on; `searchAlbums` in `combined_search.dart`): albums
+    (music.db and phone files, grouped by album name like "Przejdź do albumu") whose name or its
+    Latin form contains every word, best name match first, as a sideways row of covers (album,
+    main artist or "Różni wykonawcy", song count) under the playlists; MusicDatabase's
+    "Singles" is left out. Tapping one opens its songs (`openAlbumSongs`).
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
     <pozycja>`: Dodaj do kolejki (**implemented**), Odtwórz jako następny (**implemented**),
     Dodaj do playlisty (**implemented → sheet "Dodaj do playlisty"** below), Dodaj do nastroju

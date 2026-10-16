@@ -5,7 +5,7 @@ import '../data/source_settings.dart';
 import '../theme.dart';
 
 /// Filter icon that opens the "Szukaj w" sheet; shows a dot while the selection differs from
-/// the defaults (Tytuł, Wykonawca, Album, playlists searched).
+/// the defaults (Tytuł, Wykonawca, Album, Nastrój, playlists and albums searched).
 class SearchFieldsButton extends StatelessWidget {
   const SearchFieldsButton({super.key});
 
@@ -15,7 +15,8 @@ class SearchFieldsButton extends StatelessWidget {
     final customised =
         fields.length != SearchField.defaults.length ||
         !fields.containsAll(SearchField.defaults) ||
-        !SourceSettingsScope.of(context).playlistSearch;
+        !SourceSettingsScope.of(context).playlistSearch ||
+        !SourceSettingsScope.of(context).albumSearch;
     return IconButton(
       tooltip: 'Filtry wyszukiwania',
       icon: Badge(
@@ -121,6 +122,15 @@ class _SearchFieldsSheet extends StatelessWidget {
             ),
             value: settings.playlistSearch,
             onChanged: settings.setPlaylistSearch,
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+            title: const Text('Wyszukuj albumy'),
+            subtitle: const Text(
+              'Albumy, których nazwa pasuje do wpisanych słów',
+            ),
+            value: settings.albumSearch,
+            onChanged: settings.setAlbumSearch,
           ),
         ],
       ),

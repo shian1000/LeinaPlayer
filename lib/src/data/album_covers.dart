@@ -29,7 +29,7 @@ class CoverRequest {
     this.filePath,
     required this.seed,
     this.searchable = true,
-  }) : album = _realAlbum(album);
+  }) : album = realAlbum(album);
 
   factory CoverRequest.of(SearchHit hit) => CoverRequest(
     artist: hit.youTubeTarget.mainArtists.firstOrNull?.name ?? hit.artistLabel,
@@ -87,7 +87,8 @@ class CoverRequest {
   /// Requests with the same identity get the same cover.
   late final String identity = '$lookupKey|$videoId|$filePath|$searchable';
 
-  static String? _realAlbum(String? album) {
+  /// [album] if it's really one album, else `null`.
+  static String? realAlbum(String? album) {
     final a = album?.trim() ?? '';
     // MusicDatabase files singles and unmatched covers under SINGLES_ALBUM; some files carry a
     // YouTube address as their album tag.

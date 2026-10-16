@@ -1,3 +1,4 @@
+import 'album_covers.dart';
 import 'local_library.dart';
 import 'playlist_library.dart';
 import 'song_catalog.dart';
@@ -292,6 +293,53 @@ List<SearchHit> searchEverywhere(
     return rankA != rankB ? rankA.compareTo(rankB) : titleA.compareTo(titleB);
   });
   return hits;
+}
+
+/// An album found by [searchAlbums]: the songs (music.db and the phone) carrying its name, as
+/// the album page (`openAlbumSongs`) groups them.
+class FoundAlbum {
+  const FoundAlbum(this.name, this.songs);
+
+  final String name;
+  final List<SearchHit> songs;
+}
+
+/// Albums whose name (or its Latin form) contains every word of [query], best name matches
+/// first. MusicDatabase's "Singles" and other non-albums ([CoverRequest.realAlbum]) are left out.
+List<FoundAlbum> searchAlbums(
+  String query,
+  SongCatalog catalog,
+  LocalLibrary library,
+) {
+  final normalizedQuery = normalizeForSearch(query);
+  final byName = <String, List<SearchHit>>{};
+  for (final hit in searchEverywhere(
+    query,
+    catalog,
+    library,
+    fields: const {SearchField.album},
+  )) {
+    if (CoverRequest.realAlbum(hit.album) == null) continue;
+    (byName[hit.album!] ??= []).add(hit);
+  }
+  final keys = {
+    for (final name in byName.keys)
+      name: (
+        titleMatchRank(normalizeForSearch(name), normalizedQuery),
+        normalizeForSearch(name),
+      ),
+  };
+  return [
+    for (final name
+        in byName.keys.toList()..sort((a, b) {
+          final (rankA, nameA) = keys[a]!;
+          final (rankB, nameB) = keys[b]!;
+          return rankA != rankB
+              ? rankA.compareTo(rankB)
+              : nameA.compareTo(nameB);
+        }))
+      FoundAlbum(name, byName[name]!),
+  ];
 }
 
 /// The row for a playlist track: the MusicDatabase song when it was recognised (by its
