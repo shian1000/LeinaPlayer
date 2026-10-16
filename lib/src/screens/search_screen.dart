@@ -115,7 +115,8 @@ class SearchScreen extends StatelessWidget {
 
 /// "Przeglądaj" grouped under headings instead of one mix of tiles (Juxtopposed's Spotify
 /// redesign), from what music.db and the moods know: moods, genres, decades, languages and the
-/// artists' countries — the biggest first.
+/// artists' countries — the biggest first. Full albums aren't in them: they are mixes to play
+/// through, and an album would fill 45 minutes of one.
 List<Widget> _browseGroups(BuildContext context) {
   final catalog = SongCatalogScope.of(context);
   final moodLibrary = MoodLibraryScope.maybeOf(context);
@@ -125,6 +126,7 @@ List<Widget> _browseGroups(BuildContext context) {
   final countries = <String, int>{};
   final genres = <String, int>{};
   for (final song in catalog.songs) {
+    if (song.isFullAlbum) continue;
     for (final genre in song.genres) {
       genres.update(genre, (n) => n + 1, ifAbsent: () => 1);
     }
@@ -196,6 +198,7 @@ List<Widget> _browseGroups(BuildContext context) {
               songs: (context) => hitsWhere(
                 context,
                 (song) => song.year != null && song.year! ~/ 10 * 10 == decade,
+                fullAlbums: false,
               ),
             ),
           ),
@@ -210,8 +213,11 @@ List<Widget> _browseGroups(BuildContext context) {
               context,
               title: language,
               subtitle: 'Język',
-              songs: (context) =>
-                  hitsWhere(context, (song) => song.language == language),
+              songs: (context) => hitsWhere(
+                context,
+                (song) => song.language == language,
+                fullAlbums: false,
+              ),
             ),
           ),
       ]),
@@ -228,6 +234,7 @@ List<Widget> _browseGroups(BuildContext context) {
               songs: (context) => hitsWhere(
                 context,
                 (song) => song.countries.contains(country),
+                fullAlbums: false,
               ),
             ),
           ),
@@ -235,17 +242,19 @@ List<Widget> _browseGroups(BuildContext context) {
   ];
 }
 
-/// music.db's songs passing [test], as rows, by title.
+/// music.db's songs passing [test], as rows, by title; without full albums
+/// ([CatalogSong.isFullAlbum]) unless [fullAlbums].
 List<SearchHit> hitsWhere(
   BuildContext context,
-  bool Function(CatalogSong song) test,
-) {
+  bool Function(CatalogSong song) test, {
+  bool fullAlbums = true,
+}) {
   final catalog = SongCatalogScope.of(context);
   final library = LocalLibraryScope.of(context);
   final youTube = YouTubeLibraryScope.of(context);
   return [
     for (final song in catalog.songs)
-      if (test(song))
+      if ((fullAlbums || !song.isFullAlbum) && test(song))
         withPhoneYouTube(
           SearchHit.main(song, library.filesOf(song.id)),
           youTube,
@@ -255,8 +264,11 @@ List<SearchHit> hitsWhere(
 
 /// "Odkryj coś nowego": up to six of music.db's genres (`songs.genre`), another draw each day.
 List<String> discoverGenres(SongCatalog catalog, {DateTime? now}) {
-  final genres = {for (final song in catalog.songs) ...song.genres}.toList()
-    ..sort();
+  // A genre's list has no full albums (openGenreSongs), so their genres alone would show none.
+  final genres = {
+    for (final song in catalog.songs)
+      if (!song.isFullAlbum) ...song.genres,
+  }.toList()..sort();
   final today = now ?? DateTime.now();
   return (genres
         ..shuffle(Random(today.year * 1000 + today.month * 40 + today.day)))
@@ -270,8 +282,11 @@ Future<void> openGenreSongs(BuildContext context, String genre) =>
       context,
       title: genre,
       subtitle: 'Gatunek',
-      songs: (context) =>
-          hitsWhere(context, (song) => song.genres.contains(genre)),
+      songs: (context) => hitsWhere(
+        context,
+        (song) => song.genres.contains(genre),
+        fullAlbums: false,
+      ),
     );
 
 /// "Inne kategorie": lists made from what the phone knows, not Spotify's categories.
@@ -300,6 +315,16 @@ List<Widget> _otherCategories(BuildContext context) {
         },
       ),
     ),
+    if (SongCatalogScope.of(context).songs.any((s) => s.isFullAlbum))
+      _CategoryTile(
+        name: 'Całe albumy',
+        onTap: () => SongListScreen.open(
+          context,
+          title: 'Całe albumy',
+          subtitle: 'Albumy w jednym nagraniu',
+          songs: (context) => hitsWhere(context, (song) => song.isFullAlbum),
+        ),
+      ),
     _CategoryTile(
       name: 'Najczęściej słuchane',
       onTap: () => _openMostPlayed(context),

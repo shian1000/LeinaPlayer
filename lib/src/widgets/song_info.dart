@@ -167,7 +167,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
     };
     return _Section('Utwór', [
       for (final key in song.keys)
-        if (!shownElsewhere.contains(key))
+        if (key == 'kind')
+          _songKindField(song)
+        else if (!shownElsewhere.contains(key))
           _editableField('songs', song, key, _songLabels[key] ?? key),
       for (final former in details.formerIds)
         _Field(
@@ -266,6 +268,59 @@ class _SongInfoCardState extends State<SongInfoCard> {
         current: value,
         shown: correction == null ? value : correction.newValue,
       ),
+    );
+  }
+
+  /// `songs.kind` as a switch: the row is a whole album in one recording, or a song (hand-off
+  /// `musicdatabase-song-kind.md`). Goes out as a field correction like the others; only
+  /// `full_album` or empty is accepted by MusicDatabase.
+  Widget _songKindField(DbRow row) {
+    final stored = row['kind'];
+    final outbox = OutboxScope.maybeOf(context);
+    final song = widget.hit.mainSong;
+    final id = row['id'];
+    final correction = outbox == null || id is! int
+        ? null
+        : outbox.correctionOf('songs', id, 'kind', stored);
+    final marked =
+        SongKind.of(correction == null ? stored : correction.newValue) ==
+        SongKind.fullAlbum;
+    return _Field(
+      'To jest cały album',
+      fieldValue('songs', 'kind', stored),
+      correction: correction == null
+          ? null
+          : '${correction.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie'}: '
+                '${fieldValue('songs', 'kind', correction.newValue)}',
+      trailing: outbox == null || song == null || id is! int
+          ? null
+          : Switch(
+              value: marked,
+              onChanged: (on) async {
+                final messenger = ScaffoldMessenger.of(context);
+                // Switched off, back to music.db's value unless that's the full album.
+                final value = on
+                    ? SongKind.fullAlbumValue
+                    : SongKind.of(stored) == SongKind.fullAlbum
+                    ? null
+                    : stored;
+                await outbox.correctField(
+                  table: 'songs',
+                  rowId: id,
+                  column: 'kind',
+                  oldValue: stored,
+                  newValue: value,
+                  song: song,
+                );
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _sameValue(value, stored) ? 'Poprawka wycofana.' : 'Poprawka trafi do MusicDatabase (Zgłoszenia dla MusicDatabase).',
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 
@@ -628,10 +683,19 @@ String? fieldValue(String table, String column, Object? value) =>
 bool _sameValue(Object? a, Object? b) =>
     a == null || b == null ? a == b : '$a' == '$b';
 
-String? _shown(_Kind? kind, Object? value) =>
-    kind == _Kind.albumType ? _albumTypes[value] ?? _text(value) : _text(value);
+String? _shown(_Kind? kind, Object? value) => switch (kind) {
+  _Kind.albumType => _albumTypes[value] ?? _text(value),
+  // A value the phone doesn't know yet counts as a song (SongKind.of), but is shown as it is.
+  _Kind.songKind =>
+    SongKind.of(value) == SongKind.fullAlbum
+        ? 'tak'
+        : _text(value) == null
+        ? 'nie'
+        : 'nie ($value)',
+  _ => _text(value),
+};
 
-enum _Kind { text, required, number, albumType }
+enum _Kind { text, required, number, albumType, songKind }
 
 /// [row] with its Latin form column ([latinColumn] of [column], `latin_names.dart`) only where
 /// it's of use: next to a name in another alphabet — even before music.db has the column, so
@@ -659,6 +723,7 @@ const _editable = {
     'year': _Kind.number,
     'language': _Kind.text,
     'genre': _Kind.text,
+    'kind': _Kind.songKind,
     'track_number': _Kind.number,
     'disc_number': _Kind.number,
     'title_latin': _Kind.text,
@@ -691,6 +756,7 @@ const _songLabels = {
   'year': 'Rok',
   'language': 'Język',
   'genre': 'Gatunek',
+  'kind': 'Cały album',
   'track_number': 'Numer utworu',
   'disc_number': 'Numer płyty',
 };
@@ -787,6 +853,7 @@ class _Field extends StatelessWidget {
     this.correction,
     this.correctionLink,
     this.fromPlayer = false,
+    this.trailing,
   });
 
   final String label;
@@ -805,6 +872,9 @@ class _Field extends StatelessWidget {
   /// [link] is the playing song's video: it opens where the player is, and the player pauses
   /// (like "Otwórz w YouTube" above the card).
   final bool fromPlayer;
+
+  /// In place of the pencil (e.g. a switch).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -866,6 +936,7 @@ class _Field extends StatelessWidget {
                 ],
               ),
             ),
+            ?trailing,
             if (onEdit != null)
               InkResponse(
                 onTap: onEdit,

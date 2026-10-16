@@ -31,6 +31,29 @@ void main() {
     );
   });
 
+  test('a full album: "full album" searched, only a long video accepted', () {
+    final target = MatchTarget(
+      title: 'Grochów',
+      mainArtists: [MatchArtist('Kult')],
+      fullAlbum: true,
+    );
+    expect(target.query, 'Kult Grochów full album');
+    expect(
+      pickYouTubeVideo(target, [
+        _v('song', 'Kult - Grochów', 'Kult', views: 900000),
+        _v('noduratio', 'Kult - Grochów (full album)', 'Kult'),
+        _v('album', 'Kult - Grochów [FULL ALBUM]', 'Kult', seconds: 2700),
+      ])?.id,
+      'album',
+    );
+    expect(
+      pickYouTubeVideo(_song('Kult', 'Grochów'), [
+        _v('album', 'Kult - Grochów [FULL ALBUM]', 'Kult', seconds: 2700),
+      ]),
+      isNull,
+    );
+  });
+
   test('prefers the Topic upload over a more popular live recording', () {
     final pick = pickYouTubeVideo(
       _song('Dawid Podsiadło', 'Małomiasteczkowy'),

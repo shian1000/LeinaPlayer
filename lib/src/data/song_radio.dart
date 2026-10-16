@@ -9,7 +9,8 @@ import 'text_normalizer.dart';
 /// ([moodsOf]), language, country and decade. A genre counts as shared when the names are the
 /// same, and half as much when one has a word of the other ("indie pop" and "pop"). One artist takes at most [perArtist] places, so the
 /// radio isn't the seed's discography. The same seed gives the same radio, so the list doesn't
-/// change under the user while the screen rebuilds.
+/// change under the user while the screen rebuilds. Full albums ([CatalogSong.isFullAlbum]) are
+/// left out: a 45-minute album shouldn't land in the middle of a mix.
 List<CatalogSong> songRadio(
   CatalogSong seed,
   Iterable<CatalogSong> songs, {
@@ -56,7 +57,7 @@ List<CatalogSong> songRadio(
 
   final ranked = [
     for (final song in songs)
-      if (song.id != seed.id)
+      if (song.id != seed.id && !song.isFullAlbum)
         if (score(song) case final points when points >= 2)
           (song: song, rank: points + random.nextDouble() * 2),
   ]..sort((a, b) => b.rank.compareTo(a.rank));

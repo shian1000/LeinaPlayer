@@ -66,6 +66,13 @@ class CurrentTitle extends StatelessWidget {
   }
 }
 
+/// How a full album (music.db's `songs.kind`) is marked in song rows, the player and menus.
+const fullAlbumLabel = 'Cały album';
+
+/// [text] (a song's artist line) with [fullAlbumLabel] first when [hit] is a full album.
+String withFullAlbumLabel(SearchHit? hit, String text) =>
+    hit?.isFullAlbum ?? false ? '$fullAlbumLabel • $text' : text;
+
 /// "3:05", or "1:02:03" for an hour or more.
 String formatDuration(Duration d) {
   final seconds = (d.inSeconds % 60).toString().padLeft(2, '0');
@@ -270,14 +277,20 @@ class SongTile extends StatelessWidget {
             (videoId != null && current.youtubeVideoId == videoId) ||
             (current.serverFileId != null &&
                 current.serverFileId == hit.serverFile?.id));
-    final details =
-        subtitle ??
-        [
-          hit.shownArtist(context),
-          if (hit.album != null && hit.album!.isNotEmpty)
-            hit.shownAlbum(context)!,
-          if (hit.year != null) '${hit.year}',
-        ].join(' • ');
+    final fullAlbum = hit.isFullAlbum;
+    final details = [
+      if (fullAlbum) fullAlbumLabel,
+      subtitle ??
+          [
+            hit.shownArtist(context),
+            // A full album is usually filed under itself: its own title again says nothing.
+            if (hit.album != null &&
+                hit.album!.isNotEmpty &&
+                !(fullAlbum && hit.album == hit.title))
+              hit.shownAlbum(context)!,
+            if (hit.year != null) '${hit.year}',
+          ].join(' • '),
+    ].join(' • ');
     final selection = SongSelectionScope.maybeOf(context);
     final key = selectionKey ?? SongSelection.keyOf(hit);
     final selecting = selection != null && selection.active;
@@ -314,7 +327,22 @@ class SongTile extends StatelessWidget {
             )
           : cover,
       title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
-      subtitle: Text(details, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text.rich(
+        TextSpan(
+          children: [
+            if (fullAlbum) ...[
+              const WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Icon(Icons.album, size: 14),
+              ),
+              const TextSpan(text: ' '),
+            ],
+            TextSpan(text: details),
+          ],
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: trailing == null
           ? SourceIcons(hit: hit)
           : Row(
@@ -698,19 +726,27 @@ Future<void> openSongRadio(BuildContext context, CatalogSong seed) {
   );
 }
 
+/// "Przejdź do albumu": the songs carrying [album]'s name — a full album of it first, to
+/// listen to it whole.
 Future<void> openAlbumSongs(BuildContext context, String album) =>
     SongListScreen.open(
       context,
       title: album,
       subtitle: 'Album',
-      songs: (context) => [
-        for (final hit in searchEverywhere(
-          album,
-          SongCatalogScope.of(context),
-          LocalLibraryScope.of(context),
-          youTube: YouTubeLibraryScope.of(context),
-          fields: const {SearchField.album},
-        ))
-          if (hit.album == album) hit,
-      ],
+      songs: (context) {
+        final hits = [
+          for (final hit in searchEverywhere(
+            album,
+            SongCatalogScope.of(context),
+            LocalLibraryScope.of(context),
+            youTube: YouTubeLibraryScope.of(context),
+            fields: const {SearchField.album},
+          ))
+            if (hit.album == album) hit,
+        ];
+        return [
+          ...hits.where((hit) => hit.isFullAlbum),
+          ...hits.where((hit) => !hit.isFullAlbum),
+        ];
+      },
     );

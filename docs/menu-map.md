@@ -103,7 +103,9 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     MusicDatabase ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md), field corrections)
     and shows under music.db's value until a downloaded music.db changes it. Under Linki the
     song's YouTube video and music video ("Teledysk") have a pencil too (link or id); unlike
-    the other fields the phone uses the new link at once (see `youtube.md`).
+    the other fields the phone uses the new link at once (see `youtube.md`). Once music.db has
+    `songs.kind`, "To jest cały album" is a switch instead of a pencil: a `kind` correction of
+    `full_album` or empty (hand-off [`musicdatabase-song-kind.md`](handoffs/musicdatabase-song-kind.md)).
   - Bottom row, five icons spread evenly (user's order): Otwórz w YouTube (above), Filtr
     nastrojów (**implemented**: filter icon, accent while on, **→ Filtr nastrojów**), Udostępnij
     (**→ Udostępnij utwór**, see below; IDs `Odtwarzacz › Udostępnij › …`), Kolejka
@@ -163,7 +165,7 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
 
 ## Odkrywaj (`discover_screen.dart`) — **implemented**
 
-- Category tabs at the top: "Wszystko" (30 random MusicDatabase songs) and every mood (global,
+- Category tabs at the top: "Wszystko" (30 random MusicDatabase songs, no full albums) and every mood (global,
   then own; 30 of its songs shuffled), and 🎲 "Wylosuj inne". Drawn again after a new music.db.
 - One card per song, swiped up for the next (vertical `PageView`): cover with ▶ (plays the
   category's songs from this one as a fragment — about a third in; nothing plays by itself),
@@ -492,7 +494,11 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   - "Utwórz kolejkę z wyników" (`Icons.playlist_play`, left of the filter icon in the search
     screen's app bar, while something is typed) — **implemented**: replaces the queue with every
     found song (the "Utwory: N" list, not the online results) in the list's order and plays the
-    first, like tapping a song does for one.
+    first, like tapping a song does for one (only the full albums while "Całe albumy" is ticked).
+  - "Całe albumy: N" chip right of "Utwory: N" (**implemented**, only when some found song is a
+    full album — music.db's `songs.kind`): ticked, the list shows only full albums. Full albums
+    are marked "Cały album" with a disc icon in every song row, and in the mini / full player and
+    the queue panel.
   - "Playlisty w Bibliotece: N" (while "Wyszukuj playlisty" is on): Biblioteka playlists whose
     name or owner contain every word, as you type, above the songs; tapping one opens it.
   - "Albumy: N" (while "Wyszukuj albumy" is on; `searchAlbums` in `combined_search.dart`): albums
@@ -505,13 +511,14 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     Dodaj do playlisty (**implemented → sheet "Dodaj do playlisty"** below), Dodaj do nastroju
     (**implemented**, MusicDatabase songs only, **→
     sheet "Dodaj do nastroju"** below), Zapisz na później / Usuń z „Na później” (**implemented**),
-    Przejdź do albumu (**implemented**: the album's songs in a song list — `openAlbumSongs`; left
+    Przejdź do albumu (**implemented**: the album's songs in a song list, a full album of it
+    first — `openAlbumSongs`; left
     out for songs with no album), Przejdź do wykonawców ›, Przejdź do radia utworu (**implemented**,
     music.db songs: `songRadio` in `song_radio.dart` — the song, then up to 50 songs like it by
     shared artist, genres (`songs.genre`, once music.db has it — hand-off
     [`musicdatabase-genres.md`](handoffs/musicdatabase-genres.md)), moods, language, country and
-    decade, at most 8 per artist, the same list for the same song; a song list with Odtwórz /
-    Losowo. Phone-only logic — MusicDatabase has no radio),
+    decade, at most 8 per artist, no full albums, the same list for the same song; a song list
+    with Odtwórz / Losowo. Phone-only logic — MusicDatabase has no radio),
     Udostępnij (**→ Udostępnij utwór**, below), Wyświetl informacje o utworze (**implemented**: the
     full player's "Informacje o utworze" card in a sheet — `showSongInfoSheet` in `song_info.dart`); above them, in a smaller
     block, Pobierz utwór (**implemented**, `downloadEntry`: hidden for a phone file; "Pobieram…"
@@ -577,11 +584,13 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   biggest first, at most 12 per group): Nastroje (**→ Nastrój**), Gatunki, Dekady (years to come
   left out; "Lata 80." only for the 1900s, other decades as "1890–1899"), Języki, Kraje
   wykonawców (the first part of `artists.origin`) — each **→ a song list** (Odtwórz, Losowo,
-  song rows).
+  song rows); full albums aren't counted or listed in them (nor do their genres alone make Odkryj coś
+  nowego's or Home's "Twoje gatunki").
 - Inne kategorie (**implemented**, each **→ a song list**): Ostatnio dodane (music.db's 100
-  highest ids), Najczęściej słuchane (the listening stats over everything, most played first),
-  Bez nastroju (music.db songs in no mood), Bez linku YouTube (music.db knows no video), Tylko
-  na telefonie (phone files not in MusicDatabase).
+  highest ids), Całe albumy (music.db's full albums — only when it has some), Najczęściej
+  słuchane (the listening stats over everything, most played first), Bez nastroju (music.db
+  songs in no mood), Bez linku YouTube (music.db knows no video), Tylko na telefonie (phone
+  files not in MusicDatabase).
 
 ## Biblioteka (`library_screen.dart`)
 

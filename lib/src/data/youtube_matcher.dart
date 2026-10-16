@@ -25,16 +25,24 @@ class MatchTarget {
     required this.title,
     required this.mainArtists,
     this.featArtists = const [],
+    this.fullAlbum = false,
   });
 
   final String title;
   final List<MatchArtist> mainArtists;
   final List<MatchArtist> featArtists;
 
+  /// A whole album in one recording (`SongKind.fullAlbum`): only a long "full album" video will
+  /// do, never one of its songs.
+  final bool fullAlbum;
+
   /// What to type into YouTube's search: main artists and the title, no guests (extra words make
-  /// YouTube's results worse, not better).
-  String get query =>
-      '${mainArtists.map((a) => a.name).join(' ')} $title'.trim();
+  /// YouTube's results worse, not better) — "full album" added for a [fullAlbum].
+  String get query => [
+    ...mainArtists.map((a) => a.name),
+    title,
+    if (fullAlbum) 'full album',
+  ].join(' ').trim();
 }
 
 /// A candidate with its score; [rejected] says why it can't be the song at all.
@@ -93,7 +101,8 @@ class _Song {
       ],
       featArtists = [
         for (final a in target.featArtists) [for (final n in a.names) _norm(n)],
-      ];
+      ],
+      fullAlbum = target.fullAlbum;
 
   /// Whole title, " padded " for whole-word `contains`.
   final String title;
@@ -103,7 +112,14 @@ class _Song {
 
   final List<List<String>> mainArtists;
   final List<List<String>> featArtists;
+  final bool fullAlbum;
 }
+
+/// What MusicDatabase's hand-off asks of a full album's video: around 20 minutes or more.
+const _fullAlbumMinutes = 20;
+
+/// Words of a full album's video, not a sign of a wrong one.
+const _fullAlbumWords = {'full album', 'caly album'};
 
 final _brackets = RegExp(r'[\(\[][^\)\]]*[\)\]]');
 
@@ -237,7 +253,12 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
   ScoredVideo reject(String why) => ScoredVideo(video, 0, rejected: why);
 
   final duration = video.duration;
-  if (duration != null &&
+  if (song.fullAlbum) {
+    // Without a duration a single song can't be told apart.
+    if (duration == null || duration.inMinutes < _fullAlbumMinutes) {
+      return reject('czas trwania');
+    }
+  } else if (duration != null &&
       (duration.inSeconds < 45 || duration.inMinutes >= 20)) {
     return reject('czas trwania');
   }
@@ -252,6 +273,7 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
   );
 
   for (final word in _notTheSong) {
+    if (song.fullAlbum && _fullAlbumWords.contains(word)) continue;
     if (_hasWord(title, word) && !_hasWord(song.title, word)) {
       return reject('„$word”');
     }
@@ -307,6 +329,9 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
       score += word == 'official audio' || word == 'audio' ? 2 : 1;
       break;
     }
+  }
+  if (song.fullAlbum && _fullAlbumWords.any((w) => _hasWord(title, w))) {
+    score += 2;
   }
   final views = video.viewCount;
   if (views != null && views > 0) score += 0.3 * log(views) / ln10;

@@ -16,6 +16,7 @@ import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
+import '../widgets/common.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
@@ -43,6 +44,9 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
 
   /// The last online search (the button); dropped as soon as the query changes.
   _OnlineResults? _online;
+
+  /// "Całe albumy" ticked: only full albums (music.db's `songs.kind`) among the songs found.
+  bool _onlyFullAlbums = false;
 
   void _onQueryChanged() {
     setState(() {
@@ -137,7 +141,10 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
         ),
         actions: [
           if (_query.text.trim().isNotEmpty)
-            _QueueResultsButton(query: _query.text.trim()),
+            _QueueResultsButton(
+              query: _query.text.trim(),
+              onlyFullAlbums: _onlyFullAlbums,
+            ),
           const SearchFieldsButton(),
           if (_query.text.isNotEmpty)
             IconButton(
@@ -155,6 +162,8 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
           query: _query.text,
           online: _online,
           onSearchOnline: _searchOnline,
+          onlyFullAlbums: _onlyFullAlbums,
+          onOnlyFullAlbums: (on) => setState(() => _onlyFullAlbums = on),
         ),
       ),
     );
@@ -164,9 +173,13 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
 /// Replaces the queue with every song found for [query], in the list's order, starting with
 /// the first; the online results aren't part of it.
 class _QueueResultsButton extends StatelessWidget {
-  const _QueueResultsButton({required this.query});
+  const _QueueResultsButton({
+    required this.query,
+    required this.onlyFullAlbums,
+  });
 
   final String query;
+  final bool onlyFullAlbums;
 
   @override
   Widget build(BuildContext context) {
@@ -175,12 +188,15 @@ class _QueueResultsButton extends StatelessWidget {
       icon: const Icon(Icons.playlist_play, size: 28),
       onPressed: () {
         FocusScope.of(context).unfocus();
-        final hits = searchEverywhere(
-          query,
-          SongCatalogScope.of(context),
-          LocalLibraryScope.of(context),
-          youTube: YouTubeLibraryScope.of(context),
-        );
+        final hits = [
+          for (final hit in searchEverywhere(
+            query,
+            SongCatalogScope.of(context),
+            LocalLibraryScope.of(context),
+            youTube: YouTubeLibraryScope.of(context),
+          ))
+            if (!onlyFullAlbums || hit.isFullAlbum) hit,
+        ];
         if (hits.isEmpty) {
           ScaffoldMessenger.of(context)
             ..clearSnackBars()
@@ -228,11 +244,15 @@ class _Results extends StatelessWidget {
     required this.query,
     required this.online,
     required this.onSearchOnline,
+    required this.onlyFullAlbums,
+    required this.onOnlyFullAlbums,
   });
 
   final String query;
   final _OnlineResults? online;
   final VoidCallback onSearchOnline;
+  final bool onlyFullAlbums;
+  final ValueChanged<bool> onOnlyFullAlbums;
 
   @override
   Widget build(BuildContext context) {
@@ -289,12 +309,19 @@ class _Results extends StatelessWidget {
       );
     }
     final youTubeLibrary = YouTubeLibraryScope.of(context);
-    final results = searchEverywhere(
+    final found = searchEverywhere(
       query,
       catalog,
       library,
       youTube: youTubeLibrary,
     );
+    final fullAlbums = found.where((hit) => hit.isFullAlbum).length;
+    final results = onlyFullAlbums && fullAlbums > 0
+        ? [
+            for (final hit in found)
+              if (hit.isFullAlbum) hit,
+          ]
+        : found;
     final youTube = settings.youTubeSearchEnabled;
     final spotify = settings.searchesSpotifyPlaylists;
     final onlineSection = youTube || spotify
@@ -326,14 +353,26 @@ class _Results extends StatelessWidget {
     }
     final header = Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Text(
-        results.isEmpty
-            ? 'Brak utworów dla „${query.trim()}” w bazie i na telefonie'
-            : 'Utwory: ${results.length}',
-        style: TextStyle(
-          color: context.palette.textSecondary,
-          fontSize: AppFontSize.small,
-        ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              results.isEmpty
+                  ? 'Brak utworów dla „${query.trim()}” w bazie i na telefonie'
+                  : 'Utwory: ${results.length}',
+              style: TextStyle(
+                color: context.palette.textSecondary,
+                fontSize: AppFontSize.small,
+              ),
+            ),
+          ),
+          if (fullAlbums > 0)
+            PillChip(
+              label: 'Całe albumy: $fullAlbums',
+              selected: onlyFullAlbums,
+              onTap: () => onOnlyFullAlbums(!onlyFullAlbums),
+            ),
+        ],
       ),
     );
     final leading = [

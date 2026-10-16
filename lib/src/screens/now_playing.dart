@@ -218,7 +218,11 @@ class MiniPlayer extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        track.shownArtist(context),
+                                        withFullAlbumLabel(
+                                          PlaybackQueueScope.of(context)
+                                              .current,
+                                          track.shownArtist(context),
+                                        ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
@@ -680,7 +684,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                     ),
                                   ),
                                   Text(
-                                    track.shownArtist(context),
+                                    withFullAlbumLabel(
+                                      queue.current,
+                                      track.shownArtist(context),
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -1126,7 +1133,10 @@ class _QueuePanel extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          entry.hit.shownArtist(context),
+                          withFullAlbumLabel(
+                            entry.hit,
+                            entry.hit.shownArtist(context),
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

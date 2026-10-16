@@ -9,6 +9,7 @@ CatalogSong _song(
   String? language,
   List<String> origins = const [],
   String? genre,
+  SongKind kind = SongKind.song,
 }) => CatalogSong(
   id: id,
   title: 'Song $id',
@@ -17,6 +18,7 @@ CatalogSong _song(
   language: language,
   origins: origins,
   genre: genre,
+  kind: kind,
 );
 
 void main() {
@@ -51,6 +53,16 @@ void main() {
     ).map((s) => s.id).toList();
     expect(radio, contains(7));
     expect(radio.where((id) => id >= 2 && id <= 6), hasLength(2));
+  });
+
+  test('full albums are left out, even very much alike', () {
+    final seed = _song(1, 'A', year: 2000);
+    final songs = [
+      seed,
+      _song(2, 'A', year: 2000, kind: SongKind.fullAlbum),
+      _song(3, 'A', year: 2001),
+    ];
+    expect(songRadio(seed, songs).map((s) => s.id), [1, 3]);
   });
 
   test('the same seed gives the same radio', () {

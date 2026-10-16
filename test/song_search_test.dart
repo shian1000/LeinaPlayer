@@ -468,7 +468,11 @@ void main() {
       expect(playlists.playlists, isEmpty);
 
       await tester.tap(find.text('Zapisz w Bibliotece'));
-      await settle(tester, until: () => playlists.playlists.isNotEmpty);
+      // The screen, not the notifier: it sets `playlists` before it notifies (AGENTS.md).
+      await settle(
+        tester,
+        until: () => find.text('Sortuj').evaluate().isNotEmpty,
+      );
       expect(playlists.playlists.single.sourceId, 'a' * 22);
       expect(playlists.playlists.single.trackCount, 2);
       expect(find.text('Zapisz w Bibliotece'), findsNothing);

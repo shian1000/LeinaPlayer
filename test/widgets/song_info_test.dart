@@ -358,6 +358,71 @@ void main() {
     await tester.runAsync(() => root.delete(recursive: true));
   });
 
+  testWidgets('"To jest cały album": a switch sending songs.kind, '
+      'switched back the correction is dropped', (tester) async {
+    databaseFactory = databaseFactoryFfi;
+    SharedPreferences.setMockInitialValues({});
+    late Directory root;
+    late DatabaseSync sync;
+    late Outbox outbox;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('song_info_test');
+      sync = DatabaseSync(storageRoot: () async => root);
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN kind TEXT');
+      await db.close();
+      outbox = Outbox(
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
+    });
+    final hit = SearchHit.main(
+      CatalogSong(id: 3, title: 'Pay Your Respect', artistLabel: 'Afina'),
+      const [],
+    );
+    await tester.pumpWidget(
+      app(
+        SongInfoCard(hit: hit),
+        sync: sync,
+        outbox: outbox,
+      ),
+    );
+    await pumpUntil(
+      tester,
+      () => find.text('To jest cały album').evaluate().isNotEmpty,
+    );
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+
+    await tester.tap(find.byType(Switch));
+    await pumpUntil(
+      tester,
+      () => find.text('Poprawka czeka na wysłanie: tak').evaluate().isNotEmpty,
+    );
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    final corrections = await tester.runAsync(
+      () async => outbox.waitingCorrections,
+    );
+    expect(corrections!.single.table, 'songs');
+    expect(corrections.single.column, 'kind');
+    expect(corrections.single.oldValue, isNull);
+    expect(corrections.single.newValue, 'full_album');
+
+    await tester.tap(find.byType(Switch));
+    await pumpUntil(
+      tester,
+      () => find.textContaining('Poprawka czeka').evaluate().isEmpty,
+    );
+    expect(
+      await tester.runAsync(() async => outbox.waitingCorrections),
+      isEmpty,
+    );
+
+    sync.dispose();
+    await tester.runAsync(() => root.delete(recursive: true));
+  });
+
   testWidgets('no Latin form fields for names in Latin letters', (
     tester,
   ) async {

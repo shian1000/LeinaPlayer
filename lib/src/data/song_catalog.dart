@@ -100,6 +100,24 @@ class ServerFile {
   String get fileName => path.split('/').last;
 }
 
+/// What a row of `songs` is (`songs.kind`, hand-off `musicdatabase-song-kind.md`).
+enum SongKind {
+  /// An ordinary song: `NULL`, and any value the phone doesn't know yet (MusicDatabase may add
+  /// some, e.g. a live set).
+  song,
+
+  /// `'full_album'`: a whole album in one recording (a "full album" video, the album in one
+  /// file) — filed under the album it plays. Left out of the radio, Odkrywaj and other
+  /// automatic picks.
+  fullAlbum;
+
+  static SongKind of(Object? value) =>
+      value == fullAlbumValue ? fullAlbum : song;
+
+  /// `songs.kind` of a [fullAlbum].
+  static const fullAlbumValue = 'full_album';
+}
+
 /// The genres in `songs.genre`: comma-separated, the main one first, each once.
 List<String> genresOf(String? genre) => [
   ...{
@@ -128,6 +146,7 @@ class CatalogSong {
     this.year,
     this.language,
     String? genre,
+    this.kind = SongKind.song,
     String? youtubeVideoId,
     String? musicVideoId,
     this.spotifyTrackId,
@@ -152,7 +171,11 @@ class CatalogSong {
        albumLatin = latinFormOf(album, albumLatin),
        youTubeTarget =
            youTubeTarget ??
-           MatchTarget(title: title, mainArtists: [MatchArtist(artistLabel)]),
+           MatchTarget(
+             title: title,
+             mainArtists: [MatchArtist(artistLabel)],
+             fullAlbum: kind == SongKind.fullAlbum,
+           ),
        youtubeVideoId = _videoIdOf(youtubeVideoId),
        youTube = _youTubeLinkOf(youtubeVideoId),
        musicVideoId = _videoIdOf(musicVideoId),
@@ -196,6 +219,7 @@ class CatalogSong {
       year = song.year,
       language = song.language,
       genres = song.genres,
+      kind = song.kind,
       countries = song.countries,
       youtubeVideoId = links.video == null
           ? song.youtubeVideoId
@@ -261,6 +285,11 @@ class CatalogSong {
   /// `songs.genre` split into its genres, the main one first; empty without one (or before
   /// music.db has the column — hand-off `musicdatabase-genres.md`).
   final List<String> genres;
+
+  /// `songs.kind`: an ordinary song, or a whole album in one recording.
+  final SongKind kind;
+
+  bool get isFullAlbum => kind == SongKind.fullAlbum;
 
   /// The countries its artists come from: the first part of each `artists.origin` ("Kraj -
   /// Region - Miasto"), for Wyszukaj's "Przeglądaj".
@@ -440,12 +469,21 @@ class SongCatalog extends ChangeNotifier {
         _badVideos = BadVideos.none;
         _status = CatalogStatus.noDatabase;
       } else {
-        _songs = await _readSongs(
+        final songs = await _readSongs(
           file,
           await _readServerFiles(await _sync.localFile('files.db')),
         );
-        _badVideos = await _readBadVideos(file);
-        _idChanges = await _readIdChanges(file);
+        final badVideos = await _readBadVideos(file);
+        final idChanges = await _readIdChanges(file);
+        // All at once, with the indexes below: a search between two awaits would otherwise
+        // read the new songs through the old search texts.
+        _songs = songs;
+        _badVideos = badVideos;
+        _idChanges = idChanges;
+        _searchTexts = null;
+        _byTitle = null;
+        _byYouTubeId = null;
+        _byId = null;
         _status = CatalogStatus.ready;
       }
       _loadedSyncTime = syncTime;
@@ -539,6 +577,7 @@ class SongCatalog extends ChangeNotifier {
                ${column('spotify_url')} AS spotify_url,
                ${column('title_latin')} AS title_latin,
                ${column('genre')} AS genre,
+               ${column('kind')} AS kind,
                $albumLatin AS album_latin,
                a.name AS artist, a.origin, a.synonyms, $artistLatin AS name_latin
         FROM songs s JOIN artists a ON a.id = s.artist_id''');
@@ -571,6 +610,7 @@ class SongCatalog extends ChangeNotifier {
       year: row['year'] as int?,
       language: present(row['language'] as String?),
       genre: row['genre'] as String?,
+      kind: SongKind.of(row['kind']),
       youtubeVideoId: (row['youtube_video_id'] as String?)?.trim(),
       musicVideoId: (row['music_video_youtube_id'] as String?)?.trim(),
       spotifyTrackId: _spotifyTrackId(row['spotify_url'] as String?),
@@ -584,6 +624,7 @@ class SongCatalog extends ChangeNotifier {
           for (final a in artists)
             if (a.role == 'feat') MatchArtist(a.name, _otherNames(a)),
         ],
+        fullAlbum: SongKind.of(row['kind']) == SongKind.fullAlbum,
       ),
       artistLabel: _artistLabel(artists),
       artistNames: [for (final a in artists) a.name],

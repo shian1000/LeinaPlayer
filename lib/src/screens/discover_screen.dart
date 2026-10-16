@@ -73,7 +73,10 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         youTube,
       )..shuffle(random)).take(_deckSize).toList();
     }
-    final songs = catalog.songs;
+    final songs = [
+      for (final song in catalog.songs)
+        if (!song.isFullAlbum) song,
+    ];
     if (songs.isEmpty) return <SearchHit>[];
     final picked = <int>{};
     while (picked.length < min(_deckSize, songs.length)) {

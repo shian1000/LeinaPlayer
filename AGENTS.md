@@ -73,6 +73,10 @@ up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the p
 button where "Polub" was); song menus unfold "Dodaj do playlisty ›" / "Przejdź do
 wykonawców ›" in place; Wyszukaj's "Przeglądaj" is grouped (moods, genres, decades, languages,
 countries).
+Full albums — music.db rows that are a whole album in one recording (`songs.kind`,
+`SongKind`) — are marked "Cały album", can be filtered in search, are left out of the radio,
+Odkrywaj and Przeglądaj's lists, are looked for on YouTube only as long "full album" videos,
+and are marked from Informacje o utworze ([hand-off](docs/handoffs/musicdatabase-song-kind.md)).
 Playback extras: Powtarzaj (off / wszystkie / utwór, `PlaybackQueue.setRepeat`), Wyłącznik
 czasowy (song menu), a song's radio (phone-side alikeness by artist, genre — music.db's
 `songs.genre`, [hand-off](docs/handoffs/musicdatabase-genres.md) — moods, language, country,
@@ -238,6 +242,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - A music.db song id kept by the phone or synced (plays, saved data) may be one MusicDatabase
   has since merged or deleted: look it up with `SongCatalog.current` (follows music.db's
   `song_id_changes`), not `byId`. MusicDatabase never remaps ids in what it stores for the phone.
+- A new list the phone fills by itself from all of music.db (a radio, random picks, a browse
+  category to play through) leaves out full albums (`CatalogSong.isFullAlbum`; `hitsWhere(…,
+  fullAlbums: false)`); lists the user built or searched keep them (MusicDatabase's hand-off).
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
   reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.

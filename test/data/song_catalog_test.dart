@@ -228,6 +228,27 @@ void main() {
       expect(catalog.byId(1)!.spotifyTrackId, isNull);
     });
 
+    test('songs.kind: full albums marked, an unknown value is a song, no '
+        'column at all is songs only', () async {
+      await loadSample();
+      expect(catalog.songs.any((s) => s.isFullAlbum), isFalse);
+
+      final path = (await sync.localFile('music.db')).path;
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN kind TEXT');
+      await db.rawUpdate("UPDATE songs SET kind = 'full_album' WHERE id = 2");
+      await db.rawUpdate("UPDATE songs SET kind = 'dj_mix' WHERE id = 3");
+      await db.close();
+      final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      addTearDown(again.dispose);
+      await again.ensureLoaded();
+      expect(again.byId(2)!.kind, SongKind.fullAlbum);
+      expect(again.byId(2)!.youTubeTarget.fullAlbum, isTrue);
+      expect(again.byId(3)!.kind, SongKind.song);
+      expect(again.byId(1)!.kind, SongKind.song);
+      expect(again.byId(1)!.youTubeTarget.fullAlbum, isFalse);
+    });
+
     test('puts titles starting with the query first', () async {
       await loadSample();
       expect(catalog.search('california').map((s) => s.id).toList(), [5, 2]);

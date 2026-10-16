@@ -97,6 +97,9 @@ class SearchHit {
 
   bool get inMainDatabase => mainSong != null;
 
+  /// A whole album in one recording (music.db's `songs.kind`).
+  bool get isFullAlbum => mainSong?.isFullAlbum ?? false;
+
   /// Latin forms of [title], [artistLabel] and [album] from music.db, for names in another
   /// alphabet (`latin_names.dart`); `null` for songs music.db doesn't have.
   String? get titleLatin => mainSong?.titleLatin;

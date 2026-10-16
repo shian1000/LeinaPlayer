@@ -74,7 +74,10 @@ class HomeRecommendations {
     for (final heard in stats.songs) {
       final id = heard.songId;
       if (id == null || heard.plays == 0) continue;
-      for (final genre in song(id)?.genres ?? const <String>[]) {
+      final heardSong = song(id);
+      // A genre's list has no full albums, so their genres alone would open an empty one.
+      if (heardSong == null || heardSong.isFullAlbum) continue;
+      for (final genre in heardSong.genres) {
         plays.update(
           genre,
           (n) => n + heard.plays,
