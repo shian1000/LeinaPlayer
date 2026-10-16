@@ -78,6 +78,9 @@ Full albums — music.db rows that are a whole album in one recording (`songs.ki
 `SongKind`) — are marked "Cały album", can be filtered in search, are left out of the radio,
 Odkrywaj and Przeglądaj's lists, are looked for on YouTube only as long "full album" videos,
 and are marked from Informacje o utworze ([hand-off](docs/handoffs/musicdatabase-song-kind.md)).
+Changing a song's artist there is a proposal of another artist for that song (`songs.artist_id`
+with a name), never a rename of the shared artist row — that's the separate "Popraw pisownię
+nazwy" ([hand-off](docs/handoffs/musicdatabase-song-artist.md)).
 Playback extras: Powtarzaj (off / wszystkie / utwór, `PlaybackQueue.setRepeat`), Wyłącznik
 czasowy (song menu), a song's radio (phone-side alikeness by artist, genre — music.db's
 `songs.genre`, [hand-off](docs/handoffs/musicdatabase-genres.md) — moods, language, country,

@@ -368,6 +368,40 @@ void main() {
         );
       },
     );
+    test(
+      'songs.artist_id: corrected with a name, taken back with the old name',
+      () async {
+        Future<void> propose(Outbox outbox, String name) => outbox.correctField(
+          table: 'songs',
+          rowId: 4601,
+          column: 'artist_id',
+          oldValue: 7,
+          newValue: name,
+          oldAsValue: 'Elise Trouw',
+          song: chromatic,
+        );
+        final outbox = newOutbox();
+        await propose(outbox, 'Lola Young');
+        final file = (await outbox.pending()).single;
+        final row = (await rows(file, 'field_corrections')).single;
+        expect(row, containsPair('old_value', 7));
+        expect(row, containsPair('new_value', 'Lola Young'));
+
+        final sent = await Directory('${root.path}/outbox/sent').create();
+        await file.rename('${sent.path}/${file.path.split('/').last}');
+        await outbox.load();
+        await propose(outbox, 'Elise Trouw');
+        final back = (await rows(
+          (await outbox.pending()).single,
+          'field_corrections',
+        )).single;
+        expect(back, containsPair('old_value', 7));
+        expect(back, containsPair('new_value', 'Elise Trouw'));
+        // Already taken back: the same again sends nothing more.
+        await propose(outbox, 'Elise Trouw');
+        expect(await outbox.pending(), hasLength(1));
+      },
+    );
   });
 
   group('sending', () {

@@ -10,6 +10,7 @@ import '../data/moods.dart';
 import '../data/outbox.dart';
 import '../data/song_catalog.dart';
 import '../data/song_details.dart';
+import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
 import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
@@ -147,7 +148,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
       else ...[
         _songSection(details),
         for (final (i, a) in details.artists.indexed)
-          _artistSection(a.role, a.artist, first: i == 0),
+          _artistSection(a.role, a.artist, song: i == 0 ? details.song : null),
         if (details.album != null) _albumSection(details),
       ],
       _linksSection(details),
@@ -179,18 +180,151 @@ class _SongInfoCardState extends State<SongInfoCard> {
     ]);
   }
 
-  Widget _artistSection(String role, DbRow artist, {required bool first}) {
+  /// [song] is given for the song's own artist (`songs.artist_id`), the first section.
+  Widget _artistSection(String role, DbRow artist, {DbRow? song}) {
     final row = _withLatinColumn(artist, 'name', 'name_latin');
     return _Section(
-      first
+      song != null
           ? 'Wykonawca'
           : role == 'feat'
           ? 'Gościnnie (feat.)'
           : 'Współwykonawca',
       [
         for (final key in row.keys)
-          _editableField('artists', row, key, _artistLabels[key] ?? key),
+          if (key == 'name' && song != null)
+            _mainArtistNameField(song, row)
+          else
+            _editableField('artists', row, key, _artistLabels[key] ?? key),
       ],
+    );
+  }
+
+  /// The song's own artist. Its pencil asks what's wrong: the song is another artist's — a
+  /// `songs.artist_id` correction carrying that artist's name, which changes only this song in
+  /// MusicDatabase — or the name is misspelt — `artists.name`, for all the artist's songs. The
+  /// first is what's usually meant, so it comes first.
+  Widget _mainArtistNameField(DbRow song, DbRow artist) {
+    final outbox = OutboxScope.maybeOf(context);
+    final catalogSong = widget.hit.mainSong;
+    final songId = song['id'];
+    final artistId = song['artist_id'];
+    final name = _text(artist['name']);
+    if (outbox == null ||
+        catalogSong == null ||
+        songId is! int ||
+        artistId is! int ||
+        name == null) {
+      return _editableField('artists', artist, 'name', _artistLabels['name']!);
+    }
+    final other = outbox.correctionOf('songs', songId, 'artist_id', artistId);
+    final spelling = artist['id'] is int
+        ? outbox.correctionOf('artists', artist['id'] as int, 'name', name)
+        : null;
+    String state(FieldCorrection c) =>
+        c.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie';
+    final notes = [
+      // A sent one taken back names the same artist again: nothing to show.
+      if (other != null && !_sameArtistName(other.newValue, name))
+        '${state(other)}: inny wykonawca — ${other.newValue}',
+      if (spelling != null)
+        '${state(spelling)}: pisownia — ${_text(spelling.newValue) ?? '(puste)'}',
+    ];
+    return _Field(
+      _artistLabels['name']!,
+      name,
+      correction: notes.isEmpty ? null : notes.join('\n'),
+      onEdit: () async {
+        final choice = await showDialog<bool>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: Text(name),
+            children: [
+              _ChoiceOption(
+                'Ten utwór ma innego wykonawcę',
+                'Zmieni się tylko ten utwór.',
+                onPressed: () => Navigator.of(context).pop(true),
+              ),
+              _ChoiceOption(
+                'Popraw pisownię nazwy',
+                'We wszystkich utworach tego wykonawcy.',
+                onPressed: () => Navigator.of(context).pop(false),
+              ),
+            ],
+          ),
+        );
+        if (choice == null || !mounted) return;
+        if (choice) {
+          await _proposeOtherArtist(
+            outbox,
+            catalogSong,
+            songId: songId,
+            artistId: artistId,
+            name: name,
+            shown: other?.newValue as String? ?? name,
+          );
+        } else {
+          await _edit(
+            outbox,
+            catalogSong,
+            table: 'artists',
+            rowId: artist['id'] as int,
+            column: 'name',
+            label: 'Pisownia nazwy wykonawcy',
+            kind: _Kind.required,
+            current: name,
+            shown: spelling == null ? name : spelling.newValue,
+          );
+        }
+      },
+    );
+  }
+
+  /// Sends the user's artist for the song as a `songs.artist_id` correction: [artistId] is the
+  /// song's artist in music.db, [name] its name, the new value the name typed. MusicDatabase
+  /// finds the artist of that name (or makes one) and moves only this song to it.
+  Future<void> _proposeOtherArtist(
+    Outbox outbox,
+    CatalogSong song, {
+    required int songId,
+    required int artistId,
+    required String name,
+    required String shown,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => TextInputDialog(
+        title: 'Inny wykonawca tego utworu',
+        hint: 'Nazwa wykonawcy',
+        initial: shown,
+      ),
+    );
+    if (text == null) return;
+    final typed = text.trim();
+    if (typed.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Nazwa wykonawcy nie może być pusta.')),
+      );
+      return;
+    }
+    if (_sameArtistName(typed, shown)) return;
+    // The same artist typed differently is no other artist: taken back.
+    final back = _sameArtistName(typed, name);
+    await outbox.correctField(
+      table: 'songs',
+      rowId: songId,
+      column: 'artist_id',
+      oldValue: artistId,
+      newValue: back ? name : typed,
+      oldAsValue: name,
+      song: song,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          back ? 'Poprawka wycofana.' : 'Propozycja innego wykonawcy trafi do MusicDatabase (Zgłoszenia dla MusicDatabase).',
+        ),
+      ),
     );
   }
 
@@ -680,6 +814,10 @@ String fieldLabel(String table, String column) =>
 String? fieldValue(String table, String column, Object? value) =>
     _shown(_editable[table]?[column], value);
 
+/// Names MusicDatabase would take for one artist (its `normalize()`).
+bool _sameArtistName(Object? a, Object? b) =>
+    normalizeForSearch('${a ?? ''}') == normalizeForSearch('${b ?? ''}');
+
 bool _sameValue(Object? a, Object? b) =>
     a == null || b == null ? a == b : '$a' == '$b';
 
@@ -750,6 +888,7 @@ String? _text(Object? value) => switch (value) {
 
 const _songLabels = {
   'id': 'ID w MusicDatabase',
+  'artist_id': 'Wykonawca utworu',
   'title': 'Tytuł',
   'title_latin': 'Tytuł alfabetem łacińskim',
   'album': 'Album',
@@ -788,6 +927,33 @@ const _albumTypes = {
   'compilation': 'kompilacja',
   'soundtrack': 'ścieżka dźwiękowa',
 };
+
+/// An option of a [SimpleDialog] with a line saying what it does.
+class _ChoiceOption extends StatelessWidget {
+  const _ChoiceOption(this.title, this.subtitle, {required this.onPressed});
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => SimpleDialogOption(
+    onPressed: onPressed,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: AppFontSize.small,
+            color: context.palette.textSecondary,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 class _Note extends StatelessWidget {
   const _Note(this.text);

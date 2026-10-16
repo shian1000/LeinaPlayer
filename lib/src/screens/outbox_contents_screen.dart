@@ -154,8 +154,11 @@ class _CorrectionTile extends StatelessWidget {
     return ListTile(
       leading: const Icon(Icons.edit_outlined),
       title: Text(
-        '${fieldLabel(c.table, c.column)}${where == null ? '' : ' ($where)'}: '
-        '${shown(c.oldValue)} → ${shown(c.newValue)}',
+        // old_value is an artists.id there; the song's artist is in the subtitle.
+        c.table == 'songs' && c.column == 'artist_id'
+            ? 'Inny wykonawca: ${shown(c.newValue)}'
+            : '${fieldLabel(c.table, c.column)}${where == null ? '' : ' ($where)'}: '
+                  '${shown(c.oldValue)} → ${shown(c.newValue)}',
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),

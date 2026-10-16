@@ -52,6 +52,7 @@ What the phone lets the user correct (nothing else is ever sent):
 | `songs` | `title` | text, never NULL |
 | `songs` | `album`, `language` | text or NULL |
 | `songs` | `year`, `track_number`, `disc_number` | integer or NULL |
+| `songs` | `artist_id` | **an artist's name** (text, never NULL; `old_value` is the id) — since 2026-10-17, [`musicdatabase-song-artist.md`](musicdatabase-song-artist.md) |
 | `artists` | `name` | text, never NULL |
 | `artists` | `origin`, `synonyms` | text or NULL (typed by hand, in whatever form the owner uses) |
 | `albums` | `title` | text, never NULL |

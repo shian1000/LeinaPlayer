@@ -281,7 +281,8 @@ class Outbox extends ChangeNotifier {
   /// suggestion MusicDatabase's owner reviews; the phone keeps using music.db's value (except
   /// YouTube links, `main.dart`). Corrected again before it's sent, the newer value replaces the
   /// older; set back to [oldValue], the correction is dropped — or, once sent, taken back with a
-  /// newer one giving [oldValue] again.
+  /// newer one giving [oldValue] again. [oldAsValue] is [oldValue] as a new value would give it,
+  /// where the two differ: `songs.artist_id` is corrected with an artist's name.
   Future<void> correctField({
     required String table,
     required int rowId,
@@ -289,9 +290,11 @@ class Outbox extends ChangeNotifier {
     required Object? oldValue,
     required Object? newValue,
     required CatalogSong song,
+    Object? oldAsValue,
   }) => _inTurn(() async {
     final key = (table: table, rowId: rowId, column: column);
-    if (_same(oldValue, newValue)) {
+    final old = oldAsValue ?? oldValue;
+    if (_same(old, newValue)) {
       if (_known[key]?.sent == false) {
         await _writeCorrection(key, null);
       }
@@ -299,7 +302,7 @@ class Outbox extends ChangeNotifier {
       final takeBack =
           sent != null &&
           _same(sent.oldValue, oldValue) &&
-          !_same(sent.newValue, oldValue);
+          !_same(sent.newValue, old);
       if (!takeBack) return;
     }
     await _writeCorrection(key, {

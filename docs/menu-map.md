@@ -102,7 +102,11 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     only what the phone knows. A pencil next to the song's, its artists' and its album's own
     fields (empty ones shown as "—") corrects the value: the correction goes to the outbox for
     MusicDatabase ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md), field corrections)
-    and shows under music.db's value until a downloaded music.db changes it. Under Linki the
+    and shows under music.db's value until a downloaded music.db changes it. The song's own
+    artist's name asks first: "Ten utwór ma innego wykonawcę" (a `songs.artist_id` correction
+    with the typed name — only this song changes, hand-off
+    [`musicdatabase-song-artist.md`](handoffs/musicdatabase-song-artist.md)) or "Popraw pisownię
+    nazwy" (`artists.name`, all the artist's songs). Under Linki the
     song's YouTube video and music video ("Teledysk") have a pencil too (link or id); unlike
     the other fields the phone uses the new link at once (see `youtube.md`). Once music.db has
     `songs.kind`, "To jest cały album" is a switch instead of a pencil: a `kind` correction of

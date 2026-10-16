@@ -62,7 +62,11 @@ another alphabet, even before music.db has the columns; hand-off
 2026-10-15, the song's YouTube video (`songs.youtube_video_id`) and music video
 (`songs.music_video_youtube_id`, a new column — hand-off
 [`../handoffs/musicdatabase-youtube-links-by-hand.md`](../handoffs/musicdatabase-youtube-links-by-hand.md)).
-Ids, other links and service ids aren't editable. Format in
+Since 2026-10-17 the song's own artist is corrected as **another artist for the song**
+(`songs.artist_id` with the artist's name — only that song moves in MusicDatabase; owner's
+decision, hand-off [`../handoffs/musicdatabase-song-artist.md`](../handoffs/musicdatabase-song-artist.md));
+the artist's name spelling (`artists.name`, all its songs) is the second choice under the same
+pencil. Ids, other links and service ids aren't editable. Format in
 [`../handoffs/musicdatabase-field-corrections.md`](../handoffs/musicdatabase-field-corrections.md).
 
 - **The phone keeps showing music.db's value** (server wins, ADR 0003), with "Poprawka czeka na

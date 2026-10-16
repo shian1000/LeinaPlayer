@@ -186,6 +186,82 @@ void main() {
     await tester.runAsync(() => root.delete(recursive: true));
   });
 
+  testWidgets('another artist for the song: a songs.artist_id correction '
+      'with the name, the same name again takes it back', (tester) async {
+    databaseFactory = databaseFactoryFfi;
+    SharedPreferences.setMockInitialValues({});
+    late Directory root;
+    late DatabaseSync sync;
+    late Outbox outbox;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('song_info_test');
+      sync = DatabaseSync(storageRoot: () async => root);
+      await writeMusicDb((await sync.localFile('music.db')).path);
+      outbox = Outbox(
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
+    });
+    final hit = SearchHit.main(
+      CatalogSong(id: 3, title: 'Pay Your Respect', artistLabel: 'Afina'),
+      const [],
+    );
+    await tester.pumpWidget(
+      app(
+        SongInfoCard(hit: hit),
+        sync: sync,
+        outbox: outbox,
+      ),
+    );
+    await pumpUntil(tester, () => find.text('Afina').evaluate().isNotEmpty);
+
+    Future<void> propose(String name) async {
+      final row = find.ancestor(
+        of: find.text('Afina'),
+        matching: find.byType(Row),
+      );
+      await tester.tap(
+        find.descendant(
+          of: row.first,
+          matching: find.byIcon(Icons.edit_outlined),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ten utwór ma innego wykonawcę'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), name);
+      await tester.tap(find.text('Zapisz'));
+    }
+
+    await propose('Lola Young');
+    await pumpUntil(
+      tester,
+      () => find
+          .text('Poprawka czeka na wysłanie: inny wykonawca — Lola Young')
+          .evaluate()
+          .isNotEmpty,
+    );
+    final corrections = await tester.runAsync(
+      () async => outbox.waitingCorrections,
+    );
+    expect(corrections!.single.table, 'songs');
+    expect(corrections.single.rowId, 3);
+    expect(corrections.single.column, 'artist_id');
+    expect(corrections.single.oldValue, 3);
+    expect(corrections.single.newValue, 'Lola Young');
+
+    // The song's own artist, spelt differently, is no other artist.
+    await propose('AFINA');
+    await pumpUntil(
+      tester,
+      () => find.textContaining('inny wykonawca').evaluate().isEmpty,
+    );
+    expect(await tester.runAsync(outbox.pending), isEmpty);
+
+    sync.dispose();
+    await tester.runAsync(() => root.delete(recursive: true));
+  });
+
   testWidgets(
     'a YouTube link set by hand: a correction the phone uses at once',
     (tester) async {
