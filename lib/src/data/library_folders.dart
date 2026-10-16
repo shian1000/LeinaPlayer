@@ -253,6 +253,7 @@ class LibraryFolders extends ChangeNotifier {
 
   static const _foldersKey = 'library.folders';
   static const _sortKey = 'library.sort';
+  static const _gridKey = 'library.grid';
   static const _openedKey = 'library.opened';
 
   final DateTime Function() _now;
@@ -270,6 +271,7 @@ class LibraryFolders extends ChangeNotifier {
   /// Every account's folders and the deletions not sent yet.
   List<LibraryFolder> _all = const [];
   LibrarySort _sort = LibrarySort.recent;
+  bool _grid = false;
   Map<String, int> _opened = const {};
 
   /// Item keys of the playlists and moods loaded now, by their ref and the other way round
@@ -288,6 +290,9 @@ class LibraryFolders extends ChangeNotifier {
 
   LibrarySort get sort => _sort;
 
+  /// Biblioteka's playlists, moods and folders as a grid of covers instead of a list.
+  bool get grid => _grid;
+
   static String playlistKey(int playlistId) => 'p$playlistId';
 
   Future<void> load() async {
@@ -304,6 +309,7 @@ class LibraryFolders extends ChangeNotifier {
       debugPrint('Biblioteka folders unreadable, starting empty: $e');
     }
     _sort = LibrarySort.values.asNameMap()[prefs.getString(_sortKey)] ?? _sort;
+    _grid = prefs.getBool(_gridKey) ?? _grid;
     notifyListeners();
   }
 
@@ -317,6 +323,12 @@ class LibraryFolders extends ChangeNotifier {
       _sortKey,
       sort.name,
     );
+  }
+
+  Future<void> setGrid(bool grid) async {
+    _grid = grid;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(_gridKey, grid);
   }
 
   /// [key] (a playlist, mood or folder) was opened now.

@@ -1,17 +1,19 @@
 # Menu map
 
 The app's navigation and menus are modelled on the Spotify Android app (layout and naming only — no
-Spotify branding, logo or artwork). All leaf elements are **dummies**: tapping one shows a snackbar
-`Atrapa: <ID>`. Implementing a feature means replacing that dummy with real behaviour.
+Spotify branding, logo or artwork). There are no dummies any more (the `Atrapa: <ID>` snackbar and
+`dummy.dart` were removed on 2026-10-16): an element is built or left out, and a button whose
+feature is missing only in some setups (no scope in a test, a song with no album) is left out
+too.
 
 ## How IDs work
 
-An ID is the path to the element, segments joined with ` › `. It is exactly the text shown in the
-snackbar, so it can be grepped in `lib/` (the last segment is usually the visible label; the
-prefix lives in a `_id` constant or `idPrefix:` argument in the screen file). Labels that occur
+An ID is the path to the element, segments joined with ` › `, as this file names it (the last
+segment is usually the visible label; the prefix lives in a `_id` constant or `idPrefix:`
+argument in the screen file — kept for naming menus, nothing shows it now). Labels that occur
 twice on the same screen get a suffix in parentheses, e.g. `(ikona)` vs `(przycisk)`.
 
-Legend: **→** opens another screen/sheet (implemented), everything else is a dummy.
+Legend: **→** opens another screen/sheet; **implemented** marks what does something itself.
 
 ## From outside the app (Android)
 
@@ -42,7 +44,8 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   was (like the reference app); play carries on from there, with the same queue
   (`QueueSession`). ⊕ before play/pause — Dodaj do playlisty (**implemented**, the same sheet as
   in the song's menu). Holding it shows four buttons just above it (`Mini odtwarzacz › Szybkie
-  akcje › …`): Ukryj, Urządzenia, Polub (dummies) and Więcej (**→ the song's menu**). Tapping it **→ full player** (slides up, covers the bottom bar):
+  akcje › …`), all **implemented**: Nastrój (**→ Dodaj do nastroju**), Na później / Zapisane
+  (toggles "Na później"), Playlista (**→ Dodaj do playlisty**) and Więcej (**→ the song's menu**). Tapping it **→ full player** (slides up, covers the bottom bar):
   - Header: ⌄ (collapse), "Odtwarzanie z wyników wyszukiwania / „<query>” w wyszukiwarce" (the
     menu ⋮ is in the bottom row, by the thumb).
   - Big cover, title, artist, Nastrój (**implemented**: the moon, accent when the song is in a
@@ -58,7 +61,12 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   - Losowo (**implemented**: toggles shuffle, green while on — see the queue below), Poprzedni (**implemented**: within the first 5 s the previous song
     in the queue, otherwise — or with nothing before it — the song from the start), play/pause
     (**implemented**), Następny (**implemented**: the next song in the queue; disabled at its
-    end), `Odtwarzacz › Powtarzaj` (the sleep timer is in the song's menu). "Poprzedni" walks back through the queue (what
+    end), Powtarzaj (**implemented**, `PlaybackQueue.setRepeat`, kept with the saved queue): each tap
+    goes off → wszystkie → utwór (green while on). Wszystkie: with nothing left, the queue's main
+    songs (or, with none, everything played) go to its end again, in order or shuffled — ahead
+    of time, so they crossfade and are cached; switched off, the rounds not started yet are taken
+    out. Utwór: the song plays again when it ends (no crossfade), "Następny" still moves on. The
+    sleep timer is in the song's menu. "Poprzedni" walks back through the queue (what
     played before), whatever playlist each song was queued from.
   - Play queue (`PlaybackQueue`): one list — what played, the song playing, what comes next.
     Tapping a playlist track (or Odtwórz) replaces the **whole** queue, songs added by hand
@@ -167,8 +175,10 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
 ## Ja (`profile_screen.dart`)
 
 - Profile card: avatar, the logged-in MusicDatabase user ("N playlist • M własnych nastrojów") or
-  "Nie zalogowano" — tapping **→ Konto** (`account_screen.dart`); `Ja › Edytuj profil`,
-  `Ja › Udostępnij profil`.
+  "Nie zalogowano" — tapping **→ Konto** (`account_screen.dart`); ✏ Edytuj profil (**→ Konto**)
+  and Udostępnij profil (**implemented**: the latest year's summary opened on its last card, the
+  one shared as a picture — `ListeningSummaryScreen(atShareCard:)`; a note when nothing has
+  been played yet).
 - Konto MusicDatabase card (synced or phone only) **→ Konto**.
 - Statystyki słuchania **→ Statystyki słuchania** (`listening_stats_screen.dart`) —
   **implemented** (ADR 0012): "Ten tydzień" on top — the week's highlights as cards (milestones,
@@ -181,8 +191,7 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   Pory dnia (listened time per hour), Dekady, Języki, Kraje wykonawców, Skąd grało (shares).
   Ustawienia **→ Ustawienia**.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
-  app: 🗑 "Wyczyść historię" in the app bar (confirm dialog), `Ostatnie › Filtr: Muzyka` chip
-  (dummy), then the history by day ("Dzisiaj", "Wczoraj",
+  app: 🗑 "Wyczyść historię" in the app bar (confirm dialog), then the history by day ("Dzisiaj", "Wczoraj",
   "5 października", with the year when not this year): the songs played that day, newest first,
   each once per playlist it came from (song rows with the playing animation; ⋮ IDs `Ostatnie ›
   Utwór › Menu (⋮) › <pozycja>`, the same entries as in search). A song played from a playlist
@@ -203,7 +212,11 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
 One list under section headers (user's choice): MusicDatabase, Słuchanie, Wyszukiwanie i
 import, Wyświetlanie, Dane, Aplikacja.
 
-- `Ustawienia › Wyszukaj ustawienie` (magnifier in the app bar)
+- Wyszukaj ustawienie (magnifier in the app bar) — **implemented**: a search screen over every
+  entry's name, the parts of its subtitle and its `keywords` (the settings on its screen), and
+  the screens under it (`deeper`: Pamięć podręczna), ignoring case and Polish letters; a result
+  shows the setting and its path and opens its screen. A new setting gets its name added to
+  `keywords` in `settings_screen.dart`.
 
 ### MusicDatabase
 
@@ -349,7 +362,10 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   przez Wi-Fi" (off by default; on cellular only cached covers and covers inside phone files show),
   Pamięć podręczna **→ Pamięć podręczna** (`cache_settings_screen.dart`; subtitle: MB used in
   total) — every cache setting, nowhere else ("Pamięć podręczna" is the one name used in the UI):
-  - "Zajęte razem: X MB".
+  - "Zajęte razem: X MB" (with the downloaded songs).
+  - *Pobrane* — "Pobrane utwory" ("N utworów, X MB": songs kept with "Pobierz") and "Usuń
+    wszystkie pobrane" (confirm: server copies deleted, YouTube audio back in the cache). They're
+    outside the YouTube limit and "Wyczyść" / "Wyczyść wszystko" leave them.
   - *Utwory z YouTube* — "Liczba utworów" (dialog, default 25; lowering it deletes the excess
     at once; disabled with a note while YouTube's "Pamięć podręczna" playback method is off),
     "Zajęte miejsce" ("N utworów, X MB") **→ Utwory z YouTube** (`cache_contents_screen.dart`:
@@ -395,21 +411,28 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 
 ## Home (`home_screen.dart`)
 
-- `Home › Filtr: Wszystko` / `Home › Filtr: Muzyka` / `Home › Filtr: Podcasty`; ⚙ (tune icon)
+- Filters (**implemented**, not remembered): Wszystko, Utwory (the rows of songs: Ostatnio
+  odtwarzane, Na później, Nowe w bazie, Zapomniane), Playlisty (Twoje playlisty, rows added from
+  a playlist), Nastroje (Twoje nastroje, rows added from a mood); the artists', albums' and
+  genres' rows show only with Wszystko. ⚙ (tune icon)
   "Dostosuj stronę główną" **→ Dostosuj stronę główną**.
 - Rows in the user's order (`HomeLayout` in `data/home_layout.dart`, phone only): pinned ones
   first (a pin before the title), hidden ones left out. Every row scrolls sideways with all its
   cards (no "Pokaż wszystko"). From the phone (**implemented**; left out while empty):
   Ostatnio odtwarzane (the history's last 12 songs), Twoje playlisty, Twoje nastroje, Na później
   (saved songs); rows added from Biblioteka (a playlist's / mood's first 12 songs). Song cards
-  play the row from the tapped song; playlist / mood cards open it. Then the sample rows
-  ("Rekomendacje"), cards `Home › <sekcja> › karta <n>` (n = 1…6): `Popularne radio`,
-  `Weekend z muzyką`, `Nowe wydania dla Ciebie`, `Popularni wykonawcy`,
-  `Popularne albumy i single`, `W otoczeniu jesiennych dźwięków`, `Nowe nuty dla Ciebie`,
-  `Odkrywaj swoje gatunki`.
+  play the row from the tapped song; playlist / mood cards open it. Then the recommendations
+  (**implemented**, ids `rec:…`, `HomeRecommendations` in `data/home_recommendations.dart` from
+  the listening stats over everything and music.db; each left out while it has nothing):
+  Twoi najczęściej słuchani wykonawcy (round covers of their most played song **→ the artist's
+  songs**), Albumy, do których wracasz (**→ the album's songs**), Nowe w bazie (music.db's 12
+  highest ids — MusicDatabase numbers songs as they're added), Twoje gatunki (the genres of
+  what was heard, most played first; before any plays the day's genres from Wyszukaj **→ the
+  genre's songs**), Zapomniane (songs heard at least twice but not for 60 days). The old sample
+  rows' `sample:…` ids left in a saved layout are passed over.
 - "⋯" on every row (**implemented**): Przypnij na górze / Odepnij, Przenieś wyżej, Przenieś
   niżej, Ukryj sekcję (an added one: Usuń sekcję), Dostosuj stronę główną.
-- **Dostosuj stronę główną** (`CustomizeHomeScreen`): "Rekomendacje" switch (the sample rows),
+- **Dostosuj stronę główną** (`CustomizeHomeScreen`): "Rekomendacje" switch (the rows above),
   "Dodaj sekcję z Biblioteki" (a sheet of playlists and moods), then every row with a checkbox
   (shown), a pin and ≡ to drag it into order.
 
@@ -482,10 +505,26 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     Dodaj do playlisty (**implemented → sheet "Dodaj do playlisty"** below), Dodaj do nastroju
     (**implemented**, MusicDatabase songs only, **→
     sheet "Dodaj do nastroju"** below), Zapisz na później / Usuń z „Na później” (**implemented**),
-    Przejdź do albumu (**implemented**: the album's songs in a song list — `openAlbumSongs`; a
-    dummy for songs with no album), Przejdź do wykonawców ›, Udostępnij (**→ Udostępnij utwór**, below), Wyświetl informacje o utworze (**implemented**: the
+    Przejdź do albumu (**implemented**: the album's songs in a song list — `openAlbumSongs`; left
+    out for songs with no album), Przejdź do wykonawców ›, Przejdź do radia utworu (**implemented**,
+    music.db songs: `songRadio` in `song_radio.dart` — the song, then up to 50 songs like it by
+    shared artist, genres (`songs.genre`, once music.db has it — hand-off
+    [`musicdatabase-genres.md`](handoffs/musicdatabase-genres.md)), moods, language, country and
+    decade, at most 8 per artist, the same list for the same song; a song list with Odtwórz /
+    Losowo. Phone-only logic — MusicDatabase has no radio),
+    Udostępnij (**→ Udostępnij utwór**, below), Wyświetl informacje o utworze (**implemented**: the
     full player's "Informacje o utworze" card in a sheet — `showSongInfoSheet` in `song_info.dart`); above them, in a smaller
-    block, `Pobierz utwór`, `Wyłącznik czasowy`, `Ukryj utwór`. The same ⋮ is used in
+    block, Pobierz utwór (**implemented**, `downloadEntry`: hidden for a phone file; "Pobieram…"
+    while it downloads, "Usuń z pobranych" once done; a note when it's done or failed — see
+    Playlista › Pobierz for what's kept), Wyłącznik czasowy (**implemented → sheet**, `sleep_timer_sheet.dart`:
+    5–45 min, 1 godz., Koniec utworu, and Wyłącz while on; the entry shows what's left — "Wyłącznik
+    czasowy: 12 min". The time fades the music out over 5 s and pauses; Koniec utworu leaves the
+    next song waiting in the player, as after a restart; not kept across restarts), Ukryj utwór /
+    Przestań ukrywać (**implemented**, `HiddenSongs` in `data/hidden_songs.dart`, phone only:
+    the queue passes over a hidden song when it moves on by itself — a tapped one still plays —
+    Odkrywaj and a song's radio leave it out, its rows are dimmed; a note with Cofnij; the list
+    in Ustawienia › Odtwarzanie › Ukryte utwory, `hidden_songs_screen.dart`).
+    The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`). Entries with › unfold their options under them in
     the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Nowa playlista, then every
     playlist made on the phone) and Przejdź do wykonawców › (each artist of the song — **→ its
@@ -523,19 +562,26 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     "Utwory dodane… są…" / "Część utworów dodanych…". With nothing playing the first added song
     starts anyway and doesn't count.
   - **Udostępnij utwór** (`showSongShareSheet` in `share_sheet.dart`; also from the playlist
-    track ⋮ and the full player): a card with the song's cover, title and artist over four round
-    buttons — `<prefix> › Udostępnij › Leina Radio` (dummy), YouTube (**implemented**: the
+    track ⋮ and the full player): a card with the song's cover, title and artist over three round
+    buttons — YouTube (**implemented**: the
     song's video link — music.db's, else one the phone found or the playlist's — to the phone's
     share sheet), Spotify (**implemented**: the track link — MusicDatabase's `spotify_url` when
-    it's a track page, else the Spotify playlist's track), `<prefix> › Udostępnij › MP3` (dummy).
-    YouTube/Spotify without a link are dimmed; tapping one says why.
-- `Wyszukaj › Odkryj coś nowego › <#tag>` (`#polskie indie`, `#mod rock`, `#dance rock`)
+    it's a track page, else the Spotify playlist's track), Plik (**implemented**: the audio file the
+    phone has — its own, a server file downloaded with "Pobierz", or YouTube audio in the cache —
+    to the phone's share sheet; not "MP3", since YouTube audio is webm/m4a). Each without a link
+    or file is dimmed; tapping it says why. ("Leina Radio" was removed — user's decision.)
+- Odkryj coś nowego (**implemented**, `discoverGenres`): up to six of music.db's genres
+  (`songs.genre`), another draw each day, as `#genre` cards **→ the genre's songs**; left out
+  while music.db has no genres.
 - "Przeglądaj" grouped under headings (**implemented**, from music.db and the moods; the
-  biggest first, at most 12 per group): Nastroje (**→ Nastrój**), Dekady (years to come left
-  out), Języki, Kraje wykonawców (the first part of `artists.origin`) — each **→ a song list**
-  (Odtwórz, Losowo, song rows). MusicDatabase has no genres.
-- `Wyszukaj › Kategoria: <nazwa>` — grid "Inne kategorie" (samples); full list in
-  `searchCategories` in `lib/src/sample_content.dart`.
+  biggest first, at most 12 per group): Nastroje (**→ Nastrój**), Gatunki, Dekady (years to come
+  left out; "Lata 80." only for the 1900s, other decades as "1890–1899"), Języki, Kraje
+  wykonawców (the first part of `artists.origin`) — each **→ a song list** (Odtwórz, Losowo,
+  song rows).
+- Inne kategorie (**implemented**, each **→ a song list**): Ostatnio dodane (music.db's 100
+  highest ids), Najczęściej słuchane (the listening stats over everything, most played first),
+  Bez nastroju (music.db songs in no mood), Bez linku YouTube (music.db knows no video), Tylko
+  na telefonie (phone files not in MusicDatabase).
 
 ## Biblioteka (`library_screen.dart`)
 
@@ -580,7 +626,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   song was queued from as a whole (its `QueueOrigin`: tapped there, or the whole playlist added
   to the queue; not a single song added from its ⋮) has a green title with `PlayingBars`, like
   the playing song in a list (also inside folders).
-- `Biblioteka › Widok siatki`
+- Widok siatki / Widok listy (right of "Sortuj wg", also in categories and folders) —
+  **implemented**: three covers per row with the name under them; remembered on the phone
+  (`LibraryFolders.grid`), not synced.
 - Covers show what a row is (`CollectionFrame`): a playlist has a stack of edges above its cover,
   an album (Spotify album import) one edge, a mood rounder corners and a crescent in the corner.
 - Library items: the user's playlists (`PlaylistLibrary`, newest first; cover — the picked one
@@ -659,7 +707,9 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
 - Header: the cover picked with "Dodaj okładkę", else a 2×2 collage of the covers of the first
   four different albums (the first track's cover with fewer; a Spotify album always just one) —
   `CollectionCover`, also in Biblioteka, search and the menus; name, owner
-  avatar + name (the YouTube channel / Spotify user; "YouTube"/"Spotify" when unknown), source icon
+  avatar + name (the YouTube channel / Spotify user; "YouTube"/"Spotify" when unknown,
+  "MusicDatabase" for a folder; made on the phone: the account it syncs with, else "Leina
+  Radio"), source icon
   (YouTube / Spotify) + "N utworów • X godz. Y min" (sum of the known lengths).
 - Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: **Udostępnij** (implemented, the
   same sheet as the icon below), **Dodaj do kolejki** / **Odtwórz jako następną** (implemented:
@@ -668,15 +718,31 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   **`Usuń z
   Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), **Zmień
   nazwę** (implemented: synced like any change; importing the playlist again keeps the phone's
-  name), `Dodaj do tej playlisty`, `Edytuj playlistę`, **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**
+  name), **Dodaj do tej playlisty** / **Edytuj playlistę** (implemented, made on the phone only — the
+  chips below), **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**
   (implemented, like a mood's), **Wyświetl utwory, których nie ma w bazie danych**
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
   tracks not recognised as MusicDatabase songs, "Poza bazą danych: N z M", rows like the
   playlist's — tapping plays on through the playlist from there; a note instead when music.db
   isn't downloaded; later the place to ask MusicDatabase to add them), Dodaj do innej playlisty
   (**implemented**: every track → "Dodaj do playlisty"), Przenieś do folderu (**implemented**, see
-  Biblioteka), `Pokaż kod playlisty`.
-- `Playlista › Pobierz (ikona)`, Udostępnij (ikona, **implemented → Udostępnij sheet**,
+  Biblioteka).
+- Pobierz (ikona, **implemented**, saved playlists): downloads every song not on the phone yet,
+  one at a time (`Downloads` in `playback/downloads.dart`, `TrackPlayer.download`) — from the
+  first source in the play order that has it: a file of MusicDatabase's library is copied to
+  `<support>/downloads/` (`ServerDownloads`; it then plays from there, the server not asked),
+  else the YouTube audio is kept in the cache, `pinned` (local.db v18), outside the limit; with
+  the server out of reach YouTube is tried. A note "Pobieram N utworów…", then done / how many
+  failed. A spinner while it works; filled and green once every song is offline (a phone file
+  counts) — tapped then, "Usunąć pobrane?" takes them off; green outline when only some are.
+  Downloaded songs show the offline pin ("Dostępne offline (pobrane)"). The songs waiting are kept in
+  `local.db`'s `download_queue` (v19) and the run goes on after the app was frozen or killed:
+  on start and on every return to the app (`Downloads.resume`); a song that failed 3 runs is
+  given up. While it runs, `DownloadService.kt` (a `dataSync` foreground service, notification
+  "Pobieranie utworów: N z M" with a progress bar) keeps Android from freezing the app, so it
+  goes on with the screen off. Not done: songs added to a downloaded playlist later aren't
+  downloaded by themselves.
+- Udostępnij (ikona, **implemented → Udostępnij sheet**,
   `share_sheet.dart`: a card with the playlist's mosaic, name and "Playlista • <owner>" over three
   round buttons — Kopiuj link, Otwórz w YouTube/Spotify, Więcej (the phone's share sheet). The
   link is the playlist's page where it was imported from: `youtube.com/playlist?list=…` or
@@ -688,7 +754,18 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   YouTube's daily limit — see [`youtube.md`](agent-notes/youtube.md)), Odtwarzanie losowe
   (**implemented**: queues the playlist shuffled, from a random track), Odtwórz playlistę
   (**implemented**: queues the playlist from its first track, shuffle off),
-  `Playlista › Dodaj (do tej playlisty)` / `Edytuj (playlistę)` / `Sortuj (playlistę)`.
+  chips (**implemented**):
+  - **Dodaj** and **Edytuj** — only on a playlist made on the phone (`source` NULL): an imported one's
+    next import replaces its tracks. Dodaj **→ `playlist_add_screen.dart`**: song search (music.db
+    and the phone), ⊕ puts a song at the end at once (`PlaylistLibrary.addSongs`), ✓ when it's
+    already there (tapped again: a note). Edytuj **→ `playlist_edit_screen.dart`**: the tracks in
+    their own order, dragged by the handle, ⊖ takes one out; nothing changes until "Zapisz"
+    (`PlaylistLibrary.rearrange`, synced), Back drops the edit without asking (`AppShell` pops tab
+    routes past a `PopScope`).
+  - **Sortuj** — every saved playlist: Własna kolejność, Ostatnio dodane (made on the phone only:
+    its own order backwards — added songs go at the end, so after an Edytuj it's the edited order
+    backwards), Tytuł, Wykonawca. The list and what plays follow it; kept on the phone per playlist
+    (`shared_preferences` `playlist.sort.<uid>`), not synced; the chip shows the pick.
 - Tracks: the same rows as song search (`SongTile`: cover, title highlighted while playing,
   source icons) but with just the artist under the title, plus a ⋮. Tapping queues the whole
   playlist at that track and plays it like in search (phone file / YouTube in the user's order);
@@ -698,12 +775,9 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   video found is remembered (full icon from then on). Opening the
   playlist that's playing jumps to the song playing, third row under the app bar (as far as the
   list can scroll; the entry playing, when queued from this playlist, knows its place in it).
-- Track ⋮ **→ sheet**, IDs `Playlista › Utwór › Menu (⋮) › <pozycja>`: Udostępnij (**→
-  Udostępnij utwór**, see search), `Dodaj do
-  Polubionych utworów`, Dodaj do playlisty (**implemented**), Dodaj do nastroju (**implemented**, see search),
-  Usuń z tej playlisty (**implemented**, every saved playlist; synced; an imported one's next
-  import leaves the track out), Dodaj do kolejki and
-  Odtwórz jako następny (**implemented**, see the play queue under Player), `Przejdź do albumu`, `Przejdź do wykonawców`, `Przejdź do radia utworu`.
+- Track ⋮ **→ the song's menu** (the same as search's, `showSongMenu`), IDs `Playlista › Utwór ›
+  Menu (⋮) › <pozycja>`, with Usuń z tej playlisty (**implemented**, every saved playlist; synced;
+  an imported one's next import leaves the track out) after the queue entries.
 
 ## Utwórz sheet (`create_sheet.dart`)
 
@@ -723,17 +797,18 @@ Opened from Biblioteka's "+" (prefix `Biblioteka › Utwórz (+)`), also on a ca
 - Nastrój (**implemented**): name dialog, then a new mood — the logged-in user's, or one only on
   this phone while logged out ([ADR 0008](decisions/0008-moods.md)).
 - Folder (**implemented**): name dialog, then an empty Biblioteka folder.
-- `… › Współtworzone playlisty`
-- `… › Blend`
 
 ## Deliberately left out
 
-- Spotify-branded entries ("Spotify Singles", "Netflix" category, "Pokaż kod Spotify" — renamed to
-  "Pokaż kod playlisty/utworu").
+- Spotify-branded entries ("Spotify Singles", "Netflix" category, "Pokaż kod Spotify").
+- Removed (user's decision, 2026-10-16): Utwórz › Współtworzone playlisty and Blend (they need
+  friends' accounts on MusicDatabase — back to it with those), Pokaż kod playlisty (the link is
+  in Udostępnij), Udostępnij › Leina Radio, Home's Podcasty filter and sample rows, Wyszukaj's
+  Spotify categories.
 - Removed at the user's request: settings entries "Reklama", "Kontrola rodzicielska",
   "Prywatność i funkcje społecznościowe", "Wyświetlane treści", "Aplikacje i urządzenia", the
   "Darmowe konto" header with its Premium button, the camera icon on Wyszukaj and the whole
   Premium tab. Never built: ads and the reaction (emoji) button on tracks.
-- Ustawienia: only "Wyszukaj ustawienie" is still a dummy. Spotify's quick tiles (Tryb
+- Ustawienia: Spotify's quick tiles (Tryb
   oszczędzania danych, Sesja prywatna), Powiadomienia, Jakość zawartości multimedialnej and the
   "Wyloguj" button at the bottom were removed (user's decision; logging out is in Konto).

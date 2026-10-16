@@ -120,7 +120,11 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   found by caching ahead didn't show there).
 - `youtube_cache` + files in `<support dir>/youtube_cache/<id>.webm|m4a`: up to
   `SourceSettings.cacheLimit` (default 25), least recently played deleted first. `.part` files
-  left by interrupted downloads are deleted on start.
+  left by interrupted downloads are deleted on start. A video downloaded with "Pobierz" stays in
+  the same table with `pinned` = 1 (local.db v18): outside the limit, left by "Wyczyść", and
+  `YouTubePlayback` plays it from the phone whatever the playback methods are (cache method off
+  included). `download(pin: true)` pins also a video already cached or being downloaded by
+  caching ahead — a second `download` of a video waits for the first one's future.
 
 Playback (`lib/src/playback/youtube_playback.dart`, `YouTubePlayback`): the switched-on
 `YouTubePlaybackMethod`s in the user's order (Ustawienia › Odtwarzanie › Sposoby odtwarzania YouTube;

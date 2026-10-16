@@ -13,23 +13,23 @@ void main() {
 
   test('Home layout: pinned first, hidden left out, order and additions '
       'remembered', () async {
-    final layout = HomeLayout(defaults: ['a', 'b', 'sample:c']);
-    expect(layout.visible, ['a', 'b', 'sample:c']);
+    final layout = HomeLayout(defaults: ['a', 'b', 'rec:c']);
+    expect(layout.visible, ['a', 'b', 'rec:c']);
 
     await layout.setPinned('b', true);
-    expect(layout.visible, ['b', 'a', 'sample:c']);
+    expect(layout.visible, ['b', 'a', 'rec:c']);
     await layout.move('a', 1);
-    expect(layout.visible, ['b', 'sample:c', 'a']);
+    expect(layout.visible, ['b', 'rec:c', 'a']);
     await layout.setHidden('a', true);
     await layout.setRecommendations(false);
     expect(layout.visible, ['b']);
     await layout.add('playlist:7');
     expect(layout.visible, ['b', 'playlist:7']);
 
-    final reloaded = HomeLayout(defaults: ['a', 'b', 'sample:c']);
+    final reloaded = HomeLayout(defaults: ['a', 'b', 'rec:c']);
     await reloaded.load();
     expect(reloaded.visible, ['b', 'playlist:7']);
-    expect(reloaded.all, ['b', 'playlist:7', 'sample:c', 'a']);
+    expect(reloaded.all, ['b', 'playlist:7', 'rec:c', 'a']);
     await reloaded.remove('playlist:7');
     await reloaded.setHidden('a', false);
     expect(reloaded.visible, ['b', 'a']);

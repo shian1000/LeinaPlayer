@@ -29,6 +29,9 @@ class MainActivity : AudioServiceActivity() {
         if (links?.messenger !== messenger) {
             links = LinksBridge(messenger, applicationContext)
         }
+        if (downloads?.messenger !== messenger) {
+            downloads = DownloadBridge(messenger, applicationContext)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,6 +50,7 @@ class MainActivity : AudioServiceActivity() {
     companion object {
         private var newPipe: NewPipeBridge? = null
         private var links: LinksBridge? = null
+        private var downloads: DownloadBridge? = null
     }
 }
 

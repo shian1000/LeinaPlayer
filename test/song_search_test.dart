@@ -47,6 +47,8 @@ class _FakeBackend implements AudioBackend {
   @override
   Future<void> pause() async {}
   @override
+  Future<void> fadeOutAndPause(Duration fade) => pause();
+  @override
   Future<void> seek(Duration position) async {}
   @override
   Future<void> dispose() async {}
@@ -470,7 +472,8 @@ void main() {
       expect(playlists.playlists.single.sourceId, 'a' * 22);
       expect(playlists.playlists.single.trackCount, 2);
       expect(find.text('Zapisz w Bibliotece'), findsNothing);
-      expect(find.text('Edytuj'), findsOneWidget);
+      // The saved playlist's chips; an imported one is sorted, not edited.
+      expect(find.text('Sortuj'), findsOneWidget);
     },
   );
 }

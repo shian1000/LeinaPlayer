@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
+import '../data/account.dart';
 import '../data/home_layout.dart';
+import '../data/home_recommendations.dart';
+import '../data/latin_names.dart';
+import '../data/listening_log.dart';
+import '../data/listening_stats.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/play_history.dart';
@@ -11,7 +16,6 @@ import '../data/saved_songs.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
-import '../dummy.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
@@ -22,34 +26,22 @@ import '../widgets/mood_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_tile.dart';
+import 'listening_stats_screen.dart';
 import 'mood_screen.dart';
 import 'playlist_screen.dart';
+import 'search_screen.dart';
 
 const _id = 'Home';
 
-enum _CardStyle { square, artist, album }
-
-/// A sample row (placeholder content, "recommendations").
-class _Sample {
-  const _Sample(this.title, this.style, this.itemName);
-
-  final String title;
-  final _CardStyle style;
-  final String itemName;
-
-  String get id => 'sample:$title';
-}
-
-const _samples = [
-  _Sample('Popularne radio', _CardStyle.square, 'Radio'),
-  _Sample('Weekend z muzyką', _CardStyle.square, 'Playlista'),
-  _Sample('Nowe wydania dla Ciebie', _CardStyle.album, 'Wydanie'),
-  _Sample('Popularni wykonawcy', _CardStyle.artist, 'Wykonawca'),
-  _Sample('Popularne albumy i single', _CardStyle.album, 'Album'),
-  _Sample('W otoczeniu jesiennych dźwięków', _CardStyle.square, 'Playlista'),
-  _Sample('Nowe nuty dla Ciebie', _CardStyle.square, 'Mix'),
-  _Sample('Odkrywaj swoje gatunki', _CardStyle.square, '#gatunek'),
-];
+/// Home's recommendation rows (Dostosuj stronę główną › Rekomendacje): made on the phone from the
+/// listening stats and music.db ([HomeRecommendations]).
+const _recommendations = {
+  'rec:artists': 'Twoi najczęściej słuchani wykonawcy',
+  'rec:albums': 'Albumy, do których wracasz',
+  'rec:newest': 'Nowe w bazie',
+  'rec:genres': 'Twoje gatunki',
+  'rec:forgotten': 'Zapomniane',
+};
 
 /// Home's rows made from what's on the phone.
 const _librarySections = {
@@ -59,8 +51,31 @@ const _librarySections = {
   'lib:saved': 'Na później',
 };
 
-const _filters = ['Wszystko', 'Muzyka', 'Podcasty'];
-const _cardsPerSection = 6;
+/// The chips over Home: which rows show.
+enum _HomeFilter {
+  all('Wszystko'),
+  songs('Utwory'),
+  playlists('Playlisty'),
+  moods('Nastroje');
+
+  const _HomeFilter(this.label);
+
+  final String label;
+
+  /// Rows of artists, albums and genres show only with "Wszystko".
+  bool shows(String id) => switch (this) {
+    all => true,
+    songs => const {
+      'lib:recent',
+      'lib:saved',
+      'rec:newest',
+      'rec:forgotten',
+    }.contains(id),
+    playlists => id == 'lib:playlists' || id.startsWith('playlist:'),
+    moods => id == 'lib:moods' || id.startsWith('mood:'),
+  };
+}
+
 const _cardWidth = 144.0;
 const _rowLimit = 12;
 
@@ -73,7 +88,7 @@ class HomeScreen extends StatefulWidget {
   /// [HomeLayout.defaults].
   static final defaultSections = [
     ..._librarySections.keys,
-    for (final sample in _samples) sample.id,
+    ..._recommendations.keys,
   ];
 
   @override
@@ -81,7 +96,33 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedFilter = 0;
+  _HomeFilter _filter = _HomeFilter.all;
+
+  /// The recommendations, from the plays read for [_readFor] (the account and the play going on).
+  HomeRecommendations? _recommended;
+  Object? _readFor;
+  int _reading = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final log = ListeningLogScope.maybeOf(context);
+    final user = AccountScope.maybeOf(context)?.userName;
+    final catalog = SongCatalogScope.maybeOf(context);
+    final readFor = (user, log?.current?.uid, catalog?.songCount);
+    if (log == null || catalog == null || readFor == _readFor) return;
+    _readFor = readFor;
+    final reading = ++_reading;
+    log.listens(account: user).then((listens) {
+      if (!mounted || reading != _reading) return;
+      setState(
+        () => _recommended = HomeRecommendations.of(
+          listens,
+          song: catalog.current,
+        ),
+      );
+    });
+  }
 
   /// Only for widget tests without [HomeLayoutScope].
   final _fallback = HomeLayout(defaults: HomeScreen.defaultSections);
@@ -99,7 +140,8 @@ class _HomeScreenState extends State<HomeScreen> {
       listenable: layout,
       builder: (context, _) {
         final sections = [
-          for (final id in layout.visible) ?_HomeSection.of(context, id),
+          for (final id in layout.visible)
+            if (_filter.shows(id)) ?_HomeSection.of(context, id, _recommended),
         ];
         return SafeArea(
           child: Column(
@@ -109,15 +151,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      for (var i = 0; i < _filters.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
+                      for (final filter in _HomeFilter.values) ...[
+                        if (filter.index > 0) const SizedBox(width: 8),
                         PillChip(
-                          label: _filters[i],
-                          selected: i == _selectedFilter,
-                          onTap: () {
-                            setState(() => _selectedFilter = i);
-                            showDummy(context, '$_id › Filtr: ${_filters[i]}');
-                          },
+                          label: filter.label,
+                          selected: filter == _filter,
+                          onTap: () => setState(() => _filter = filter),
                         ),
                       ],
                     ],
@@ -161,22 +200,13 @@ class _HomeSection {
   final List<Widget> Function(BuildContext context) cards;
 
   /// `null` when the section's playlist / mood is gone, or a library row has nothing to show.
-  static _HomeSection? of(BuildContext context, String id) {
-    final sample = _samples.where((s) => s.id == id).firstOrNull;
-    if (sample != null) {
-      return _HomeSection(
-        id,
-        sample.title,
-        switch (sample.style) {
-          _CardStyle.square => 205,
-          _CardStyle.artist => 185,
-          _CardStyle.album => 220,
-        },
-        (_) => [
-          for (var i = 0; i < _cardsPerSection; i++)
-            _SampleCard(section: sample, index: i),
-        ],
-      );
+  static _HomeSection? of(
+    BuildContext context,
+    String id,
+    HomeRecommendations? recommended,
+  ) {
+    if (_recommendations[id] case final title?) {
+      return _recommendation(context, id, title, recommended);
     }
     final catalog = SongCatalogScope.maybeOf(context);
     final library = LocalLibraryScope.maybeOf(context);
@@ -272,10 +302,111 @@ class _HomeSection {
     return null;
   }
 
+  /// A recommendation row; `null` while there's nothing to recommend (no plays yet, no
+  /// genres in music.db).
+  static _HomeSection? _recommendation(
+    BuildContext context,
+    String id,
+    String title,
+    HomeRecommendations? recommended,
+  ) {
+    const songHeight = 205.0;
+    final catalog = SongCatalogScope.maybeOf(context);
+    final library = LocalLibraryScope.maybeOf(context);
+    final youTube = YouTubeLibraryScope.maybeOf(context);
+    if (catalog == null || library == null || youTube == null) return null;
+    final stats = recommended?.stats;
+    switch (id) {
+      case 'rec:newest':
+        if (catalog.songs.isEmpty) return null;
+        // MusicDatabase numbers songs as they're added.
+        final newest = [...catalog.songs]..sort((a, b) => b.id.compareTo(a.id));
+        final hits = [
+          for (final song in newest.take(_rowLimit))
+            withPhoneYouTube(
+              SearchHit.main(song, library.filesOf(song.id)),
+              youTube,
+            ),
+        ];
+        return _HomeSection(
+          id,
+          title,
+          songHeight,
+          (_) => _songCards(hits, playlistName: title),
+        );
+      case 'rec:forgotten':
+        final forgotten = recommended?.forgotten ?? const <StatsSong>[];
+        if (forgotten.isEmpty) return null;
+        return _HomeSection(
+          id,
+          title,
+          songHeight,
+          (context) => _songCards([
+            for (final song in forgotten.take(_rowLimit))
+              hitOfStatsSong(context, song),
+          ], playlistName: title),
+        );
+      case 'rec:artists':
+        final artists = [
+          for (final a in stats?.artists ?? const <StatsEntry>[])
+            if (a.plays > 0) a,
+        ];
+        if (artists.isEmpty) return null;
+        return _HomeSection(
+          id,
+          title,
+          185,
+          (_) => [
+            for (final artist in artists.take(_rowLimit))
+              _ArtistCard(artist: artist),
+          ],
+        );
+      case 'rec:albums':
+        final albums = [
+          for (final a in stats?.albums ?? const <StatsEntry>[])
+            if (a.plays > 0) a,
+        ];
+        if (albums.isEmpty) return null;
+        return _HomeSection(
+          id,
+          title,
+          songHeight,
+          (_) => [
+            for (final album in albums.take(_rowLimit))
+              _AlbumCard(album: album),
+          ],
+        );
+      case 'rec:genres':
+        // Before anything was heard: the day's genres, like Wyszukaj's "Odkryj coś nowego".
+        final genres = recommended?.genres.isNotEmpty ?? false
+            ? recommended!.genres
+            : discoverGenres(catalog);
+        if (genres.isEmpty) return null;
+        return _HomeSection(
+          id,
+          title,
+          songHeight,
+          (_) => [
+            for (final genre in genres.take(_rowLimit))
+              _Card(
+                cover: CoverArt(
+                  seed: '#$genre',
+                  size: _cardWidth,
+                  icon: Icons.tag,
+                ),
+                title: genre,
+                subtitle: 'Gatunek',
+                onTap: () => openGenreSongs(context, genre),
+              ),
+          ],
+        );
+    }
+    return null;
+  }
+
   /// Its title in "Dostosuj stronę główną", also when it shows nothing now.
   static String titleFor(BuildContext context, String id) {
-    final sample = _samples.where((s) => s.id == id).firstOrNull;
-    if (sample != null) return sample.title;
+    if (_recommendations[id] case final title?) return title;
     if (_librarySections[id] case final title?) return title;
     if (id.startsWith('playlist:')) {
       return PlaylistLibraryScope.maybeOf(context)
@@ -580,81 +711,44 @@ class _Card extends StatelessWidget {
   );
 }
 
-class _SampleCard extends StatelessWidget {
-  const _SampleCard({required this.section, required this.index});
+/// A recommended artist: their most played song's cover in a circle; tapping opens their songs.
+class _ArtistCard extends StatelessWidget {
+  const _ArtistCard({required this.artist});
 
-  final _Sample section;
-  final int index;
+  final StatsEntry artist;
 
   @override
   Widget build(BuildContext context) {
-    final title = '${section.itemName} ${index + 1}';
-    final secondary = TextStyle(
-      color: context.palette.textSecondary,
-      fontSize: AppFontSize.small,
-    );
-    final details = switch (section.style) {
-      _CardStyle.square => [
-        Text(
-          'Wykonawca A, Wykonawca B, Wykonawca C i inni',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: secondary,
-        ),
-      ],
-      _CardStyle.artist => [
-        Text(
-          title,
-          maxLines: 1,
-          textAlign: TextAlign.center,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-      _CardStyle.album => [
-        Text(index.isEven ? 'Album' : 'Singiel', style: secondary),
-        Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        Text('Wykonawca', maxLines: 1, style: secondary),
-      ],
-    };
+    final song = artist.song;
+    final name = showsLatinNames(context)
+        ? withLatin(artist.name, artist.latin)
+        : artist.name;
     return InkWell(
-      onTap: () =>
-          showDummy(context, '$_id › ${section.title} › karta ${index + 1}'),
+      onTap: () => openArtistSongs(context, artist.name),
       child: SizedBox(
         width: _cardWidth,
         child: Column(
-          crossAxisAlignment: section.style == _CardStyle.artist
-              ? CrossAxisAlignment.center
-              : CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                CoverArt(
-                  seed: '${section.title}$index',
-                  size: _cardWidth,
-                  circle: section.style == _CardStyle.artist,
-                  icon: section.style == _CardStyle.artist
-                      ? Icons.person
-                      : Icons.music_note,
-                ),
-                if (section.style == _CardStyle.square)
-                  Positioned(
-                    left: 8,
-                    bottom: 8,
-                    right: 8,
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: AppFontSize.listTitle,
-                        fontWeight: FontWeight.bold,
-                      ),
+            ClipOval(
+              child: song == null
+                  ? CoverArt(
+                      seed: artist.name,
+                      size: _cardWidth,
+                      icon: Icons.person,
+                      circle: true,
+                    )
+                  : SongCover(
+                      cover: CoverRequest.of(hitOfStatsSong(context, song)),
+                      size: _cardWidth,
                     ),
-                  ),
-              ],
             ),
             const SizedBox(height: 8),
-            ...details,
+            Text(
+              name,
+              maxLines: 1,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -662,8 +756,31 @@ class _SampleCard extends StatelessWidget {
   }
 }
 
+/// A recommended album: its most played song's cover; tapping opens the album's songs.
+class _AlbumCard extends StatelessWidget {
+  const _AlbumCard({required this.album});
+
+  final StatsEntry album;
+
+  @override
+  Widget build(BuildContext context) {
+    final song = album.song;
+    return _Card(
+      cover: song == null
+          ? CoverArt(seed: album.name, size: _cardWidth, icon: Icons.album)
+          : SongCover(
+              cover: CoverRequest.of(hitOfStatsSong(context, song)),
+              size: _cardWidth,
+            ),
+      title: album.name,
+      subtitle: album.detail ?? 'Album',
+      onTap: () => openAlbumSongs(context, album.name),
+    );
+  }
+}
+
 /// "Dostosuj stronę główną": every section with a switch (shown or hidden) and a pin, dragged
-/// into order; "Rekomendacje" turns Home's sample rows on and off; rows can be added from
+/// into order; "Rekomendacje" turns the recommended rows on and off; rows can be added from
 /// Biblioteka (a playlist's or a mood's songs).
 class CustomizeHomeScreen extends StatelessWidget {
   const CustomizeHomeScreen({super.key, required this.layout});
@@ -693,7 +810,8 @@ class CustomizeHomeScreen extends StatelessWidget {
                   SwitchListTile(
                     title: const Text('Rekomendacje'),
                     subtitle: const Text(
-                      'Sekcje proponowane przez aplikację (na razie przykładowe)',
+                      'Wykonawcy, albumy, gatunki, nowe i zapomniane utwory — '
+                      'z tego, czego słuchasz',
                     ),
                     value: layout.recommendations,
                     onChanged: layout.setRecommendations,
@@ -724,7 +842,7 @@ class CustomizeHomeScreen extends StatelessWidget {
                 onReorderItem: layout.reorder,
                 itemBuilder: (context, i) {
                   final id = all[i];
-                  final sample = id.startsWith('sample:');
+                  final recommended = id.startsWith('rec:');
                   return Material(
                     key: ValueKey(id),
                     color: palette.background,
@@ -737,12 +855,12 @@ class CustomizeHomeScreen extends StatelessWidget {
                       title: Text(
                         HomeScreenTitles.of(context, id),
                         style: TextStyle(
-                          color: sample && !layout.recommendations
+                          color: recommended && !layout.recommendations
                               ? palette.textSecondary
                               : null,
                         ),
                       ),
-                      subtitle: sample
+                      subtitle: recommended
                           ? const Text('Rekomendacja')
                           : layout.isAdded(id)
                           ? const Text('Z Biblioteki')

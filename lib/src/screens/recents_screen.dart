@@ -6,9 +6,7 @@ import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
-import '../dummy.dart';
 import '../theme.dart';
-import '../widgets/common.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'history_settings_screen.dart';
@@ -108,17 +106,6 @@ class _RecentsScreenState extends State<RecentsScreen> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Row(
-                children: [
-                  PillChip(
-                    label: 'Muzyka',
-                    onTap: () => showDummy(context, '$_id › Filtr: Muzyka'),
-                  ),
-                ],
-              ),
-            ),
             if (days.isEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),

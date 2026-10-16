@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../data/combined_search.dart';
+import '../data/hidden_songs.dart';
 import '../data/mood_filter.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_video.dart';
@@ -68,16 +69,26 @@ class QueueOrigin {
   };
 }
 
+/// "Powtarzaj": off, the whole queue again after its last song, or the current song over and
+/// over.
+enum QueueRepeat { off, all, one }
+
 /// One song in the queue; [key] tells apart the same song queued twice.
 class QueueEntry {
-  QueueEntry._(this.hit, {this.origin, this.index, this.pinned = false})
-    : key = _nextKey++;
+  QueueEntry._(
+    this.hit, {
+    this.origin,
+    this.index,
+    this.pinned = false,
+    this.round,
+  }) : key = _nextKey++;
 
   QueueEntry._pinnedFrom(QueueEntry entry)
     : hit = entry.hit,
       origin = entry.origin,
       index = entry.index,
       pinned = true,
+      round = entry.round,
       key = entry.key;
 
   static int _nextKey = 0;
@@ -90,6 +101,12 @@ class QueueEntry {
 
   /// Moved by hand: shuffle leaves it where the user put it.
   final bool pinned;
+
+  /// Queued again by "Powtarzaj" (all): which time round. Switching it off takes out the
+  /// rounds not started yet.
+  final int? round;
+
+  bool get repeated => round != null;
   final int key;
 }
 
@@ -108,6 +125,7 @@ class PlaybackQueue extends ChangeNotifier {
   PlaybackQueue(
     this._tracks, {
     this.filter,
+    this.hidden,
     Random? random,
     this.offlineRetries = const [
       Duration(seconds: 5),
@@ -121,18 +139,22 @@ class PlaybackQueue extends ChangeNotifier {
       (skip) => skip == MediaSkip.next ? next() : previous(),
     );
     filter?.addListener(_filterChanged);
+    hidden?.addListener(_filterChanged);
     _tracks.player.onNearEnd = _nearEnd;
   }
 
   /// "Przenikanie utworów": the song is about to end, so the next one starts now and fades in.
   bool _nearEnd() {
-    if (!hasNext) return false;
+    if (!hasNext || _repeat == QueueRepeat.one || _sleepAfterSong) return false;
     unawaited(_advance());
     return true;
   }
 
   /// "Filtr nastrojów"; `null`: every song plays.
   final MoodFilter? filter;
+
+  /// "Ukryj utwór": passed over like songs the [filter] hides; `null`: none.
+  final HiddenSongs? hidden;
 
   /// Moving on by itself with no connection, the queue tries the same song again after each of
   /// these waits instead of skipping it — otherwise it raced through dozens of songs in a
@@ -166,6 +188,10 @@ class PlaybackQueue extends ChangeNotifier {
   /// What the queue was last filled with by a tap ([start]).
   QueueOrigin? _mainOrigin;
   bool _shuffle = false;
+  QueueRepeat _repeat = QueueRepeat.off;
+  Timer? _sleepTimer;
+  DateTime? _sleepAt;
+  bool _sleepAfterSong = false;
 
   /// Bumped by every user action, so an automatic move (or caching ahead) started earlier gives
   /// up.
@@ -204,7 +230,17 @@ class PlaybackQueue extends ChangeNotifier {
 
   bool get shuffle => _shuffle;
 
-  bool _shown(QueueEntry entry) => filter?.allows(entry.hit) ?? true;
+  QueueRepeat get repeat => _repeat;
+
+  /// "Wyłącznik czasowy": when the music fades out and stops; `null` when the timer is off.
+  DateTime? get sleepAt => _sleepAt;
+
+  /// "Wyłącznik czasowy" › "Koniec utworu": the queue stops when the current song ends.
+  bool get sleepAfterSong => _sleepAfterSong;
+
+  bool _shown(QueueEntry entry) =>
+      (filter?.allows(entry.hit) ?? true) &&
+      !(hidden?.contains(entry.hit) ?? false);
 
   /// Everything that plays after the current song, in order (without the songs [filter] hides).
   List<QueueEntry> get upcoming => List.unmodifiable(_upcoming.where(_shown));
@@ -311,6 +347,73 @@ class PlaybackQueue extends ChangeNotifier {
     _prefetchAhead();
   }
 
+  /// Off takes out the songs queued again by [QueueRepeat.all].
+  void setRepeat(QueueRepeat mode) {
+    if (mode == _repeat) return;
+    _repeat = mode;
+    if (mode != QueueRepeat.all) {
+      final playing = _current?.round;
+      _upcoming.removeWhere((e) => e.repeated && e.round != playing);
+    }
+    _repeatAtEnd();
+    notifyListeners();
+    _prefetchAhead();
+  }
+
+  /// [QueueRepeat.all] with nothing left to play: the songs played go to the queue again — the
+  /// main songs, in their order (shuffled with shuffle on), or everything when there are none.
+  /// Done ahead, not when the last song ends, so it fades into the first one and is cached.
+  void _repeatAtEnd() {
+    if (_repeat != QueueRepeat.all || _upcoming.any(_shown)) return;
+    final played = [..._history, ?_current];
+    final main = played.where(isMain).toList();
+    final seen = <Object>{};
+    final again = [
+      for (final e in main.isEmpty ? played : main)
+        if (seen.add(main.isEmpty ? TrackRef.of(e.hit).key : e.index!)) e,
+    ];
+    if (main.isNotEmpty) again.sort((a, b) => a.index!.compareTo(b.index!));
+    if (_shuffle) again.shuffle(_random);
+    final round =
+        [...played, ..._upcoming].map((e) => e.round ?? 0).fold(0, max) + 1;
+    _upcoming.addAll([
+      for (final e in again)
+        QueueEntry._(e.hit, origin: e.origin, index: e.index, round: round),
+    ]);
+  }
+
+  /// "Wyłącznik czasowy": the music fades out and stops in [after]; replaces a timer set before.
+  void sleepIn(Duration after) {
+    _cancelSleep();
+    _sleepAt = DateTime.now().add(after);
+    _sleepTimer = Timer(after, () {
+      _cancelSleep();
+      notifyListeners();
+      unawaited(_tracks.player.fadeOutAndPause());
+    });
+    notifyListeners();
+  }
+
+  /// "Wyłącznik czasowy" › "Koniec utworu".
+  void sleepAfterCurrent() {
+    _cancelSleep();
+    _sleepAfterSong = true;
+    notifyListeners();
+  }
+
+  /// "Wyłącz wyłącznik czasowy".
+  void cancelSleep() {
+    _cancelSleep();
+    notifyListeners();
+  }
+
+  void _cancelSleep() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepAt = null;
+    _sleepAfterSong = false;
+  }
+
   /// Puts [mainSongs] in the places of the main songs in [_upcoming], in order; the rest go at
   /// the end.
   void _refill(List<QueueEntry> mainSongs) {
@@ -415,6 +518,7 @@ class PlaybackQueue extends ChangeNotifier {
     final at = _upcoming.indexOf(entry);
     if (at < 0) return -1;
     _upcoming.removeAt(at);
+    _repeatAtEnd();
     notifyListeners();
     _prefetchAhead();
     return at;
@@ -481,6 +585,7 @@ class PlaybackQueue extends ChangeNotifier {
   /// "Wyczyść kolejkę": drops every song added by hand.
   void clearAdded() {
     _upcoming.removeWhere((e) => !isMain(e));
+    _repeatAtEnd();
     notifyListeners();
     _prefetchAhead();
   }
@@ -496,8 +601,12 @@ class PlaybackQueue extends ChangeNotifier {
   /// Takes the next song [filter] allows out of [_upcoming]; the hidden ones before it go to
   /// the history, as passed.
   QueueEntry? _moveNext() {
-    final at = _upcoming.indexWhere(_shown);
-    if (at < 0) return null;
+    var at = _upcoming.indexWhere(_shown);
+    if (at < 0) {
+      _repeatAtEnd();
+      at = _upcoming.indexWhere(_shown);
+      if (at < 0) return null;
+    }
     final current = _current;
     if (current != null) _history.add(current);
     _history.addAll(_upcoming.take(at));
@@ -538,6 +647,7 @@ class PlaybackQueue extends ChangeNotifier {
     // A user's pick (allowExternal) starts at once, even over a song already fading out.
     if (allowExternal) _tracks.player.cancelFade();
     _current = entry;
+    _repeatAtEnd();
     notifyListeners();
     final generation = _generation;
     final outcome = await _tracks.play(
@@ -565,6 +675,24 @@ class PlaybackQueue extends ChangeNotifier {
   /// switching — this may happen with the screen off).
   Future<void> _advance() async {
     final generation = ++_generation;
+    if (_sleepAfterSong) {
+      _cancelSleep();
+      final entry = _moveNext();
+      if (entry == null) {
+        notifyListeners();
+        await _tracks.player.stopAtEnd();
+        return;
+      }
+      // The next song waits in the player, as after a restart; "Odtwórz" plays it.
+      _current = entry;
+      notifyListeners();
+      await _tracks.player.park(shown(entry), () => playCurrent());
+      return;
+    }
+    if (_repeat == QueueRepeat.one && _current != null) {
+      final outcome = await _play(_current!, allowExternal: false);
+      if (outcome.played || generation != _generation) return;
+    }
     while (generation == _generation) {
       final entry = _moveNext();
       if (entry == null) break;
@@ -600,6 +728,7 @@ class PlaybackQueue extends ChangeNotifier {
   /// The filter changed, or the moods it looks at: other songs may be hidden now. Caching ahead
   /// is planned again only when the songs to cache changed — moods change often while syncing.
   void _filterChanged() {
+    _repeatAtEnd();
     notifyListeners();
     if (_current != null && !listEquals(_ahead(), _aheadPlanned)) {
       _prefetchAhead();
@@ -680,6 +809,7 @@ class PlaybackQueue extends ChangeNotifier {
       'origin': originAt(e.origin),
       'index': e.index,
       if (e.pinned) 'pinned': true,
+      'round': ?e.round,
     };
     final mainOrigin = _mainOrigin;
     return {
@@ -689,6 +819,7 @@ class PlaybackQueue extends ChangeNotifier {
       'current': json(current),
       'upcoming': [for (final e in _upcoming) json(e)],
       'shuffle': _shuffle,
+      'repeat': _repeat.name,
       'origins': [for (final o in origins) o.toJson()],
     };
   }
@@ -711,6 +842,7 @@ class PlaybackQueue extends ChangeNotifier {
         origin: origin == null ? null : origins[origin],
         index: map['index'] as int?,
         pinned: map['pinned'] as bool? ?? false,
+        round: map['round'] as int?,
       );
     }
 
@@ -725,6 +857,9 @@ class PlaybackQueue extends ChangeNotifier {
       ..clear()
       ..addAll((json['upcoming'] as List).map(entry));
     _shuffle = json['shuffle'] as bool;
+    _repeat =
+        QueueRepeat.values.asNameMap()[json['repeat'] as String?] ??
+        QueueRepeat.off;
     notifyListeners();
   }
 
@@ -769,7 +904,9 @@ class PlaybackQueue extends ChangeNotifier {
     _generation++;
     _prefetchRun++;
     _prefetchTimer?.cancel();
+    _sleepTimer?.cancel();
     filter?.removeListener(_filterChanged);
+    hidden?.removeListener(_filterChanged);
     if (_tracks.player.onNearEnd == _nearEnd) _tracks.player.onNearEnd = null;
     _completions.cancel();
     _skips.cancel();

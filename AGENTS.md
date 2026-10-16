@@ -15,9 +15,10 @@ work it out itself with simplified local logic, kept only on the phone until Mus
 its own value ([ADR 0003](docs/decisions/0003-app-supports-musicdatabase.md)). The app must keep
 working without the server.
 
-Current state: navigation and menus are modelled on the Spotify Android app. Most leaf elements
-are still dummies that show `Atrapa: <ID>`, and Home shows static placeholder data;
-[`docs/menu-map.md`](docs/menu-map.md) lists every element and marks what's implemented. Real so
+Current state: navigation and menus are modelled on the Spotify Android app. No element is a
+dummy (the old `Atrapa: <ID>` snackbar) any more — what couldn't be built was removed (user's
+decision, 2026-10-16); [`docs/menu-map.md`](docs/menu-map.md) lists every element. Home's
+recommendation rows come from the listening stats and music.db (`home_recommendations.dart`). Real so
 far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `tag.db` from a remote
 or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)), scanning music
 folders on the phone into the phone's own `local.db`, song search over both databases, and
@@ -70,8 +71,15 @@ three phone only; the queue opens in place of the full player's cover, and lyric
 up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the player, above
 "Informacje o utworze" (user's layout: bottom row YouTube, mood filter, share, queue, ⋮; a mood
 button where "Polub" was); song menus unfold "Dodaj do playlisty ›" / "Przejdź do
-wykonawców ›" in place; Wyszukaj's "Przeglądaj" is grouped (moods, decades, languages,
+wykonawców ›" in place; Wyszukaj's "Przeglądaj" is grouped (moods, genres, decades, languages,
 countries).
+Playback extras: Powtarzaj (off / wszystkie / utwór, `PlaybackQueue.setRepeat`), Wyłącznik
+czasowy (song menu), a song's radio (phone-side alikeness by artist, genre — music.db's
+`songs.genre`, [hand-off](docs/handoffs/musicdatabase-genres.md) — moods, language, country,
+decade; `song_radio.dart`), "Pobierz" for a song or playlist (kept offline for good; a queue in
+`local.db` that resumes, under a foreground service — `playback/downloads.dart`), "Ukryj utwór"
+(phone only). Playlists made on the phone: Dodaj / Edytuj; every saved playlist: Sortuj.
+Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
 while logged out), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
 permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)); a whole playlist,
@@ -159,7 +167,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog`, `pluralWord` (Polish plurals) and
   `dayMonthLabel` in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
-  `showShareSheet` in `share_sheet.dart`; `song_names.dart` — `shownTitle` / `shownArtist` /
+  `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
   `music.db` and `files.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
@@ -173,7 +181,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
   folders (synced), sort order and "last opened" (`library_folders.dart`), songs saved for
-  later (`saved_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
+  later (`saved_songs.dart`), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
   (`home_layout.dart`) — all three phone only, syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
@@ -187,17 +195,15 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
   (`network_errors.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
-  port of MusicDatabase's `normalize()` (`text_normalizer.dart`), and lyrics from LRCLIB (`lyrics.dart`).
+  port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from LRCLIB (`lyrics.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
-  (the queue and position saved across restarts), `YouTubePlayback` (the user's ordered ways
+  (the queue and position saved across restarts), `Downloads` ("Pobierz": songs and playlists kept on the phone for good), `YouTubePlayback` (the user's ordered ways
   of playing a YouTube video) and `ListeningTracker` (the listened time of each play, from
   `PlayerController.positionChanges`, for the stats). Never pause between songs — see
   [`local-library.md`](docs/agent-notes/local-library.md) (Android 12+ freezes the app).
 - `lib/src/theme.dart`, `lib/src/theme_controller.dart` — themes and the appearance settings.
-- `lib/src/dummy.dart` — `showDummy()`, used by every not-yet-implemented element.
-- `lib/src/sample_content.dart` — static placeholder content.
 - `test/` — widget/unit tests, mirrors `lib/`; `test/support/` holds shared test helpers.
 - `tool/` — scripts run on the computer: `build_release_apk.sh` and `build_info.sh` (the numbered release build), `youtube_match_benchmark.dart`, `generate_icons.py`
   (draws the app icon and writes every Android/iOS size — rerun it instead of editing the PNGs).
@@ -207,7 +213,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
   incoming YouTube/Spotify links and opening the YouTube app by package),
   `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links), `LinkTargets.kt`,
-  `LaterLinks.kt` (links saved for later),
+  `LaterLinks.kt` (links saved for later), `DownloadService.kt` (the "Pobieranie utworów"
+  foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `docs/` — documentation for humans and AI agents (see [`docs/index.md`](docs/index.md)).
 
@@ -221,7 +228,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `SavedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `SavedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
@@ -252,6 +259,12 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Context menus are `showMenuSheet`: rare options go in `quickEntries` (a small block on top),
   and options with choices of their own unfold in place via `MenuSheetEntry.submenu` rather than
   opening a second sheet (Juxtopposed's redesign, user's choice).
+- No dummy elements: a feature is built or its button is left out (user's decision; the old
+  `showDummy` / `Atrapa:` snackbar is gone). A `MenuSheetEntry` needs an `onTap` unless it has a
+  `submenu`.
+- An in-flight map of futures (`_downloads[id] ??= work().whenComplete(...)`) must remove the
+  entry in a block, `() { map.remove(id); }`: `() => map.remove(id)` returns that very future,
+  which `whenComplete` then waits for — the download hangs forever.
 - No comments explaining *what* code does; only *why*, when non-obvious.
 
 ## Testing & verification
@@ -287,6 +300,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   reference `MusicDatabase` commits from here.
 - Only commit when explicitly asked. Do not push to any remote — the user pushes via their own
   IDE (VS Code or Android Studio).
+- Never `git checkout <file>` (or `git restore`) to drop `dart format` noise in a file: it also
+  throws away the session's uncommitted edits to it (it once wiped `PlaylistLibrary.rearrange`).
+  Format only the files you changed instead.
 
 ## Topic notes (`docs/agent-notes/`)
 

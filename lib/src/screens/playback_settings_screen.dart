@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../data/hidden_songs.dart';
 import '../data/source_settings.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'hidden_songs_screen.dart';
 import 'playback_order_screen.dart';
 import 'youtube_playback_screen.dart';
 
@@ -80,6 +82,22 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
               ),
             ),
           ),
+          if (HiddenSongsScope.maybeOf(context) case final hidden?)
+            ListTile(
+              leading: const Icon(Icons.block),
+              title: const Text('Ukryte utwory'),
+              subtitle: Text(
+                hidden.songs.isEmpty
+                    ? 'Brak — „Ukryj utwór” w menu utworu'
+                    : '${hidden.songs.length} — kolejka, Odkrywaj i radio je pomijają',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const HiddenSongsScreen(),
+                ),
+              ),
+            ),
           const SectionTitle('Przejścia między utworami'),
           ListTile(
             leading: const Icon(Icons.join_inner),

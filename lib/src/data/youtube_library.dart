@@ -16,12 +16,16 @@ class YouTubeCacheEntry {
     required this.file,
     required this.sizeBytes,
     required this.lastPlayed,
+    this.pinned = false,
   });
 
   final String videoId;
   final File file;
   final int sizeBytes;
   final DateTime lastPlayed;
+
+  /// Downloaded with "Pobierz": kept for good, not part of the cache limit.
+  final bool pinned;
 }
 
 /// What the phone itself knows about YouTube, in `local.db` (tables created by
@@ -36,7 +40,8 @@ class YouTubeCacheEntry {
 /// - `youtube_removed_videos`: videos YouTube no longer has ([markVideoRemoved]); a playlist's
 ///   or the phone's own video that's among them isn't used ([isVideoRemoved]).
 /// - `youtube_cache`: audio of played videos, in `<support dir>/youtube_cache/`, at most the
-///   user's limit; the least recently played goes first.
+///   user's limit; the least recently played goes first. Videos downloaded with "Pobierz"
+///   ([setPinned]) stay there outside the limit until taken off again.
 ///
 /// A file gets into the cache by [download], started next to playback: YouTube throttles one
 /// long request to about playback speed, but answers 1 MB `Range` requests at full speed, so the
@@ -132,7 +137,12 @@ class YouTubeLibrary extends ChangeNotifier {
   /// been uploaded since. A tap on the song searches right away.
   static const notFoundFor = Duration(days: 30);
   Map<String, YouTubeCacheEntry> _cache = const {};
-  final _downloading = <String>{};
+
+  /// Downloads under way; a second [download] of the same video waits for the first.
+  final _downloads = <String, Future<bool>>{};
+
+  /// Videos to keep with "Pobierz" once their download under way finishes.
+  final _pinWhenDone = <String>{};
 
   static const _chunkSize = 1024 * 1024;
 
@@ -195,9 +205,34 @@ class YouTubeLibrary extends ChangeNotifier {
     return null;
   }
 
-  int get cachedCount => _cache.length;
-  int get cachedBytes =>
-      _cache.values.fold(0, (sum, entry) => sum + entry.sizeBytes);
+  /// The cache proper, without the videos downloaded with "Pobierz".
+  int get cachedCount => _cache.values.where((e) => !e.pinned).length;
+  int get cachedBytes => _cache.values
+      .where((e) => !e.pinned)
+      .fold(0, (sum, entry) => sum + entry.sizeBytes);
+
+  /// Downloaded with "Pobierz".
+  bool isPinned(String videoId) => _cache[videoId]?.pinned ?? false;
+
+  List<YouTubeCacheEntry> get pinnedEntries => [
+    for (final entry in _cache.values)
+      if (entry.pinned) entry,
+  ];
+
+  /// "Pobierz" on (the audio must be cached already) or off — off puts it back in the cache,
+  /// trimmed to [limit] like any other.
+  Future<void> setPinned(String videoId, bool pinned, {int? limit}) async {
+    if (!_cache.containsKey(videoId)) return;
+    final db = await _database();
+    await db.update(
+      'youtube_cache',
+      {'pinned': pinned ? 1 : 0},
+      where: 'video_id = ?',
+      whereArgs: [videoId],
+    );
+    await _reloadCache(db);
+    if (!pinned && limit != null) await trim(limit);
+  }
 
   Future<Directory> _cacheDir() async =>
       Directory('${(await _storageRoot()).path}/youtube_cache')
@@ -248,6 +283,7 @@ class YouTubeLibrary extends ChangeNotifier {
         lastPlayed: DateTime.fromMillisecondsSinceEpoch(
           row['last_played_at']! as int,
         ),
+        pinned: (row['pinned'] as int? ?? 0) == 1,
       );
       if (await entry.file.exists()) {
         entries[entry.videoId] = entry;
@@ -468,10 +504,14 @@ class YouTubeLibrary extends ChangeNotifier {
         file: entry.file,
         sizeBytes: entry.sizeBytes,
         lastPlayed: now,
+        pinned: entry.pinned,
       ),
     };
     return entry.file;
   }
+
+  /// [videoId]'s cached audio file, without marking it played; `null` when not cached.
+  File? cachedFileOf(String videoId) => _cache[videoId]?.file;
 
   /// Whether [videoId]'s audio is in the cache (without marking it played).
   bool isCached(String videoId) => _cache.containsKey(videoId);
@@ -482,14 +522,33 @@ class YouTubeLibrary extends ChangeNotifier {
 
   /// Saves [url]'s audio as [videoId]'s cache file and records it, dropping the least recently
   /// played beyond [limit]. Failures only leave nothing cached; playback doesn't depend on it.
-  /// Returns whether the audio is cached now (or being downloaded already).
+  /// Returns whether the audio is cached now. With [pin] ("Pobierz") the audio is kept outside
+  /// the limit, also when it's cached already or another download of it is under way.
   Future<bool> download(
+    String videoId,
+    String url,
+    String extension,
+    int limit, {
+    bool pin = false,
+  }) async {
+    if (_cache.containsKey(videoId)) {
+      if (pin) await setPinned(videoId, true);
+      return true;
+    }
+    if (pin) _pinWhenDone.add(videoId);
+    return _downloads[videoId] ??= _download(videoId, url, extension, limit)
+        .whenComplete(() {
+          // A block: `=> remove(…)` would return this very future, which then waits for itself.
+          _downloads.remove(videoId);
+        });
+  }
+
+  Future<bool> _download(
     String videoId,
     String url,
     String extension,
     int limit,
   ) async {
-    if (_cache.containsKey(videoId) || !_downloading.add(videoId)) return true;
     final file = await newCacheFile(videoId, extension);
     final part = File('${file.path}.part');
     final client = HttpClient()
@@ -542,7 +601,7 @@ class YouTubeLibrary extends ChangeNotifier {
       return false;
     } finally {
       client.close(force: true);
-      _downloading.remove(videoId);
+      _pinWhenDone.remove(videoId);
     }
   }
 
@@ -563,14 +622,16 @@ class YouTubeLibrary extends ChangeNotifier {
       'size_bytes': await file.length(),
       'downloaded_at': now,
       'last_played_at': now,
+      'pinned': isPinned(videoId) || _pinWhenDone.remove(videoId) ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     await _reloadCache(db);
     await trim(limit);
   }
 
-  /// Deletes the least recently played files until at most [limit] are left.
+  /// Deletes the least recently played files until at most [limit] are left (downloaded ones
+  /// aren't counted or deleted).
   Future<void> trim(int limit) async {
-    final byAge = _cache.values.toList()
+    final byAge = _cache.values.where((e) => !e.pinned).toList()
       ..sort((a, b) => a.lastPlayed.compareTo(b.lastPlayed));
     final excess = byAge.length - limit;
     if (excess <= 0) return;
@@ -580,9 +641,9 @@ class YouTubeLibrary extends ChangeNotifier {
     await _reloadCache(await _database());
   }
 
-  /// The cached songs, most recently played first.
+  /// The cached songs, most recently played first (without the downloaded ones).
   List<YouTubeCacheEntry> get cacheEntries =>
-      _cache.values.toList()
+      _cache.values.where((e) => !e.pinned).toList()
         ..sort((a, b) => b.lastPlayed.compareTo(a.lastPlayed));
 
   /// Title and artist the phone has seen for each of [videoIds] — in a playlist, the history or
@@ -625,8 +686,9 @@ class YouTubeLibrary extends ChangeNotifier {
     await _reloadCache(await _database());
   }
 
+  /// Empties the cache; songs downloaded with "Pobierz" stay.
   Future<void> clearCache() async {
-    for (final entry in _cache.values.toList()) {
+    for (final entry in _cache.values.where((e) => !e.pinned).toList()) {
       await _remove(entry);
     }
     await _reloadCache(await _database());

@@ -111,6 +111,13 @@ class YouTubePlayback {
       onConnecting?.call();
     }
 
+    // Downloaded with "Pobierz": played from the phone whatever the methods are.
+    if (library.isPinned(videoId)) {
+      final file = await library.cachedFile(videoId);
+      if (file != null && await player.play(track(file.path))) {
+        return YouTubePlayedVia.cache;
+      }
+    }
     for (final method in settings.activePlaybackMethods) {
       switch (method) {
         case YouTubePlaybackMethod.cache:

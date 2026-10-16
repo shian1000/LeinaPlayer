@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -7,7 +9,7 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
-import '../dummy.dart';
+import '../playback/downloads.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import 'song_cover.dart';
@@ -192,9 +194,9 @@ Future<void> showLinkShareSheet(
   );
 }
 
-/// A song: as Leina Radio (not built yet), its YouTube video, its Spotify track, or its file
-/// (not built yet). YouTube and Spotify hand the link to the phone's share sheet; they're dimmed
-/// when the song has no such link. [idPrefix] names the dummies (`<idPrefix> › Udostępnij › …`).
+/// A song: its YouTube video, its Spotify track, or its audio file. YouTube and Spotify hand the
+/// link to the phone's share sheet, "Plik" the file the phone has (its own, a downloaded server
+/// file or YouTube audio in the cache); each is dimmed when there's none.
 Future<void> showSongShareSheet(
   BuildContext context,
   SearchHit hit, {
@@ -205,8 +207,9 @@ Future<void> showSongShareSheet(
   final videoId = song.youtubeVideoId;
   final spotify = song.spotifyUri;
   final subject = '${song.artistLabel} – ${song.title}';
-  void dummy(String label) =>
-      showDummy(context, '$idPrefix › Udostępnij › $label');
+  final file = song.onPhone
+      ? File(song.phoneFiles.first.filePath)
+      : DownloadsScope.maybeOf(context)?.fileOf(song);
   return showShareSheet(
     context,
     title: song.shownTitle(context),
@@ -214,11 +217,6 @@ Future<void> showSongShareSheet(
     cover: SongCover(cover: CoverRequest.of(song), size: 160),
     tint: context.palette.colorForSeed(song.coverSeed),
     options: [
-      ShareOption(
-        icon: Icons.cell_tower,
-        label: 'Leina Radio',
-        onTap: () => dummy('Leina Radio'),
-      ),
       ShareOption(
         icon: Icons.smart_display_outlined,
         label: 'YouTube',
@@ -238,8 +236,15 @@ Future<void> showSongShareSheet(
       ),
       ShareOption(
         icon: Icons.audio_file_outlined,
-        label: 'MP3',
-        onTap: () => dummy('MP3'),
+        label: 'Plik',
+        onTap: file == null
+            ? null
+            : () => SharePlus.instance.share(
+                ShareParams(files: [XFile(file.path)], subject: subject),
+              ),
+        unavailable:
+            'Telefon nie ma pliku tego utworu — pobierz go („Pobierz utwór”) '
+            'albo odtwórz, żeby trafił do pamięci podręcznej.',
       ),
     ],
   );

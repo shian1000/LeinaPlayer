@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/outbox.dart';
+import '../data/server_downloads.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
@@ -45,6 +46,15 @@ class PlayOutcome {
   final String? message;
 }
 
+/// What "Pobierz" did with a song.
+enum DownloadOutcome {
+  downloaded,
+
+  /// A file on the phone: nothing to download.
+  onPhone,
+  failed,
+}
+
 /// Where MusicDatabase's server at [base] serves [file]'s audio.
 Uri serverFileUri(Uri base, ServerFile file) =>
     base.resolve('library/${file.id}');
@@ -81,6 +91,7 @@ class TrackPlayer {
     required this.youTubeSearch,
     this.openExternal,
     this.outbox,
+    this.serverDownloads,
     Future<List<Uri>> Function()? serverAddresses,
     Future<bool> Function()? onWifi,
   }) : _serverAddresses = serverAddresses ?? _noServer,
@@ -98,6 +109,10 @@ class TrackPlayer {
   /// Where dead music.db links (and the videos found instead), and videos found for songs
   /// music.db has no link for, are reported for MusicDatabase; `null` reports nothing.
   final Outbox? outbox;
+
+  /// Server files kept on the phone with "Pobierz", played instead of streaming them; `null`:
+  /// none (tests).
+  final ServerDownloads? serverDownloads;
 
   /// MusicDatabase's server as the phone reaches it now, best address first
   /// ([DatabaseSync.serverAddresses]), for [PlaybackSource.server].
@@ -281,6 +296,24 @@ class TrackPlayer {
     String? playlistName,
     void Function(String status)? onStatus,
   }) async {
+    NowPlaying track(String source) => NowPlaying(
+      title: hit.title,
+      artist: hit.artistLabel,
+      titleLatin: hit.titleLatin,
+      artistLatin: hit.artistLatin,
+      source: source,
+      serverFileId: file.id,
+      coverSeed: hit.coverSeed,
+      cover: CoverRequest.of(hit),
+      searchQuery: searchQuery,
+      playlistName: playlistName,
+    );
+    // Downloaded with "Pobierz": no server needed.
+    if (await serverDownloads?.fileFor(file.id) case final copy?) {
+      if (await player.play(track(copy.path))) {
+        return const PlayOutcome.played();
+      }
+    }
     final addresses = await _serverAddresses();
     if (addresses.isEmpty) {
       return const PlayOutcome.failed(
@@ -298,20 +331,7 @@ class TrackPlayer {
         refused ??= status;
         continue;
       }
-      final ok = await player.play(
-        NowPlaying(
-          title: hit.title,
-          artist: hit.artistLabel,
-          titleLatin: hit.titleLatin,
-          artistLatin: hit.artistLatin,
-          source: uri.toString(),
-          serverFileId: file.id,
-          coverSeed: hit.coverSeed,
-          cover: CoverRequest.of(hit),
-          searchQuery: searchQuery,
-          playlistName: playlistName,
-        ),
-      );
+      final ok = await player.play(track(uri.toString()));
       return ok
           ? const PlayOutcome.played()
           : PlayOutcome.failed(player.lastError);
@@ -443,8 +463,65 @@ class TrackPlayer {
       return false;
     }
     if (settings.queuePrefetchWifiOnly && !await _onWifi()) return false;
+    return _cacheYouTube(hit, pin: false);
+  }
+
+  /// "Pobierz": keeps [hit] on the phone for good, from the first source in the play order that
+  /// has it — a file of MusicDatabase's library copied to the phone ([ServerDownloads]), or the
+  /// YouTube audio kept in the cache outside its limit ([YouTubeLibrary.setPinned]). When the
+  /// server can't be reached, YouTube is tried. A file on the phone needs nothing.
+  Future<DownloadOutcome> download(SearchHit hit) async {
+    if (hit.onPhone) return DownloadOutcome.onPhone;
+    hit = _withRememberedVideo(hit);
+    final server = hit.serverFile;
+    final downloads = serverDownloads;
+    final order = settings.activePlaybackOrder.where(hit.playableFrom);
+    if (order.firstOrNull == PlaybackSource.server &&
+        server != null &&
+        downloads != null) {
+      final addresses = await _serverAddresses();
+      if (await downloads.download(server, [
+        for (final base in addresses) serverFileUri(base, server),
+      ])) {
+        return DownloadOutcome.downloaded;
+      }
+    }
+    if (!settings.enabledSources.contains(PlaybackSource.youtube)) {
+      return DownloadOutcome.failed;
+    }
+    return await _cacheYouTube(hit, pin: true)
+        ? DownloadOutcome.downloaded
+        : DownloadOutcome.failed;
+  }
+
+  /// [hit] kept with "Pobierz": a downloaded server file or pinned YouTube audio.
+  bool isDownloaded(SearchHit hit) {
+    hit = _withRememberedVideo(hit);
+    final server = hit.serverFile;
+    if (server != null && (serverDownloads?.isDownloaded(server.id) ?? false)) {
+      return true;
+    }
+    final videoId = hit.youtubeVideoId;
+    return videoId != null && youTubeLibrary.isPinned(videoId);
+  }
+
+  /// "Usuń z pobranych": a server file's copy is deleted, YouTube audio goes back to the cache.
+  Future<void> removeDownload(SearchHit hit) async {
+    hit = _withRememberedVideo(hit);
+    if (hit.serverFile case final server?) {
+      await serverDownloads?.remove(server.id);
+    }
+    if (hit.youtubeVideoId case final videoId?) {
+      await youTubeLibrary.setPinned(videoId, false, limit: settings.cacheKeep);
+    }
+  }
+
+  /// [hit]'s YouTube audio into the cache — found on YouTube first when the phone doesn't know
+  /// the video yet; with [pin], kept there for good.
+  Future<bool> _cacheYouTube(SearchHit hit, {required bool pin}) async {
+    if (!settings.enabledSources.contains(PlaybackSource.youtube)) return false;
     var videoId = hit.youtubeVideoId;
-    if (source == null) {
+    if (hit.youTube != YouTubeLink.linked || videoId == null) {
       if (hit.youTube != YouTubeLink.unknown ||
           !settings.youTubeSearchEnabled ||
           !settings.enabledSources.contains(PlaybackSource.youtube)) {
@@ -457,7 +534,10 @@ class TrackPlayer {
       }
     }
     if (videoId == null) return false;
-    if (youTubeLibrary.isCached(videoId)) return true;
+    if (youTubeLibrary.isCached(videoId)) {
+      if (pin) await youTubeLibrary.setPinned(videoId, true);
+      return true;
+    }
     for (final method in settings.activePlaybackMethods.where(
       (m) => m.streams,
     )) {
@@ -468,6 +548,7 @@ class TrackPlayer {
           stream.url,
           stream.extension,
           settings.cacheKeep,
+          pin: pin,
         )) {
           return true;
         }
@@ -478,7 +559,7 @@ class TrackPlayer {
           // queue doesn't stall on it. Each round marks one more video, so this ends.
           await youTubeLibrary.markVideoRemoved(videoId);
           await _reportIfMainLink(hit, videoId);
-          return prefetch(hit);
+          return _cacheYouTube(_withRememberedVideo(hit), pin: pin);
         }
       }
     }

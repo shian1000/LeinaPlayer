@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
+import 'package:music_database_app/src/data/database_sync.dart';
+import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/server_downloads.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
@@ -10,6 +13,7 @@ import 'package:music_database_app/src/data/youtube_search.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
 import 'package:music_database_app/src/playback/track_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'playback_test.dart' show FakeBackend;
 
@@ -39,8 +43,11 @@ void main() {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) {
       asked.add('${request.method} ${request.uri.path}');
-      request.response.statusCode =
-          answers[request.uri.path] ?? HttpStatus.notFound;
+      final status = answers[request.uri.path] ?? HttpStatus.notFound;
+      request.response.statusCode = status;
+      if (request.method == 'GET' && status == HttpStatus.ok) {
+        request.response.add(List.filled(100, 7));
+      }
       request.response.close();
     });
     backend = FakeBackend();
@@ -61,7 +68,10 @@ void main() {
   // Nothing listens there: a refused connection, like a server out of reach.
   final unreachable = Uri.parse('http://127.0.0.1:1/');
 
-  TrackPlayer tracks(List<Uri> Function() addresses) => TrackPlayer(
+  TrackPlayer tracks(
+    List<Uri> Function() addresses, {
+    ServerDownloads? downloads,
+  }) => TrackPlayer(
     player: player,
     settings: settings,
     youTubeLibrary: YouTubeLibrary(() => Future.error(StateError('unused'))),
@@ -73,7 +83,52 @@ void main() {
     ),
     youTubeSearch: YouTubeSearch(),
     openExternal: (_) async => true,
+    serverDownloads: downloads,
     serverAddresses: () async => addresses(),
+  );
+
+  test(
+    '"Pobierz": the file is copied to the phone and plays from there without '
+    'the server',
+    () async {
+      sqfliteFfiInit();
+      final root = await Directory.systemTemp.createTemp(
+        'server_download_play',
+      );
+      final sync = DatabaseSync(storageRoot: () async => root);
+      final catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final local = LocalLibrary(
+        catalog,
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
+      addTearDown(() async {
+        local.dispose();
+        catalog.dispose();
+        sync.dispose();
+        await root.delete(recursive: true);
+      });
+      final downloads = ServerDownloads(
+        local.database,
+        storageRoot: () async => root,
+      );
+      await downloads.load();
+
+      final online = tracks(() => [base()], downloads: downloads);
+      expect(online.isDownloaded(_song()), isFalse);
+      expect(await online.download(_song()), DownloadOutcome.downloaded);
+      expect(online.isDownloaded(_song()), isTrue);
+
+      asked.clear();
+      final away = tracks(() => [unreachable], downloads: downloads);
+      expect((await away.play(_song())).played, isTrue);
+      expect(backend.opened.single, endsWith('/downloads/42.mp3'));
+      expect(asked, isEmpty);
+
+      await away.removeDownload(_song());
+      expect(away.isDownloaded(_song()), isFalse);
+      expect((await away.play(_song())).offline, isTrue);
+    },
   );
 
   test('streams the file from the first address that answers', () async {

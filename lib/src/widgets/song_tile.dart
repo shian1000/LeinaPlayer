@@ -5,11 +5,15 @@ export '../data/song_catalog.dart' show artistNamesOf;
 import '../data/saved_songs.dart';
 import '../data/combined_search.dart';
 import '../data/local_library.dart';
+import '../data/hidden_songs.dart';
 import '../data/mood_filter.dart';
+import '../data/moods.dart';
+import '../data/song_radio.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
+import '../playback/downloads.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/track_player.dart';
@@ -22,6 +26,7 @@ import '../screens/queue_screen.dart';
 import '../screens/song_list_screen.dart';
 import 'playlist_picker.dart';
 import 'share_sheet.dart';
+import 'sleep_timer_sheet.dart';
 import 'song_selection.dart';
 import '../data/album_covers.dart';
 import 'song_cover.dart';
@@ -283,7 +288,8 @@ class SongTile extends StatelessWidget {
       cover: CoverRequest.of(hit),
       size: SongTile.coverSize,
     );
-    final tile = ListTile(
+    final hidden = HiddenSongsScope.maybeOf(context)?.contains(hit) ?? false;
+    final row = ListTile(
       contentPadding: trailing == null
           ? null
           : const EdgeInsets.only(left: 16, right: 4),
@@ -328,6 +334,8 @@ class SongTile extends StatelessWidget {
           : onLongPress ??
                 () => showSongMenu(context, hit, idPrefix: menuIdPrefix),
     );
+    // "Ukryj utwór": still there to tap, but dimmed like the reference app's hidden songs.
+    final tile = hidden ? Opacity(opacity: 0.45, child: row) : row;
     if (selecting) return tile;
     // Like the reference app: dragging a song to the right queues it.
     return SwipeActions(
@@ -361,7 +369,10 @@ class SourceIcons extends StatelessWidget {
     final cached =
         videoId != null &&
         (YouTubeLibraryScope.maybeOf(context)?.isCached(videoId) ?? false);
-    final offline = hit.onPhone || cached;
+    final downloaded =
+        !hit.onPhone &&
+        (DownloadsScope.maybeOf(context)?.isDownloaded(hit) ?? false);
+    final offline = hit.onPhone || cached || downloaded;
     final searchable =
         source == null &&
         order.contains(PlaybackSource.youtube) &&
@@ -423,6 +434,8 @@ class SourceIcons extends StatelessWidget {
                 child: Tooltip(
                   message: hit.onPhone
                       ? 'Dostępne offline (plik na telefonie)'
+                      : downloaded
+                      ? 'Dostępne offline (pobrane)'
                       : 'Dostępne offline (pamięć podręczna)',
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -446,8 +459,11 @@ class SourceIcons extends StatelessWidget {
 
 /// The menu of a song — its ⋮, and a long press on its row outside a [SongSelectionArea]:
 /// "Dodaj do kolejki", "Odtwórz jako następny", "Dodaj do nastroju", "Dodaj do playlisty",
-/// "Zapisz na później", "Udostępnij", "Wyświetl informacje o utworze"; the rest are dummies like in the reference app. [extra] entries (e.g. "Usuń z tej playlisty") go after the queue ones.
-/// "Pobierz utwór", "Wyłącznik czasowy" and "Ukryj utwór" (dummies) sit in a smaller block above.
+/// "Zapisz na później", "Przejdź do albumu" (only when the song has one), "Przejdź do
+/// wykonawców", "Udostępnij", "Wyświetl informacje o utworze". [extra] entries (e.g. "Usuń z tej
+/// playlisty") go after the queue ones.
+/// "Przejdź do radia utworu" (music.db songs). "Pobierz utwór", "Wyłącznik czasowy" and
+/// "Ukryj utwór" sit in a smaller block above.
 Future<void> showSongMenu(
   BuildContext context,
   SearchHit hit, {
@@ -463,10 +479,10 @@ Future<void> showSongMenu(
       title: hit.shownTitle(context),
       subtitle: hit.shownArtist(context),
     ),
-    quickEntries: const [
-      MenuSheetEntry(Icons.download_outlined, 'Pobierz utwór'),
-      MenuSheetEntry(Icons.timer_outlined, 'Wyłącznik czasowy'),
-      MenuSheetEntry(Icons.block, 'Ukryj utwór'),
+    quickEntries: [
+      ?downloadEntry(context, hit),
+      ?sleepTimerEntry(context),
+      ?hideEntry(context, hit),
     ],
     entries: [
       MenuSheetEntry(
@@ -481,8 +497,7 @@ Future<void> showSongMenu(
       ),
       ?moodMenuEntry(context, hit),
       ...extra,
-      playlistSubmenuEntry(context, [hit]) ??
-          const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
+      ?playlistSubmenuEntry(context, [hit]),
       if (SavedSongsScope.maybeOf(context) case final saved?)
         saved.contains(hit)
             ? MenuSheetEntry(
@@ -500,9 +515,7 @@ Future<void> showSongMenu(
           Icons.album_outlined,
           'Przejdź do albumu',
           onTap: () => openAlbumSongs(context, album),
-        )
-      else
-        const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
+        ),
       MenuSheetEntry(
         Icons.person_outline,
         'Przejdź do wykonawców',
@@ -515,6 +528,12 @@ Future<void> showSongMenu(
             ),
         ],
       ),
+      if (hit.mainSong case final song?)
+        MenuSheetEntry(
+          Icons.radio,
+          'Przejdź do radia utworu',
+          onTap: () => openSongRadio(context, song),
+        ),
       MenuSheetEntry(
         Icons.share_outlined,
         'Udostępnij',
@@ -570,6 +589,115 @@ Future<void> openArtistSongs(BuildContext context, String artist) =>
     );
 
 /// The songs of the album called [album] (a lite album page).
+/// "Ukryj utwór" / "Przestań ukrywać" in a song's menu; `null` without [HiddenSongs].
+MenuSheetEntry? hideEntry(BuildContext context, SearchHit hit) {
+  final hidden = HiddenSongsScope.maybeOf(context);
+  if (hidden == null) return null;
+  final messenger = ScaffoldMessenger.of(context);
+  return hidden.contains(hit)
+      ? MenuSheetEntry(
+          Icons.visibility_outlined,
+          'Przestań ukrywać',
+          onTap: () => hidden.toggle(hit),
+        )
+      : MenuSheetEntry(
+          Icons.block,
+          'Ukryj utwór',
+          onTap: () async {
+            await hidden.toggle(hit);
+            messenger
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(
+                  persist: false,
+                  content: Text(
+                    'Ukryto „${hit.title}” — kolejka, Odkrywaj i radio go pominą.',
+                  ),
+                  action: SnackBarAction(
+                    label: 'Cofnij',
+                    onPressed: () => hidden.toggle(hit),
+                  ),
+                ),
+              );
+          },
+        );
+}
+
+/// "Pobierz utwór" in a song's menu — "Pobieram…" while it downloads, "Usuń z pobranych" once
+/// it's on the phone; `null` for a file of the phone's own (or without [Downloads]).
+MenuSheetEntry? downloadEntry(BuildContext context, SearchHit hit) {
+  final downloads = DownloadsScope.maybeOf(context);
+  if (downloads == null || hit.onPhone) return null;
+  if (downloads.isDownloading(hit)) {
+    return MenuSheetEntry(Icons.downloading, 'Pobieram…', onTap: () {});
+  }
+  if (downloads.isDownloaded(hit)) {
+    return MenuSheetEntry(
+      Icons.download_done,
+      'Usuń z pobranych',
+      onTap: () => downloads.remove([hit]),
+    );
+  }
+  final messenger = ScaffoldMessenger.of(context);
+  return MenuSheetEntry(
+    Icons.download_outlined,
+    'Pobierz utwór',
+    onTap: () async {
+      final failed = await downloads.download([hit]);
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              failed == 0
+                  ? 'Pobrano „${hit.title}” — zagra też bez internetu.'
+                  : 'Nie udało się pobrać „${hit.title}”.',
+            ),
+          ),
+        );
+    },
+  );
+}
+
+/// "Przejdź do radia utworu": [songRadio] for [seed], worked out once for the screen (it goes
+/// through all of music.db) and again only for a new music.db.
+Future<void> openSongRadio(BuildContext context, CatalogSong seed) {
+  List<CatalogSong>? songs;
+  CatalogSong? from;
+  return SongListScreen.open(
+    context,
+    title: 'Radio: ${seed.title}',
+    subtitle: 'Radio utworu',
+    songs: (context) {
+      final catalog = SongCatalogScope.of(context);
+      final library = LocalLibraryScope.of(context);
+      final youTube = YouTubeLibraryScope.of(context);
+      // A new music.db gives the seed a new object.
+      final now = catalog.current(seed.id) ?? seed;
+      if (songs == null || !identical(from, now)) {
+        from = now;
+        songs = songRadio(
+          now,
+          catalog.songs,
+          moodsOf: MoodLibraryScope.maybeOf(context)?.moodKeysOf,
+        );
+      }
+      final hidden = HiddenSongsScope.maybeOf(context);
+      return [
+        for (final (i, song) in songs!.indexed)
+          if (withPhoneYouTube(
+                SearchHit.main(song, library.filesOf(song.id)),
+                youTube,
+              )
+              case final hit
+              // The seed stays: the radio is of it.
+              when i == 0 || !(hidden?.contains(hit) ?? false))
+            hit,
+      ];
+    },
+  );
+}
+
 Future<void> openAlbumSongs(BuildContext context, String album) =>
     SongListScreen.open(
       context,

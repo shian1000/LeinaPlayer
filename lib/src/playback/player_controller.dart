@@ -89,6 +89,9 @@ abstract class AudioBackend {
   Future<void> crossfadeTo(NowPlaying track, Duration fade);
   Future<void> play();
   Future<void> pause();
+
+  /// Turns the volume down to nothing over [fade], pauses, and puts the volume back.
+  Future<void> fadeOutAndPause(Duration fade);
   Future<void> seek(Duration position);
   Future<void> dispose();
 }
@@ -384,6 +387,19 @@ class JustAudioBackend implements AudioBackend {
   }
 
   @override
+  Future<void> fadeOutAndPause(Duration fade) async {
+    _endFade();
+    final player = _player;
+    final steps = fade.inMilliseconds ~/ _fadeStep.inMilliseconds;
+    for (var i = 1; i <= steps && player.playing; i++) {
+      await Future<void>.delayed(_fadeStep);
+      await player.setVolume(1 - i / steps);
+    }
+    await player.pause();
+    await player.setVolume(1);
+  }
+
+  @override
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
@@ -548,6 +564,16 @@ class PlayerController extends ChangeNotifier {
     _playing = false;
     _resume = resume;
     notifyListeners();
+  }
+
+  /// "Wyłącznik czasowy": the music fades out over [fade] and pauses.
+  Future<void> fadeOutAndPause([
+    Duration fade = const Duration(seconds: 5),
+  ]) async {
+    _fadePending = false;
+    final backend = _backend;
+    if (backend == null || _resume != null || !_playing) return;
+    await backend.fadeOutAndPause(fade);
   }
 
   /// Nothing follows the song that just ended: stop at its start, ready to play again.

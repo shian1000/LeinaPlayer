@@ -36,16 +36,6 @@ Future<void> showCreateSheet(BuildContext context, {required String idPrefix}) {
           subtitle: 'Uporządkuj playlisty i nastroje w Bibliotece',
           onTap: () => createFolder(context),
         ),
-      const MenuSheetEntry(
-        Icons.group_outlined,
-        'Współtworzone playlisty',
-        subtitle: 'Utwórz playlistę ze znajomymi',
-      ),
-      const MenuSheetEntry(
-        Icons.join_inner,
-        'Blend',
-        subtitle: 'Połącz gusta znajomych w jedną playlistę',
-      ),
     ],
   );
 }

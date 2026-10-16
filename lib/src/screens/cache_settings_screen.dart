@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/album_covers.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
+import '../playback/downloads.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'cache_contents_screen.dart';
@@ -10,9 +11,11 @@ import 'cache_contents_screen.dart';
 String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 
 /// Everything the phone keeps to play and show without the internet: YouTube audio, the queue's
-/// next songs (downloaded into that audio cache) and album covers, in bytes.
+/// next songs (downloaded into that audio cache), songs kept with "Pobierz" and album covers, in
+/// bytes.
 int cacheBytesOf(BuildContext context) =>
     YouTubeLibraryScope.of(context).cachedBytes +
+    (DownloadsScope.maybeOf(context)?.bytes ?? 0) +
     (AlbumCoversScope.maybeOf(context)?.cachedBytes ?? 0);
 
 /// "Ustawienia › Oszczędzanie danych i tryb offline › Pamięć podręczna": every cache setting in
@@ -174,8 +177,8 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
     final library = YouTubeLibraryScope.of(context);
     if (!await _confirm(
       'Wyczyścić całą pamięć podręczną?',
-      'Zapisane utwory z YouTube i pobrane okładki zostaną usunięte. Pobrana baza danych '
-          'i muzyka z telefonu zostają.',
+      'Zapisane utwory z YouTube i pobrane okładki zostaną usunięte. Pobrana baza danych, '
+          'utwory pobrane przyciskiem „Pobierz” i muzyka z telefonu zostają.',
     )) {
       return;
     }
@@ -184,10 +187,25 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
     _done('Wyczyszczono pamięć podręczną.');
   }
 
+  Future<void> _removeDownloads(Downloads downloads) async {
+    if (!await _confirm(
+      'Usunąć wszystkie pobrane?',
+      'Utwory pobrane przyciskiem „Pobierz” przestaną być dostępne bez internetu. Pliki z '
+          'serwera zostaną usunięte z telefonu, utwory z YouTube wrócą do zwykłej pamięci '
+          'podręcznej.',
+      action: 'Usuń',
+    )) {
+      return;
+    }
+    await downloads.removeAll();
+    _done('Usunięto pobrane utwory.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final settings = SourceSettingsScope.of(context);
+    final downloads = DownloadsScope.maybeOf(context);
     final library = YouTubeLibraryScope.of(context);
     final covers = AlbumCoversScope.maybeOf(context);
     final songsOn = settings.playbackMethods.contains(
@@ -214,6 +232,31 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
               style: hint,
             ),
           ),
+          if (downloads != null) ...[
+            const SectionTitle('Pobrane'),
+            ListTile(
+              leading: const Icon(Icons.download_for_offline_outlined),
+              title: const Text('Pobrane utwory'),
+              subtitle: Text(
+                '${downloads.count} ${_songs(downloads.count)}, '
+                '${_mb(downloads.bytes)} MB',
+              ),
+            ),
+            ListTile(
+              enabled: downloads.count > 0,
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Usuń wszystkie pobrane'),
+              onTap: () => _removeDownloads(downloads),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Text(
+                'Utwory i playlisty pobrane przyciskiem „Pobierz” zostają na telefonie bez '
+                'limitu, także po „Wyczyść”. Muzyka z telefonu się do nich nie liczy.',
+                style: hint,
+              ),
+            ),
+          ],
           const SectionTitle('Utwory z YouTube'),
           ListTile(
             enabled: songsOn,
@@ -327,7 +370,9 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           ListTile(
             leading: Icon(Icons.delete_sweep_outlined, color: palette.accent),
             title: const Text('Wyczyść wszystko'),
-            subtitle: const Text('Utwory z YouTube i okładki'),
+            subtitle: const Text(
+              'Utwory z YouTube i okładki (pobrane zostają)',
+            ),
             onTap: () => _clearAll(covers),
           ),
         ],

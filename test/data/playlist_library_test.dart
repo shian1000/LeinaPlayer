@@ -454,6 +454,26 @@ void main() {
     expect(playlists.byId(first.playlist.id)!.name, 'Po zmianie');
   });
 
+  test('"Edytuj": tracks reordered and taken out in one go', () async {
+    await catalog.ensureLoaded();
+    final saved = await playlists.create('Cztery', [
+      for (final id in [1, 2, 4, 5])
+        SearchHit.main(catalog.byId(id)!, const []),
+    ]);
+    var changed = 0;
+    playlists.onChanged = () => changed++;
+
+    await playlists.rearrange(saved.id, [3, 0, 2]);
+
+    final tracks = await playlists.tracks(saved.id);
+    expect(
+      [for (final t in tracks) (t.position, t.mainDbId)],
+      [(0, 5), (1, 1), (2, 4)],
+    );
+    expect(playlists.byId(saved.id)!.trackCount, 3);
+    expect(changed, 1);
+  });
+
   test('a track removed from a playlist leaves no gap', () async {
     await catalog.ensureLoaded();
     final saved = await playlists.create('Trzy', [

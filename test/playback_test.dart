@@ -45,6 +45,8 @@ class FakeBackend implements AudioBackend {
   @override
   Future<void> pause() async => _state.add((playing: false, completed: false));
   @override
+  Future<void> fadeOutAndPause(Duration fade) => pause();
+  @override
   Future<void> seek(Duration position) async => lastSeek = position;
   void finish() => _state.add((playing: true, completed: true));
   @override

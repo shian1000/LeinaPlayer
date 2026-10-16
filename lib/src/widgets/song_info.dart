@@ -658,6 +658,7 @@ const _editable = {
     'album': _Kind.text,
     'year': _Kind.number,
     'language': _Kind.text,
+    'genre': _Kind.text,
     'track_number': _Kind.number,
     'disc_number': _Kind.number,
     'title_latin': _Kind.text,
@@ -689,6 +690,7 @@ const _songLabels = {
   'album': 'Album',
   'year': 'Rok',
   'language': 'Język',
+  'genre': 'Gatunek',
   'track_number': 'Numer utworu',
   'disc_number': 'Numer płyty',
 };

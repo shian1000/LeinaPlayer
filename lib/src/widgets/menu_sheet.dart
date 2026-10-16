@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../dummy.dart';
 import '../theme.dart';
 
 class MenuSheetEntry {
@@ -18,7 +17,7 @@ class MenuSheetEntry {
   final String? subtitle;
   final bool premium;
 
-  /// When null (and no [submenu]) the entry is a dummy reporting `<idPrefix> › <label>`.
+  /// What tapping does; `null` only for an entry with a [submenu].
   final VoidCallback? onTap;
 
   /// Its own options, unfolded under it in the same sheet ("Dodaj do playlisty ›") instead of
@@ -68,11 +67,7 @@ Future<void> showMenuSheet(
                     title: Text(entry.label),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
-                      (entry.onTap ??
-                          () => showDummy(
-                            context,
-                            '$idPrefix › ${entry.label}',
-                          ))();
+                      entry.onTap?.call();
                     },
                   ),
                 const Divider(),
@@ -119,11 +114,7 @@ Future<void> showMenuSheet(
                         )
                       : () {
                           Navigator.of(sheetContext).pop();
-                          (entry.onTap ??
-                              () => showDummy(
-                                context,
-                                '$idPrefix › ${entry.label}',
-                              ))();
+                          entry.onTap?.call();
                         },
                 ),
                 if (entry.submenu != null && open == entry.label)
@@ -145,11 +136,7 @@ Future<void> showMenuSheet(
                           : Text(inner.subtitle!),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        (inner.onTap ??
-                            () => showDummy(
-                              context,
-                              '$idPrefix › ${entry.label} › ${inner.label}',
-                            ))();
+                        inner.onTap?.call();
                       },
                     ),
               ],

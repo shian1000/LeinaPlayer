@@ -8,7 +8,6 @@ import '../data/saved_songs.dart';
 import '../data/smart_playlists.dart';
 import '../data/song_catalog.dart';
 import '../data/text_normalizer.dart';
-import '../dummy.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
@@ -152,23 +151,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     padding: const EdgeInsets.only(bottom: 16),
                     children: [
                       const _Categories(),
-                      Row(
-                        children: [
-                          if (folders != null) _SortButton(folders: folders),
-                          const Spacer(),
-                          IconButton(
-                            tooltip: 'Widok siatki',
-                            icon: const Icon(Icons.grid_view),
-                            onPressed: () =>
-                                showDummy(context, '$_id › Widok siatki'),
-                          ),
-                        ],
-                      ),
+                      if (folders != null) _ViewRow(folders: folders),
                       if (entries.isEmpty)
                         const _EmptyLibrary()
                       else
-                        for (final entry in entries)
-                          LibraryEntryTile(entry: entry),
+                        LibraryEntries(entries: entries),
                     ],
                   ),
           ),
@@ -438,7 +425,7 @@ class LibraryCategoryScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 16),
         children: [
-          if (folders != null) Row(children: [_SortButton(folders: folders)]),
+          if (folders != null) _ViewRow(folders: folders),
           if (entries.isEmpty)
             switch (category) {
               LibraryCategory.moods => const _EmptyMoods(),
@@ -455,8 +442,7 @@ class LibraryCategoryScreen extends StatelessWidget {
               ),
             }
           else
-            for (final entry in entries)
-              LibraryEntryTile(entry: entry, category: category),
+            LibraryEntries(entries: entries, category: category),
         ],
       ),
     );
@@ -478,6 +464,71 @@ class _EmptyNote extends StatelessWidget {
       style: TextStyle(color: palette.textSecondary),
     ),
   );
+}
+
+/// "Sortuj wg" and the list / grid switch.
+class _ViewRow extends StatelessWidget {
+  const _ViewRow({required this.folders});
+
+  final LibraryFolders folders;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      _SortButton(folders: folders),
+      const Spacer(),
+      IconButton(
+        tooltip: folders.grid ? 'Widok listy' : 'Widok siatki',
+        icon: Icon(folders.grid ? Icons.view_list : Icons.grid_view),
+        onPressed: () => folders.setGrid(!folders.grid),
+      ),
+    ],
+  );
+}
+
+/// [entries] as rows, or as a grid of covers when "Widok siatki" is on.
+class LibraryEntries extends StatelessWidget {
+  const LibraryEntries({super.key, required this.entries, this.category});
+
+  final List<LibraryEntry> entries;
+  final LibraryCategory? category;
+
+  static const _gap = 12.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!(LibraryFoldersScope.maybeOf(context)?.grid ?? false)) {
+      return Column(
+        children: [
+          for (final entry in entries)
+            LibraryEntryTile(entry: entry, category: category),
+        ],
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = (constraints.maxWidth - 2 * _gap) / 3;
+          return Wrap(
+            spacing: _gap,
+            runSpacing: _gap,
+            children: [
+              for (final entry in entries)
+                SizedBox(
+                  width: width,
+                  child: LibraryEntryTile(
+                    entry: entry,
+                    category: category,
+                    gridSize: width,
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 /// "Sortuj wg": shows the order and opens the sheet to change it.
@@ -529,22 +580,31 @@ class _SortButton extends StatelessWidget {
 /// folder, or opens a folder's menu. The playlist / mood the playing song was queued from is
 /// highlighted, like the playing song in a list.
 class LibraryEntryTile extends StatelessWidget {
-  const LibraryEntryTile({super.key, required this.entry, this.category});
+  const LibraryEntryTile({
+    super.key,
+    required this.entry,
+    this.category,
+    this.gridSize,
+  });
 
   final LibraryEntry entry;
+
+  /// A cell of [LibraryEntries]' grid this wide: the cover with the name under it.
+  final double? gridSize;
 
   /// The category it's listed in; a folder opened from it shows only what the category does.
   final LibraryCategory? category;
 
   @override
   Widget build(BuildContext context) {
+    final coverSize = gridSize ?? 64;
     final (leading, subtitle) = switch (entry) {
       FolderEntry(:final contents) => (
-        _FolderIcon(size: 64),
+        _FolderIcon(size: coverSize),
         'Folder • ${_itemCount(contents)}',
       ),
       PlaylistEntry(:final playlist) => (
-        PlaylistCover(playlist: playlist, size: 64),
+        PlaylistCover(playlist: playlist, size: coverSize),
         [
           playlist.source == PlaylistSource.spotifyAlbum
               ? 'Album'
@@ -553,7 +613,7 @@ class LibraryEntryTile extends StatelessWidget {
         ].join(' • '),
       ),
       MoodEntry(:final mood) => (
-        MoodCover(mood: mood, size: 64),
+        MoodCover(mood: mood, size: coverSize),
         mood.global ? 'Nastrój • globalny' : 'Nastrój • Twój',
       ),
     };
@@ -565,30 +625,55 @@ class LibraryEntryTile extends StatelessWidget {
       MoodEntry(:final mood) => origin?.isFrom(moodKey: mood.key) ?? false,
       FolderEntry() => false,
     };
+    void open() => switch (entry) {
+      FolderEntry(:final folder) => FolderScreen.open(
+        context,
+        folder,
+        category: category,
+      ),
+      PlaylistEntry(:final playlist) => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PlaylistScreen(playlist: playlist),
+        ),
+      ),
+      MoodEntry(:final mood) => MoodScreen.open(context, mood),
+    };
+    final VoidCallback? menu = folders == null
+        ? null
+        : () => switch (entry) {
+            FolderEntry(:final folder) => showFolderMenu(context, folder),
+            _ => showMoveToFolderSheet(context, entry.key),
+          };
+    if (gridSize != null) {
+      return InkWell(
+        onTap: open,
+        onLongPress: menu,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            leading,
+            const SizedBox(height: 6),
+            CurrentTitle(text: entry.name, isCurrent: playing),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: AppFontSize.small,
+                color: context.palette.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: leading,
       title: CurrentTitle(text: entry.name, isCurrent: playing),
       subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      onTap: () => switch (entry) {
-        FolderEntry(:final folder) => FolderScreen.open(
-          context,
-          folder,
-          category: category,
-        ),
-        PlaylistEntry(:final playlist) => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => PlaylistScreen(playlist: playlist),
-          ),
-        ),
-        MoodEntry(:final mood) => MoodScreen.open(context, mood),
-      },
-      onLongPress: folders == null
-          ? null
-          : () => switch (entry) {
-              FolderEntry(:final folder) => showFolderMenu(context, folder),
-              _ => showMoveToFolderSheet(context, entry.key),
-            },
+      onTap: open,
+      onLongPress: menu,
     );
   }
 
@@ -749,7 +834,7 @@ class FolderScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 16),
         children: [
-          Row(children: [_SortButton(folders: folders)]),
+          _ViewRow(folders: folders),
           if (entries.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
@@ -760,8 +845,7 @@ class FolderScreen extends StatelessWidget {
                 style: TextStyle(color: palette.textSecondary),
               ),
             ),
-          for (final entry in entries)
-            LibraryEntryTile(entry: entry, category: category),
+          LibraryEntries(entries: entries, category: category),
         ],
       ),
     );

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
+import 'package:music_database_app/src/data/hidden_songs.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/mood_filter.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
@@ -64,6 +65,8 @@ class _Backend implements AudioBackend {
   Future<void> play() async => _state.add((playing: true, completed: false));
   @override
   Future<void> pause() async => pauses++;
+  @override
+  Future<void> fadeOutAndPause(Duration fade) => pause();
   @override
   Future<void> seek(Duration position) async => seeks.add(position);
   @override
@@ -824,6 +827,135 @@ void main() {
     await flush();
     expect(backend.pauses, 1);
     expect(backend.seeks.last, Duration.zero);
+  });
+
+  test(
+    '"Ukryj utwór": passed over when moving on, played when tapped',
+    () async {
+      final hidden = HiddenSongs();
+      final hiding = PlaybackQueue(
+        tracks,
+        prefetchDelay: Duration.zero,
+        hidden: hidden,
+      );
+      addTearDown(hiding.dispose);
+      final b = _file('b');
+      await hidden.toggle(b);
+
+      await hiding.start([_file('a'), b, _file('c')], 0);
+      expect(titles(hiding.upcoming), ['c']);
+      backend.finish();
+      await flush();
+      expect(backend.opened.last, '/music/c.mp3');
+
+      await hiding.start([_file('a'), b], 1);
+      expect(hiding.current?.title, 'b');
+      expect(backend.opened.last, '/music/b.mp3');
+    },
+  );
+
+  group('"Powtarzaj"', () {
+    test('all: the playlist again after its last song, in its order; '
+        'added songs aren\'t repeated; off takes the repeats out', () async {
+      await queue.start([_file('a'), _file('b')], 0, playlistName: 'P');
+      await queue.add([_file('x')]);
+      queue.setRepeat(QueueRepeat.all);
+      expect(titles(queue.upcoming), ['x', 'b']);
+
+      await queue.next();
+      await queue.next();
+      expect(queue.current?.title, 'b');
+      expect(titles(queue.upcoming), ['a', 'b']);
+
+      backend.finish();
+      await flush();
+      expect(backend.opened.last, '/music/a.mp3');
+
+      // Off in the second round: it plays to its end, no third round.
+      queue.setRepeat(QueueRepeat.off);
+      expect(titles(queue.upcoming), ['b']);
+      await queue.next();
+      expect(queue.hasNext, isFalse);
+
+      queue.setRepeat(QueueRepeat.all);
+      expect(titles(queue.upcoming), ['a', 'b']);
+      queue.setRepeat(QueueRepeat.off);
+      expect(queue.upcoming, isEmpty);
+    });
+
+    test('all with only songs added by hand repeats them', () async {
+      await queue.add([_file('x'), _file('y')]);
+      queue.setRepeat(QueueRepeat.all);
+      expect(titles(queue.upcoming), ['y']);
+      await queue.next();
+      expect(titles(queue.upcoming), ['x', 'y']);
+    });
+
+    test(
+      'one: the song plays again when it ends; "Następny" moves on',
+      () async {
+        await queue.start([_file('a'), _file('b')], 0);
+        queue.setRepeat(QueueRepeat.one);
+
+        backend.finish();
+        await flush();
+        expect(backend.opened, ['/music/a.mp3', '/music/a.mp3']);
+        expect(queue.current?.title, 'a');
+
+        await queue.next();
+        expect(queue.current?.title, 'b');
+      },
+    );
+
+    test('kept with the saved queue', () async {
+      await queue.start([_file('a'), _file('b')], 1);
+      queue.setRepeat(QueueRepeat.all);
+      final saved = jsonDecode(jsonEncode(queue.snapshot())) as Map;
+      final other = PlaybackQueue(tracks, prefetchDelay: Duration.zero);
+      addTearDown(other.dispose);
+      other.restore(saved.cast(), (ref) => _file(ref.title));
+      expect(other.repeat, QueueRepeat.all);
+      expect(titles(other.upcoming), ['a', 'b']);
+      expect(other.upcoming.every((e) => e.repeated), isTrue);
+    });
+  });
+
+  group('"Wyłącznik czasowy"', () {
+    test('after a time the music stops', () async {
+      await queue.start([_file('a'), _file('b')], 0);
+      queue.sleepIn(const Duration(milliseconds: 20));
+      expect(queue.sleepAt, isNotNull);
+      await waitUntil(() => backend.pauses > 0);
+      expect(queue.sleepAt, isNull);
+      expect(queue.current?.title, 'a');
+    });
+
+    test(
+      '"Koniec utworu": the next song waits in the player, not playing',
+      () async {
+        await queue.start([_file('a'), _file('b')], 0);
+        queue.sleepAfterCurrent();
+        expect(queue.sleepAfterSong, isTrue);
+
+        backend.finish();
+        await flush();
+        expect(backend.opened, ['/music/a.mp3']);
+        expect(queue.current?.title, 'b');
+        expect(player.restored, isTrue);
+        expect(queue.sleepAfterSong, isFalse);
+
+        await player.togglePlay();
+        expect(backend.opened.last, '/music/b.mp3');
+      },
+    );
+
+    test('switched off, nothing stops', () async {
+      await queue.start([_file('a'), _file('b')], 0);
+      queue.sleepIn(const Duration(milliseconds: 10));
+      queue.cancelSleep();
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(backend.pauses, 0);
+    });
   });
 
   group('"Przenikanie utworów"', () {

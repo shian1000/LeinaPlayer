@@ -347,6 +347,108 @@ void main() {
     },
   );
 
+  testWidgets('a playlist made on the phone: Sortuj, Edytuj and Dodaj', (
+    tester,
+  ) async {
+    // Every track on screen at once, under the playlist's header.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pumpLibrary(
+      tester,
+      before: () => playlists.create('Moja', [
+        for (final id in [2, 1, 5]) SearchHit.main(catalog.byId(id)!, const []),
+      ]),
+    );
+    await tester.tap(find.text('Moja'));
+    await settle(tester, until: find.text('Going to California'));
+    List<String> shown() {
+      final titles = [
+        'Going to California',
+        'Małomiasteczkowy',
+        'California Dreaming',
+        'Pusty',
+      ].where((t) => find.text(t).evaluate().isNotEmpty).toList();
+      return titles..sort(
+        (a, b) => tester
+            .getTopLeft(find.text(a).first)
+            .dy
+            .compareTo(tester.getTopLeft(find.text(b).first).dy),
+      );
+    }
+
+    expect(shown(), [
+      'Going to California',
+      'Małomiasteczkowy',
+      'California Dreaming',
+    ]);
+
+    await tester.tap(find.text('Sortuj'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tytuł'));
+    await tester.pumpAndSettle();
+    expect(shown(), [
+      'California Dreaming',
+      'Going to California',
+      'Małomiasteczkowy',
+    ]);
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getString('playlist.sort.${playlists.playlists.single.uid}'),
+      'title',
+    );
+
+    // Edytuj shows the playlist's own order, whatever the sort.
+    await tester.tap(find.text('Edytuj'));
+    await tester.pumpAndSettle();
+    expect(find.text('Edytuj playlistę'), findsOneWidget);
+    await tester.tap(find.byTooltip('Usuń z playlisty').first);
+    await tester.pump();
+    expect(find.text('Going to California'), findsNothing);
+    await tester.tap(find.text('Zapisz'));
+    await pumpUntil(
+      tester,
+      () =>
+          find.text('Going to California').evaluate().isEmpty &&
+          find.text('Edytuj playlistę').evaluate().isEmpty,
+    );
+    final ids = await tester.runAsync(
+      () async => [
+        for (final t in await playlists.tracks(playlists.playlists.single.id))
+          t.mainDbId,
+      ],
+    );
+    expect(ids, [1, 5]);
+
+    await tester.tap(find.text('Dodaj'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'pusty');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Dodaj do playlisty'));
+    await pumpUntil(
+      tester,
+      () => find.byTooltip('Jest na playliście').evaluate().isNotEmpty,
+    );
+    await tester.enterText(find.byType(TextField), 'malomiasteczkowy');
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Jest na playliście'), findsOneWidget);
+    await tester.pageBack();
+    await settle(tester, until: find.text('Pusty'));
+    expect(shown(), ['California Dreaming', 'Małomiasteczkowy', 'Pusty']);
+  });
+
+  testWidgets('an imported playlist can be sorted, not edited', (tester) async {
+    await pumpLibrary(tester, before: importDoAuta);
+    await tester.tap(find.text('Do auta'));
+    await settle(tester, until: find.text('Utwór'));
+    expect(find.text('Sortuj'), findsOneWidget);
+    expect(find.text('Dodaj'), findsNothing);
+    expect(find.text('Edytuj'), findsNothing);
+    await tester.tap(find.text('Sortuj'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ostatnio dodane'), findsNothing);
+  });
+
   testWidgets('⋮ › Zmień nazwę renames the playlist', (tester) async {
     await pumpLibrary(tester, before: importDoAuta);
     await tester.tap(find.text('Do auta'));

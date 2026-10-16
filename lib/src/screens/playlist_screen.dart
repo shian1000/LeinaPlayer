@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
@@ -15,8 +16,9 @@ import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_playlist.dart';
 import '../data/youtube_search.dart';
-import '../dummy.dart';
+import '../playback/downloads.dart';
 import '../playback/playback_queue.dart';
+import '../app_name.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
 import '../widgets/common.dart';
@@ -25,11 +27,12 @@ import '../widgets/folder_sheet.dart';
 import '../widgets/mood_sheet.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/share_sheet.dart';
-import '../widgets/song_cover.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/youtube_export_dialog.dart';
 import 'missing_tracks_screen.dart';
+import 'playlist_add_screen.dart';
+import 'playlist_edit_screen.dart';
 import '../widgets/song_names.dart';
 
 const _id = 'Playlista';
@@ -60,8 +63,25 @@ class PlaylistScreen extends StatefulWidget {
   State<PlaylistScreen> createState() => _PlaylistScreenState();
 }
 
+/// "Sortuj" on a saved playlist: how its tracks are listed and played, kept on the phone for
+/// each playlist. "Ostatnio dodane" only for one made on the phone — an imported one's order is
+/// its source's.
+enum _TrackSort {
+  own('Własna kolejność'),
+  recent('Ostatnio dodane'),
+  title('Tytuł'),
+  artist('Wykonawca');
+
+  const _TrackSort(this.label);
+
+  final String label;
+}
+
 class _PlaylistScreenState extends State<PlaylistScreen> {
+  /// As listed: [_ownOrder] in the order "Sortuj" picked.
   List<PlaylistTrack>? _tracks;
+  List<PlaylistTrack>? _ownOrder;
+  _TrackSort _sort = _TrackSort.own;
   bool _loading = false;
 
   /// The Biblioteka playlist shown; for a preview, `null` until it's saved.
@@ -121,10 +141,119 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Future<void> _load() async {
     final saved = _saved;
     if (saved == null) return _fetch();
-    final tracks = await PlaylistLibraryScope.of(context).tracks(saved.id);
+    final library = PlaylistLibraryScope.of(context);
+    final tracks = await library.tracks(saved.id);
+    final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
-    setState(() => _tracks = tracks);
+    setState(() {
+      // Its track count and length change with "Dodaj" / "Edytuj".
+      _saved = library.byId(saved.id) ?? saved;
+      _sort =
+          _TrackSort.values.asNameMap()[prefs.getString(_sortKey(saved))] ??
+          _TrackSort.own;
+      _ownOrder = tracks;
+      _tracks = _sorted(tracks);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+  }
+
+  static String _sortKey(PlaylistSummary playlist) =>
+      'playlist.sort.${playlist.uid ?? playlist.id}';
+
+  /// A playlist made on the phone: songs can be added to it and it can be edited.
+  bool get _editable => _saved != null && _saved!.source == null;
+
+  List<PlaylistTrack> _sorted(List<PlaylistTrack> tracks) {
+    int byTitle(PlaylistTrack a, PlaylistTrack b) =>
+        normalizeForSearch(a.title).compareTo(normalizeForSearch(b.title));
+    int byArtist(PlaylistTrack a, PlaylistTrack b) =>
+        normalizeForSearch(a.artist).compareTo(normalizeForSearch(b.artist));
+    return switch (_sort) {
+      _TrackSort.own => tracks,
+      _TrackSort.recent => tracks.reversed.toList(),
+      _TrackSort.title =>
+        [...tracks]..sort((a, b) {
+          final c = byTitle(a, b);
+          return c != 0 ? c : byArtist(a, b);
+        }),
+      _TrackSort.artist =>
+        [...tracks]..sort((a, b) {
+          final c = byArtist(a, b);
+          return c != 0 ? c : byTitle(a, b);
+        }),
+    };
+  }
+
+  void _showSortSheet() {
+    final saved = _saved;
+    if (saved == null) return;
+    showMenuSheet(
+      context,
+      idPrefix: '$_id › Sortuj',
+      header: const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Center(
+          child: Text(
+            'Sortuj wg',
+            style: TextStyle(
+              fontSize: AppFontSize.listTitle,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+      entries: [
+        for (final option in _TrackSort.values)
+          if (option != _TrackSort.recent || _editable)
+            MenuSheetEntry(
+              option == _sort ? Icons.check : Icons.circle_outlined,
+              option.label,
+              onTap: () async {
+                setState(() {
+                  _sort = option;
+                  if (_ownOrder case final own?) _tracks = _sorted(own);
+                });
+                await (await SharedPreferences.getInstance()).setString(
+                  _sortKey(saved),
+                  option.name,
+                );
+              },
+            ),
+      ],
+    );
+  }
+
+  void _openAdd(List<SearchHit> hits) {
+    final saved = _saved;
+    if (saved == null) return;
+    PlaylistAddScreen.open(
+      context,
+      playlist: saved,
+      present: {for (final hit in hits) SongSelection.keyOf(hit)},
+      onAdded: () {
+        if (mounted) _load();
+      },
+    );
+  }
+
+  void _openEdit() {
+    final saved = _saved;
+    final own = _ownOrder;
+    if (saved == null || own == null) return;
+    final catalog = SongCatalogScope.of(context);
+    final library = LocalLibraryScope.of(context);
+    final youTube = YouTubeLibraryScope.of(context);
+    PlaylistEditScreen.open(
+      context,
+      playlist: saved,
+      tracks: [
+        for (final track in own)
+          (track, playlistHit(track, catalog, library, youTube)),
+      ],
+      onSaved: () {
+        if (mounted) _load();
+      },
+    );
   }
 
   /// Reads a preview's playlist from YouTube or Spotify.
@@ -321,7 +450,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       switch (_playlist.source) {
         PlaylistSource.spotify || PlaylistSource.spotifyAlbum => 'Spotify',
         PlaylistSource.folder => 'MusicDatabase',
-        _ => 'YouTube',
+        PlaylistSource.youtube => 'YouTube',
+        // Made on the phone.
+        null => _playlist.account ?? appName,
       };
 
   /// The playlist's cover: the one picked for it, else a collage of [hits]' covers.
@@ -510,8 +641,18 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 'Zmień nazwę',
                 onTap: _rename,
               ),
-              const MenuSheetEntry(Icons.add, 'Dodaj do tej playlisty'),
-              const MenuSheetEntry(Icons.edit_outlined, 'Edytuj playlistę'),
+              if (_editable) ...[
+                MenuSheetEntry(
+                  Icons.add,
+                  'Dodaj do tej playlisty',
+                  onTap: () => _openAdd(hits),
+                ),
+                MenuSheetEntry(
+                  Icons.edit_outlined,
+                  'Edytuj playlistę',
+                  onTap: _openEdit,
+                ),
+              ],
               ...customCoverEntries(
                 context,
                 current: PlaylistLibraryScope.of(context)
@@ -525,20 +666,15 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 'Wyświetl utwory, których nie ma w bazie danych',
                 onTap: _showMissing,
               ),
-              playlistMenuEntry(
-                    context,
-                    hits,
-                    label: 'Dodaj do innej playlisty',
-                  ) ??
-                  const MenuSheetEntry(
-                    Icons.playlist_add,
-                    'Dodaj do innej playlisty',
-                  ),
+              ?playlistMenuEntry(
+                context,
+                hits,
+                label: 'Dodaj do innej playlisty',
+              ),
               ?moveToFolderEntry(
                 context,
                 LibraryFolders.playlistKey(_saved!.id),
               ),
-              const MenuSheetEntry(Icons.qr_code, 'Pokaż kod playlisty'),
             ],
     );
   }
@@ -555,50 +691,17 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   }
 
   void _showTrackMenu(SearchHit hit, int index) {
-    showMenuSheet(
+    showSongMenu(
       context,
+      hit,
       idPrefix: '$_id › Utwór › Menu (⋮)',
-      header: MenuSheetHeader(
-        cover: SongCover(cover: CoverRequest.of(hit)),
-        title: hit.shownTitle(context),
-        subtitle: hit.shownArtist(context),
-      ),
-      entries: [
-        MenuSheetEntry(
-          Icons.share_outlined,
-          'Udostępnij',
-          onTap: () => showSongShareSheet(
-            context,
-            hit,
-            idPrefix: '$_id › Utwór › Menu (⋮)',
-          ),
-        ),
-        const MenuSheetEntry(
-          Icons.add_circle_outline,
-          'Dodaj do Polubionych utworów',
-        ),
-        playlistMenuEntry(context, [hit]) ??
-            const MenuSheetEntry(Icons.playlist_add, 'Dodaj do playlisty'),
-        ?moodMenuEntry(context, hit),
+      extra: [
         if (!_preview)
           MenuSheetEntry(
             Icons.remove_circle_outline,
             'Usuń z tej playlisty',
             onTap: () => _removeTrack(index),
           ),
-        MenuSheetEntry(
-          Icons.queue_music,
-          'Dodaj do kolejki',
-          onTap: () => addToQueue(context, hit),
-        ),
-        MenuSheetEntry(
-          Icons.playlist_play,
-          'Odtwórz jako następny',
-          onTap: () => playNextInQueue(context, hit),
-        ),
-        const MenuSheetEntry(Icons.album_outlined, 'Przejdź do albumu'),
-        const MenuSheetEntry(Icons.person_outline, 'Przejdź do wykonawców'),
-        const MenuSheetEntry(Icons.radio, 'Przejdź do radia utworu'),
       ],
     );
   }
@@ -693,7 +796,6 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   @override
   Widget build(BuildContext context) {
-    void dummy(String label) => showDummy(context, '$_id › $label');
     final palette = context.palette;
     final tint = palette.colorForSeed(_playlist.name);
     final catalog = SongCatalogScope.of(context);
@@ -829,15 +931,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
                   child: Row(
                     children: [
-                      if (!_preview)
-                        IconButton(
-                          tooltip: 'Pobierz',
-                          icon: const Icon(
-                            Icons.download_for_offline_outlined,
-                            size: 30,
-                          ),
-                          onPressed: () => dummy('Pobierz (ikona)'),
-                        ),
+                      if (!_preview && tracks != null)
+                        _DownloadButton(hits: hits, name: _playlist.name),
                       IconButton(
                         tooltip: 'Udostępnij',
                         icon: const Icon(Icons.share_outlined, size: 28),
@@ -912,20 +1007,24 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             ),
                           ]
                         : [
-                            _ActionChip(
-                              icon: Icons.add,
-                              label: 'Dodaj',
-                              onTap: () => dummy('Dodaj (do tej playlisty)'),
-                            ),
-                            _ActionChip(
-                              icon: Icons.menu,
-                              label: 'Edytuj',
-                              onTap: () => dummy('Edytuj (playlistę)'),
-                            ),
+                            if (_editable) ...[
+                              _ActionChip(
+                                icon: Icons.add,
+                                label: 'Dodaj',
+                                onTap: () => _openAdd(hits),
+                              ),
+                              _ActionChip(
+                                icon: Icons.menu,
+                                label: 'Edytuj',
+                                onTap: tracks == null ? null : _openEdit,
+                              ),
+                            ],
                             _ActionChip(
                               icon: Icons.swap_vert,
-                              label: 'Sortuj',
-                              onTap: () => dummy('Sortuj (playlistę)'),
+                              label: _sort == _TrackSort.own
+                                  ? 'Sortuj'
+                                  : _sort.label,
+                              onTap: tracks == null ? null : _showSortSheet,
                             ),
                           ],
                   ),
@@ -986,6 +1085,100 @@ String trackCountLabel(int n) {
 String _length(Duration d) => d.inHours > 0
     ? '${d.inHours} godz. ${d.inMinutes % 60} min'
     : '${d.inMinutes} min';
+
+/// "Pobierz" for the whole playlist: ⬇ downloads every song not on the phone yet, a spinner
+/// while it works, a filled mark once all are — tapped then, it asks before taking them off.
+class _DownloadButton extends StatelessWidget {
+  const _DownloadButton({required this.hits, required this.name});
+
+  final List<SearchHit> hits;
+  final String name;
+
+  Future<void> _download(BuildContext context, Downloads downloads) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final missing = hits.where((h) => !downloads.isDownloaded(h)).length;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Pobieram ${trackCountLabel(missing)} z „$name”…'),
+        ),
+      );
+    final failed = await downloads.download(hits);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            failed == 0
+                ? 'Pobrano „$name” — zagra też bez internetu.'
+                : 'Nie udało się pobrać: ${trackCountLabel(failed)}.',
+          ),
+        ),
+      );
+  }
+
+  Future<void> _remove(BuildContext context, Downloads downloads) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Usunąć pobrane?'),
+        content: Text(
+          'Utwory z „$name” przestaną być dostępne bez internetu (muzyka z telefonu '
+          'zostaje).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Anuluj'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Usuń'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) await downloads.remove(hits);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final downloads = DownloadsScope.maybeOf(context);
+    if (downloads == null) return const SizedBox.shrink();
+    final palette = context.palette;
+    if (downloads.isDownloadingAny(hits)) {
+      return const IconButton(
+        tooltip: 'Pobieram…',
+        onPressed: null,
+        icon: SizedBox.square(
+          dimension: 26,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      );
+    }
+    final state = downloads.stateOf(hits);
+    return IconButton(
+      tooltip: switch (state) {
+        DownloadState.all => 'Pobrano — usuń z pobranych',
+        DownloadState.some => 'Pobierz resztę',
+        DownloadState.none => 'Pobierz',
+      },
+      icon: Icon(
+        state == DownloadState.all
+            ? Icons.download_for_offline
+            : Icons.download_for_offline_outlined,
+        size: 30,
+        color: state == DownloadState.none ? null : palette.accent,
+      ),
+      onPressed: hits.isEmpty
+          ? null
+          : state == DownloadState.all
+          ? () => _remove(context, downloads)
+          : () => _download(context, downloads),
+    );
+  }
+}
 
 class _ActionChip extends StatelessWidget {
   const _ActionChip({

@@ -2,13 +2,13 @@
 
 ## Current state
 
-A Spotify-style UI where most leaves are still dummies (see [`menu-map.md`](menu-map.md)) around
-real search, playback and playlists. `AppShell` (`lib/src/screens/app_shell.dart`)
+A Spotify-style UI (every element in [`menu-map.md`](menu-map.md)) around real search, playback
+and playlists. `AppShell` (`lib/src/screens/app_shell.dart`)
 is the root: a `Scaffold` with a custom bottom bar (Home, Odkrywaj, Wyszukaj, Biblioteka, Ja) and an `IndexedStack` of one
 nested `Navigator` per tab, so pushed screens (playlist, settings) keep the bottom bar visible and
 each tab keeps its own back stack. Back is handled centrally in `AppShell` via `PopScope`.
 Context menus are modal bottom sheets built by `showMenuSheet()` (`lib/src/widgets/menu_sheet.dart`)
-on the root navigator. Unimplemented leaves call `showDummy(context, id)`.
+on the root navigator. There are no dummy leaves: an element not built is left out.
 
 Theming: every colour, corner style and font comes from the active theme (`AppPalette` in
 `lib/src/theme.dart`, read via `context.palette`); the chosen light/dark themes and the dark-mode

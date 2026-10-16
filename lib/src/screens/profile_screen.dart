@@ -4,22 +4,50 @@ import '../data/account.dart';
 import '../data/later_links.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
-import '../dummy.dart';
+import '../data/listening_log.dart';
+import '../data/listening_summary.dart';
+import '../data/song_catalog.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'account_screen.dart';
 import 'later_links_screen.dart';
 import 'listening_stats_screen.dart';
+import 'listening_summary_screen.dart';
 import 'recents_screen.dart';
 import 'settings_screen.dart';
-
-const _id = 'Ja';
 
 /// The "Ja" tab: the profile, the MusicDatabase account, then history, "Na później"
 /// and settings — what used to hide behind the avatar in the top corner, now down by the thumb
 /// (Juxtopposed's Spotify redesign).
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  /// "Udostępnij profil": the latest year's summary, open on its last card — the one shared as a
+  /// picture.
+  static Future<void> _shareProfile(BuildContext context) async {
+    final log = ListeningLogScope.maybeOf(context);
+    final user = AccountScope.maybeOf(context)?.userName;
+    final catalog = SongCatalogScope.maybeOf(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final listens = await log?.listens(account: user) ?? const <Listen>[];
+    final year = SummaryPeriod.available(listens).where((p) => p.isYear);
+    if (!context.mounted) return;
+    if (year.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nie ma jeszcze czego udostępnić — statystyki zbierają się podczas słuchania.',
+          ),
+        ),
+      );
+      return;
+    }
+    await ListeningSummaryScreen.open(
+      context,
+      ListeningSummary.of(listens, year.first, song: catalog?.current),
+      atShareCard: true,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +59,6 @@ class ProfileScreen extends StatelessWidget {
     final later = LaterLinksScope.maybeOf(context);
     final laterCount = later?.links.length ?? 0;
     final unopened = later?.unopenedCount ?? 0;
-    void dummy(String label) => showDummy(context, '$_id › $label');
     void push(Widget screen) =>
         Navigator.of(context)
             .push(MaterialPageRoute<void>(builder: (_) => screen));
@@ -88,12 +115,12 @@ class ProfileScreen extends StatelessWidget {
                 IconButton(
                   tooltip: 'Edytuj profil',
                   icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => dummy('Edytuj profil'),
+                  onPressed: () => push(const AccountScreen()),
                 ),
                 IconButton(
                   tooltip: 'Udostępnij profil',
                   icon: const Icon(Icons.ios_share),
-                  onPressed: () => dummy('Udostępnij profil'),
+                  onPressed: () => _shareProfile(context),
                 ),
               ],
             ),

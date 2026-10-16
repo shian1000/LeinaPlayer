@@ -49,17 +49,22 @@ void main() {
     for (final label in ['Home', 'Odkrywaj', 'Wyszukaj', 'Biblioteka', 'Ja']) {
       expect(find.text(label), findsWidgets);
     }
-    expect(find.text('Popularne radio'), findsOneWidget);
+    for (final filter in ['Wszystko', 'Utwory', 'Playlisty', 'Nastroje']) {
+      expect(find.text(filter), findsOneWidget);
+    }
+    expect(find.text('Podcasty'), findsNothing);
     expect(find.text('Premium'), findsNothing);
   });
 
-  testWidgets('dummy leaf reports its menu id', (tester) async {
+  testWidgets('Home with nothing played and no database says so', (
+    tester,
+  ) async {
     await pumpApp(tester);
+    expect(find.text('Strona główna jest pusta.'), findsOneWidget);
 
-    await tester.tap(find.text('Muzyka'));
+    await tester.tap(find.text('Nastroje'));
     await tester.pump();
-
-    expect(find.text('Atrapa: Home › Filtr: Muzyka'), findsOneWidget);
+    expect(find.textContaining('Atrapa'), findsNothing);
   });
 
   testWidgets('Biblioteka\'s + opens the create sheet', (tester) async {
@@ -69,13 +74,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Utwórz (+)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Blend'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Atrapa: Biblioteka › Utwórz (+) › Blend'),
-      findsOneWidget,
-    );
+    for (final label in ['Playlista', 'Nastrój', 'Folder']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(find.text('Blend'), findsNothing);
   });
 
   testWidgets('empty Biblioteka; "+" › Playlista offers new and import', (
@@ -125,7 +127,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Utwórz (+)'));
       await tester.pumpAndSettle();
-      expect(find.text('Blend'), findsOneWidget);
+      expect(find.text('Folder'), findsOneWidget);
 
       Future<void> sendBackGesture(String method, [Object? arguments]) =>
           tester.binding.defaultBinaryMessenger.handlePlatformMessage(
@@ -143,7 +145,7 @@ void main() {
       await sendBackGesture('commitBackGesture');
       await tester.pumpAndSettle();
 
-      expect(find.text('Blend'), findsNothing);
+      expect(find.text('Folder'), findsNothing);
       expect(find.textContaining('Brak albumów'), findsOneWidget);
     },
   );
@@ -250,6 +252,57 @@ void main() {
 
     expect(find.text('MusicDatabase'), findsOneWidget);
     expect(find.text('Serwer'), findsOneWidget);
+  });
+
+  testWidgets('Wyszukaj ustawienie finds settings on deeper screens too', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Ja'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.tap(find.text('Ustawienia'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Wyszukaj ustawienie'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'wyczysc okladki');
+    await tester.pumpAndSettle();
+    expect(find.text('Wyczyść okładki'), findsOneWidget);
+    expect(
+      find.text(
+        'Ustawienia › Dane › Oszczędzanie danych i tryb offline › '
+        'Pamięć podręczna',
+      ),
+      findsOneWidget,
+    );
+
+    // A screen named in its parent's description and found as itself is listed once.
+    await tester.enterText(find.byType(TextField), 'pamiec podreczna');
+    await tester.pumpAndSettle();
+    expect(find.text('Pamięć podręczna'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'nie ma takiego');
+    await tester.pumpAndSettle();
+    expect(find.text('Nie ma ustawienia „nie ma takiego”.'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'przenikanie');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Przenikanie utworów'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kolejność odtwarzania'), findsWidgets);
+  });
+
+  testWidgets('Biblioteka\'s grid switch is remembered', (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Biblioteka'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Widok siatki'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Widok listy'), findsOneWidget);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('library.grid'), isTrue);
   });
 
   testWidgets(

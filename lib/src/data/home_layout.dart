@@ -5,9 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Home's sections the way the user arranged them — "your homepage, your rules" from
 /// Juxtopposed's Spotify redesign: pinned ones first, the rest in the user's order, hidden ones
-/// left out, rows added from Biblioteka, and the recommendations (Home's sample rows) on or off.
-/// Only on this phone. Section ids: `sample:<title>`, `lib:<what>`, `playlist:<id>`,
-/// `mood:<key>`.
+/// left out, rows added from Biblioteka, and the recommendations on or off. Only on this phone.
+/// Section ids: `rec:<what>`, `lib:<what>`, `playlist:<id>`, `mood:<key>` (the old sample
+/// rows' `sample:<title>` left in a saved layout are no longer known, so just passed over).
 class HomeLayout extends ChangeNotifier {
   HomeLayout({required this.defaults});
 
@@ -47,8 +47,7 @@ class HomeLayout extends ChangeNotifier {
   /// What Home shows.
   List<String> get visible => [
     for (final id in all)
-      if (!_hidden.contains(id) &&
-          (_recommendations || !id.startsWith('sample:')))
+      if (!_hidden.contains(id) && (_recommendations || !id.startsWith('rec:')))
         id,
   ];
 

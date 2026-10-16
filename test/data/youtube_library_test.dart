@@ -318,6 +318,33 @@ void main() {
     },
   );
 
+  test('"Pobierz": pinned audio is outside the limit and "Wyczyść", until unpinned', () async {
+    final library = newLibrary();
+    await library.load();
+    await library.cacheComplete('kept', await downloaded(library, 'kept'), 5);
+    await library.setPinned('kept', true);
+    for (final id in ['a', 'b']) {
+      now = now.add(const Duration(minutes: 1));
+      await library.cacheComplete(id, await downloaded(library, id), 1);
+    }
+    expect(library.isPinned('kept'), isTrue);
+    expect(library.cachedCount, 1);
+    expect([for (final e in library.cacheEntries) e.videoId], ['b']);
+    expect(library.pinnedEntries.single.videoId, 'kept');
+
+    await library.clearCache();
+    expect(library.cachedCount, 0);
+    expect(await library.cachedFile('kept'), isNotNull);
+
+    // Kept across restarts.
+    final again = newLibrary();
+    await again.load();
+    expect(again.isPinned('kept'), isTrue);
+
+    await again.setPinned('kept', false, limit: 0);
+    expect(again.isCached('kept'), isFalse);
+  });
+
   test('a local.db from before the YouTube tables is upgraded', () async {
     final dir = await Directory('${root.path}/local').create(recursive: true);
     final old = await databaseFactoryFfi.openDatabase(
@@ -396,6 +423,17 @@ void main() {
         await File('${root.path}/youtube_cache/v.webm.part').exists(),
         isFalse,
       );
+    });
+
+    test('pinned while another download of it is under way', () async {
+      final library = newLibrary();
+      await library.load();
+      final first = library.download('v', url(), 'webm', 25);
+      final second = library.download('v', url(), 'webm', 25, pin: true);
+      expect(await second, isTrue);
+      expect(await first, isTrue);
+      expect(library.isPinned('v'), isTrue);
+      expect(ranges, hasLength(3));
     });
 
     test('a server ignoring Range gives the whole file at once', () async {

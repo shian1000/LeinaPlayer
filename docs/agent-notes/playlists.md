@@ -38,6 +38,12 @@ another phone, or once renamed, it's searched on YouTube like a Spotify track.
 (`playlist_picker.dart`, also the selection bar's) appends with `PlaylistLibrary.addSongs`, kept
 like `create` keeps them. Only `source` NULL playlists are offered (`PlaylistLibrary.editable`):
 re-importing an imported one replaces all its tracks, which would silently drop what was added.
+The playlist screen's Dodaj / Edytuj chips follow the same rule (shown only for `source` NULL);
+Edytuj saves with `PlaylistLibrary.rearrange` (kept positions in the new order, the rest
+deleted, renumbered through negative positions like `removeTrack`). Sortuj works on every
+playlist but only reorders what the screen lists and queues — `_tracks` is kept sorted, so the
+indexes the screen hands to the queue and to "Usuń z tej playlisty" stay right; `_ownOrder` is
+what Edytuj starts from.
 
 "Usuń z tej playlisty" (`PlaylistLibrary.removeTrack`) works in every saved playlist, imported
 ones too (user's decision): the tracks after it move up (through negative positions — the

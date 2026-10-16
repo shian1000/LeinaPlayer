@@ -10,7 +10,7 @@ import '../data/combined_search.dart';
 import '../data/lyrics.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
-import '../dummy.dart';
+import '../data/saved_songs.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
@@ -241,11 +241,7 @@ class MiniPlayer extends StatelessWidget {
                             final entry = hit == null
                                 ? null
                                 : playlistMenuEntry(context, [hit]);
-                            (entry?.onTap ??
-                                () => showDummy(
-                                  context,
-                                  'Mini odtwarzacz › Dodaj do playlisty',
-                                ))();
+                            entry?.onTap?.call();
                           },
                         ),
                         IconButton(
@@ -271,9 +267,11 @@ class MiniPlayer extends StatelessWidget {
 }
 
 /// Held mini player: a few buttons just above it, so the common things need no menu
-/// (Juxtopposed's redesign); "Menu utworu" opens the full song menu.
+/// (Juxtopposed's redesign); "Więcej" opens the full song menu.
 Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
-  const id = 'Mini odtwarzacz › Szybkie akcje';
+  final saved = SavedSongsScope.maybeOf(context);
+  final moods = MoodLibraryScope.maybeOf(context);
+  final playlist = playlistMenuEntry(context, [hit]);
   final box = context.findRenderObject() as RenderBox?;
   final top = box == null
       ? MediaQuery.sizeOf(context).height / 2
@@ -287,7 +285,7 @@ Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
     transitionDuration: const Duration(milliseconds: 120),
     pageBuilder: (dialogContext, _, _) {
       final palette = dialogContext.palette;
-      Widget action(IconData icon, String label, [VoidCallback? onTap]) =>
+      Widget action(IconData icon, String label, VoidCallback onTap) =>
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -297,7 +295,7 @@ Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
                 child: InkWell(
                   onTap: () {
                     Navigator.of(dialogContext).pop();
-                    (onTap ?? () => showDummy(context, '$id › $label'))();
+                    onTap();
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -327,9 +325,26 @@ Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
             top: max(top - 80, 0),
             child: Row(
               children: [
-                action(Icons.block, 'Ukryj'),
-                action(Icons.devices_other, 'Urządzenia'),
-                action(Icons.favorite_border, 'Polub'),
+                if (moods != null)
+                  action(
+                    moodIcon,
+                    'Nastrój',
+                    () => openMoodPicker(context, hit),
+                  ),
+                if (saved != null)
+                  saved.contains(hit)
+                      ? action(
+                          Icons.bookmark,
+                          'Zapisane',
+                          () => saved.toggle(hit),
+                        )
+                      : action(
+                          Icons.bookmark_border,
+                          'Na później',
+                          () => saved.toggle(hit),
+                        ),
+                if (playlist?.onTap case final onTap?)
+                  action(Icons.add_circle_outline, 'Playlista', onTap),
                 action(
                   Icons.more_horiz,
                   'Więcej',
@@ -564,7 +579,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       });
       return const Scaffold();
     }
-    void dummy(String label) => showDummy(context, '$_id › $label');
     final youTubeUri = queue.currentYouTubeUri;
     final musicVideoUri = queue.currentMusicVideoUri;
     final coverSize = _fullCoverSize(context);
@@ -690,8 +704,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 final entry = hit == null
                                     ? null
                                     : playlistMenuEntry(context, [hit]);
-                                (entry?.onTap ??
-                                    () => dummy('Dodaj do playlisty'))();
+                                entry?.onTap?.call();
                               },
                             ),
                           ],
@@ -754,9 +767,24 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             ),
                             // The sleep timer moved to the song's menu.
                             IconButton(
-                              tooltip: 'Powtarzaj',
-                              icon: const Icon(Icons.repeat, size: 28),
-                              onPressed: () => dummy('Powtarzaj'),
+                              tooltip: switch (queue.repeat) {
+                                QueueRepeat.off => 'Powtarzaj: wył.',
+                                QueueRepeat.all => 'Powtarzaj: wszystkie',
+                                QueueRepeat.one => 'Powtarzaj: utwór',
+                              },
+                              icon: Icon(
+                                queue.repeat == QueueRepeat.one
+                                    ? Icons.repeat_one
+                                    : Icons.repeat,
+                                size: 28,
+                                color: queue.repeat == QueueRepeat.off
+                                    ? null
+                                    : palette.accent,
+                              ),
+                              onPressed: () => queue.setRepeat(
+                                QueueRepeat.values[(queue.repeat.index + 1) %
+                                    QueueRepeat.values.length],
+                              ),
                             ),
                           ],
                         ),
@@ -817,7 +845,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                               icon: const Icon(Icons.more_vert),
                               onPressed: () {
                                 final hit = queue.current;
-                                if (hit == null) return dummy('Menu (⋮)');
+                                if (hit == null) return;
                                 showSongMenu(
                                   context,
                                   hit,

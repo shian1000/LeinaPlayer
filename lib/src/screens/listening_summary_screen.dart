@@ -21,18 +21,29 @@ import 'listening_stats_screen.dart';
 /// A year's or a season's summary as full-screen cards, after Spotify Wrapped: a tap on the
 /// right goes on, on the left back (swiping too); the last card can be shared as a picture.
 class ListeningSummaryScreen extends StatefulWidget {
-  const ListeningSummaryScreen({super.key, required this.summary});
+  const ListeningSummaryScreen({
+    super.key,
+    required this.summary,
+    this.atShareCard = false,
+  });
 
   final ListeningSummary summary;
 
+  /// Opens on the last card, the one shared as a picture ("Udostępnij profil").
+  final bool atShareCard;
+
   /// Over the whole app, bottom bar included, like a story.
-  static Future<void> open(BuildContext context, ListeningSummary summary) =>
-      Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (_) => ListeningSummaryScreen(summary: summary),
-        ),
-      );
+  static Future<void> open(
+    BuildContext context,
+    ListeningSummary summary, {
+    bool atShareCard = false,
+  }) => Navigator.of(context, rootNavigator: true).push(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) =>
+          ListeningSummaryScreen(summary: summary, atShareCard: atShareCard),
+    ),
+  );
 
   @override
   State<ListeningSummaryScreen> createState() => _ListeningSummaryScreenState();
@@ -43,6 +54,17 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
   final _shareKey = GlobalKey();
   int _page = 0;
   bool _sharing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.atShareCard) {
+      // The cards need the screen's context to be counted.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _pages.jumpToPage(_cards(context).length - 1);
+      });
+    }
+  }
 
   @override
   void dispose() {

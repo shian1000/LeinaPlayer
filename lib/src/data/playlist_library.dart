@@ -621,6 +621,53 @@ class PlaylistLibrary extends ChangeNotifier {
     onChanged?.call();
   }
 
+  /// "Edytuj" on a playlist made on the phone: its tracks become those at [positions], in that
+  /// order; the others are taken out. Synced like any change.
+  Future<void> rearrange(int playlistId, List<int> positions) async {
+    final db = await _database();
+    await db.transaction((txn) async {
+      final keep = positions.toSet();
+      final rows = await txn.query(
+        'playlist_tracks',
+        columns: ['position'],
+        where: 'playlist_id = ?',
+        whereArgs: [playlistId],
+      );
+      for (final row in rows) {
+        final position = row['position']! as int;
+        if (!keep.contains(position)) {
+          await txn.delete(
+            'playlist_tracks',
+            where: 'playlist_id = ? AND position = ?',
+            whereArgs: [playlistId, position],
+          );
+        }
+      }
+      // Through negative positions, as in [removeTrack]: (playlist_id, position) is unique.
+      for (final (i, position) in positions.indexed) {
+        await txn.update(
+          'playlist_tracks',
+          {'position': -i - 1},
+          where: 'playlist_id = ? AND position = ?',
+          whereArgs: [playlistId, position],
+        );
+      }
+      await txn.rawUpdate(
+        'UPDATE playlist_tracks SET position = -position - 1 '
+        'WHERE playlist_id = ? AND position < 0',
+        [playlistId],
+      );
+      await txn.update(
+        'playlists',
+        {'updated_at': _now().millisecondsSinceEpoch, 'dirty': 1},
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+    });
+    await load();
+    onChanged?.call();
+  }
+
   /// What identifies a track in a playlist imported from [source], for leaving it out of the
   /// next import; null for playlists that aren't imported.
   static String? _sourceKey(
@@ -739,12 +786,7 @@ class PlaylistLibrary extends ChangeNotifier {
         // The name stays: the user may have renamed it on the phone.
         await txn.update(
           'playlists',
-          {
-            'owner': owner,
-            'updated_at': now,
-            'dirty': 1,
-            'deleted_at': null,
-          },
+          {'owner': owner, 'updated_at': now, 'dirty': 1, 'deleted_at': null},
           where: 'id = ?',
           whereArgs: [playlistId],
         );

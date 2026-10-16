@@ -60,12 +60,12 @@ Worth persisting, roughly in order of how likely they are to matter:
 - A change to **setup, entry points, or how to run/verify** something (build commands, device
   quirks, memory limits for Gradle).
 - A **cross-cutting convention** now used across screens (e.g. colours only via `context.palette`,
-  font sizes only via `AppFontSize`, unimplemented leaves via `showDummy(context, id)`).
+  font sizes only via `AppFontSize`, no dummy elements — a feature is built or left out).
 - A **decision made with the user** that a future agent might otherwise reverse.
 - Deeper **subsystem-specific rationale** — why an approach was chosen, what was rejected, how a
   value was measured. That's `docs/agent-notes/` territory, not `AGENTS.md`.
 
-Not worth persisting: ordinary bug fixes, small refactors, new dummy menu items that follow the
+Not worth persisting: ordinary bug fixes, small refactors, new menu items that follow the
 existing pattern, anything self-explanatory from the diff. If the whole session was one of these,
 say so plainly and stop — don't manufacture a note.
 
@@ -84,9 +84,9 @@ For anything that clears the bar:
 5. **Keep the indexes honest, mechanically.** Not "is this worth persisting" but "did the session
    change the *shape* of something that's indexed elsewhere":
    - **`docs/menu-map.md`** — any screen, menu, sheet or element added, removed, renamed or moved,
-     any dummy ID changed, or any dummy turned into a real feature (mark it implemented and
-     describe what it does). Check by grepping the IDs from the diff (`showDummy(`, `idPrefix:`,
-     `_id = `) against the file. This is the file the user uses to refer to UI elements, so a stale
+     or any element's behaviour changed (mark it implemented and describe what it does). Check by
+     grepping the IDs and labels from the diff (`idPrefix:`, `_id = `, `MenuSheetEntry(`) against
+     the file. This is the file the user uses to refer to UI elements, so a stale
      entry is a real bug.
    - **`docs/index.md`** — a top-level doc added, removed or renamed.
    - **`AGENTS.md` "Current state" / "Project layout"** — a new top-level directory or file role

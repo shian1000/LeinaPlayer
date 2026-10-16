@@ -100,6 +100,14 @@ class ServerFile {
   String get fileName => path.split('/').last;
 }
 
+/// The genres in `songs.genre`: comma-separated, the main one first, each once.
+List<String> genresOf(String? genre) => [
+  ...{
+    for (final part in (genre ?? '').split(','))
+      if (part.trim() case final name when name.isNotEmpty) name,
+  },
+];
+
 /// The artists in a song's label ("A, B feat. C" → A, B, C).
 List<String> artistNamesOf(String label) => [
   ...{
@@ -119,6 +127,7 @@ class CatalogSong {
     this.album,
     this.year,
     this.language,
+    String? genre,
     String? youtubeVideoId,
     String? musicVideoId,
     this.spotifyTrackId,
@@ -138,6 +147,7 @@ class CatalogSong {
                country,
          },
        ],
+       genres = genresOf(genre),
        titleLatin = latinFormOf(title, titleLatin),
        albumLatin = latinFormOf(album, albumLatin),
        youTubeTarget =
@@ -185,6 +195,7 @@ class CatalogSong {
       albumLatin = song.albumLatin,
       year = song.year,
       language = song.language,
+      genres = song.genres,
       countries = song.countries,
       youtubeVideoId = links.video == null
           ? song.youtubeVideoId
@@ -246,6 +257,10 @@ class CatalogSong {
   final String? albumLatin;
   final int? year;
   final String? language;
+
+  /// `songs.genre` split into its genres, the main one first; empty without one (or before
+  /// music.db has the column — hand-off `musicdatabase-genres.md`).
+  final List<String> genres;
 
   /// The countries its artists come from: the first part of each `artists.origin` ("Kraj -
   /// Region - Miasto"), for Wyszukaj's "Przeglądaj".
@@ -523,6 +538,7 @@ class SongCatalog extends ChangeNotifier {
                ${column('music_video_youtube_id')} AS music_video_youtube_id,
                ${column('spotify_url')} AS spotify_url,
                ${column('title_latin')} AS title_latin,
+               ${column('genre')} AS genre,
                $albumLatin AS album_latin,
                a.name AS artist, a.origin, a.synonyms, $artistLatin AS name_latin
         FROM songs s JOIN artists a ON a.id = s.artist_id''');
@@ -554,6 +570,7 @@ class SongCatalog extends ChangeNotifier {
       album: row['album'] as String?,
       year: row['year'] as int?,
       language: present(row['language'] as String?),
+      genre: row['genre'] as String?,
       youtubeVideoId: (row['youtube_video_id'] as String?)?.trim(),
       musicVideoId: (row['music_video_youtube_id'] as String?)?.trim(),
       spotifyTrackId: _spotifyTrackId(row['spotify_url'] as String?),

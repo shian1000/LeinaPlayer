@@ -37,6 +37,8 @@ class _Backend implements AudioBackend {
   @override
   Future<void> pause() async => _state.add((playing: false, completed: false));
   @override
+  Future<void> fadeOutAndPause(Duration fade) => pause();
+  @override
   Future<void> seek(Duration position) async {}
   @override
   Future<void> dispose() async {}

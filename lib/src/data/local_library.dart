@@ -236,7 +236,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 17,
+        version: 19,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (
@@ -275,6 +275,8 @@ class LocalLibrary extends ChangeNotifier {
           await _addYouTubeCopyColumns(db);
           await _addExcludedTracksColumn(db);
           await _createListensTable(db);
+          await _addDownloadTables(db);
+          await _createDownloadQueueTable(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -293,9 +295,49 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 15) await _addYouTubeCopyColumns(db);
           if (from < 16) await _addExcludedTracksColumn(db);
           if (from < 17) await _createListensTable(db);
+          if (from < 18) await _addDownloadTables(db);
+          if (from < 19) await _createDownloadQueueTable(db);
         },
       ),
     );
+  }
+
+  /// Version 19: songs waiting for "Pobierz", so a download stopped by Android (the app frozen
+  /// or killed) carries on when the app is back (`playback/downloads.dart`).
+  static Future<void> _createDownloadQueueTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE download_queue (
+        -- TrackRef.key.
+        track_key VARCHAR PRIMARY KEY,
+        -- TrackRef.toJson().
+        track VARCHAR NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        added_at INTEGER NOT NULL
+      )''');
+  }
+
+  /// Version 18: "Pobierz" — songs kept for offline for good. A YouTube video's audio stays in
+  /// `youtube_cache`, marked `pinned` so the cache limit and "Wyczyść" leave it; a file of
+  /// MusicDatabase's music library is copied to `<support dir>/downloads/`.
+  static Future<void> _addDownloadTables(Database db) async {
+    final columns = {
+      for (final c in await db.rawQuery('PRAGMA table_info(youtube_cache)'))
+        c['name'],
+    };
+    // Every phone has the table since version 2; only a database made up in a test may not.
+    if (columns.isNotEmpty && !columns.contains('pinned')) {
+      await db.execute(
+        'ALTER TABLE youtube_cache ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    await db.execute('''
+      CREATE TABLE server_downloads (
+        -- files.db's files.id.
+        file_id INTEGER PRIMARY KEY,
+        file_name VARCHAR NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        downloaded_at INTEGER NOT NULL
+      )''');
   }
 
   /// Version 17: every play with how long it was really listened to, for the listening stats

@@ -6,11 +6,11 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
+import '../data/hidden_songs.dart';
 import '../data/saved_songs.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
-import '../dummy.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../theme.dart';
@@ -96,7 +96,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final youTube = YouTubeLibraryScope.of(context);
     final moodLibrary = MoodLibraryScope.maybeOf(context);
     final moods = [...?moodLibrary?.globalMoods, ...?moodLibrary?.userMoods];
-    final deck = _deck(context, catalog, library, youTube, moods);
+    final hidden = HiddenSongsScope.maybeOf(context);
+    final deck = [
+      for (final hit in _deck(context, catalog, library, youTube, moods))
+        if (!(hidden?.contains(hit) ?? false)) hit,
+    ];
     final categories = <(String?, String)>[
       (null, 'Wszystko'),
       for (final mood in moods) (mood.key, mood.name),
@@ -317,28 +321,22 @@ class _DiscoverCard extends StatelessWidget {
                                 hit.artistLabel,
                           ),
                         ),
-                        _SideButton(
-                          icon: isSaved
-                              ? Icons.bookmark
-                              : Icons.bookmark_border,
-                          label: isSaved ? 'Zapisane' : 'Na później',
-                          color: isSaved ? palette.accent : null,
-                          onTap: saved == null
-                              ? () => showDummy(context, '$_id › Na później')
-                              : () => saved.toggle(hit),
-                        ),
-                        _SideButton(
-                          icon: Icons.add_circle_outline,
-                          label: 'Dodaj',
-                          onTap: () {
-                            final entry = playlistMenuEntry(context, [hit]);
-                            (entry?.onTap ??
-                                () => showDummy(
-                                  context,
-                                  '$_id › Dodaj do playlisty',
-                                ))();
-                          },
-                        ),
+                        if (saved != null)
+                          _SideButton(
+                            icon: isSaved
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            label: isSaved ? 'Zapisane' : 'Na później',
+                            color: isSaved ? palette.accent : null,
+                            onTap: () => saved.toggle(hit),
+                          ),
+                        if (playlistMenuEntry(context, [hit])?.onTap
+                            case final onTap?)
+                          _SideButton(
+                            icon: Icons.add_circle_outline,
+                            label: 'Dodaj',
+                            onTap: onTap,
+                          ),
                         _SideButton(
                           icon: Icons.share_outlined,
                           label: 'Udostępnij',

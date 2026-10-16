@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- "Pobierz": DownloadService keeps the app running while songs download. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <!-- Reading the Wi-Fi name (Ustawienia › Źródła muzyki › Baza danych › Wi-Fi sieci lokalnej)
          to choose between the local and the remote server. Android only reveals the SSID to apps
          holding location permission; it's requested when the user taps "Użyj bieżącego
@@ -101,6 +103,9 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+        <service android:name=".DownloadService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"/>
         <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver"
             android:exported="true" tools:ignore="Instantiatable">
             <intent-filter>
