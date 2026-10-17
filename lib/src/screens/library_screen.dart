@@ -370,7 +370,7 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
     final artists = [
       for (final name in counts.keys)
         if (words.every(normalizeForSearch(name).contains)) name,
-    ]..sort((a, b) => normalizeForSearch(a).compareTo(normalizeForSearch(b)));
+    ]..sort((a, b) => compareNames(a, b));
     return Scaffold(
       appBar: AppBar(title: const Text('Wykonawcy')),
       body: Column(

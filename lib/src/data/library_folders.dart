@@ -770,8 +770,7 @@ class LibraryFolders extends ChangeNotifier {
 
   /// [entries] in the order [sort] gives.
   List<LibraryEntry> sorted(List<LibraryEntry> entries) {
-    int byName(LibraryEntry a, LibraryEntry b) =>
-        normalizeForSearch(a.name).compareTo(normalizeForSearch(b.name));
+    int byName(LibraryEntry a, LibraryEntry b) => compareNames(a.name, b.name);
     // Newest first; entries without a time go last.
     int newest(DateTime? a, DateTime? b) => a == null
         ? (b == null ? 0 : 1)
@@ -793,7 +792,7 @@ class LibraryFolders extends ChangeNotifier {
         if (ca == null || cb == null) {
           return ca == cb ? 0 : (ca == null ? -1 : 1);
         }
-        return normalizeForSearch(ca).compareTo(normalizeForSearch(cb));
+        return compareNames(ca, cb);
       },
     };
     // Ties keep the name order (List.sort isn't stable).

@@ -292,8 +292,7 @@ class MoodLibrary extends ChangeNotifier {
         row['added'] == 1 ? mood.songs.add(songId) : mood.songs.remove(songId);
       }
     }
-    int byName(Mood a, Mood b) =>
-        normalizeForSearch(a.name).compareTo(normalizeForSearch(b.name));
+    int byName(Mood a, Mood b) => compareNames(a.name, b.name);
     _userMoods = userMoods..sort(byName);
     _globalMoods = [
       for (final MapEntry(:key, :value) in global.entries)

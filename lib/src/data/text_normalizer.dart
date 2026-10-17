@@ -73,3 +73,21 @@ String normalizeForSearch(String? text) {
       .trim()
       .toLowerCase();
 }
+
+final _digitRuns = RegExp(r'\d+|\D+');
+
+/// Orders names as people read them: normalised, with runs of digits compared by value,
+/// so "2. Telefon" comes before "10. Pidvalia".
+int compareNames(String? a, String? b) {
+  final partsA = _digitRuns.allMatches(normalizeForSearch(a)).toList();
+  final partsB = _digitRuns.allMatches(normalizeForSearch(b)).toList();
+  for (var i = 0; i < partsA.length && i < partsB.length; i++) {
+    final (x, y) = (partsA[i][0]!, partsB[i][0]!);
+    final (nx, ny) = (BigInt.tryParse(x), BigInt.tryParse(y));
+    final c = nx != null && ny != null
+        ? (nx.compareTo(ny) != 0 ? nx.compareTo(ny) : x.length - y.length)
+        : x.compareTo(y);
+    if (c != 0) return c;
+  }
+  return partsA.length - partsB.length;
+}

@@ -252,6 +252,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
   reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.
+- Lists sorted by a name (playlists, folders, moods, artists, track titles) use `compareNames`
+  (`text_normalizer.dart`): numbers by value, so "2. Telefon" comes before "10. Pidvalia" —
+  not `normalizeForSearch(a).compareTo(…)` (user's request; numbered names are common there).
 - Screens never hard-code colours or font sizes: `context.palette` and `AppFontSize`
   ([`theming.md`](docs/agent-notes/theming.md), [`ui-sizing.md`](docs/agent-notes/ui-sizing.md)).
 - System Back in `AppShell` pops tab routes directly (bypassing their `PopScope`), so a pushed

@@ -165,9 +165,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   List<PlaylistTrack> _sorted(List<PlaylistTrack> tracks) {
     int byTitle(PlaylistTrack a, PlaylistTrack b) =>
-        normalizeForSearch(a.title).compareTo(normalizeForSearch(b.title));
+        compareNames(a.title, b.title);
     int byArtist(PlaylistTrack a, PlaylistTrack b) =>
-        normalizeForSearch(a.artist).compareTo(normalizeForSearch(b.artist));
+        compareNames(a.artist, b.artist);
     return switch (_sort) {
       _TrackSort.own => tracks,
       _TrackSort.recent => tracks.reversed.toList(),

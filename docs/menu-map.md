@@ -624,7 +624,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   - Ostatnie: last opened (playlist, mood or folder; a folder also by its newest item), else
     last changed; never-opened global moods last
   - Ostatnio dodane: when saved on the phone / made (global moods last)
-  - Alfabetycznie: name, case and Polish letters aside
+  - Alfabetycznie: name, case and Polish letters aside, numbers by value ("2." before "10.")
   - Twórca: folders first, then the playlist's owner ("Ty" for ones made here; a mood: "Ty" or
     "MusicDatabase"), then name
 - **Folders** — **implemented**, synced with the MusicDatabase account like playlists

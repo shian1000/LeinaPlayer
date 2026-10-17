@@ -104,12 +104,9 @@ Future<void> showMoveToFolderSheet(BuildContext context, String itemKey) {
                 said('Wyjęto z folderu „${current.name}”');
               },
             ),
-            for (final folder
-                in [...folders.folders]..sort(
-                  (a, b) =>
-                      normalizeForSearch(a.name)
-                          .compareTo(normalizeForSearch(b.name)),
-                ))
+            for (final folder in [
+              ...folders.folders,
+            ]..sort((a, b) => compareNames(a.name, b.name)))
               tile(
                 icon: Icons.folder_outlined,
                 title: folder.name,
