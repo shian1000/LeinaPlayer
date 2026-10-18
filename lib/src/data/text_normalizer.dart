@@ -91,3 +91,38 @@ int compareNames(String? a, String? b) {
   }
   return partsA.length - partsB.length;
 }
+
+/// Could [corrected] be [name] spelt better, rather than another name? A lite
+/// `title_resembles()` (MusicDatabase's `text_utils.py`): equal once normalised, or alike
+/// enough — a longest-common-subsequence ratio standing in for `SequenceMatcher`, with the same
+/// stricter thresholds for short names (no bracketed subtitles, no comparing across alphabets).
+/// MusicDatabase flags an `artists.name` correction that doesn't resemble the old name in review.
+bool nameResembles(String name, String corrected) {
+  final a = normalizeForSearch(name);
+  final b = normalizeForSearch(corrected);
+  if (a.isNotEmpty && a == b) return true;
+  final x = name.toLowerCase();
+  final y = corrected.toLowerCase();
+  if (x.isEmpty || y.isEmpty) return false;
+  final shortest = x.length < y.length ? x.length : y.length;
+  final threshold = shortest <= 5
+      ? 0.92
+      : shortest <= 8
+      ? 0.85
+      : 0.7;
+  return 2 * _commonSubsequence(x, y) / (x.length + y.length) >= threshold;
+}
+
+int _commonSubsequence(String a, String b) {
+  var previous = List.filled(b.length + 1, 0);
+  for (var i = 1; i <= a.length; i++) {
+    final row = List.filled(b.length + 1, 0);
+    for (var j = 1; j <= b.length; j++) {
+      row[j] = a.codeUnitAt(i - 1) == b.codeUnitAt(j - 1)
+          ? previous[j - 1] + 1
+          : (previous[j] > row[j - 1] ? previous[j] : row[j - 1]);
+    }
+    previous = row;
+  }
+  return previous[b.length];
+}

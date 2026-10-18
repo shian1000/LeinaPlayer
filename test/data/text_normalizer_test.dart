@@ -22,4 +22,12 @@ void main() {
       'Żurawie',
     ]);
   });
+
+  test('nameResembles tells a spelling fix from another name', () {
+    expect(nameResembles('Afina', 'AFINA'), isTrue);
+    expect(nameResembles('Kazik Staszewski', 'Kazik Staszewsky'), isTrue);
+    expect(nameResembles('Bjork', 'Björk'), isTrue);
+    expect(nameResembles('Paramore', 'David Byrne'), isFalse);
+    expect(nameResembles('Armia', 'Armja'), isFalse);
+  });
 }

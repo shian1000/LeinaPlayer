@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/database_sync.dart';
 import '../data/local_library.dart';
 import '../data/outbox.dart';
 import '../data/song_catalog.dart';
+import '../data/song_details.dart';
+import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/song_info.dart';
@@ -142,6 +145,71 @@ class _CorrectionTile extends StatelessWidget {
 
   final FieldCorrection correction;
 
+  /// A rename that doesn't look like a spelling fix — "Paramore" → "David Byrne" — was likely
+  /// meant as another artist for the song it was made from (MusicDatabase's hand-off
+  /// `artist-rename-guard-for-musicdatabaseapp.md`).
+  bool get _unlikeRename {
+    final c = correction;
+    return c.table == 'artists' &&
+        c.column == 'name' &&
+        c.oldValue is String &&
+        c.newValue is String &&
+        !nameResembles(c.oldValue! as String, c.newValue! as String);
+  }
+
+  /// Turns the rename into a `songs.artist_id` correction of the song it was made from, when
+  /// the renamed artist is that song's own one in music.db.
+  Future<void> _switchToOtherArtist(BuildContext context) async {
+    final c = correction;
+    final messenger = ScaffoldMessenger.of(context);
+    final outbox = OutboxScope.of(context);
+    final sync = DatabaseSyncScope.maybeOf(context);
+    final song = SongCatalogScope.of(context).current(c.songId);
+    final details = sync == null || song == null
+        ? null
+        : await readSongDetails(sync, song.id).catchError((Object e) {
+            debugPrint('Reading song details failed: $e');
+            return null;
+          });
+    if (song == null ||
+        details == null ||
+        details.song['artist_id'] != c.rowId) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '„${c.oldValue}” nie jest głównym wykonawcą utworu „${c.title}” — '
+            'zostaje zmiana nazwy.',
+          ),
+        ),
+      );
+      return;
+    }
+    await outbox.correctField(
+      table: 'artists',
+      rowId: c.rowId,
+      column: 'name',
+      oldValue: c.oldValue,
+      newValue: c.oldValue,
+      song: song,
+    );
+    await outbox.correctField(
+      table: 'songs',
+      rowId: song.id,
+      column: 'artist_id',
+      oldValue: c.rowId,
+      newValue: c.newValue,
+      oldAsValue: c.oldValue,
+      song: song,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          'Zamiast zmiany nazwy: „${c.newValue}” jako wykonawca utworu „${c.title}”.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = correction;
@@ -151,6 +219,7 @@ class _CorrectionTile extends StatelessWidget {
       'albums' => 'album',
       _ => null,
     };
+    final unlike = _unlikeRename;
     return ListTile(
       leading: const Icon(Icons.edit_outlined),
       title: Text(
@@ -162,10 +231,29 @@ class _CorrectionTile extends StatelessWidget {
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(
-        '${c.title} · ${c.artist}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${c.title} · ${c.artist}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (unlike) ...[
+            Text(
+              'To nie wygląda na poprawkę pisowni — zmieni nazwę we wszystkich utworach '
+              'wykonawcy. Czy ten utwór ma innego wykonawcę?',
+              style: TextStyle(color: context.palette.accent),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: () => _switchToOtherArtist(context),
+                child: const Text('Tak, tylko ten utwór'),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

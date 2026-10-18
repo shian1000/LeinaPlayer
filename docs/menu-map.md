@@ -106,7 +106,13 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     artist's name asks first: "Ten utwór ma innego wykonawcę" (a `songs.artist_id` correction
     with the typed name — only this song changes, hand-off
     [`musicdatabase-song-artist.md`](handoffs/musicdatabase-song-artist.md)) or "Popraw pisownię
-    nazwy" (`artists.name`, all the artist's songs). Under Linki the
+    nazwy" (`artists.name`, all the artist's songs); without what the first needs (no song or
+    artist id) the name has no pencil — never a rename as its only choice. A new name that
+    doesn't resemble the old one (`nameResembles`, lite `title_resembles()`) asks "To nie
+    wygląda na poprawkę pisowni…": for the song's own artist "Tak, tylko ten utwór" (sent as
+    the `songs.artist_id` correction instead) or "Nie, zmień nazwę we wszystkich utworach"; for
+    co-artists and guests a warning with "Anuluj" (MusicDatabase's hand-off
+    `artist-rename-guard-for-musicdatabaseapp.md`). Under Linki the
     song's YouTube video and music video ("Teledysk") have a pencil too (link or id); unlike
     the other fields the phone uses the new link at once (see `youtube.md`). Once music.db has
     `songs.kind`, "To jest cały album" is a switch instead of a pencil: a `kind` correction of
@@ -261,7 +267,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 - Zgłoszenia poprawek **→ Zgłoszenia poprawek** (`outbox_settings_screen.dart`) — **implemented**:
   "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by default), "Czeka na wysłanie"
   (requests in the outbox; tapped, the reported songs with the phone's replacement —
-  `outbox_contents_screen.dart`), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
+  `outbox_contents_screen.dart`; a waiting artist rename that doesn't look like a spelling fix
+  says so, with "Tak, tylko ten utwór" turning it into the `songs.artist_id` correction of the
+  song it was made from, when that artist is the song's own), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
   jutro" after the server refused), "Wyślij teraz"
   ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
 

@@ -262,6 +262,85 @@ void main() {
     await tester.runAsync(() => root.delete(recursive: true));
   });
 
+  for (final onlyThisSong in [true, false]) {
+    testWidgets('a spelling fix that names another artist asks first: '
+        '${onlyThisSong ? 'only this song' : 'rename everywhere'}', (
+      tester,
+    ) async {
+      databaseFactory = databaseFactoryFfi;
+      SharedPreferences.setMockInitialValues({});
+      late Directory root;
+      late DatabaseSync sync;
+      late Outbox outbox;
+      await tester.runAsync(() async {
+        root = await Directory.systemTemp.createTemp('song_info_test');
+        sync = DatabaseSync(storageRoot: () async => root);
+        await writeMusicDb((await sync.localFile('music.db')).path);
+        outbox = Outbox(
+          storageRoot: () async => root,
+          factoryOverride: databaseFactoryFfi,
+        );
+      });
+      final hit = SearchHit.main(
+        CatalogSong(id: 3, title: 'Pay Your Respect', artistLabel: 'Afina'),
+        const [],
+      );
+      await tester.pumpWidget(
+        app(
+          SongInfoCard(hit: hit),
+          sync: sync,
+          outbox: outbox,
+        ),
+      );
+      await pumpUntil(tester, () => find.text('Afina').evaluate().isNotEmpty);
+      final row = find.ancestor(
+        of: find.text('Afina'),
+        matching: find.byType(Row),
+      );
+      await tester.tap(
+        find.descendant(
+          of: row.first,
+          matching: find.byIcon(Icons.edit_outlined),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Popraw pisownię nazwy'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'David Byrne');
+      await tester.tap(find.text('Zapisz'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('To nie wygląda na poprawkę pisowni'),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.text(
+          onlyThisSong
+              ? 'Tak, tylko ten utwór'
+              : 'Nie, zmień nazwę we wszystkich utworach',
+        ),
+      );
+      await pumpUntil(
+        tester,
+        () => find
+            .textContaining('Poprawka czeka na wysłanie')
+            .evaluate()
+            .isNotEmpty,
+      );
+      final corrections = await tester.runAsync(
+        () async => outbox.waitingCorrections,
+      );
+      final correction = corrections!.single;
+      expect(correction.table, onlyThisSong ? 'songs' : 'artists');
+      expect(correction.column, onlyThisSong ? 'artist_id' : 'name');
+      expect(correction.newValue, 'David Byrne');
+      expect(correction.songId, 3);
+
+      sync.dispose();
+      await tester.runAsync(() => root.delete(recursive: true));
+    });
+  }
+
   testWidgets(
     'a YouTube link set by hand: a correction the phone uses at once',
     (tester) async {

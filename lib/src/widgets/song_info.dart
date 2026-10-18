@@ -147,8 +147,12 @@ class _SongInfoCardState extends State<SongInfoCard> {
         ])
       else ...[
         _songSection(details),
-        for (final (i, a) in details.artists.indexed)
-          _artistSection(a.role, a.artist, song: i == 0 ? details.song : null),
+        for (final a in details.artists)
+          _artistSection(
+            a.role,
+            a.artist,
+            song: a.role == 'main' ? details.song : null,
+          ),
         if (details.album != null) _albumSection(details),
       ],
       _linksSection(details),
@@ -202,7 +206,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
   /// The song's own artist. Its pencil asks what's wrong: the song is another artist's — a
   /// `songs.artist_id` correction carrying that artist's name, which changes only this song in
   /// MusicDatabase — or the name is misspelt — `artists.name`, for all the artist's songs. The
-  /// first is what's usually meant, so it comes first.
+  /// first is what's usually meant, so it comes first. Without what the first needs there's no
+  /// pencil at all: a rename as the only thing it does once moved all of Paramore's songs to
+  /// "David Byrne" (MusicDatabase's hand-off `artist-rename-guard-for-musicdatabaseapp.md`).
   Widget _mainArtistNameField(DbRow song, DbRow artist) {
     final outbox = OutboxScope.maybeOf(context);
     final catalogSong = widget.hit.mainSong;
@@ -214,11 +220,12 @@ class _SongInfoCardState extends State<SongInfoCard> {
         songId is! int ||
         artistId is! int ||
         name == null) {
-      return _editableField('artists', artist, 'name', _artistLabels['name']!);
+      return _Field(_artistLabels['name']!, _text(artist['name']));
     }
     final other = outbox.correctionOf('songs', songId, 'artist_id', artistId);
-    final spelling = artist['id'] is int
-        ? outbox.correctionOf('artists', artist['id'] as int, 'name', name)
+    final rowId = artist['id'];
+    final spelling = rowId is int
+        ? outbox.correctionOf('artists', rowId, 'name', name)
         : null;
     String state(FieldCorrection c) =>
         c.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie';
@@ -244,11 +251,12 @@ class _SongInfoCardState extends State<SongInfoCard> {
                 'Zmieni się tylko ten utwór.',
                 onPressed: () => Navigator.of(context).pop(true),
               ),
-              _ChoiceOption(
-                'Popraw pisownię nazwy',
-                'We wszystkich utworach tego wykonawcy.',
-                onPressed: () => Navigator.of(context).pop(false),
-              ),
+              if (rowId is int)
+                _ChoiceOption(
+                  'Popraw pisownię nazwy',
+                  'We wszystkich utworach tego wykonawcy.',
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
             ],
           ),
         );
@@ -262,17 +270,25 @@ class _SongInfoCardState extends State<SongInfoCard> {
             name: name,
             shown: other?.newValue as String? ?? name,
           );
-        } else {
+        } else if (rowId is int) {
           await _edit(
             outbox,
             catalogSong,
             table: 'artists',
-            rowId: artist['id'] as int,
+            rowId: rowId,
             column: 'name',
             label: 'Pisownia nazwy wykonawcy',
             kind: _Kind.required,
             current: name,
             shown: spelling == null ? name : spelling.newValue,
+            asOtherArtist: (typed) => _saveOtherArtist(
+              outbox,
+              catalogSong,
+              songId: songId,
+              artistId: artistId,
+              name: name,
+              typed: typed,
+            ),
           );
         }
       },
@@ -307,7 +323,26 @@ class _SongInfoCardState extends State<SongInfoCard> {
       );
       return;
     }
-    if (_sameArtistName(typed, shown)) return;
+    if (_sameArtistName(typed, shown) || !mounted) return;
+    await _saveOtherArtist(
+      outbox,
+      song,
+      songId: songId,
+      artistId: artistId,
+      name: name,
+      typed: typed,
+    );
+  }
+
+  Future<void> _saveOtherArtist(
+    Outbox outbox,
+    CatalogSong song, {
+    required int songId,
+    required int artistId,
+    required String name,
+    required String typed,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
     // The same artist typed differently is no other artist: taken back.
     final back = _sameArtistName(typed, name);
     await outbox.correctField(
@@ -458,6 +493,43 @@ class _SongInfoCardState extends State<SongInfoCard> {
     );
   }
 
+  /// An `artists.name` correction from [name] to [typed] that doesn't look like a spelling fix:
+  /// `true` renames the artist in all its songs, `false` makes [typed] the artist of only this
+  /// song (offered when [asOtherArtist] is given — the song's own artist), `null` cancels.
+  Future<bool?> _confirmRename(
+    String name,
+    String typed,
+    Future<void> Function(String typed)? asOtherArtist,
+  ) => showDialog<bool>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: Text(
+        asOtherArtist == null ? 'To nie wygląda na poprawkę pisowni.' : 'To nie wygląda na poprawkę pisowni. Czy ten utwór ma innego wykonawcę?',
+      ),
+      children: [
+        if (asOtherArtist != null)
+          _ChoiceOption(
+            'Tak, tylko ten utwór',
+            '„$typed” będzie wykonawcą tylko tego utworu.',
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+        _ChoiceOption(
+          asOtherArtist == null
+              ? 'Zmień nazwę we wszystkich utworach'
+              : 'Nie, zmień nazwę we wszystkich utworach',
+          'Wszystkie utwory wykonawcy „$name” dostaną nazwę „$typed”.',
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+        if (asOtherArtist == null)
+          _ChoiceOption(
+            'Anuluj',
+            'Nazwa zostaje bez zmian.',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+      ],
+    ),
+  );
+
   Future<void> _edit(
     Outbox outbox,
     CatalogSong song, {
@@ -468,6 +540,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
     required _Kind kind,
     required Object? current,
     required Object? shown,
+    Future<void> Function(String typed)? asOtherArtist,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
     Object? value;
@@ -521,6 +594,18 @@ class _SongInfoCardState extends State<SongInfoCard> {
           : trimmed;
     }
     if (_sameValue(value, shown)) return;
+    if (table == 'artists' &&
+        column == 'name' &&
+        value is String &&
+        current is String &&
+        !nameResembles(current, value)) {
+      final rename = await _confirmRename(current, value, asOtherArtist);
+      if (rename == null || !mounted) return;
+      if (!rename) {
+        await asOtherArtist!(value);
+        return;
+      }
+    }
     await outbox.correctField(
       table: table,
       rowId: rowId,

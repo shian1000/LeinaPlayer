@@ -22,6 +22,13 @@ first:
 
 Co-artists and guests ("Współwykonawca", "Gościnnie") keep only the spelling correction for now.
 
+A spelling correction whose new name doesn't resemble the old one (a lite `title_resembles()`)
+asks first — for the song's own artist "Tak, tylko ten utwór" sends the `songs.artist_id`
+correction instead; a waiting one gets the same hint and switch in "Czeka na wysłanie". The
+song's artist name never falls back to a plain rename (MusicDatabase's
+`artist-rename-guard-for-musicdatabaseapp.md`, after Paramore's songs were all renamed). The
+`song_id` of an `artists.name` row stays the song the user was looking at.
+
 ## The correction
 
 A `field_corrections` row like the others (format 1, see
