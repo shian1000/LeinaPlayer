@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import '../data/database_sync.dart';
 import '../data/outbox.dart';
 import '../data/server_downloads.dart';
 import '../data/song_catalog.dart';
+import '../data/song_requests.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
 import '../data/youtube_library.dart';
@@ -91,6 +93,7 @@ class TrackPlayer {
     required this.youTubeSearch,
     this.openExternal,
     this.outbox,
+    this.catalog,
     this.serverDownloads,
     Future<List<Uri>> Function()? serverAddresses,
     Future<bool> Function()? onWifi,
@@ -109,6 +112,10 @@ class TrackPlayer {
   /// Where dead music.db links (and the videos found instead), and videos found for songs
   /// music.db has no link for, are reported for MusicDatabase; `null` reports nothing.
   final Outbox? outbox;
+
+  /// music.db as loaded: a song played that it doesn't have is asked for in [outbox], unless
+  /// its owner rejected it; `null` asks for nothing.
+  final SongCatalog? catalog;
 
   /// Server files kept on the phone with "Pobierz", played instead of streaming them; `null`:
   /// none (tests).
@@ -156,6 +163,7 @@ class TrackPlayer {
     bool allowExternal = true,
     void Function(String status)? onStatus,
   }) async {
+    unawaited(_requestIfMissing(hit));
     hit = _withRememberedVideo(hit);
     final outcome = await _playOnce(
       hit,
@@ -430,6 +438,21 @@ class TrackPlayer {
     final song = hit.mainSong?.fromMusicDb;
     if (song == null || song.youtubeVideoId != gone) return;
     await _report(() => outbox?.reportDeadYouTubeLink(song, gone));
+  }
+
+  /// Only against a loaded music.db: it says what MusicDatabase has and what its owner rejected.
+  Future<void> _requestIfMissing(SearchHit hit) async {
+    final catalog = this.catalog;
+    if (outbox == null ||
+        catalog == null ||
+        catalog.status != CatalogStatus.ready) {
+      return;
+    }
+    final request = SongRequest.of(hit);
+    if (request == null || catalog.rejectedSongRequests.rejects(request)) {
+      return;
+    }
+    await _report(() => outbox?.requestSong(request));
   }
 
   /// A report that fails (storage) mustn't stop playback.

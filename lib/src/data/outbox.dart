@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'song_catalog.dart';
+import 'song_requests.dart';
 import 'youtube_video.dart';
 
 /// Requests for MusicDatabase, waiting on the phone until it can hand them over
@@ -190,6 +191,89 @@ class Outbox extends ChangeNotifier {
         unless: () => _reported(_foundLinks, 'video_id', song.id, video.id),
         table: _foundLinks,
       );
+
+  /// The phone plays [song], which music.db doesn't have: MusicDatabase's owner is asked to add
+  /// it. Asked once: a song already in any request (waiting, sent or refused) by the same
+  /// artist and title, or the same YouTube video, isn't added again. Returns whether it was
+  /// added now.
+  Future<bool> requestSong(SongRequest song) => _write(
+    (db) async => db.insert(_songRequests, {
+      'title': song.title,
+      'artist': song.artist,
+      'album': song.album,
+      'year': song.year,
+      'youtube_video_id': song.youtubeVideoId,
+      'spotify_track_id': song.spotifyTrackId,
+      'source': song.source.code,
+      'requested_at': _timestamp(_now()),
+    }),
+    unless: () => _songRequested(song),
+    table: _songRequests,
+  );
+
+  /// The songs asked to be added in the requests waiting to be sent, in the order they were
+  /// asked for.
+  Future<List<SongRequest>> waitingSongRequests() => _inTurn(() async {
+    final factory = factoryOverride ?? databaseFactory;
+    final requests = <SongRequest>[];
+    for (final file in await pending()) {
+      final db = await factory.openDatabase(
+        file.path,
+        options: OpenDatabaseOptions(readOnly: true),
+      );
+      try {
+        if (!await _hasTable(db, _songRequests)) continue;
+        for (final row in await db.query(
+          _songRequests,
+          orderBy: 'requested_at',
+        )) {
+          requests.add(_songRequestOf(row));
+        }
+      } finally {
+        await db.close();
+      }
+    }
+    return requests;
+  });
+
+  static SongRequest _songRequestOf(Map<String, Object?> row) => SongRequest(
+    title: row['title']! as String,
+    artist: row['artist'] as String?,
+    source: SongRequestSource.values.firstWhere(
+      (s) => s.code == row['source'],
+      orElse: () => SongRequestSource.youtube,
+    ),
+    album: row['album'] as String?,
+    year: row['year'] as int?,
+    youtubeVideoId: row['youtube_video_id'] as String?,
+    spotifyTrackId: row['spotify_track_id'] as String?,
+  );
+
+  Future<bool> _songRequested(SongRequest song) async {
+    final dir = await directory();
+    final factory = factoryOverride ?? databaseFactory;
+    for (final folder in _numbered(dir)) {
+      if (!await folder.exists()) continue;
+      await for (final f in folder.list()) {
+        if (!_requestName.hasMatch(_baseName(f.path))) continue;
+        final db = await factory.openDatabase(f.path);
+        try {
+          if (!await _hasTable(db, _songRequests)) continue;
+          for (final row in await db.query(_songRequests)) {
+            final asked = _songRequestOf(row);
+            if (asked.key == song.key ||
+                (song.youtubeVideoId != null &&
+                    asked.youtubeVideoId == song.youtubeVideoId)) {
+              return true;
+            }
+          }
+        } finally {
+          await db.close();
+        }
+      }
+    }
+    return false;
+  }
 
   /// The links found for songs without one in the requests waiting to be sent, in the order
   /// they were found.
@@ -664,6 +748,7 @@ class Outbox extends ChangeNotifier {
   static const _deadLinks = 'dead_youtube_links';
   static const _corrections = 'field_corrections';
   static const _foundLinks = 'found_youtube_links';
+  static const _songRequests = 'song_requests';
 
   // Each kind of report gets files of its own: MusicDatabase keeps a whole file unprocessed
   // while it doesn't know one of its tables, and corrections came after dead links.
@@ -704,6 +789,18 @@ class Outbox extends ChangeNotifier {
       video_channel TEXT,
       found_at TEXT NOT NULL,
       PRIMARY KEY (song_id, video_id)
+    )''',
+    _songRequests: '''
+    CREATE TABLE song_requests (
+      title TEXT NOT NULL,
+      artist TEXT,
+      album TEXT,
+      year INTEGER,
+      duration_s INTEGER,
+      youtube_video_id TEXT,
+      spotify_track_id TEXT,
+      source TEXT NOT NULL,
+      requested_at TEXT NOT NULL
     )''',
   };
 

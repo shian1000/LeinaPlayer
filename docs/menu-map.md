@@ -269,7 +269,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   (requests in the outbox; tapped, the reported songs with the phone's replacement —
   `outbox_contents_screen.dart`; a waiting artist rename that doesn't look like a spelling fix
   says so, with "Tak, tylko ten utwór" turning it into the `songs.artist_id` correction of the
-  song it was made from, when that artist is the song's own), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
+  song it was made from, when that artist is the song's own; then the songs played that
+  music.db doesn't have, asked to be added — `song_requests.dart`), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
   jutro" after the server refused), "Wyślij teraz"
   ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
 

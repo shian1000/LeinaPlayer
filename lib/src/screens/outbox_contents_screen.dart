@@ -6,6 +6,7 @@ import '../data/local_library.dart';
 import '../data/outbox.dart';
 import '../data/song_catalog.dart';
 import '../data/song_details.dart';
+import '../data/song_requests.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
@@ -14,7 +15,8 @@ import '../widgets/song_tile.dart';
 
 /// "Czeka na wysłanie" in Ustawienia › Zgłoszenia poprawek: the songs reported in the
 /// requests still waiting in the outbox, with the video the phone found instead, the videos found
-/// for songs without a link, and the fields the user corrected in "Informacje o utworze".
+/// for songs without a link, the fields the user corrected in "Informacje o utworze", and the
+/// songs played that music.db doesn't have, asked to be added.
 class OutboxContentsScreen extends StatefulWidget {
   const OutboxContentsScreen({super.key});
 
@@ -23,14 +25,19 @@ class OutboxContentsScreen extends StatefulWidget {
 }
 
 class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
-  Future<(List<DeadLinkReport>, List<FoundLinkReport>)>? _reports;
+  Future<(List<DeadLinkReport>, List<FoundLinkReport>, List<SongRequest>)>?
+  _reports;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Also after a send or a new report while the screen is open.
     final outbox = OutboxScope.of(context);
-    _reports = (outbox.waitingReports(), outbox.waitingFoundLinks()).wait;
+    _reports = (
+      outbox.waitingReports(),
+      outbox.waitingFoundLinks(),
+      outbox.waitingSongRequests(),
+    ).wait;
   }
 
   @override
@@ -42,64 +49,89 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
         backgroundColor: palette.surface,
         title: const Text('Czeka na wysłanie'),
       ),
-      body: FutureBuilder<(List<DeadLinkReport>, List<FoundLinkReport>)>(
-        future: _reports,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return _Note('Nie udało się odczytać zgłoszeń.');
-          }
-          final data = snapshot.data;
-          if (data == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final (reports, found) = data;
-          if (reports.isEmpty && found.isEmpty && corrections.isEmpty) {
-            return const _Note('Wszystkie zgłoszenia zostały wysłane.');
-          }
-          return ListView(
-            padding: const EdgeInsets.only(bottom: 24),
-            children: [
-              if (reports.isNotEmpty) ...[
-                const _Note(
-                  'Linki z bazy danych, których YouTube już nie odtwarza. Do czasu poprawki w '
-                  'MusicDatabase telefon gra film znaleziony w zamian.',
-                ),
-                for (final report in reports)
-                  _SongReportTile(
-                    songId: report.songId,
-                    title: report.title,
-                    artist: report.artist,
-                    what: report.replacementTitle == null
-                        ? 'Bez zamiennika'
-                        : 'Zamiennik: '
-                              '${_video(report.replacementTitle, report.replacementChannel)}',
-                  ),
-              ],
-              if (found.isNotEmpty) ...[
-                const _Note(
-                  'Filmy znalezione przez telefon dla utworów bez linku w bazie danych.',
-                ),
-                for (final report in found)
-                  _SongReportTile(
-                    songId: report.songId,
-                    title: report.title,
-                    artist: report.artist,
-                    what:
-                        'Znaleziono: ${_video(report.videoTitle, report.videoChannel)}',
-                  ),
-              ],
-              if (corrections.isNotEmpty) ...[
-                const _Note(
-                  'Poprawki informacji o utworach. Do czasu ich przyjęcia w MusicDatabase '
-                  'telefon pokazuje wartości z bazy danych.',
-                ),
-                for (final correction in corrections)
-                  _CorrectionTile(correction),
-              ],
-            ],
-          );
-        },
-      ),
+      body:
+          FutureBuilder<
+            (List<DeadLinkReport>, List<FoundLinkReport>, List<SongRequest>)
+          >(
+            future: _reports,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return _Note('Nie udało się odczytać zgłoszeń.');
+              }
+              final data = snapshot.data;
+              if (data == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final (reports, found, songs) = data;
+              if (reports.isEmpty &&
+                  found.isEmpty &&
+                  corrections.isEmpty &&
+                  songs.isEmpty) {
+                return const _Note('Wszystkie zgłoszenia zostały wysłane.');
+              }
+              return ListView(
+                padding: const EdgeInsets.only(bottom: 24),
+                children: [
+                  if (reports.isNotEmpty) ...[
+                    const _Note(
+                      'Linki z bazy danych, których YouTube już nie odtwarza. Do czasu poprawki w '
+                      'MusicDatabase telefon gra film znaleziony w zamian.',
+                    ),
+                    for (final report in reports)
+                      _SongReportTile(
+                        songId: report.songId,
+                        title: report.title,
+                        artist: report.artist,
+                        what: report.replacementTitle == null
+                            ? 'Bez zamiennika'
+                            : 'Zamiennik: '
+                                  '${_video(report.replacementTitle, report.replacementChannel)}',
+                      ),
+                  ],
+                  if (found.isNotEmpty) ...[
+                    const _Note(
+                      'Filmy znalezione przez telefon dla utworów bez linku w bazie danych.',
+                    ),
+                    for (final report in found)
+                      _SongReportTile(
+                        songId: report.songId,
+                        title: report.title,
+                        artist: report.artist,
+                        what:
+                            'Znaleziono: ${_video(report.videoTitle, report.videoChannel)}',
+                      ),
+                  ],
+                  if (corrections.isNotEmpty) ...[
+                    const _Note(
+                      'Poprawki informacji o utworach. Do czasu ich przyjęcia w MusicDatabase '
+                      'telefon pokazuje wartości z bazy danych.',
+                    ),
+                    for (final correction in corrections)
+                      _CorrectionTile(correction),
+                  ],
+                  if (songs.isNotEmpty) ...[
+                    const _Note(
+                      'Utwory spoza bazy danych, o których dodanie telefon prosi MusicDatabase.',
+                    ),
+                    for (final song in songs)
+                      ListTile(
+                        leading: const Icon(Icons.playlist_add),
+                        title: Text(
+                          song.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          song.artist ?? SongRequest.unknownArtist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ],
+              );
+            },
+          ),
     );
   }
 }

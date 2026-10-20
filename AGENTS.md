@@ -124,9 +124,11 @@ saves it for later with the person who sent it (Ja › Na później,
 - The app gets MusicDatabase's data by downloading its SQLite files over HTTP
   ([ADR 0002](docs/decisions/0002-database-download.md)). What goes back is a request file in the
   phone's outbox ([ADR 0005](docs/decisions/0005-outbox-for-musicdatabase.md), `outbox.dart`; so
-  far dead music.db YouTube links, videos the phone found for songs music.db has no link for, and
-  the user's corrections of song / artist / album fields — incl. YouTube links set by hand —
-  each kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
+  far dead music.db YouTube links, videos the phone found for songs music.db has no link for,
+  the user's corrections of song / artist / album fields — incl. YouTube links set by hand — and
+  songs played that music.db doesn't have, asked to be added (`song_requests.dart`; ones
+  MusicDatabase's owner rejected come back in music.db's `rejected_song_requests` and aren't
+  asked for again); each kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
   sharing server — the request format is a contract, see the
   [hand-off](docs/handoffs/musicdatabase-outbox.md)). The phone logs in with a MusicDatabase user
   (Ustawienia › Konto, `account.dart`; `POST /login` gives a token sent with the requests —
@@ -225,6 +227,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `LaterLinks.kt` (links saved for later), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
+- `third_party/audio_service/` — a patched copy of audio_service 0.18.19 (`dependency_overrides`
+  in `pubspec.yaml`): without the patch the notification's and lock screen's buttons die for
+  good once Android stops the service while the app's engine lives on (seen on the Pixel after
+  days). What and why: `third_party/audio_service/PATCHED.md`; keep it when upgrading the
+  package unless the new release fixes it.
 - `docs/` — documentation for humans and AI agents (see [`docs/index.md`](docs/index.md)).
 
 ## Coding conventions
@@ -301,7 +308,14 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (e.g. while music plays) — use screenshots there. The Huawei runs Android 10, so background
   restrictions of Android 12+ (foreground-service starts, app freezing) only show on the Pixel;
   it can be reached remotely over Tailscale with wireless debugging (the user pairs; the pairing
-  and connect ports are random — scan 30000–49999 with `nc -z` if they aren't given). The
+  and connect ports are random — `adb mdns services` lists them, else scan 30000–49999 with `nc -z`).
+  Pair and connect with the SDK's `~/Android/Sdk/platform-tools/adb`, not the Debian `/usr/bin/adb`
+  (34): with that one the connection stays "offline" (TLS `CERTIFICATE_UNKNOWN`), and a pairing
+  made with it isn't accepted by the newer one. The Pixel turns wireless debugging off by itself
+  after a while (e.g. during a ~9 min build) — the user switches it back on, no new pairing.
+  Notification / lock-screen controls are tested from adb: `cmd media_session dispatch
+  pause|play|next` (Android 10 lacks it — `input keyevent KEYCODE_MEDIA_PAUSE`), then
+  `dumpsys media_session` for the state. The
   Huawei has only a swipe lock: wake it (`input keyevent KEYCODE_WAKEUP`) and unlock it with
   `input swipe 540 1800 540 600 300` rather than waiting for the user. It also shows no app logs
   (`logcat -s flutter` stays empty) — diagnose there from the screen.

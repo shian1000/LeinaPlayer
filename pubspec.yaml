@@ -61,6 +61,12 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   sqflite_common_ffi: ^2.4.3
 
+dependency_overrides:
+  # 0.18.19 with a fix for dead notification / lock-screen buttons — see
+  # third_party/audio_service/PATCHED.md.
+  audio_service:
+    path: third_party/audio_service
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 

@@ -117,6 +117,20 @@ phone only. Format in
   `bad_youtube_videos` ([`../handoffs/musicdatabase-bad-videos.md`](../handoffs/musicdatabase-bad-videos.md)),
   so the phone drops a turned-down video and searches again (`youtube.md`).
 
+## Songs to add (2026-10-18)
+
+Fourth request type, the owner's request: **`song_requests`** — a song the phone plays that
+music.db doesn't have (a YouTube or Spotify playlist's track, a shared link, a phone file), asked
+to be added. Format in
+[`../handoffs/musicdatabase-song-requests.md`](../handoffs/musicdatabase-song-requests.md).
+
+- Asked when it starts playing (`TrackPlayer.play`), once per song (artist + title, or its
+  YouTube video), only with music.db loaded. Files of their own; "Czeka na wysłanie" lists them.
+- Not automatic in MusicDatabase (owner's decision): the owner adds, skips or rejects each one.
+- A rejected song comes back as a row of music.db's `rejected_song_requests` — the first answer
+  channel from MusicDatabase about a request — and the phone never asks for it again
+  (`SongCatalog.rejectedSongRequests`). An added one just appears in the next music.db.
+
 ## Sending (MusicDatabase's inbox)
 
 - `PUT <server>/inbox/<file name>` with `Content-Length`, to the same addresses as the download,

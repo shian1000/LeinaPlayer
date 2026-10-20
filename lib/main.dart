@@ -193,6 +193,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     youTubeAudio: _youTubeAudio,
     youTubeSearch: _youTubeSearch,
     outbox: _outbox,
+    catalog: _songCatalog,
     serverDownloads: _serverDownloads,
     serverAddresses: _databaseSync.serverAddresses,
   );

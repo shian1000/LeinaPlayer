@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'database_sync.dart';
 import 'latin_names.dart';
+import 'song_requests.dart';
 import 'text_normalizer.dart';
 import 'youtube_matcher.dart';
 
@@ -401,6 +402,12 @@ class SongCatalog extends ChangeNotifier {
   /// Videos MusicDatabase found bad (`bad_youtube_videos`).
   BadVideos get badVideos => _badVideos;
 
+  RejectedSongRequests _rejectedSongRequests = RejectedSongRequests.none;
+
+  /// Songs MusicDatabase's owner doesn't want added (`rejected_song_requests`): not asked for
+  /// again ([SongRequest]).
+  RejectedSongRequests get rejectedSongRequests => _rejectedSongRequests;
+
   /// When the `music.db` now loaded was downloaded (`DatabaseSync.lastSync` at load time).
   DateTime? get loadedSyncTime => _loadedSyncTime;
   int get songCount => _songs.length;
@@ -467,6 +474,7 @@ class SongCatalog extends ChangeNotifier {
       if (!await file.exists()) {
         _songs = const [];
         _badVideos = BadVideos.none;
+        _rejectedSongRequests = RejectedSongRequests.none;
         _status = CatalogStatus.noDatabase;
       } else {
         final songs = await _readSongs(
@@ -474,11 +482,13 @@ class SongCatalog extends ChangeNotifier {
           await _readServerFiles(await _sync.localFile('files.db')),
         );
         final badVideos = await _readBadVideos(file);
+        final rejected = await _readRejectedSongRequests(file);
         final idChanges = await _readIdChanges(file);
         // All at once, with the indexes below: a search between two awaits would otherwise
         // read the new songs through the old search texts.
         _songs = songs;
         _badVideos = badVideos;
+        _rejectedSongRequests = rejected;
         _idChanges = idChanges;
         _searchTexts = null;
         _byTitle = null;
@@ -491,6 +501,7 @@ class SongCatalog extends ChangeNotifier {
       debugPrint('Loading music.db failed: $e');
       _songs = const [];
       _badVideos = BadVideos.none;
+      _rejectedSongRequests = RejectedSongRequests.none;
       _status = CatalogStatus.error;
     } finally {
       _searchTexts = null;
@@ -706,6 +717,18 @@ class SongCatalog extends ChangeNotifier {
         ))
           row['old_song_id']! as int: row['new_song_id'] as int?,
       };
+    } finally {
+      await db.close();
+    }
+  }
+
+  Future<RejectedSongRequests> _readRejectedSongRequests(File file) async {
+    final db = await (factoryOverride ?? databaseFactory).openDatabase(
+      file.path,
+      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+    );
+    try {
+      return await RejectedSongRequests.read(db);
     } finally {
       await db.close();
     }
