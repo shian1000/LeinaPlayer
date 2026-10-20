@@ -506,8 +506,11 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     the query changes. All parts are searched at once, each with its own spinner / error with
     retry: "Playlisty na YouTube: N" and "Playlisty na Spotify: N" (rows of covers scrolled
     sideways — picture, name, owner, track count when known; tapping one opens its **preview**,
-    see Playlista) and "YouTube: N" (up to 15 videos: title, channel, duration; tapping one
-    streams it like a song with a stored link).
+    see Playlista) and "YouTube: N" (up to 15 videos: artist and title read from the video's
+    title like a playlist import's — `parseYouTubeTrack()`, so "Бумбокс - Твiй на 100%" from
+    channel "familyboombox" is Бумбокс's song — and duration; a video music.db has, by its link
+    or that artist and title, is that song (`hitForSearchedVideo` in `video_link.dart`); tapping
+    one streams it like a song with a stored link).
   - "Utwórz kolejkę z wyników" (`Icons.playlist_play`, left of the filter icon in the search
     screen's app bar, while something is typed) — **implemented**: replaces the queue with every
     found song (the "Utwory: N" list, not the online results) in the list's order and plays the

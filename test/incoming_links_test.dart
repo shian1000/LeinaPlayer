@@ -7,6 +7,7 @@ import 'package:music_database_app/src/data/incoming_links.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
+import 'package:music_database_app/src/data/song_requests.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/spotify_playlist.dart';
 import 'package:music_database_app/src/data/video_link.dart';
@@ -150,6 +151,48 @@ void main() {
       expect((h.title, h.artistLabel), ('Piosenka', 'Nieznany Zespół'));
       expect(h.playlistVideoId, 'bbbbbbbbbbb');
     });
+
+    test(
+      'a YouTube search result: parsed like a link, nothing remembered',
+      () async {
+        await catalog.ensureLoaded();
+        SearchHit searched(YouTubeVideo video) => hitForSearchedVideo(
+          video,
+          catalog: catalog,
+          library: library,
+          youTube: youTube,
+        );
+        // The real case: the channel isn't the artist, the video's title holds both.
+        final unknown = searched(
+          const YouTubeVideo(
+            id: 'Ws-hd5C5STg',
+            title: 'Бумбокс - Твiй на 100%',
+            channel: 'familyboombox',
+          ),
+        );
+        expect(unknown.mainSong, isNull);
+        expect(
+          (unknown.title, unknown.artistLabel),
+          ('Твiй на 100%', 'Бумбокс'),
+        );
+        expect(unknown.youtubeVideoId, 'Ws-hd5C5STg');
+        final request = SongRequest.of(unknown)!;
+        expect((request.artist, request.title), ('Бумбокс', 'Твiй на 100%'));
+        expect(request.youtubeVideoId, 'Ws-hd5C5STg');
+
+        final known = searched(
+          const YouTubeVideo(
+            id: 'aaaaaaaaaaa',
+            title: 'Led Zeppelin - Going to California (Official Audio)',
+            channel: 'Led Zeppelin',
+          ),
+        );
+        expect(known.mainSong?.title, 'Going to California');
+        expect(known.youtubeVideoId, 'aaaaaaaaaaa');
+        expect(SongRequest.of(known), isNull);
+        expect(youTube.matchFor(known.mainSong!.id), isNull);
+      },
+    );
 
     test('a Spotify track: recognised by title and artist, else found on YouTube later', () async {
       final playlists = PlaylistLibrary(library.database, catalog, youTube);

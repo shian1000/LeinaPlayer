@@ -263,6 +263,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - A new list the phone fills by itself from all of music.db (a radio, random picks, a browse
   category to play through) leaves out full albums (`CatalogSong.isFullAlbum`; `hitsWhere(…,
   fullAlbums: false)`); lists the user built or searched keep them (MusicDatabase's hand-off).
+- A YouTube video turned into a song (`SearchHit`) never takes the raw video title and channel:
+  go through `parseYouTubeTrack()` and the catalog (`hitForVideoLink` / `hitForSearchedVideo`
+  in `video_link.dart`, `PlaylistLibrary`) — otherwise the song request sent to MusicDatabase
+  asks for the channel as artist and the whole video title as title (it happened with search
+  results).
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
   reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.

@@ -101,3 +101,45 @@ Future<SearchHit> hitForSpotifyTrack(
     youTube,
   );
 }
+
+/// The song a video found by Wyszukaj's YouTube search is, recognised like [hitForVideoLink]
+/// (music.db's link, the phone's earlier match, artist and title read from the video's title),
+/// but nothing is remembered: only showing a result mustn't match it. Not recognised: the video
+/// with its parsed artist and title, so a song request for it doesn't ask for the channel and
+/// the whole video title.
+SearchHit hitForSearchedVideo(
+  YouTubeVideo video, {
+  required SongCatalog catalog,
+  required LocalLibrary library,
+  required YouTubeLibrary youTube,
+}) {
+  final phoneMatched = youTube.songForVideo(video.id);
+  final known =
+      catalog.findByYouTubeId(video.id) ??
+      (phoneMatched == null ? null : catalog.byId(phoneMatched));
+  if (known != null) {
+    return SearchHit.main(
+      known,
+      library.filesOf(known.id),
+      phoneMatch: known.youtubeVideoId == null ? video.id : null,
+    );
+  }
+  final parsed = parseYouTubeTrack(video.title, video.channel);
+  final song = catalog.findExact(title: parsed.title, artist: parsed.artist);
+  if (song != null) {
+    // Not over MusicDatabase's own answer, including "not on YouTube" (N/A).
+    final useVideo =
+        song.youTube == YouTubeLink.unknown &&
+        !youTube.isWrongFor(song.id, video.id);
+    return SearchHit.main(
+      song,
+      library.filesOf(song.id),
+      phoneMatch: useVideo ? video.id : null,
+    );
+  }
+  return SearchHit.youTubeOnly(
+    title: parsed.title,
+    artistLabel: parsed.artist,
+    videoId: video.id,
+  );
+}

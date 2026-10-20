@@ -262,17 +262,18 @@ void main() {
     expect(find.text('YouTube: 1'), findsOneWidget);
     expect(find.text('Playlisty na YouTube: 1'), findsOneWidget);
     expect(find.text('California — składanka'), findsOneWidget);
-    expect(find.text('California (Official Video)'), findsOneWidget);
+    // The video's title without its junk bracket; the channel as the artist.
+    expect(find.text('California (Official Video)'), findsNothing);
     expect(find.text('Kanał • 3:05'), findsOneWidget);
 
-    await tester.tap(find.text('California (Official Video)'));
+    await tester.tap(find.text('Kanał • 3:05'));
     await settle(tester, until: () => backend.opened.isNotEmpty);
     expect(backend.opened, ['https://stream.test/vid1/251']);
 
     // A changed query drops the results that belonged to the old one.
     await type(tester, 'Californi');
     expect(find.text('Wyszukaj na YouTubie'), findsOneWidget);
-    expect(find.text('California (Official Video)'), findsNothing);
+    expect(find.text('Kanał • 3:05'), findsNothing);
   });
 
   testWidgets('no YouTube button while YouTube search is off', (tester) async {

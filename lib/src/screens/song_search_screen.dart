@@ -13,6 +13,7 @@ import '../playback/player_controller.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
+import '../data/video_link.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
@@ -768,10 +769,11 @@ class _YouTubeTile extends StatelessWidget {
     final duration = video.duration;
     final isCurrent =
         PlayerScope.of(context).current?.youtubeVideoId == video.id;
-    final hit = SearchHit.youTubeOnly(
-      title: video.title,
-      artistLabel: video.channel,
-      videoId: video.id,
+    final hit = hitForSearchedVideo(
+      video,
+      catalog: SongCatalogScope.of(context),
+      library: LocalLibraryScope.of(context),
+      youTube: YouTubeLibraryScope.of(context),
     );
     final tile = ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
@@ -783,18 +785,18 @@ class _YouTubeTile extends StatelessWidget {
       ),
       leading: SongCover(
         cover: CoverRequest(
-          artist: video.channel,
-          title: video.title,
+          artist: hit.artistLabel,
+          title: hit.title,
           videoId: video.id,
           seed: video.id,
           searchable: false,
         ),
         size: SongTile.coverSize,
       ),
-      title: CurrentTitle(text: video.title, isCurrent: isCurrent),
+      title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
       subtitle: Text(
         [
-          video.channel,
+          hit.shownArtist(context),
           ?(duration == null ? null : formatDuration(duration)),
         ].join(' • '),
         maxLines: 1,
