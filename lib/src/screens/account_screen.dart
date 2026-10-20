@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../data/account.dart';
 import '../data/database_sync.dart';
+import '../data/later_links.dart';
 import '../data/library_folders.dart';
 import '../data/listening_log.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_sync.dart';
+import '../data/saved_songs.dart';
 import '../data/youtube_account.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -149,6 +151,8 @@ class _AccountScreenState extends State<AccountScreen> {
                 const _MoodSyncTile(),
                 const _FolderSyncTile(),
                 const _ListenSyncTile(),
+                const _SavedSongSyncTile(),
+                const _LaterLinkSyncTile(),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: const LogOutButton(),
@@ -449,6 +453,42 @@ class _ListenSyncTile extends StatelessWidget {
       last: listens.lastSync,
       onSync: () async =>
           listens.sync(await DatabaseSyncScope.of(context).serverAddresses()),
+    );
+  }
+}
+
+/// How liked songs and songs saved "Na później" last synced with MusicDatabase, and "sync now".
+class _SavedSongSyncTile extends StatelessWidget {
+  const _SavedSongSyncTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final songs = SavedSongsSyncScope.maybeOf(context);
+    if (songs == null) return const SizedBox.shrink();
+    return _SyncTile(
+      title: 'Polubione i zapisane utwory',
+      syncing: songs.syncing,
+      last: songs.lastSync,
+      onSync: () async =>
+          songs.sync(await DatabaseSyncScope.of(context).serverAddresses()),
+    );
+  }
+}
+
+/// How the links saved "Na później" last synced with MusicDatabase, and "sync now".
+class _LaterLinkSyncTile extends StatelessWidget {
+  const _LaterLinkSyncTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final links = LaterLinksScope.maybeOf(context);
+    if (links == null) return const SizedBox.shrink();
+    return _SyncTile(
+      title: 'Linki na później',
+      syncing: links.syncing,
+      last: links.lastSync,
+      onSync: () async =>
+          links.sync(await DatabaseSyncScope.of(context).serverAddresses()),
     );
   }
 }

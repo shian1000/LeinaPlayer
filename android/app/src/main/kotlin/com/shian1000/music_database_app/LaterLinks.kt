@@ -69,17 +69,26 @@ object LaterLinks {
     fun save(context: Context, url: String, service: String, kind: String, personId: String) {
         val now = System.currentTimeMillis()
         val links = read(context, LINKS)
-        // The same link from the same person again only moves it to the top.
-        links.removeAll { it.optString("url") == url && it.optString("personId") == personId }
-        links.add(
-            JSONObject()
-                .put("id", UUID.randomUUID().toString())
-                .put("url", url)
-                .put("service", service)
-                .put("kind", kind)
-                .put("personId", personId)
-                .put("savedAt", now),
-        )
+        // The same link from the same person again only moves it to the top, keeping its id
+        // (shared with MusicDatabase once synced).
+        val same = links.firstOrNull {
+            it.optString("url") == url && it.optString("personId") == personId &&
+                !it.has("deletedAt")
+        }
+        if (same != null) {
+            same.put("savedAt", now).put("updatedAt", now).remove("openedAt")
+            if (same.has("account")) same.put("dirty", true)
+        } else {
+            links.add(
+                JSONObject()
+                    .put("id", UUID.randomUUID().toString())
+                    .put("url", url)
+                    .put("service", service)
+                    .put("kind", kind)
+                    .put("personId", personId)
+                    .put("savedAt", now),
+            )
+        }
         write(context, LINKS, links)
         val people = read(context, PEOPLE)
         people.firstOrNull { it.optString("id") == personId }?.put("usedAt", now)
@@ -94,6 +103,16 @@ object LaterLinks {
             if (key == "id") continue
             if (value == null) link.remove(key) else link.put(key, value)
         }
+        write(context, LINKS, links)
+    }
+
+    /** Stores [link] (with its `id`, from MusicDatabase) in place of the one with its id. */
+    fun putLink(context: Context, link: Map<String, Any?>) {
+        val id = link["id"] as? String ?: return
+        val links = read(context, LINKS).filter { it.optString("id") != id }.toMutableList()
+        val json = JSONObject()
+        for ((key, value) in link) if (value != null) json.put(key, value)
+        links.add(json)
         write(context, LINKS, links)
     }
 

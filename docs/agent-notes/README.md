@@ -7,6 +7,8 @@
 - [`playlists.md`](playlists.md) — Biblioteka playlists: tables, YouTube and Spotify import,
   recognising songs, videos YouTube removed, searching YouTube/Spotify playlists and previews,
   Spotify albums and track links, sharing playlists and songs, adding songs, phone-only folders.
+- [`signing.md`](signing.md) — the release key outside the repo, `android/key.properties`, why it
+  must never change, its SHA-1 in Google Cloud.
 - [`theming.md`](theming.md) — how themes work and how to add one.
 - [`ui-sizing.md`](ui-sizing.md) — calibrated font sizes and spacing, no screen-size scaling.
 - [`youtube.md`](youtube.md) — YouTube search methods, lite matcher + benchmark, NewPipe playback,

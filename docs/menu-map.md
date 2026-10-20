@@ -219,6 +219,7 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   opened). Tap opens it like a link given to the app (plays / imports) and marks it listened;
   ⋮ / long press: Otwórz w Leina Radio, Oznacz jako (nie)odsłuchany, Zmień, od kogo jest (incl.
   Nowa osoba), Otwórz w aplikacji YouTube/Spotify, Kopiuj link, Usuń z „Na później”.
+  The links sync with the account (the sender by name; [ADR 0013](decisions/0013-saved-songs-sync.md)).
 
 ## Ustawienia (`settings_screen.dart`)
 
@@ -245,7 +246,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   phone-only moods too ("Dodać playlisty i nastroje z telefonu do konta?"), and a "Nastroje tylko
   na tym telefonie: N" row adds them ([ADR 0008](decisions/0008-moods.md)). A "Foldery" row
   does the same for Biblioteka's folders ("Foldery tylko na tym telefonie: N"; the login offer
-  lists them too — [ADR 0011](decisions/0011-folder-sync.md)).
+  lists them too — [ADR 0011](decisions/0011-folder-sync.md)). "Polubione i zapisane utwory" and
+  "Linki na później" rows show how those synced, with ⟳ — no offer: what was saved while logged
+  out joins the account by itself ([ADR 0013](decisions/0013-saved-songs-sync.md)).
   Below everything, once signed in for "Utwórz na YouTube": "Konto Google (playlisty na
   YouTube)" — the Google account's e-mail with **Wyloguj** (the next playlist asks for an
   account again).
@@ -618,7 +621,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   (**implemented**, `ArtistsScreen`: every artist in music.db and of the phone's songs not in it,
   with song counts, alphabetically, a field to narrow it — **→ the artist's songs**), Na później **→ Na później** (`saved_songs_screen.dart`: saved songs newest first,
   "Odtwórz", song rows; saved / taken out with the song menu's "Zapisz na później" / "Usuń z „Na
-  później”" or Odkrywaj's bookmark — `SavedSongs`, phone only), Dynamiczne playlisty **→
+  później”" or Odkrywaj's bookmark — `SavedSongs`, synced with the account, ADR 0013), Dynamiczne playlisty **→
   Dynamiczne playlisty** (`smart_playlist_screen.dart`, below). A category shows its playlists /
   moods outside folders plus the folders holding any of them (inside, only those).
 - Below the categories: everything — folders, playlists and moods outside folders, mixed in the
@@ -685,7 +688,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
 
 - Header with the song (or "N utworów"); "Polubione utwory" (heart cover, song count; ⊕, or an
   accent ✓ when all these songs are liked — tapping likes them, or unlikes them when all are
-  liked; `LikedSongs`, phone only — the only place a song is liked, user's decision); "Nowa
+  liked; `LikedSongs`, synced with the account — the only place a song is liked, user's decision); "Nowa
   playlista" (name dialog; a new playlist of these songs); then every playlist made on the phone (not imported — re-importing would replace the
   added songs; a note says so when there are imported ones) — tapping one puts the songs at its
   end, synced like any change.

@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Private checklist for sharing the app (kept local only)
+/docs/udostepnienie-todo.txt

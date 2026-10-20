@@ -67,8 +67,9 @@ Biblioteka, Ja (the profile, no avatar or drawer); Home's rows arranged by the u
 hide, rows from Biblioteka — `home_layout.dart`); Odkrywaj — one song at a time from all of
 MusicDatabase or a mood; Biblioteka as categories, with "Polubione utwory" (liked in the
 "Dodaj do playlisty" sheet / submenu — the full player's ⊕ turns into an accent ✓, Spotify-like),
-songs saved "Na później" (both `saved_songs.dart`) and dynamic playlists — a saved search filter
-(`smart_playlists.dart`), all phone only; the queue opens in place of the full player's cover, and lyrics (looked
+songs saved "Na później" (both `saved_songs.dart`, synced with the account —
+[ADR 0013](docs/decisions/0013-saved-songs-sync.md)) and dynamic playlists — a saved search filter
+(`smart_playlists.dart`, phone only); the queue opens in place of the full player's cover, and lyrics (looked
 up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the player, above
 "Informacje o utworze" (user's layout: bottom row YouTube, mood filter, share, queue, ⋮; a mood
 button where "Polub" was); song menus unfold "Dodaj do playlisty ›" / "Przejdź do
@@ -102,7 +103,7 @@ itself, without MusicDatabase (unlisted, a one-off copy; [`youtube.md`](docs/age
 a tapped link first shows a native sheet asking where to open it (Leina Radio,
 the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
 saves it for later with the person who sent it (Ja › Na później,
-`later_links.dart`; kept natively in `LaterLinks.kt`).
+`later_links.dart`; kept natively in `LaterLinks.kt`, synced with the account from Dart — ADR 0013).
 
 ## Read order
 
@@ -142,7 +143,10 @@ moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and
 `GET /library/<files.id>` ([ADR 0010](docs/decisions/0010-server-files.md)). Biblioteka's folders go as JSON too
 (`/users/<name>/folders`, [ADR 0011](docs/decisions/0011-folder-sync.md); server side in a
 [hand-off](docs/handoffs/musicdatabase-folders.md)); its sort order and "last opened" stay on the
-phone (`library_folders.dart`), not synced. Any other way of talking to MusicDatabase is not decided — check with the user
+phone (`library_folders.dart`), not synced. Liked songs and songs saved "Na później" go as
+`/users/<name>/saved-songs`, links saved "Na później" as `/users/<name>/later-links`, one item at a
+time ([ADR 0013](docs/decisions/0013-saved-songs-sync.md); server side in a
+[hand-off](docs/handoffs/musicdatabase-saved-songs.md)). Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands
@@ -153,6 +157,7 @@ flutter run                  # run on a connected device/emulator
 flutter analyze              # static analysis — run before considering a change done
 flutter test                 # run widget/unit tests
 tool/build_release_apk.sh    # build the release APK — always this, not a bare `flutter build apk`
+                             # (signed with the release key from android/key.properties — signing.md)
 ```
 
 The release build is numbered by `tool/build_info.sh`: build number = commit count (Android needs
@@ -192,7 +197,8 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
   folders (synced), sort order and "last opened" (`library_folders.dart`), songs saved for
-  later and liked songs (`saved_songs.dart`), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
+  later and liked songs (`saved_songs.dart`, synced item by item with `item_sync.dart`'s `ItemSync`
+  like the later links), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
   (`home_layout.dart`) — all three phone only, syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
@@ -244,7 +250,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `SavedSongsScope`, `LikedSongsScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `SavedSongsScope`, `LikedSongsScope`, `SavedSongsSyncScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus
@@ -353,6 +359,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - [`covers.md`](docs/agent-notes/covers.md) — album covers: sources and their order, matching,
   rate limits, the cover cache, the MusicDatabase hand-off, playlist/mood collages and picked
   covers.
+- [`signing.md`](docs/agent-notes/signing.md) — the release key (outside the repo,
+  `android/key.properties`), why it must never change, its SHA-1 in Google Cloud.
 - [`ui-sizing.md`](docs/agent-notes/ui-sizing.md) — font sizes/spacing are calibrated against the
   reference app; why there's no screen-size scaling.
 

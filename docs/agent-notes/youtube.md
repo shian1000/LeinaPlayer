@@ -214,9 +214,9 @@ with the YouTube Data API — MusicDatabase isn't involved (user's choice; its o
   with "Wyloguj"). Google Cloud project with YouTube Data API v3, OAuth consent screen in
   "Testing" (testers listed there), scope `auth/youtube`. Two OAuth clients: **Android**
   (package `com.shian1000.music_database_app` + SHA-1 of the signing key) and **Web**, whose id
-  is `serverClientId` in the code. The release is signed with `~/.android/debug.keystore`
-  (SHA-1 `F4:39:48:90:36:28:0A:1E:EB:FC:6E:8E:15:02:62:5A:A7:E9:2C:3D`): building on another
-  machine or with another key breaks sign-in (often reported as "canceled") until its SHA-1 is
+  is `serverClientId` in the code. The release is signed with the release key ([`signing.md`](signing.md),
+  SHA-1 `D7:1B:8B:4C:8C:50:0D:6C:80:04:C5:07:5C:20:17:59:B7:9B:76:47`): building with another key
+  (another machine's debug key) breaks sign-in (often reported as "canceled") until its SHA-1 is
   added to the Android client. Android only; iOS would need its own client.
 - **Quota:** 10 000 units a day per project, 50 per playlist and per added video — ~200 songs.
   Videos come from what playback would use, else the phone's own search (no API quota).

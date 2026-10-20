@@ -155,6 +155,10 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
                 LaterLinks.removeLink(context, call.argument<String>("id")!!)
                 result.success(null)
             }
+            "putLaterLink" -> {
+                LaterLinks.putLink(context, call.argument<Map<String, Any?>>("link")!!)
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
