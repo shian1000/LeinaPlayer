@@ -43,13 +43,22 @@ class PrivacyScreen extends StatelessWidget {
         ),
       ),
     );
-    Widget status(String value) => Padding(
+    // The accent while the service is reached, the theme's error red while it isn't.
+    Widget status(bool connects, String value) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Text(
-        value,
-        style: TextStyle(fontSize: AppFontSize.small, color: palette.accent),
+        'Teraz: $value',
+        style: TextStyle(
+          fontSize: AppFontSize.small,
+          color: connects
+              ? palette.accent
+              : Theme.of(context).colorScheme.error,
+        ),
       ),
     );
+    Widget statusOf(List<String> what) => what.isEmpty
+        ? status(false, 'nie łączy się')
+        : status(true, 'łączy się z internetem (${what.join(', ')})');
     Widget onlyWhenUsed([String? what]) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(
@@ -112,13 +121,16 @@ class PrivacyScreen extends StatelessWidget {
             'na niego trafia.',
           ),
           if (sync != null)
-            status(
-              sync.hasServer
-                  ? (userName != null
-                        ? 'Teraz: serwer ustawiony, zalogowano jako $userName'
-                        : 'Teraz: serwer ustawiony, bez logowania')
-                  : 'Teraz: żaden serwer nie jest ustawiony',
-            ),
+            sync.hasServer
+                ? status(
+                    true,
+                    'łączy się z serwerem, '
+                    '${userName != null ? 'zalogowano jako $userName' : 'bez logowania'}',
+                  )
+                : status(
+                    false,
+                    'nie łączy się — żaden serwer nie jest ustawiony',
+                  ),
           goTo('Serwer: adresy', () => const DatabaseSourceScreen()),
           goTo('Konto: logowanie i wylogowanie', () => const AccountScreen()),
 
@@ -129,10 +141,11 @@ class PrivacyScreen extends StatelessWidget {
             'tylko samo zapytanie.',
           ),
           if (sync != null)
-            status(
-              'Teraz: baza z GitHuba ${sync.gitHubOn ? 'włączona' : 'wyłączona'}'
-              '${updates != null && updates.configured ? ', aktualizacje ${updates.autoCheck ? 'włączone' : 'wyłączone'}' : ''}',
-            ),
+            statusOf([
+              if (sync.gitHubOn) 'baza',
+              if (updates != null && updates.configured && updates.autoCheck)
+                'aktualizacje',
+            ]),
           goTo(
             'Serwer › Pobieraj z GitHuba',
             () => const DatabaseSourceScreen(),
@@ -151,6 +164,12 @@ class PrivacyScreen extends StatelessWidget {
             'czego szukasz (tytuł i wykonawcę). Odtworzone utwory zostają w pamięci '
             'podręcznej; kolejne z kolejki mogą być pobierane z wyprzedzeniem.',
           ),
+          if (settings != null)
+            statusOf([
+              if (settings.enabledSources.contains(PlaybackSource.youtube))
+                'odtwarzanie',
+              if (settings.youTubeSearchEnabled) 'wyszukiwanie',
+            ]),
           goTo(
             'Kolejność odtwarzania: źródła, w tym YouTube',
             () => const PlaybackOrderScreen(),
@@ -171,12 +190,15 @@ class PrivacyScreen extends StatelessWidget {
             'zapamiętuje tylko adres e-mail konta.',
           ),
           if (google?.email case final email?) ...[
-            status('Teraz: zalogowano jako $email'),
-            goTo('Konto › Wyloguj z Google', () => const AccountScreen()),
-          ] else
-            onlyWhenUsed(
-              'Tylko gdy sam stukniesz „Utwórz na YouTube” — teraz nie jesteś zalogowany.',
+            status(
+              true,
+              'łączy się z internetem przy „Utwórz na YouTube”, zalogowano jako $email',
             ),
+            goTo('Konto › Wyloguj z Google', () => const AccountScreen()),
+          ] else ...[
+            status(false, 'nie łączy się — nie jesteś zalogowany'),
+            onlyWhenUsed('Tylko gdy sam stukniesz „Utwórz na YouTube”.'),
+          ],
 
           const SectionTitle('Spotify'),
           text(
@@ -184,6 +206,10 @@ class PrivacyScreen extends StatelessWidget {
             'Spotify. Spotify dostaje identyfikator playlisty / albumu / utworu albo to, czego '
             'szukasz. Bez konta (z kluczem API tylko, jeśli go wpiszesz).',
           ),
+          if (settings != null)
+            statusOf([
+              if (settings.spotifyPlaylistSearch) 'wyszukiwanie playlist',
+            ]),
           goTo(
             'Spotify: wyszukiwanie playlist i klucz API',
             () => const SpotifySourceScreen(),
@@ -198,6 +224,19 @@ class PrivacyScreen extends StatelessWidget {
             'i album (albo tytuł) lub identyfikator filmu; znaleziona okładka zostaje w pamięci '
             'podręcznej.',
           ),
+          if (settings != null)
+            statusOf([
+              for (final source in settings.activeCoverSources)
+                if (source == CoverSource.itunes ||
+                    source == CoverSource.deezer ||
+                    source == CoverSource.youtube)
+                  source.label,
+              if (settings.coverWifiOnly &&
+                  settings.activeCoverSources.any(
+                    (s) => s != CoverSource.file && s != CoverSource.server,
+                  ))
+                'tylko przez Wi-Fi',
+            ]),
           goTo(
             'Źródła okładek (każde osobno)',
             () => const CoverSourcesScreen(),
@@ -213,8 +252,7 @@ class PrivacyScreen extends StatelessWidget {
             '(projekt społecznościowy) dostaje tytuł, wykonawcę, album i długość utworu. Teksty '
             'nie są zapisywane na telefonie.',
           ),
-          if (settings != null)
-            status('Teraz: ${settings.lyrics ? 'włączone' : 'wyłączone'}'),
+          if (settings != null) statusOf([if (settings.lyrics) 'LRCLIB']),
           goTo(
             'Oszczędzanie danych › Pobieraj teksty piosenek',
             () => const DataSaverScreen(),
@@ -226,6 +264,7 @@ class PrivacyScreen extends StatelessWidget {
             'źródłowy i pobranie nowej wersji otwierają się w przeglądarce. Paczka zgłoszeń, '
             'linki i podsumowania trafiają do aplikacji, którą wybierzesz w „Udostępnij”.',
           ),
+          status(false, 'nie łączy się sama'),
           onlyWhenUsed(),
 
           const SectionTitle('Kto widzi Twoje dane'),

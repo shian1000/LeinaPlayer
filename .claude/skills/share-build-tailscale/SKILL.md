@@ -81,5 +81,6 @@ Answer in Polish with:
 - when it expires (from `EXPIRES=`),
 - whether the APK was rebuilt or already current,
 - a reminder that the phone must be connected to Tailscale and allow installing apps from the
-  browser ("nieznane źródła"). The release APK is signed with the debug key
-  (`android/app/build.gradle.kts`), so it updates an existing install of this app in place.
+  browser ("nieznane źródła"). The release APK is signed with the release key
+  (`docs/agent-notes/signing.md`), so it updates an install from a GitHub release or an earlier
+  share in place (one signed with the old debug key needs uninstalling first).

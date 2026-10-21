@@ -103,9 +103,9 @@ Android may refuse to install the next one over it.
 `com.shian1000.music_database_app` (from `android/app/build.gradle.kts`) — only re-check that file
 if the install step reports a different id than expected.
 
-The release build is currently signed with the debug key (`signingConfig = debug` in
-`android/app/build.gradle.kts`), so it installs over earlier `flutter run` debug builds without
-trouble. If install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (signature mismatch, e.g. after
+The release build is signed with the release key (`android/key.properties`,
+`docs/agent-notes/signing.md`), so it installs over GitHub releases and earlier shares, but not
+over a `flutter run` debug build or a build signed with the old debug key. If install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` (signature mismatch, e.g. after
 a real release key is configured), tell the user that reinstalling requires uninstalling the
 existing app first — which wipes all of the app's local data on the phone — and only run
 `adb -s <device-id> uninstall com.shian1000.music_database_app` after they confirm.

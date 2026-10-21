@@ -60,7 +60,12 @@ void main() {
       ]) {
         expect(find.text(title), findsOneWidget);
       }
-      expect(find.text('Teraz: włączone'), findsOneWidget);
+      const lyricsOn = 'Teraz: łączy się z internetem (LRCLIB)';
+      expect(find.text(lyricsOn), findsOneWidget);
+      final off = find.text('Teraz: nie łączy się');
+      final offBefore = off.evaluate().length;
+      // Every section says whether it connects now.
+      expect(find.textContaining('Teraz: '), findsNWidgets(6));
 
       await tester.tap(
         find.text('Oszczędzanie danych › Pobieraj teksty piosenek'),
@@ -72,7 +77,10 @@ void main() {
       await tester.pump();
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('Teraz: wyłączone'), findsOneWidget);
+      expect(find.text(lyricsOn), findsNothing);
+      expect(off, findsNWidgets(offBefore + 1));
+      final red = tester.widget<Text>(off.first).style!.color;
+      expect(red, Theme.of(tester.element(off.first)).colorScheme.error);
     },
   );
 }

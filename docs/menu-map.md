@@ -441,8 +441,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   no ads / analytics / crash reports; what stays on the phone; then one section per service the
   app talks to (Serwer MusicDatabase, GitHub, YouTube, Konto Google, Spotify, Okładki: iTunes,
   Deezer, miniatury YouTube, LRCLIB, Przeglądarka i „Udostępnij”) — why, when, what it gets, a
-  "Teraz: …" line where there's a state (server set / logged in, GitHub and updates on, Google
-  account, lyrics on), and rows that open the screen with its switch (Serwer, Konto, Kolejność
+  "Teraz: …" line in every section — "łączy się z serwerem / z internetem (what for)" in the accent
+  colour (plus "zalogowano jako …" for the server and Google), or "nie łączy się …" in the theme's
+  error red — and rows that open the screen with its switch (Serwer, Konto, Kolejność
   odtwarzania, YouTube, Pamięć podręczna, Spotify, Źródła okładek, Oszczędzanie danych,
   Informacje i pomoc) or "Tylko gdy sam tego użyjesz"; last "Kto widzi Twoje dane".
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: the

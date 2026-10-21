@@ -311,7 +311,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (`privacy_screen.dart`) with why, when and what it sends, and with a way to the switch that
   stops it (or "Tylko gdy sam tego użyjesz") — a new service or a new kind of data sent goes
   there in the same change, and a new automatic connection gets a switch (user's rule;
-  the lyrics got "Pobieraj teksty piosenek" for it).
+  the lyrics got "Pobieraj teksty piosenek" for it). Each section's "Teraz: …" line is computed
+  from those switches (accent = connects, the theme's error red = doesn't) — a new switch must
+  feed it.
 - No dummy elements: a feature is built or its button is left out (user's decision; the old
   `showDummy` / `Atrapa:` snackbar is gone). A `MenuSheetEntry` needs an `onTap` unless it has a
   `submenu`.
