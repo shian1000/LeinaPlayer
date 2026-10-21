@@ -74,7 +74,8 @@ class AppRelease {
       buildNumber: int.parse(tag.group(2)!),
       apkUrl: Uri.parse(apk),
       pageUrl: Uri.parse(json['html_url'] as String? ?? apk),
-      notes: (json['body'] as String? ?? '').trim(),
+      // GitHub keeps the description as typed in the browser, with \r\n line ends.
+      notes: (json['body'] as String? ?? '').replaceAll('\r\n', '\n').trim(),
     );
   }
 }

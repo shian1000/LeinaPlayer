@@ -16,7 +16,7 @@ void main() {
   Map<String, Object?> release(String tag, {List<String>? assets}) => {
     'tag_name': tag,
     'html_url': 'https://github.com/owner/repo/releases/tag/$tag',
-    'body': '- Nowość\n- Poprawka\n',
+    'body': '- Nowość\r\n- Poprawka\r\n',
     'assets': [
       for (final name in assets ?? ['LeinaRadio-$tag.apk'])
         {
