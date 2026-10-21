@@ -199,7 +199,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
           _addressField(
             key: DatabaseSourceScreen.remoteFieldKey,
             controller: _remote,
-            hint: 'http://serwer:8000/',
+            hint: 'http://serwer:8002/',
             helper:
                 'Używany poza siecią lokalną (np. przez Tailscale). Pobierane są pliki '
                 'music.db, tag.db i files.db (pliki muzyki na serwerze).',
@@ -210,7 +210,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
           _addressField(
             key: DatabaseSourceScreen.localFieldKey,
             controller: _local,
-            hint: 'http://192.168.1.10:8000/',
+            hint: 'http://192.168.1.10:8002/',
             helper: 'Używany, gdy telefon jest w sieci Wi-Fi wybranej poniżej.',
             error: _localError,
             onSubmitted: () => _save(sync),

@@ -492,7 +492,7 @@ void main() {
     await tester.tap(find.text('Zapisz'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Nieprawidłowy adres (np. http://serwer:8000/)'),
+      find.text('Nieprawidłowy adres (np. http://serwer:8002/)'),
       findsOneWidget,
     );
 

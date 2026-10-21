@@ -213,7 +213,7 @@ class DatabaseSync extends ChangeNotifier {
         !(uri.scheme == 'http' || uri.scheme == 'https') ||
         uri.host.isEmpty) {
       throw const FormatException(
-        'Nieprawidłowy adres (np. http://serwer:8000/)',
+        'Nieprawidłowy adres (np. http://serwer:8002/)',
       );
     }
     final segments = [...uri.pathSegments.where((s) => s.isNotEmpty)];
