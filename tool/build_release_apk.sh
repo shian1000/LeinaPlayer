@@ -19,9 +19,12 @@ if [[ -f tool/release.env ]]; then
   done < <(grep -E '^[A-Z_]+=' tool/release.env)
 fi
 
+# --split-per-abi (tool/prepare_release.sh): one APK per CPU instead of the universal one.
 read -r number commit < <(tool/build_info.sh)
 flutter build apk --release \
   --build-number="$number" \
   --dart-define=GIT_COMMIT="$commit" \
-  ${defines[@]+"${defines[@]}"}
-echo "$number $commit" > build/app/outputs/flutter-apk/app-release.version
+  --dart-define=BUILD_NUMBER="$number" \
+  ${defines[@]+"${defines[@]}"} \
+  "$@"
+[[ " $* " == *" --split-per-abi "* ]] || echo "$number $commit" > build/app/outputs/flutter-apk/app-release.version

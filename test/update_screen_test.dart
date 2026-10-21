@@ -65,6 +65,9 @@ void main() {
   testWidgets('Informacje i pomoc shows a newer release and offers it', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final updates = newUpdates();
     await tester.runAsync(() async {
       await updates.load();
@@ -76,6 +79,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Aktualizacje'), findsOneWidget);
+    expect(find.text('Dlaczego aplikacja tyle zajmuje'), findsOneWidget);
+    expect(find.text('Zajęte 0.0 MB'), findsOneWidget);
     expect(
       find.text('Dostępna wersja 1.0.0 (58) — stuknij, żeby pobrać'),
       findsOneWidget,

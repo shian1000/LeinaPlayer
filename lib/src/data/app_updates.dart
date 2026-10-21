@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' show Abi;
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -12,6 +13,41 @@ import 'network_errors.dart';
 /// without it — someone else's: their APK is signed with another key and couldn't install the
 /// owner's releases anyway, so there is nothing to offer.
 const updateRepo = String.fromEnvironment('UPDATE_REPO');
+
+const _buildNumber = String.fromEnvironment('BUILD_NUMBER');
+
+/// The build number (the commit count, `tool/build_info.sh`) of the running app: BUILD_NUMBER
+/// from `tool/build_release_apk.sh`, else derived from Android's [versionCode] — which
+/// `android/app/build.gradle.kts` sets to build × 10 + variant, so it isn't the build number.
+String buildNumberOf(String versionCode) {
+  if (_buildNumber.isNotEmpty) return _buildNumber;
+  final code = int.tryParse(versionCode);
+  return code != null && Platform.isAndroid ? '${code ~/ 10}' : versionCode;
+}
+
+/// Which APK is installed, from the last digit of Android's [versionCode]
+/// (`android/app/build.gradle.kts`): `true` the universal one, `false` a split one, `null` when
+/// unknown (not Android, or a build from before that numbering).
+bool? isUniversalApk(String versionCode) {
+  final code = int.tryParse(versionCode);
+  if (code == null || !Platform.isAndroid || code < 100) return null;
+  return switch (code % 10) {
+    9 => true,
+    1 || 2 || 4 => false,
+    _ => null,
+  };
+}
+
+/// The Android ABI name the running app was built for, as in the split APKs' file names.
+String? get currentAndroidAbi => switch (Abi.current()) {
+  Abi.androidArm64 => 'arm64-v8a',
+  Abi.androidArm => 'armeabi-v7a',
+  Abi.androidX64 => 'x86_64',
+  _ => null,
+};
+
+/// The split APKs' ABI names (`app-<abi>-release.apk`, `tool/prepare_release.sh`).
+const _abis = ['arm64-v8a', 'armeabi-v7a', 'x86_64'];
 
 /// A newer release found on GitHub.
 class AppRelease {
@@ -29,8 +65,9 @@ class AppRelease {
   /// `58` of the tag `1.0.0+58` — compared with the installed build's number.
   final int buildNumber;
 
-  /// The release's first `.apk` asset; downloaded by the browser, which hands it to Android's
-  /// installer (no install permission in the app — owner's choice).
+  /// The release's APK for this phone's CPU ([abi] in its name), else its universal one (no
+  /// ABI in the name); downloaded by the browser, which hands it to Android's installer (no
+  /// install permission in the app — owner's choice).
   final Uri apkUrl;
 
   final Uri pageUrl;
@@ -57,17 +94,26 @@ class AppRelease {
   );
 
   /// The release in GitHub's `releases/latest` answer, or `null` when its tag isn't
-  /// `<version>+<build>` or it has no APK.
-  static AppRelease? fromGitHub(Map<String, Object?> json) {
+  /// `<version>+<build>` or it has no APK this phone ([abi]) can install.
+  static AppRelease? fromGitHub(Map<String, Object?> json, {String? abi}) {
     final tag = RegExp(r'^v?([0-9][0-9A-Za-z.\-]*)\+([0-9]+)$')
         .firstMatch(json['tag_name'] as String? ?? '');
     if (tag == null) return null;
-    final apk = [
+    final apks = <String, String>{
       for (final asset in json['assets'] as List? ?? const [])
         if (asset is Map &&
-            (asset['name'] as String? ?? '').toLowerCase().endsWith('.apk'))
-          asset['browser_download_url'] as String?,
-    ].nonNulls.firstOrNull;
+            (asset['name'] as String? ?? '').toLowerCase().endsWith('.apk') &&
+            asset['browser_download_url'] is String)
+          (asset['name'] as String).toLowerCase():
+              asset['browser_download_url'] as String,
+    };
+    final forAbi = abi == null
+        ? null
+        : apks.entries.where((e) => e.key.contains(abi)).firstOrNull;
+    final universal = apks.entries
+        .where((e) => !_abis.any(e.key.contains))
+        .firstOrNull;
+    final apk = (forAbi ?? universal)?.value;
     if (apk == null) return null;
     return AppRelease(
       version: tag.group(1)!,
@@ -89,7 +135,9 @@ class AppUpdates extends ChangeNotifier {
     required this.installedBuild,
     Uri? apiBase,
     DateTime Function()? now,
-  }) : _apiBase = apiBase ?? Uri.parse('https://api.github.com/'),
+    String? abi,
+  }) : abi = abi ?? currentAndroidAbi,
+       _apiBase = apiBase ?? Uri.parse('https://api.github.com/'),
        _now = now ?? DateTime.now;
 
   static const _autoKey = 'updates.auto_check';
@@ -100,8 +148,11 @@ class AppUpdates extends ChangeNotifier {
   /// `<owner>/<repo>` whose releases are checked; empty = no checks ([configured]).
   final String repo;
 
-  /// The installed build's number (Android's versionCode).
+  /// The installed build's number ([buildNumberOf]).
   final Future<int> Function() installedBuild;
+
+  /// This phone's CPU, picking the release's APK ([currentAndroidAbi]).
+  final String? abi;
   final Uri _apiBase;
   final DateTime Function() _now;
 
@@ -198,7 +249,7 @@ class AppUpdates extends ChangeNotifier {
     notifyListeners();
     try {
       final json = await _fetchLatest();
-      _latest = json == null ? null : AppRelease.fromGitHub(json);
+      _latest = json == null ? null : AppRelease.fromGitHub(json, abi: abi);
       _installed = await installedBuild();
       _problem = null;
       _lastCheck = _now();

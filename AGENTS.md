@@ -172,11 +172,12 @@ flutter test                 # run widget/unit tests
 tool/build_release_apk.sh    # build the release APK — always this, not a bare `flutter build apk`
                              # (signed with the release key from android/key.properties — signing.md;
                              # build-time settings from the git-ignored tool/release.env)
-tool/prepare_release.sh      # the APK + tag for a GitHub release (releases.md); the owner publishes
+tool/prepare_release.sh      # universal + arm64 APKs and the tag for a GitHub release (releases.md)
 ```
 
-The release build is numbered by `tool/build_info.sh`: build number = commit count (Android needs
-it to grow), plus the short commit hash with "+zmiany" when `lib/`, `android/` or the pubspec
+The release build is numbered by `tool/build_info.sh`: build number = commit count (Android's
+versionCode is that × 10 + the APK's CPU variant — `releases.md`; the app gets the build number
+from `BUILD_NUMBER`), plus the short commit hash with "+zmiany" when `lib/`, `android/` or the pubspec
 files differ from it — shown in Informacje i pomoc (`GIT_COMMIT` dart-define). Only the "1.0.0"
 part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
 

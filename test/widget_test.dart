@@ -212,6 +212,16 @@ void main() {
 
       expect(find.text('1.2.3 (kompilacja 45)'), findsOneWidget);
       expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
+      // The size section, then below it, further down than one screen.
+      await tester.scrollUntilVisible(
+        find.text('Dlaczego aplikacja tyle zajmuje'),
+        200,
+      );
+      expect(find.text('Dlaczego aplikacja tyle zajmuje'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Linki z YouTube i Spotify'),
+        200,
+      );
       expect(find.text('Linki z YouTube i Spotify'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('https://github.com/shian1000/LeinaPlayer'),

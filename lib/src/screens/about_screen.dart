@@ -8,6 +8,7 @@ import '../data/app_updates.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/update_dialog.dart';
+import 'cache_settings_screen.dart';
 
 /// "Ustawienia › Informacje i pomoc": the app's version and the terms it may be shared under.
 /// Mostly a reminder for the owner — the app is for private use only and must never go to an
@@ -82,6 +83,39 @@ class AboutScreen extends StatelessWidget {
           paragraph(
             'Odtwarzanie i wyszukiwanie w YouTube może przestać działać po zmianach po '
             'stronie YouTube. Naprawa wymaga wtedy nowej wersji aplikacji.',
+          ),
+          const SectionTitle('Dlaczego aplikacja tyle zajmuje'),
+          paragraph(
+            'Sama aplikacja to ok. 22 MB: silnik Flutter, którym rysuje ekran, i jej kod '
+            'skompilowany do kodu maszynowego, razem z biblioteką NewPipe i silnikiem JavaScript '
+            'do odtwarzania z YouTube.',
+          ),
+          paragraph(
+            'Aplikacja jest wydawana w dwóch wersjach. Mała (ok. 25 MB) jest dla '
+            'współczesnych telefonów z procesorem 64-bitowym — prawie wszystkich. Duża (ok. '
+            '69 MB) zawiera wersje dla trzech rodzajów procesorów i działa na każdym '
+            'telefonie, ale zajmuje około trzy razy więcej: Android przechowuje cały plik, '
+            'choć używa tylko jednej części. Aktualizacje same wybierają małą, jeśli pasuje do '
+            'telefonu; z dużej można przejść na małą bez utraty danych.',
+          ),
+          _ApkVariantTile(packageInfo: packageInfo ?? PackageInfo.fromPlatform),
+          paragraph(
+            'W trakcie używania najwięcej miejsca zajmuje pamięć podręczna: utwory z YouTube '
+            '(by grały bez internetu i nie pobierały się ponownie), okładki i utwory zapisane '
+            'przez „Pobierz”. Jej limit ustawisz poniżej. Baza utworów zajmuje kilka MB.',
+          ),
+          ListTile(
+            leading: const Icon(Icons.sd_storage_outlined),
+            title: const Text('Pamięć podręczna'),
+            subtitle: Text(
+              'Zajęte ${(cacheBytesOf(context) / (1024 * 1024)).toStringAsFixed(1)} MB',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const CacheSettingsScreen(),
+              ),
+            ),
           ),
           const SectionTitle('Linki z YouTube i Spotify'),
           paragraph(
@@ -193,7 +227,13 @@ class _VersionTile extends StatefulWidget {
 class _VersionTileState extends State<_VersionTile> {
   late final Future<String> _version = widget
       .packageInfo()
-      .then((info) => versionLabel(info.version, info.buildNumber, gitCommit))
+      .then(
+        (info) => versionLabel(
+          info.version,
+          buildNumberOf(info.buildNumber),
+          gitCommit,
+        ),
+      )
       .catchError((Object _) => 'nieznana');
 
   @override
@@ -204,5 +244,44 @@ class _VersionTileState extends State<_VersionTile> {
       title: Text('$appName — wersja'),
       subtitle: Text(snapshot.data ?? '…'),
     ),
+  );
+}
+
+/// "Zainstalowana wersja: mała / duża", from the installed APK's versionCode; nothing when it
+/// can't tell ([isUniversalApk]).
+class _ApkVariantTile extends StatefulWidget {
+  const _ApkVariantTile({required this.packageInfo});
+
+  final Future<PackageInfo> Function() packageInfo;
+
+  @override
+  State<_ApkVariantTile> createState() => _ApkVariantTileState();
+}
+
+class _ApkVariantTileState extends State<_ApkVariantTile> {
+  // Once: the screen rebuilds whenever the update check reports.
+  late final Future<PackageInfo> _info = widget.packageInfo();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<PackageInfo>(
+    future: _info,
+    builder: (context, snapshot) {
+      final info = snapshot.data;
+      final universal = info == null ? null : isUniversalApk(info.buildNumber);
+      if (universal == null) return const SizedBox.shrink();
+      return ListTile(
+        leading: const Icon(Icons.inventory_2_outlined),
+        title: Text(
+          universal
+              ? 'Zainstalowana wersja: duża'
+              : 'Zainstalowana wersja: mała',
+        ),
+        subtitle: Text(
+          universal
+              ? 'Następna aktualizacja przejdzie na małą, jeśli pasuje do telefonu'
+              : 'Tylko dla procesora tego telefonu',
+        ),
+      );
+    },
   );
 }

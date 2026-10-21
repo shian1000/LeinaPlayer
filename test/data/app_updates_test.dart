@@ -27,12 +27,14 @@ void main() {
     ],
   };
 
-  AppUpdates newUpdates({String repo = 'owner/repo'}) => AppUpdates(
-    repo: repo,
-    installedBuild: () async => installed,
-    apiBase: Uri.parse('http://127.0.0.1:${gitHub.port}/'),
-    now: () => now,
-  );
+  AppUpdates newUpdates({String repo = 'owner/repo', String? abi}) =>
+      AppUpdates(
+        repo: repo,
+        installedBuild: () async => installed,
+        apiBase: Uri.parse('http://127.0.0.1:${gitHub.port}/'),
+        now: () => now,
+        abi: abi,
+      );
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
@@ -169,5 +171,32 @@ void main() {
     await updates.checkIfDue();
     await updates.check();
     expect(requests, isEmpty);
+  });
+
+  test('the APK for this phone\'s CPU, else the universal one', () async {
+    latest = release(
+      '1.0.0+70',
+      assets: ['LeinaRadio-1.0.0+70.apk', 'LeinaRadio-1.0.0+70-arm64-v8a.apk'],
+    );
+    String? apkFor(String? abi) {
+      final found = AppRelease.fromGitHub(latest, abi: abi);
+      return found?.apkUrl.pathSegments.last;
+    }
+
+    expect(apkFor('arm64-v8a'), 'LeinaRadio-1.0.0+70-arm64-v8a.apk');
+    expect(apkFor('armeabi-v7a'), 'LeinaRadio-1.0.0+70.apk');
+    expect(apkFor(null), 'LeinaRadio-1.0.0+70.apk');
+
+    // A release with only a split APK offers nothing to a phone it doesn't fit.
+    latest = release('1.0.0+70', assets: ['LeinaRadio-1.0.0+70-arm64-v8a.apk']);
+    expect(apkFor('armeabi-v7a'), isNull);
+
+    final updates = newUpdates(abi: 'arm64-v8a');
+    await updates.load();
+    await updates.check();
+    expect(
+      updates.available?.apkUrl.pathSegments.last,
+      'LeinaRadio-1.0.0+70-arm64-v8a.apk',
+    );
   });
 }

@@ -290,7 +290,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   final _hiddenSongs = HiddenSongs();
   final _appUpdates = AppUpdates(
     installedBuild: () async =>
-        int.tryParse((await PackageInfo.fromPlatform()).buildNumber) ?? 0,
+        int.tryParse(
+          buildNumberOf((await PackageInfo.fromPlatform()).buildNumber),
+        ) ??
+        0,
   );
   final _smartPlaylists = SmartPlaylists();
   final _homeLayout = HomeLayout(defaults: HomeScreen.defaultSections);

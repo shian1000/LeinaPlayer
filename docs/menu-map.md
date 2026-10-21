@@ -458,7 +458,9 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
-  Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków.
+  Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków, and "Dlaczego
+  aplikacja tyle zajmuje" (the APK holds three CPU builds, ~22 MB each in use; the cache takes the
+  most while used) with "Pamięć podręczna — Zajęte X MB" → Pamięć podręczna.
 
 ## Explanations on a long press (`feature_info.dart`, texts in `feature_infos.dart`)
 
