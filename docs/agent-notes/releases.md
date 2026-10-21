@@ -5,6 +5,10 @@ for a newer build (Ustawienia › Informacje i pomoc › Aktualizacje, `lib/src/
 
 ## Making a release (owner, by hand)
 
+The skill `prepare-github-release` (`.claude/skills/prepare-github-release/`) walks through it:
+build, verify, English release notes, the prefilled link, and the check after publishing.
+
+
 1. Commit everything — a release is built from a commit, never from "+zmiany".
 2. `tool/prepare_release.sh` (or the desktop shortcut "Przygotuj wydanie Leina Radio"): builds
    the universal APK unless the current one is fresh, then the split ones (Flutter makes no
