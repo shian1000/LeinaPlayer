@@ -14,7 +14,7 @@ decided in the app's [ADR 0006](../decisions/0006-musicdatabase-login.md).
 ## Why
 
 The owner wants Leina Radio to log in with a MusicDatabase user (main menu › Users; one exists:
-`owner`) — username and password only. The phone signs its inbox requests with that user, and
+the owner's) — username and password only. The phone signs its inbox requests with that user, and
 later per-user data (`user.db`) will build on it. Decided with the owner: the password is checked
 **on the server**, which hands the phone a **token**; the phone keeps the token, never the
 password.

@@ -1,7 +1,7 @@
 # Handoff for the MusicDatabase agent: an inbox for requests from the phone
 
 **Status (2026-10-13):** done in MusicDatabase — the inbox is
-`Settings.phone_inbox_dir` on the T7 (`PUT /inbox/<name>` on the sharing server), described in
+`Settings.phone_inbox_dir` on the data drive (`PUT /inbox/<name>` on the sharing server), described in
 MusicDatabase's `docs/handoffs/inbox-for-musicdatabaseapp.md`. The phone sends to it; the first
 request (the four Elise Trouw songs, with replacements) arrived on 2026-10-13.
 

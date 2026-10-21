@@ -51,13 +51,13 @@ Re-run `check_build_fresh.sh` afterwards; it must print `fresh`.
 
 The script:
 
-- binds to this machine's **Tailscale** IPv4 (`tailscale ip -4`, currently `100.64.0.10`), so
+- binds to this machine's **Tailscale** IPv4 (`tailscale ip -4`), so
   only devices on the user's tailnet can reach it. Never bind to `0.0.0.0` or the LAN address.
   If Tailscale is down, the script exits with code 2; tell the user, don't fall back to another
   interface.
 - copies the APK to `build/share/music_database_app.apk` and serves only that directory. The file
   name, port and Tailscale IP don't change, so the link is always the same:
-  `http://100.64.0.10:8001/music_database_app.apk`, and it always points at the build just
+  `http://<tailscale-ip>:8001/music_database_app.apk` (the script prints it as `URL=`), and it always points at the build just
   checked. Every response carries `Cache-Control: no-store` (`scripts/no_cache_server.py`), so the
   phone's browser can't hand out a previously downloaded, older APK under the same URL.
 - runs the server under `timeout` in its own session (`setsid nohup … & disown`, the same pattern

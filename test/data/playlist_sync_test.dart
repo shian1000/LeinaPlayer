@@ -25,7 +25,7 @@ class FakePlaylistServer {
   final covers = FakeCoverBlobs();
   int counter = 0;
   String token = 'tok';
-  String user = 'owner';
+  String user = 'tester';
 
   Uri get address => Uri.parse('http://127.0.0.1:${_server.port}/');
 
@@ -192,7 +192,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    userName = 'owner';
+    userName = 'tester';
     token = 'tok';
     unauthorized = 0;
     clock = DateTime(2026, 10, 13, 12);
@@ -269,12 +269,12 @@ void main() {
       [for (final t in stored['tracks']! as List) t['youtube_video_id']],
       ['a', 'b'],
     );
-    expect(playlists.playlists.single.account, 'owner');
+    expect(playlists.playlists.single.account, 'tester');
 
     // Nothing changed since: only the GET goes.
     server.requests.clear();
     await syncNow();
-    expect(server.requests, ['GET /users/owner/playlists']);
+    expect(server.requests, ['GET /users/tester/playlists']);
   });
 
   test(
@@ -323,10 +323,10 @@ void main() {
     expect(server.playlists.values.single['cover'], hash);
     expect(server.covers.blobs[hash], picture);
     expect(server.requests, [
-      'GET /users/owner/playlists',
-      'PUT /users/owner/playlists/${server.playlists.keys.single}',
-      'PUT /users/owner/covers/$hash',
-      'PUT /users/owner/playlists/${server.playlists.keys.single}',
+      'GET /users/tester/playlists',
+      'PUT /users/tester/playlists/${server.playlists.keys.single}',
+      'PUT /users/tester/covers/$hash',
+      'PUT /users/tester/playlists/${server.playlists.keys.single}',
     ]);
 
     // Another change sends the same cover without its picture.
@@ -500,7 +500,7 @@ void main() {
       await syncNow();
       expect(server.requests, isEmpty);
 
-      userName = 'owner';
+      userName = 'tester';
       token = 'tok';
       await playlists.load();
       expect(

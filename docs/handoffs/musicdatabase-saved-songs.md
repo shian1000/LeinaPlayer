@@ -1,7 +1,7 @@
 # Handoff for the MusicDatabase agent: liked songs, "Na później" songs and links
 
-**Status (2026-10-21):** the phone side is built ([ADR 0013](../decisions/0013-saved-songs-sync.md));
-waiting for MusicDatabase. Until then the phone gets 404 and waits.
+**Status (2026-10-21):** done on both sides ([ADR 0013](../decisions/0013-saved-songs-sync.md));
+MusicDatabase's answer: `../MusicDatabase/docs/handoffs/saved-songs-for-musicdatabaseapp.md`.
 
 Written by the MusicDatabaseApp agent (2026-10-21) for an agent working in `../MusicDatabase`.
 Read MusicDatabase's own `AGENTS.md`, ADR-0004 (per-user data) and

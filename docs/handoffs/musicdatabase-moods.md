@@ -67,7 +67,7 @@ promotion meets a marker with that name, refuse it with a clear message and don'
 ## Changing global moods without the owner's review (decision 5)
 
 This is the part that needs real design. Today the sharing server serves only a **copy** of
-`tag.db`. The copy is refreshed about once a day (`sharing.py`), and the original isn't on T7.
+`tag.db`. The copy is refreshed about once a day (`sharing.py`), and the original isn't on the data drive.
 A permitted user's change must:
 
 - take effect without the owner accepting it;
@@ -83,7 +83,7 @@ Choose the mechanism with the owner and document it. One option fits the existin
 
 1. The server accepts an authenticated change.
 2. It checks the permission against `account.json`.
-3. It writes the change to a log file on T7.
+3. It writes the change to a log file on the data drive.
 4. MusicDatabase applies the log to the original `tag.db` at startup and before each sharing
    copy, then archives it.
 
@@ -170,5 +170,5 @@ Unit tests for:
 - applying permitted users' global changes, and their log.
 
 Server tests like the existing login/inbox/playlist ones. On the real server: a `curl` round
-trip with a token for `owner`, then remove the test mood, any test global change and any
+trip with a token for the owner's account, then remove the test mood, any test global change and any
 granted test permission afterwards.

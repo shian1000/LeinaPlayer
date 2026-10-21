@@ -336,6 +336,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 
 ## Git policy
 
+- Both repos are public on GitHub. Nothing committed may carry this machine's or a user's
+  private data — the Tailscale or LAN address, local paths (`/home/…`, `/media/…`), drive or
+  host names, account names: write `<tailscale-ip>`, "the owner's account", "the data drive",
+  or read the value at run time (`tailscale ip -4`). Such values live only in git-ignored local
+  files (user's rule, 2026-10-21); what stays on this computer only may keep them.
 - This is a separate git repository from `MusicDatabase`; do not assume shared history or try to
   reference `MusicDatabase` commits from here.
 - Only commit when explicitly asked. Do not push to any remote — the user pushes via their own

@@ -38,7 +38,7 @@ of this task. The phone does that itself for now.
   soundtracks (e.g. "Cyberpunk: Edgerunners OST", 8 artists), but possibly also unrelated albums
   that share a name.
 
-The user's music files, `/media/owner/ServerHDD/Shared/Music` (the folder "Import data from
+The user's music files on an external drive of the server (the folder "Import data from
 mp3 tags" is used on):
 
 - 4281 mp3 files, in folders grouped like playlists (not by album).

@@ -21,7 +21,7 @@ class FakeItemServer {
   final requests = <String>[];
   int counter = 0;
   bool supported = true;
-  final user = 'owner';
+  final user = 'tester';
 
   Uri get address => Uri.parse('http://127.0.0.1:${_server.port}/');
 
@@ -120,7 +120,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    user = 'owner';
+    user = 'tester';
     clock = DateTime(2026, 10, 20, 12);
   });
 
@@ -191,7 +191,7 @@ void main() {
       // Nothing to send back: only the GET.
       server.requests.clear();
       await reinstalled.sync.sync([server.address]);
-      expect(server.requests, ['GET /users/owner/saved-songs']);
+      expect(server.requests, ['GET /users/tester/saved-songs']);
     });
 
     test('the same song liked on two phones is one item', () async {
@@ -275,7 +275,7 @@ void main() {
         expect(first.liked.songs.map((s) => s.title), ['Offline']);
 
         // Logging in again: the account's songs are back, the offline one joins them.
-        user = 'owner';
+        user = 'tester';
         first.liked.accountChanged();
         await first.sync.sync([server.address]);
         expect(first.liked.songs.map((s) => s.title), ['Offline', 'Mine']);
@@ -434,7 +434,7 @@ void main() {
         expect(server.requests, isEmpty);
         expect(first.links.links, hasLength(1));
 
-        user = 'owner';
+        user = 'tester';
         first.links.accountChanged();
         await first.links.sync([server.address]);
         expect(first.links.links, hasLength(2));

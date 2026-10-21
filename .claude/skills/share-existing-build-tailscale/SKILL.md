@@ -7,7 +7,7 @@ description: 'Serve the release APK that is already built in this repo over Tail
 
 Same as `share-build-tailscale`, minus the build: it never runs `flutter build`, Gradle, or
 anything else that compiles. It serves whatever `build/app/outputs/flutter-apk/app-release.apk`
-is there right now, under the same link (`http://100.64.0.10:8001/music_database_app.apk`).
+is there right now, under the same link (`http://<tailscale-ip>:8001/music_database_app.apk`).
 
 It reuses the scripts of `share-build-tailscale` instead of having its own copies, so both skills
 always serve the same way and replace each other's running share (shared PID file

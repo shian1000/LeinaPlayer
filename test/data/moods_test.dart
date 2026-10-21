@@ -29,7 +29,7 @@ class FakeMoodServer {
   final globalChanges = <(int, int, bool)>[];
   int counter = 0;
   String token = 'tok';
-  String user = 'owner';
+  String user = 'tester';
   bool permitted = true;
   Set<int> globalMoodIds = {1};
 
@@ -239,7 +239,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    userName = 'owner';
+    userName = 'tester';
     token = 'tok';
     permitted = true;
     revoked.clear();
@@ -307,8 +307,8 @@ void main() {
       server.requests.clear();
       await syncNow();
       expect(server.requests, [
-        'GET /users/owner/moods',
-        'GET /users/owner/global-mood-covers',
+        'GET /users/tester/moods',
+        'GET /users/tester/global-mood-covers',
       ]);
 
       await moods.setSong(moods.userMoods.single, 2, false);
@@ -442,7 +442,7 @@ void main() {
       await syncNow();
       expect(server.requests, isEmpty);
 
-      userName = 'owner';
+      userName = 'tester';
       token = 'tok';
       await moods.load();
       expect([for (final m in moods.userMoods) m.name], ['Konto', 'Telefon']);
@@ -531,7 +531,7 @@ void main() {
     await library.setCover(library.globalMoods.single, hash);
     expect(library.globalMoods.single.cover, hash);
 
-    userName = 'owner';
+    userName = 'tester';
     await library.load();
     // Not the account's until the phone-only things are added to it.
     expect(library.globalMoods.single.cover, hash);
@@ -576,7 +576,7 @@ void main() {
       await db.execute('CREATE TABLE playlists (id INTEGER PRIMARY KEY)');
       await db.insert('moods', {
         'uid': 'u',
-        'account': 'owner',
+        'account': 'tester',
         'name': 'Stary',
         'created_at': 1,
         'updated_at': 1,

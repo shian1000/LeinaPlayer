@@ -220,12 +220,12 @@ void main() {
     () async {
       final outbox = newOutbox();
       await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
-      user = 'owner';
+      user = 'tester';
       await outbox.reportDeadYouTubeLink(losingSleep, 'ad5ukUkNjgw');
       final files = await outbox.pending();
       expect(names(files), [
         '2026-10-12_23-44-05_001.db',
-        'owner_2026-10-12_23-44-05_002.db',
+        'tester_2026-10-12_23-44-05_002.db',
       ]);
       expect(await rows(files.first, 'dead_youtube_links'), hasLength(1));
       expect(await rows(files.last, 'dead_youtube_links'), hasLength(1));
@@ -620,19 +620,19 @@ void main() {
         final outbox = newOutbox();
         user = 'inny';
         await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
-        user = 'owner';
+        user = 'tester';
         token = 'tok-123';
         now = now.add(const Duration(minutes: 1));
         await outbox.reportDeadYouTubeLink(losingSleep, 'ad5ukUkNjgw');
         expect(names(await outbox.pending()), [
           'inny_2026-10-12_23-44-05_001.db',
-          'owner_2026-10-12_23-45-05_002.db',
+          'tester_2026-10-12_23-45-05_002.db',
         ]);
         answers = [403, 201];
         final result = await outbox.send([base()]);
         expect(result.sent, 1);
         expect(result.problem, contains('innego użytkownika'));
-        expect(received.keys, ['owner_2026-10-12_23-45-05_002.db']);
+        expect(received.keys, ['tester_2026-10-12_23-45-05_002.db']);
         expect(names(await outbox.pending()), [
           'inny_2026-10-12_23-44-05_001.db',
         ]);

@@ -33,7 +33,7 @@ void main() {
         final login = jsonDecode(body) as Map<String, Object?>;
         if (login['password'] == 'tajne1') {
           request.response.write(
-            jsonEncode({'username': 'owner', 'token': 'tok'}),
+            jsonEncode({'username': 'tester', 'token': 'tok'}),
           );
         } else {
           request.response.statusCode = HttpStatus.unauthorized;
@@ -67,7 +67,7 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.byKey(AccountScreen.userFieldKey), 'owner');
+    await tester.enterText(find.byKey(AccountScreen.userFieldKey), 'tester');
     await tester.enterText(find.byKey(AccountScreen.passwordFieldKey), 'zle');
     await tester.tap(find.text('Zaloguj'));
     await pumpUntil(
@@ -84,7 +84,7 @@ void main() {
     await tester.tap(find.text('Zaloguj'));
     await pumpUntil(tester, () => account.loggedIn);
     await tester.pump();
-    expect(find.text('owner'), findsOneWidget);
+    expect(find.text('tester'), findsOneWidget);
     expect(find.text('Zalogowano'), findsOneWidget);
 
     await tester.tap(find.text('Wyloguj'));

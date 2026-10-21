@@ -3,10 +3,11 @@
 ## Status
 
 Accepted (2026-10-21). Phone side built and checked by tests
-(`test/data/saved_songs_sync_test.dart`, against a fake server); MusicDatabase's side is asked
-for in [`../handoffs/musicdatabase-saved-songs.md`](../handoffs/musicdatabase-saved-songs.md).
-Until it exists the phone gets 404, shows "Serwer MusicDatabase nie obsługuje jeszcze …" in
-Konto and keeps everything waiting.
+(`test/data/saved_songs_sync_test.dart`, against a fake server). MusicDatabase's side was asked
+for in [`../handoffs/musicdatabase-saved-songs.md`](../handoffs/musicdatabase-saved-songs.md) and
+built the same day as written (its answer: `../MusicDatabase/docs/handoffs/saved-songs-for-musicdatabaseapp.md`
+— 64 KiB body limit, one revision counter per collection, the deleted form carries `updated_at`,
+merged songs' `song_id` rewritten under a new revision).
 
 ## Context
 

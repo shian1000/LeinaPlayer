@@ -55,7 +55,7 @@ image's hash, and the image goes through its own endpoint, addressed by that has
   (**413** above that). Answer **415** for any other type, or when the bytes don't start with
   a PNG/JPEG signature. Checking the signature is enough. Don't decode the image.
 - Auth and codes as for playlists: `Authorization: Bearer <token>`, `<name>` must be the token's
-  user (otherwise 403), 401, 411, and 503 when T7 isn't mounted.
+  user (otherwise 403), 401, 411, and 503 when the data drive isn't mounted.
 - Store the files outside `user.db`. Binary data doesn't belong in SQLite here. For example:
   `Users/<name>/covers/<sha256>.png|.jpg`.
 - The responses may be cached forever (`Cache-Control: immutable`): a hash never changes its
@@ -152,6 +152,6 @@ Unit tests for:
 - the `user.db` migration, and 503 before it has run.
 
 Server tests like the existing playlist and mood ones. On the real server: a `curl` round trip
-with a token for `owner` (upload a small PNG, set it on a test playlist, read it back, delete
+with a token for the owner's account (upload a small PNG, set it on a test playlist, read it back, delete
 the playlist, check the archive). Afterwards remove the test playlist, its archive files, the
 blob and the token.

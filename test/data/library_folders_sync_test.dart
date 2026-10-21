@@ -13,7 +13,7 @@ class FakeFolderServer {
   final folders = <String, Map<String, Object?>>{};
   int counter = 0;
   bool supportsFolders = true;
-  final user = 'owner';
+  final user = 'tester';
 
   Uri get address => Uri.parse('http://127.0.0.1:${_server.port}/');
 
@@ -103,7 +103,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     server = FakeFolderServer();
     await server.start();
-    user = 'owner';
+    user = 'tester';
   });
 
   tearDown(() => server.close());
@@ -218,7 +218,7 @@ void main() {
     await folders.create('Tylko tu');
     expect(folders.folders.single.account, isNull);
 
-    user = 'owner';
+    user = 'tester';
     expect([for (final f in folders.folders) f.name], ['Konto', 'Tylko tu']);
     expect(folders.phoneOnlyCount, 1);
     await folders.addPhoneOnlyToAccount();

@@ -24,7 +24,7 @@ Only consider entries whose `product:`/model looks like a real phone. Ignore any
 different task. A phone can appear two ways:
 
 - **USB**: a serial like `HYFDU19412006823`.
-- **Wireless debugging**: an `ip:port` like `192.0.2.15:46499`, or (right after boot, before a
+- **Wireless debugging**: an `ip:port` like `192.168.x.y:46499`, or (right after boot, before a
   manual `adb connect`) an mDNS name like `adb-XXXXXXXX..._adb-tls-connect._tcp`. Wireless IPs and
   ports change across reconnects/reboots — always read the current one from `adb devices -l`, never
   reuse an address from a previous session or from this file.

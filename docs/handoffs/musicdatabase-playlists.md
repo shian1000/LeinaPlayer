@@ -15,7 +15,7 @@ and anything you changed from this one.
 
 ## Why
 
-Users' playlists live in `Users/<name>/user.db` on the server (ADR-0004; so far `owner` has
+Users' playlists live in `Users/<name>/user.db` on the server (ADR-0004; so far the owner has
 one, "0. Fixed", imported from a folder) and in the phone's own `local.db` (imported from YouTube
 and Spotify). The owner wants them to be one set per user. The phone should receive the server's
 playlists and send its own, and a user's phones (the owner has two) should see each other's
@@ -174,5 +174,5 @@ Unit tests for the conflict rules (equal base, stale base newer/older, delete vs
 the `source` + `source_id` merge, the archive file being written before deletion, revisions
 bumped by menu writes and by `apply_song_id_changes()`, and song id resolution. Server tests
 like the existing ones in `tests/` for login/inbox (401/403/409/503). On the real server: a
-`curl` round trip with a token for `owner` (GET, PUT of a test playlist, DELETE, then check
+`curl` round trip with a token for the owner's account (GET, PUT of a test playlist, DELETE, then check
 the archive), and remove the test playlist and its archive file afterwards.

@@ -38,7 +38,7 @@ void main() {
             request.response.headers.contentType = ContentType.json;
             request.response.write(
               jsonEncode({
-                'username': 'owner',
+                'username': 'tester',
                 'token': 'tok-123',
                 'permissions': permissions,
               }),
@@ -46,14 +46,14 @@ void main() {
           } else {
             request.response.statusCode = HttpStatus.unauthorized;
           }
-        case '/users/owner' when request.method == 'GET':
+        case '/users/tester' when request.method == 'GET':
           if (request.headers.value(HttpHeaders.authorizationHeader) !=
               'Bearer tok-123') {
             request.response.statusCode = HttpStatus.unauthorized;
           } else {
             request.response.headers.contentType = ContentType.json;
             request.response.write(
-              jsonEncode({'username': 'owner', 'permissions': permissions}),
+              jsonEncode({'username': 'tester', 'permissions': permissions}),
             );
           }
         case '/logout' when request.method == 'POST':
@@ -82,7 +82,7 @@ void main() {
       expect(await account.logIn([base()], ' Owner ', 'tajne1'), isNull);
       expect(logins.single, {'username': 'Owner', 'password': 'tajne1'});
       expect(account.loggedIn, isTrue);
-      expect(account.userName, 'owner');
+      expect(account.userName, 'tester');
       expect(account.token, 'tok-123');
 
       final prefs = await SharedPreferences.getInstance();
@@ -95,7 +95,7 @@ void main() {
 
       final restarted = Account();
       await restarted.load();
-      expect(restarted.userName, 'owner');
+      expect(restarted.userName, 'tester');
       expect(restarted.token, 'tok-123');
     },
   );
@@ -103,26 +103,26 @@ void main() {
   test('a wrong password, an old server and no server say so', () async {
     final account = Account();
     expect(
-      await account.logIn([base()], 'owner', 'zle'),
+      await account.logIn([base()], 'tester', 'zle'),
       contains('Nieprawidłowa'),
     );
     loginAnswer = HttpStatus.tooManyRequests;
     expect(
-      await account.logIn([base()], 'owner', 'tajne1'),
+      await account.logIn([base()], 'tester', 'tajne1'),
       allOf(contains('Za dużo'), contains('5 min')),
     );
     loginAnswer = HttpStatus.notFound;
     expect(
-      await account.logIn([base()], 'owner', 'tajne1'),
+      await account.logIn([base()], 'tester', 'tajne1'),
       contains('nie obsługuje jeszcze logowania'),
     );
     final gone = base();
     await server.close(force: true);
     expect(
-      await account.logIn([gone], 'owner', 'tajne1'),
+      await account.logIn([gone], 'tester', 'tajne1'),
       contains('Brak połączenia'),
     );
-    expect(await account.logIn([], 'owner', 'tajne1'), contains('adres'));
+    expect(await account.logIn([], 'tester', 'tajne1'), contains('adres'));
     expect(account.loggedIn, isFalse);
   });
 
@@ -149,7 +149,7 @@ void main() {
       await account.tokenRejected();
       expect(account.loggedIn, isFalse);
       expect(account.needsLogin, isTrue);
-      expect(account.userName, 'owner');
+      expect(account.userName, 'tester');
     },
   );
 

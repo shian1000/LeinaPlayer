@@ -86,7 +86,7 @@ class _FakeListenServer {
         'Bearer tok') {
       return reply(HttpStatus.unauthorized);
     }
-    if (!supported || request.uri.path != '/users/owner/listens') {
+    if (!supported || request.uri.path != '/users/tester/listens') {
       return reply(HttpStatus.notFound);
     }
     if (request.method == 'GET') {
@@ -296,7 +296,7 @@ void main() {
 
     test('plays made logged out go to the account that logs in', () async {
       await play('Gruppa krovi', 200);
-      user = 'owner';
+      user = 'tester';
       await play('Kukushka', 10);
       await log.sync([server.address]);
 
@@ -305,8 +305,8 @@ void main() {
         for (final l in server.listens.values) l['title'],
       ], unorderedEquals(['Gruppa krovi', 'Kukushka']));
       expect(server.listens.values.first.containsKey('account'), isFalse);
-      final mine = await log.listens(account: 'owner');
-      expect([for (final l in mine) l.account], ['owner', 'owner']);
+      final mine = await log.listens(account: 'tester');
+      expect([for (final l in mine) l.account], ['tester', 'tester']);
 
       // Nothing new: nothing sent.
       final posts = server.posts;
@@ -317,7 +317,7 @@ void main() {
     test(
       'takes other phones\' plays, page by page, and the longer time',
       () async {
-        user = 'owner';
+        user = 'tester';
         final uid = await log.start(title: 'Here', source: ListenSource.phone);
         await log.listened(const Duration(seconds: 20));
         await log.finish();
@@ -340,7 +340,7 @@ void main() {
 
         await log.sync([server.address]);
         expect(log.lastSync?.problem, isNull);
-        final listens = await log.listens(account: 'owner');
+        final listens = await log.listens(account: 'tester');
         expect(listens, hasLength(ListeningLog.batchSize + 4));
         expect(
           listens.firstWhere((l) => l.uid == uid).listened,
@@ -354,7 +354,7 @@ void main() {
     test(
       'a server without the endpoints says so and keeps the plays',
       () async {
-        user = 'owner';
+        user = 'tester';
         server.supported = false;
         await play('Gruppa krovi', 200);
         await log.sync([server.address]);
