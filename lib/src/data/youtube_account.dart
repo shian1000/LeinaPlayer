@@ -10,11 +10,12 @@ import 'youtube_api.dart';
 /// Managing the user's YouTube playlists (YouTube Data API).
 const youTubeScope = 'https://www.googleapis.com/auth/youtube';
 
-/// The Web client of the app's Google Cloud project. Android's Credential Manager needs it as
-/// `serverClientId`; the app itself is recognised by its Android client (package name + the
-/// signing key's SHA-1) — see `docs/agent-notes/youtube.md`.
-const _webClientId =
-    '120009798113-2s1vgh8j3f6cp87jgoue8hfbgmkhso2j.apps.googleusercontent.com';
+/// The Web client of the Google Cloud project the build belongs to, from the git-ignored
+/// `tool/release.env` (`GOOGLE_WEB_CLIENT_ID`, passed by `tool/build_release_apk.sh`). Android's
+/// Credential Manager needs it as `serverClientId`; the app itself is recognised by its Android
+/// client (package name + the signing key's SHA-1) — see `docs/agent-notes/youtube.md`. Empty in
+/// a build without it: "Utwórz na YouTube" is left out ([YouTubeAccount.supported]).
+const _webClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
 
 /// Why signing in to Google failed, for display; [cancelled] when the user closed the window.
 class GoogleSignInFailed implements Exception {
@@ -108,7 +109,9 @@ class YouTubeAccount extends ChangeNotifier {
   YouTubeAccount({GoogleAuth? auth, YouTubeApi? api, bool? supported})
     : _auth = auth ?? _PluginGoogleAuth(),
       api = api ?? YouTubeApi(),
-      supported = supported ?? (!kIsWeb && Platform.isAndroid);
+      supported =
+          supported ??
+          (!kIsWeb && Platform.isAndroid && _webClientId.isNotEmpty);
 
   final GoogleAuth _auth;
 

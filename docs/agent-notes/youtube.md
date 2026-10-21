@@ -214,7 +214,9 @@ with the YouTube Data API — MusicDatabase isn't involved (user's choice; its o
   with "Wyloguj"). Google Cloud project with YouTube Data API v3, OAuth consent screen in
   "Testing" (testers listed there), scope `auth/youtube`. Two OAuth clients: **Android**
   (package `com.shian1000.music_database_app` + SHA-1 of the signing key) and **Web**, whose id
-  is `serverClientId` in the code. The release is signed with the release key ([`signing.md`](signing.md),
+  is `serverClientId` — `GOOGLE_WEB_CLIENT_ID` in the git-ignored `tool/release.env`, passed as a
+  `--dart-define` by `tool/build_release_apk.sh`; without it "Utwórz na YouTube" is left out
+  (`YouTubeAccount.supported`). The release is signed with the release key ([`signing.md`](signing.md),
   SHA-1 `D7:1B:8B:4C:8C:50:0D:6C:80:04:C5:07:5C:20:17:59:B7:9B:76:47`): building with another key
   (another machine's debug key) breaks sign-in (often reported as "canceled") until its SHA-1 is
   added to the Android client. Android only; iOS would need its own client.

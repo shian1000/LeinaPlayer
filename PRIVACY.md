@@ -1,55 +1,57 @@
-# Prywatność — Leina Radio
+# Privacy — Leina Radio
 
-Stan na 21 października 2026. To samo, krócej, jest w aplikacji:
-**Ustawienia › Prywatność i połączenia** — tam przy każdej pozycji widać, czy aplikacja teraz
-się z nią łączy, i jest przejście do przełącznika, który to wyłącza.
+As of 21 October 2026. The same, shorter, is in the app: **Ustawienia › Prywatność i
+połączenia** — there each entry shows whether the app connects to it right now, with a way to
+the switch that turns it off. (The app's interface is in Polish; screen names below are quoted
+as they appear in it.)
 
-## W skrócie
+## In short
 
-- **Bez reklam, analityki i raportów o awariach.** Aplikacja nie zawiera żadnych bibliotek, które
-  wysyłałyby dane same z siebie (np. Firebase, Crashlytics).
-- **Twoje dane zostają na telefonie**: Biblioteka (playlisty, nastroje, foldery, polubione,
-  „Na później”), statystyki słuchania, historia i ustawienia — dopóki sam nie zalogujesz się
-  na serwer MusicDatabase.
-- **Aplikacja łączy się z siecią tylko wtedy, gdy wymaga tego funkcja**, której używasz albo
-  którą masz włączoną. Prawie każde automatyczne połączenie da się wyłączyć.
-- **Każdy serwis, z którym aplikacja się łączy, widzi adres IP telefonu** — jak przy każdym
-  połączeniu w internecie. Nie dostaje nic, co by Cię wskazywało, chyba że napisano niżej inaczej.
+- **No ads, no analytics, no crash reporting.** The app contains no library that sends data on
+  its own (such as Firebase or Crashlytics).
+- **Your data stays on the phone**: your library (playlists, moods, folders, liked songs, songs
+  saved for later), listening stats, history and settings — unless you log in to a MusicDatabase
+  server yourself.
+- **The app only connects when a feature needs it** — one you use or one you have switched on.
+  Almost every automatic connection can be switched off.
+- **Every service the app connects to sees the phone's IP address** — as with any connection on
+  the internet. It gets nothing that identifies you unless stated otherwise below.
 
-## Z czym aplikacja się łączy i dlaczego
+## What the app connects to, and why
 
-| Kto | Po co | Kiedy | Co dostaje | Jak wyłączyć |
+| Who | What for | When | What it gets | How to turn it off |
 |---|---|---|---|---|
-| **Serwer MusicDatabase** (jeśli go ustawisz) | baza utworów, pliki muzyczne z biblioteki serwera, zgłoszenia poprawek, synchronizacja konta | raz dziennie i przy zmianach | zgłoszenia poprawek; **tylko po zalogowaniu**: playlisty, nastroje, foldery, okładki, polubione, „Na później”, linki na później (z imieniem osoby, która je przysłała) i każde odtworzenie (co, kiedy, jak długo, skąd) | nie ustawiać serwera albo się nie logować (Ustawienia › Serwer, › Konto) |
-| **GitHub** | publiczna kopia bazy utworów (gdy serwer nie odpowiada), sprawdzanie nowej wersji aplikacji | raz dziennie przy otwarciu | nic poza samym zapytaniem | Ustawienia › Serwer › „Pobieraj z GitHuba”; Informacje i pomoc › „Sprawdzaj aktualizacje automatycznie” |
-| **YouTube (Google)** | wyszukiwanie filmów, dopasowywanie utworów do filmów, import playlist i odtwarzanie | gdy szukasz, importujesz albo grasz utwór z YouTube | identyfikatory filmów i playlist, wyszukiwany tekst (tytuł, wykonawca) — bez konta i logowania | źródła odtwarzania (Ustawienia › Odtwarzanie), wyszukiwanie (Ustawienia › YouTube) |
-| **YouTube Data API (Google)** | oficjalne wyszukiwanie | tylko jeśli wpiszesz własny klucz API | wyszukiwany tekst i Twój klucz | nie wpisywać klucza |
-| **Konto Google** | „Utwórz na YouTube” — playlista na Twoim koncie YouTube | tylko gdy sam tego użyjesz | nazwa playlisty i jej filmy; Google wie, które konto się zalogowało. Aplikacja zapamiętuje tylko adres e-mail | Ustawienia › Konto › „Wyloguj” |
-| **Spotify** | import playlist, albumów i utworów z linków; wyszukiwanie playlist Spotify | gdy otworzysz link Spotify albo szukasz playlist | identyfikator playlisty / albumu / utworu albo wyszukiwany tekst (i Twój klucz API, jeśli go wpiszesz) | Ustawienia › Spotify |
-| **iTunes (Apple), Deezer, miniatury YouTube** | okładki albumów | przy utworach bez okładki w pliku (wynik zostaje w pamięci podręcznej) | wykonawca i album (albo tytuł) lub identyfikator filmu | Ustawienia › Okładki albumów (każde źródło osobno); Oszczędzanie danych › „tylko przez Wi-Fi” |
-| **LRCLIB** (projekt społecznościowy) | teksty piosenek | gdy otwarty jest pełny odtwarzacz | tytuł, wykonawca, album i długość utworu | Oszczędzanie danych › „Pobieraj teksty piosenek” |
-| **Przeglądarka i „Udostępnij”** | linki (MusicBrainz, Apple Music, Deezer, Spotify, GitHub), paczka zgłoszeń, udostępniane linki i podsumowania | tylko gdy sam stukniesz | to, co wybierzesz | — |
+| **MusicDatabase server** (if you set one) | the song catalog, music files from the server's library, correction reports, account sync | once a day and on changes | correction reports; **only when logged in**: playlists, moods, folders, covers, liked songs, songs and links saved for later (with the name of whoever sent the link) and every play (what, when, for how long, from where) | don't set a server, or don't log in (Ustawienia › Serwer, › Konto) |
+| **GitHub** | the public copy of the song catalog (when no server answers); checking for a new version of the app | once a day when the app opens | nothing beyond the request itself | Ustawienia › Serwer › "Pobieraj z GitHuba"; Informacje i pomoc › "Sprawdzaj aktualizacje automatycznie" |
+| **YouTube (Google)** | searching videos, matching songs to videos, importing playlists and playback | when you search, import or play a song from YouTube | video and playlist ids, the text you search for (title, artist) — no account, no login | playback sources (Ustawienia › Odtwarzanie), search (Ustawienia › YouTube) |
+| **YouTube Data API (Google)** | official search | only if you enter your own API key | the text you search for and your key | don't enter a key |
+| **Google account** | "Utwórz na YouTube" — a playlist on your YouTube account | only when you use it | the playlist's name and its videos; Google knows which account signed in. The app keeps only the e-mail address | Ustawienia › Konto › "Wyloguj" |
+| **Spotify** | importing playlists, albums and tracks from links; searching Spotify playlists | when you open a Spotify link or search for playlists | the playlist / album / track id or the text you search for (and your API key, if you enter one) | Ustawienia › Spotify |
+| **iTunes (Apple), Deezer, YouTube thumbnails** | album covers | for songs without a cover in the file (the result is cached) | artist and album (or title), or a video id | Ustawienia › Okładki albumów (each source separately); Oszczędzanie danych › Wi-Fi only |
+| **LRCLIB** (a community project) | song lyrics | while the full player is open | title, artist, album and length of the song | Oszczędzanie danych › "Pobieraj teksty piosenek" |
+| **Browser and "Udostępnij" (share)** | links (MusicBrainz, Apple Music, Deezer, Spotify, GitHub), the correction-report package, shared links and summaries | only when you tap them | whatever you choose | — |
 
-## Kto widzi Twoje dane
+## Who sees your data
 
-- **Właściciel serwera MusicDatabase**, z którym się łączysz: Twoje zgłoszenia poprawek, a jeśli
-  się zalogujesz — także Twoją Bibliotekę i historię słuchania. Jeśli nie ustawisz serwera, nikt.
-- **Osoba, której wyślesz paczkę zgłoszeń** („Wyślij paczkę…”): zgłoszenia podpisane nazwą, którą
-  wpisałeś.
-- **Nikt inny.** Imiona osób, które przysłały Ci linki „Na później”, zostają na telefonie (po
-  zalogowaniu także na serwerze) — te osoby nic nie dostają.
+- **The owner of the MusicDatabase server** you connect to: your correction reports and, if you
+  log in, your library and listening history. If you don't set a server, nobody.
+- **Whoever you send a correction-report package to** ("Wyślij paczkę…"): the reports, signed
+  with the name you typed.
+- **Nobody else.** The names of people who sent you links saved for later stay on the phone (and,
+  when logged in, on the server) — those people receive nothing.
 
-## Gdzie są dane i jak je usunąć
+## Where the data is and how to delete it
 
-- Na telefonie: w danych aplikacji. Ustawienia Androida › Aplikacje › Leina Radio › Pamięć ›
-  „Wyczyść dane” usuwa wszystko (albo odinstalowanie aplikacji). Samą pamięć podręczną (utwory,
-  okładki) czyści się w aplikacji: Oszczędzanie danych › Pamięć podręczna.
-- Na serwerze MusicDatabase: u jego właściciela — usunięcie danych konta trzeba z nim ustalić.
+- On the phone, in the app's data: Android Settings › Apps › Leina Radio › Storage › "Clear
+  data" deletes everything (as does uninstalling). The cache alone (songs, covers) is cleared in
+  the app: Oszczędzanie danych › Pamięć podręczna.
+- On a MusicDatabase server: with its owner — deleting an account's data is arranged with them.
 
-## Klucze i hasła
+## Keys and passwords
 
-- Hasło do konta MusicDatabase nie jest zapisywane na telefonie — serwer daje w zamian token.
-- Klucze API YouTube i Spotify, jeśli je wpiszesz, zostają tylko na telefonie.
-- Logowanie do Google obsługują Usługi Google Play; aplikacja nie widzi hasła ani tokenu.
+- The MusicDatabase account password is not stored on the phone — the server returns a token
+  instead.
+- YouTube and Spotify API keys, if you enter them, stay on the phone only.
+- Google sign-in is handled by Google Play services; the app never sees the password or token.
 
-Pytania i zmiany: zgłoszenie w repozytorium tej aplikacji na GitHubie.
+Questions and changes: open an issue in this app's GitHub repository.

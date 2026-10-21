@@ -7,8 +7,11 @@ stays `music_database_app`) — is the mobile frontend for [MusicDatabase](../Mu
 library / metadata enrichment tool. MusicDatabase today is a Python terminal app with a local
 SQLite database and enrichment from MusicBrainz, Wikipedia, iTunes, and Genius.
 
-This app is a Flutter client, targeting Android first, with iOS support kept buildable. It is
-for private use only and is never published in an app store; the app is GPLv3
+This app is a Flutter client, targeting Android first, with iOS support kept buildable.
+Everything on GitHub (README, PRIVACY.md, docs) is in English; the app's UI is Polish (user's
+rule). The public README doesn't mention playing audio from YouTube or name the YouTube
+libraries (user's choice; the add-ons, sharing checklist 8.3, will document them). It is for
+private use only and is never published in an app store; the app is GPLv3
 ([ADR 0004](docs/decisions/0004-license-and-distribution.md)). It uses MusicDatabase's data and
 supports MusicDatabase: when something is missing there (so far: YouTube links), the phone may
 work it out itself with simplified local logic, kept only on the phone until MusicDatabase has
@@ -311,8 +314,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Every connection the app makes is listed on Ustawienia › Prywatność i połączenia
   (`privacy_screen.dart`) with why, when and what it sends, and with a way to the switch that
   stops it (or "Tylko gdy sam tego użyjesz") — a new service or a new kind of data sent goes
-  there and into `PRIVACY.md` (the public version; YouTube described neutrally, no NewPipe —
-  user's choice) in the same change, and a new automatic connection gets a switch (user's rule;
+  there and into `PRIVACY.md` (the public version, in English like everything on GitHub;
+  YouTube described neutrally, no NewPipe — user's choice) in the same change, and a new automatic connection gets a switch (user's rule;
   the lyrics got "Pobieraj teksty piosenek" for it). Each section's "Teraz: …" line is computed
   from those switches (accent = connects, the theme's error red = doesn't) — a new switch must
   feed it.

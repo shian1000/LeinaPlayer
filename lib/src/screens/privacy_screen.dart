@@ -195,7 +195,12 @@ class PrivacyScreen extends StatelessWidget {
               'łączy się z internetem przy „Utwórz na YouTube”, zalogowano jako $email',
             ),
             goTo('Konto › Wyloguj z Google', () => const AccountScreen()),
-          ] else ...[
+          ] else if (google != null && !google.supported)
+            status(
+              false,
+              'nie łączy się — ta wersja aplikacji nie ma tej funkcji',
+            )
+          else ...[
             status(false, 'nie łączy się — nie jesteś zalogowany'),
             onlyWhenUsed('Tylko gdy sam stukniesz „Utwórz na YouTube”.'),
           ],

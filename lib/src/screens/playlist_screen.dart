@@ -7,6 +7,7 @@ import '../data/combined_search.dart';
 import '../data/library_folders.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
+import '../data/youtube_account.dart';
 import '../data/playlist_search.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
@@ -485,7 +486,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     final canMake =
         saved != null &&
         (playlist.source == null || playlist.source == PlaylistSource.folder) &&
-        (playlist.youTubeCopyId == null || playlist.youTubeCopyUnfinished);
+        (playlist.youTubeCopyId == null || playlist.youTubeCopyUnfinished) &&
+        (YouTubeAccountScope.maybeOf(context)?.supported ?? true);
     showLinkShareSheet(
       context,
       link: playlist.link,

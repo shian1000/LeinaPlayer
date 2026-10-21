@@ -15,7 +15,7 @@ fi
 defines=()
 if [[ -f tool/release.env ]]; then
   while IFS='=' read -r key value; do
-    [[ "$key" =~ ^(UPDATE_REPO)$ ]] && defines+=("--dart-define=$key=$value")
+    [[ "$key" =~ ^(UPDATE_REPO|GOOGLE_WEB_CLIENT_ID)$ ]] && defines+=("--dart-define=$key=$value")
   done < <(grep -E '^[A-Z_]+=' tool/release.env)
 fi
 

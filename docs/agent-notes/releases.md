@@ -36,8 +36,9 @@ The owner does GitHub writes himself; agents prepare the files and give the step
 - Build-time only: `tool/release.env` (git-ignored; `tool/release.env.example`) sets
   `UPDATE_REPO=<owner>/<repo>`, passed by `tool/build_release_apk.sh` as a `--dart-define`.
   Without it (someone else's build) nothing is checked or shown — their APK, signed with
-  another key, couldn't install the owner's releases anyway. The same file is the place for
-  other build-time pointers to the owner's services (sharing checklist 6.1: the Google client id).
+  another key, couldn't install the owner's releases anyway. The same file holds
+  `GOOGLE_WEB_CLIENT_ID` ("Utwórz na YouTube", [`youtube.md`](youtube.md)); only the keys
+  listed in `tool/build_release_apk.sh` are passed on.
 - Once a day on start / return to the app (switch in Informacje i pomoc, on by default) and
   "Sprawdź teraz": `GET https://api.github.com/repos/<repo>/releases/latest` (no token; the
   anonymous limit of 60 requests an hour is plenty). The tag's `+<build>` is compared with the
