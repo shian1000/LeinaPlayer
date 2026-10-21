@@ -103,7 +103,11 @@ curl -s -H "Accept: application/vnd.github+json" -H "User-Agent: LeinaRadio" \
 Check: `tag_name` is the new tag, not draft / pre-release, both `.apk` assets present; an arm64
 phone gets the asset with `arm64-v8a` in its name and any other phone the one without an ABI
 (the app's rule, `AppRelease.fromGitHub`); download both public URLs (`curl -sL`, `%2B` in the
-path) and compare SHA-256 with the local files. Report in Polish; if the notes came out with
+path) and compare SHA-256 with the local files. The tag is made on `main` at publish time, so it may
+point at a later commit than the APKs' `COMMIT=` (e.g. a docs-only commit pushed in between):
+fine when `git diff --stat <COMMIT> <tag> -- lib android pubspec.yaml pubspec.lock` is empty,
+otherwise tell the owner the release's source and its APKs differ. Point out typos in the notes,
+and labels translated to English where the app shows them in Polish. Report in Polish; if the notes came out with
 CRLF line ends that's fine (the app normalises them).
 
 Then tick the release in `docs/udostepnienie-todo.txt` if that checklist still has a matching
