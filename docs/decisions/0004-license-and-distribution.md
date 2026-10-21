@@ -15,7 +15,7 @@ reason NewPipe itself is not on Google Play.
 
 - The app is licensed under GPLv3 (`LICENSE` in the repo root).
 - It is for private use. It may be given for free to a small circle of friends, with access to
-  the source code (the public repo, https://github.com/shian1000/MusicDatabaseApp).
+  the source code (the public repo, https://github.com/shian1000/LeinaPlayer).
 - It is never published in Google Play or any other app store.
 - "Ustawienia › Informacje i pomoc" (`about_screen.dart`) states all of this, as a reminder for
   the owner.

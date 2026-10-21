@@ -210,12 +210,12 @@ void main() {
       expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
       expect(find.text('Linki z YouTube i Spotify'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('https://github.com/shian1000/MusicDatabaseApp'),
+        find.text('https://github.com/shian1000/LeinaPlayer'),
         200,
       );
       expect(find.textContaining('GPLv3'), findsOneWidget);
       expect(
-        find.text('https://github.com/shian1000/MusicDatabaseApp'),
+        find.text('https://github.com/shian1000/LeinaPlayer'),
         findsOneWidget,
       );
       String? copied;
@@ -238,7 +238,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Kopiuj link'));
       await tester.pumpAndSettle();
-      expect(copied, 'https://github.com/shian1000/MusicDatabaseApp');
+      expect(copied, 'https://github.com/shian1000/LeinaPlayer');
       expect(find.text('Skopiowano link do kodu źródłowego'), findsOneWidget);
     },
   );

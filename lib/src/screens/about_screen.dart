@@ -17,7 +17,7 @@ class AboutScreen extends StatelessWidget {
   final Future<PackageInfo> Function()? packageInfo;
 
   static final sourceUrl = Uri.parse(
-    'https://github.com/shian1000/MusicDatabaseApp',
+    'https://github.com/shian1000/LeinaPlayer',
   );
 
   Future<void> _openSource(BuildContext context) async {
