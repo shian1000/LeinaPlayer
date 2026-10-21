@@ -115,7 +115,7 @@ class SourceSettings extends ChangeNotifier {
   /// The longest "Przenikanie utworów", as in the reference app.
   static const maxCrossfadeSeconds = 12;
 
-  bool _youTubeSearchEnabled = false;
+  bool _youTubeSearchEnabled = true;
   bool _playlistSearch = true;
   bool _albumSearch = true;
   bool _youTubePlaylistSearch = true;

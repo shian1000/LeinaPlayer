@@ -254,7 +254,7 @@ import, Wyświetlanie, Dane, Aplikacja.
 - Serwer **→ Serwer** (`database_source_screen.dart`) — **implemented**:
   - "Adres serwera (połączenie zdalne)" and "Adres serwera (sieć lokalna)" — two addresses of
     MusicDatabase's `music.db` / `tag.db` / `files.db` (the server's music files, ADR 0010),
-    validated and saved with "Zapisz" (saving downloads
+    validated and saved with "Zapisz adresy i pobierz bazę" (saving downloads
     right away).
   - "Wi-Fi sieci lokalnej" — the saved home Wi-Fi name (× clears it) and "Użyj bieżącego
     połączenia", which asks for location permission (Android's requirement for reading the
@@ -263,7 +263,7 @@ import, Wyświetlanie, Dane, Aplikacja.
     local address (`DatabaseSync.discoverLocalServer`).
   - "GitHub (publiczna kopia bazy)" — "Pobieraj z GitHuba" (switch, on by default) and the
     repository `<owner>/<repo>` (default `shian1000/LeinaMusicDatabase`; a pasted repository
-    link is accepted, empty brings the default back; saved with "Zapisz"). Only `music.db` /
+    link is accepted, empty brings the default back; saved with "Zapisz adresy i pobierz bazę"). Only `music.db` /
     `tag.db`, never `files.db`.
   - "Ostatnie pobranie" (with which source was used: sieć lokalna / połączenie zdalne / GitHub),
     the last error if any, "Pobierz teraz".
@@ -274,6 +274,8 @@ import, Wyświetlanie, Dane, Aplikacja.
   download also runs automatically once a day on start — see
   [`decisions/0002-database-download.md`](decisions/0002-database-download.md) and
   [`decisions/0014-github-database-and-request-packages.md`](decisions/0014-github-database-and-request-packages.md).
+  Leaving the screen also saves the typed addresses when all are valid ("Zapisano adresy
+  serwera"), else keeps the old ones ("Nie zapisano adresu serwera: jest nieprawidłowy").
 - Zgłoszenia poprawek **→ Zgłoszenia poprawek** (`outbox_settings_screen.dart`) — **implemented**:
   "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by default), "Czeka na wysłanie"
   (requests in the outbox; tapped, the reported songs with the phone's replacement —
@@ -331,7 +333,8 @@ import, Wyświetlanie, Dane, Aplikacja.
 
 - YouTube **→ YouTube** (`youtube_source_screen.dart`, state in `SourceSettings`)
   section *Wyszukiwanie*:
-  - "Włącz szukanie w serwisie YouTube" — turns on the "Wyszukaj na YouTubie" button and
+  - "Włącz szukanie w serwisie YouTube" (on by default, like Spotify's playlist search — owner's
+    choice) — turns on the "Wyszukaj na YouTubie" button and
     looking up songs on YouTube when tapped (see song search below).
   - "Korzystaj z NewPipeExtractor" (on; Android only), "Korzystaj z pakietu youtube_explode"
     (on), "Korzystaj z yt-dlp przez serwer", "Korzystaj z API" — the search methods, tried top

@@ -30,9 +30,15 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
   bool _readingWifi = false;
   bool _searchingServer = false;
 
+  // Kept for dispose, when the context can't be used any more.
+  DatabaseSync? _sync;
+  ScaffoldMessengerState? _messenger;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _sync = DatabaseSyncScope.of(context);
+    _messenger = ScaffoldMessenger.maybeOf(context);
     if (_initialized) return;
     _initialized = true;
     final sync = DatabaseSyncScope.of(context);
@@ -43,10 +49,53 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
 
   @override
   void dispose() {
+    _saveOnLeaving();
     _remote.dispose();
     _local.dispose();
     _gitHub.dispose();
     super.dispose();
+  }
+
+  /// Leaving the screen keeps what was typed (owner's wish: "Zapisz" was easy to miss) — when
+  /// every field is valid; otherwise nothing is saved and a note says so. A system Back pops tab
+  /// routes without asking (AGENTS.md), so this runs here rather than in a PopScope.
+  void _saveOnLeaving() {
+    final sync = _sync;
+    if (sync == null) return;
+    String shown(Object? value) => value?.toString() ?? '';
+    final changed =
+        _remote.text.trim() != shown(sync.remoteUrl) ||
+        _local.text.trim() != shown(sync.localUrl) ||
+        _gitHub.text.trim() != sync.gitHubRepo;
+    if (!changed) return;
+    if (_validate(_remote.text) != null ||
+        _validate(_local.text) != null ||
+        _validateRepo(_gitHub.text) != null) {
+      _noteAfterLeaving('Nie zapisano adresu serwera: jest nieprawidłowy');
+      return;
+    }
+    final remote = _remote.text;
+    final local = _local.text;
+    final gitHub = _gitHub.text;
+    () async {
+      await sync.setRemoteUrl(remote);
+      await sync.setLocalUrl(local);
+      await sync.setGitHubRepo(gitHub);
+      if (sync.hasSource) await sync.syncNow();
+    }();
+    _noteAfterLeaving('Zapisano adresy serwera');
+  }
+
+  /// A note shown once this screen is gone: during dispose the tree is locked and the
+  /// messenger can't rebuild yet.
+  void _noteAfterLeaving(String text) {
+    final messenger = _messenger;
+    if (messenger == null) return;
+    Future.microtask(() {
+      if (messenger.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(text)));
+      }
+    });
   }
 
   /// Message for a field that doesn't hold a usable address, or `null` if it's fine.
@@ -233,7 +282,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
           _addressField(
             key: DatabaseSourceScreen.localFieldKey,
             controller: _local,
-            hint: 'http://192.168.1.10:8002/',
+            hint: 'http://192.168.x.x:8002/',
             helper: 'Używany, gdy telefon jest w sieci Wi-Fi wybranej poniżej.',
             error: _localError,
             onSubmitted: () => _save(sync),
@@ -270,7 +319,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
               ),
               onPressed: sync.downloading ? null : () => _save(sync),
               child: const Text(
-                'Zapisz',
+                'Zapisz adresy i pobierz bazę',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),

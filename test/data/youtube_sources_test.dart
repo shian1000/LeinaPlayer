@@ -56,7 +56,8 @@ void main() {
   test('source settings: defaults, saved values and playback order', () async {
     final settings = SourceSettings();
     await settings.load();
-    expect(settings.youTubeSearchEnabled, isFalse);
+    // On by default, like Spotify's playlist search (owner's choice).
+    expect(settings.youTubeSearchEnabled, isTrue);
     expect(settings.methods, {YouTubeMethod.newPipe, YouTubeMethod.explode});
     expect(settings.playbackOrder, [
       PlaybackSource.phone,
@@ -64,7 +65,7 @@ void main() {
       PlaybackSource.youtube,
     ]);
 
-    await settings.setYouTubeSearchEnabled(true);
+    await settings.setYouTubeSearchEnabled(false);
     await settings.setMethod(YouTubeMethod.newPipe, false);
     await settings.setMethod(YouTubeMethod.explode, false);
     await settings.setMethod(YouTubeMethod.api, true);
@@ -77,7 +78,7 @@ void main() {
 
     final again = SourceSettings();
     await again.load();
-    expect(again.youTubeSearchEnabled, isTrue);
+    expect(again.youTubeSearchEnabled, isFalse);
     expect(again.methods, {YouTubeMethod.api});
     expect(again.apiKey, 'key123');
     expect(again.playbackOrder, [

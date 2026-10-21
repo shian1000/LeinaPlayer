@@ -12,6 +12,8 @@ import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/theme_controller.dart';
 import 'package:music_database_app/src/widgets/common.dart';
 
+import 'support/waiting.dart';
+
 void main() {
   // Lain (the default dark theme) draws section titles differently; these tests read Dummify's.
   // GitHub off: the app would try to download the catalog on start.
@@ -442,7 +444,13 @@ void main() {
     SwitchListTile switchOf(String label) => tester.widget<SwitchListTile>(
       find.widgetWithText(SwitchListTile, label),
     );
-    // Methods can only be chosen once YouTube search is on.
+    // On by default; methods can only be chosen while YouTube search is on.
+    expect(
+      switchOf('Korzystaj z pakietu youtube_explode').onChanged,
+      isNotNull,
+    );
+    await tester.tap(find.text('Włącz szukanie w serwisie YouTube'));
+    await tester.pumpAndSettle();
     expect(switchOf('Korzystaj z pakietu youtube_explode').onChanged, isNull);
     await tester.tap(find.text('Włącz szukanie w serwisie YouTube'));
     await tester.pumpAndSettle();
@@ -484,6 +492,61 @@ void main() {
       'phone',
       'server',
     ]);
+  });
+
+  testWidgets('Serwer keeps a typed address when left without "Zapisz"', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Ja'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
+    await tester.tap(find.text('Ustawienia'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Serwer'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('http://192.168.x.x:8002/'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(DatabaseSourceScreen.localFieldKey),
+      '10.0.0.5:8002',
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Zapisano adresy serwera'), findsOneWidget);
+    final prefs = await SharedPreferences.getInstance();
+    await tester.runAsync(
+      () => waitUntil(() => prefs.getString('database_sync.local_url') != null),
+    );
+    expect(prefs.getString('database_sync.local_url'), 'http://10.0.0.5:8002/');
+  });
+
+  testWidgets('Serwer doesn\'t keep an invalid address when left', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Ja'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
+    await tester.tap(find.text('Ustawienia'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Serwer'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(DatabaseSourceScreen.localFieldKey),
+      'ftp://serwer/',
+    );
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Nie zapisano adresu serwera: jest nieprawidłowy'),
+      findsOneWidget,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('database_sync.local_url'), isNull);
   });
 
   testWidgets('database address is validated and saved under Serwer', (
