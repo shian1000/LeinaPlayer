@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,18 +14,41 @@ void main() {
   late Map<String, List<int>> served;
   late DateTime now;
   String? wifi;
+  // A stand-in for GitHub: the release URLs answer with a redirect to the file host, as
+  // GitHub's do.
+  late HttpServer gitHub;
+  late Map<String, List<int>> released;
+  late Map<String, Object?> version;
+  late List<String> gitHubRequests;
 
   DatabaseSync newSync() => DatabaseSync(
     storageRoot: () async => storage,
     now: () => now,
     currentWifi: () async => wifi,
+    gitHubRelease: (repo) => Uri.parse(
+      'http://127.0.0.1:${gitHub.port}/$repo/releases/download/database/',
+    ),
   );
+
+  Map<String, Object?> describe(Map<String, List<int>> files) => {
+    'format': 1,
+    'published_at': '2026-10-21T11:35:11Z',
+    'files': {
+      for (final MapEntry(:key, :value) in files.entries)
+        key: {
+          'size': value.length,
+          'sha256': sha256.convert(value).toString(),
+          'content_sha256': 'ignored',
+        },
+    },
+  };
 
   Future<String> localContent(DatabaseSync sync, String name) async =>
       String.fromCharCodes(await (await sync.localFile(name)).readAsBytes());
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
+    // The tests of the server addresses run without the GitHub fallback; its group turns it on.
+    SharedPreferences.setMockInitialValues({'database_sync.github_on': false});
     storage = await Directory.systemTemp.createTemp('database_sync_test');
     now = DateTime(2026, 10, 10, 9);
     served = {'music.db': _sqlite, 'tag.db': _sqlite, 'files.db': _sqlite};
@@ -38,9 +63,44 @@ void main() {
       }
       request.response.close();
     });
+    released = {
+      'music.db': _sqlite,
+      'tag.db': [..._sqlite, 7],
+    };
+    version = describe(released);
+    gitHubRequests = [];
+    gitHub = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    gitHub.listen((request) {
+      final segments = request.uri.pathSegments;
+      final response = request.response;
+      if (segments.first == 'files') {
+        final body = released[segments.last];
+        if (body == null) {
+          response.statusCode = HttpStatus.notFound;
+        } else {
+          response.add(body);
+        }
+      } else if (segments.join('/') ==
+          'shian1000/LeinaMusicDatabase/releases/download/database/${segments.last}') {
+        gitHubRequests.add(segments.last);
+        if (segments.last == 'version.json') {
+          response.write(jsonEncode(version));
+        } else {
+          response.statusCode = HttpStatus.found;
+          response.headers.set(
+            HttpHeaders.locationHeader,
+            '/files/${segments.last}',
+          );
+        }
+      } else {
+        response.statusCode = HttpStatus.notFound;
+      }
+      response.close();
+    });
   });
 
   tearDown(() async {
+    await gitHub.close(force: true);
     await server.close(force: true);
     await storage.delete(recursive: true);
   });
@@ -236,6 +296,194 @@ void main() {
         expect(second.lastSource, DatabaseSource.local);
       },
     );
+  });
+
+  group('GitHub', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    Future<List<int>> localBytes(DatabaseSync sync, String name) async =>
+        (await sync.localFile(name)).readAsBytes();
+
+    test('a fresh install downloads the default repository', () async {
+      final sync = newSync();
+      await sync.load();
+      expect(sync.gitHubOn, isTrue);
+      expect(sync.gitHubRepo, 'shian1000/LeinaMusicDatabase');
+      expect(sync.hasServer, isFalse);
+      expect(sync.hasSource, isTrue);
+
+      await sync.syncIfDue();
+      expect(sync.lastError, isNull);
+      expect(sync.lastSource, DatabaseSource.github);
+      expect(sync.lastSync, now);
+      expect(await localBytes(sync, 'music.db'), released['music.db']);
+      expect(await localBytes(sync, 'tag.db'), released['tag.db']);
+      expect(gitHubRequests, ['version.json', 'music.db', 'tag.db']);
+    });
+
+    test('downloads only the files whose hash changed', () async {
+      final sync = newSync();
+      await sync.load();
+      expect(await sync.syncNow(), isTrue);
+
+      gitHubRequests.clear();
+      expect(await sync.syncNow(), isTrue);
+      expect(gitHubRequests, ['version.json'], reason: 'nothing changed');
+
+      released['tag.db'] = [..._sqlite, 8, 8];
+      version = describe(released);
+      gitHubRequests.clear();
+      expect(await sync.syncNow(), isTrue);
+      expect(gitHubRequests, ['version.json', 'tag.db']);
+      expect(await localBytes(sync, 'tag.db'), [..._sqlite, 8, 8]);
+    });
+
+    test('keeps the old pair when a file is newer than version.json', () async {
+      final sync = newSync();
+      await sync.load();
+      expect(await sync.syncNow(), isTrue);
+
+      // A publish under way: music.db already replaced, version.json not yet.
+      released['music.db'] = [..._sqlite, 5];
+      released['tag.db'] = [..._sqlite, 6];
+      version = describe({
+        'music.db': [..._sqlite, 4],
+        'tag.db': [..._sqlite, 6],
+      });
+      expect(await sync.syncNow(), isFalse);
+      expect(sync.lastError, contains('music.db nie zgadza się'));
+      expect(await localBytes(sync, 'music.db'), _sqlite);
+      expect(await localBytes(sync, 'tag.db'), [..._sqlite, 7]);
+      final leftovers = (await sync.databaseDirectory()).listSync().where(
+        (e) => e.path.endsWith('.part'),
+      );
+      expect(leftovers, isEmpty);
+    });
+
+    test('a file briefly missing keeps the old copy', () async {
+      final sync = newSync();
+      await sync.load();
+      expect(await sync.syncNow(), isTrue);
+
+      released['music.db'] = [..._sqlite, 5];
+      released.remove('tag.db');
+      version = describe({...released, 'tag.db': _sqlite});
+      expect(await sync.syncNow(), isFalse);
+      expect(sync.lastError, startsWith('GitHub: brak pliku tag.db'));
+      expect(await localBytes(sync, 'music.db'), _sqlite);
+    });
+
+    test('another format keeps the copy; unknown keys are ignored', () async {
+      final sync = newSync();
+      await sync.load();
+      version = {...describe(released), 'format': 2};
+      expect(await sync.syncNow(), isFalse);
+      expect(sync.lastError, contains('nieznany format'));
+      expect(await (await sync.localFile('music.db')).exists(), isFalse);
+
+      version = {...describe(released), 'mirror': 'somewhere'};
+      expect(await sync.syncNow(), isTrue);
+    });
+
+    test('a file that is not a database is refused', () async {
+      released['tag.db'] = '<html>nope</html>'.codeUnits;
+      version = describe(released);
+      final sync = newSync();
+      await sync.load();
+      expect(await sync.syncNow(), isFalse);
+      expect(sync.lastError, 'GitHub: tag.db nie jest bazą SQLite');
+      expect(await (await sync.localFile('music.db')).exists(), isFalse);
+    });
+
+    test('a reachable server comes first', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      expect(await sync.syncNow(), isTrue);
+      expect(sync.lastSource, DatabaseSource.remote);
+      expect(gitHubRequests, isEmpty);
+    });
+
+    test('GitHub when the server is down, keeping files.db', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      expect(await sync.syncNow(), isTrue);
+
+      await server.close(force: true);
+      expect(await sync.syncNow(), isTrue);
+      expect(sync.lastSource, DatabaseSource.github);
+      expect(await localBytes(sync, 'tag.db'), released['tag.db']);
+      expect(
+        await (await sync.localFile('files.db')).exists(),
+        isTrue,
+        reason: 'files.db only comes from a server and still fits its files',
+      );
+    });
+
+    test('both failing report both', () async {
+      final sync = newSync();
+      await sync.load();
+      final port = server.port;
+      await server.close(force: true);
+      await sync.setRemoteUrl('127.0.0.1:$port');
+      version = {'format': 2};
+      expect(await sync.syncNow(), isFalse);
+      expect(
+        sync.lastError,
+        'Nie można połączyć się z serwerem · GitHub: nieznany format bazy — '
+        'zostaje obecna kopia (zaktualizuj aplikację)',
+      );
+    });
+
+    test(
+      'switched off, nothing comes from GitHub — and it stays off',
+      () async {
+        final sync = newSync();
+        await sync.load();
+        await sync.setGitHubOn(false);
+        expect(sync.hasSource, isFalse);
+        await sync.syncIfDue();
+        expect(gitHubRequests, isEmpty);
+
+        final again = newSync();
+        await again.load();
+        expect(again.gitHubOn, isFalse);
+      },
+    );
+
+    test('another repository is used and remembered', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setGitHubRepo('https://github.com/friend/Fork.git');
+      expect(sync.gitHubRepo, 'friend/Fork');
+      expect(await sync.syncNow(), isFalse, reason: 'the fake knows no fork');
+      expect(gitHubRequests, isEmpty);
+
+      final again = newSync();
+      await again.load();
+      expect(again.gitHubRepo, 'friend/Fork');
+      await again.setGitHubRepo('');
+      expect(again.gitHubRepo, 'shian1000/LeinaMusicDatabase');
+    });
+
+    test('normalizeGitHubRepo', () {
+      expect(DatabaseSync.normalizeGitHubRepo(' '), isNull);
+      expect(DatabaseSync.normalizeGitHubRepo('a/b'), 'a/b');
+      expect(
+        DatabaseSync.normalizeGitHubRepo(
+          'github.com/shian1000/LeinaMusicDatabase/releases',
+        ),
+        'shian1000/LeinaMusicDatabase',
+      );
+      for (final bad in ['nope', 'a/..', '-a/b', 'http://example.com/a/b']) {
+        expect(
+          () => DatabaseSync.normalizeGitHubRepo(bad),
+          throwsFormatException,
+          reason: bad,
+        );
+      }
+    });
   });
 
   group('discoverLocalServer', () {

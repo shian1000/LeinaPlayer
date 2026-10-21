@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'song_catalog.dart';
 import 'song_requests.dart';
+import 'text_normalizer.dart';
 import 'youtube_video.dart';
 
 /// Requests for MusicDatabase, waiting on the phone until it can hand them over
@@ -22,7 +24,10 @@ import 'youtube_video.dart';
 /// sharing server — MusicDatabase's `docs/handoffs/inbox-for-musicdatabaseapp.md`); a received
 /// one moves to `outbox/sent/`, so the next finding starts a new request. One the server refuses
 /// as malformed moves to `outbox/rejected/` and isn't sent again. Both folders are kept: they
-/// stop a link from being reported twice and a number from being reused.
+/// stop a link from being reported twice and a number from being reused. Without a server, the
+/// waiting requests go as a `.zip` package through the share sheet ([exportPackage],
+/// [ADR 0014](../../../docs/decisions/0014-github-database-and-request-packages.md)) and count
+/// as sent the same way.
 class Outbox extends ChangeNotifier {
   Outbox({
     Future<Directory> Function()? storageRoot,
@@ -70,6 +75,11 @@ class Outbox extends ChangeNotifier {
 
   static const _autoSendKey = 'outbox.auto_send';
   static const _heldOnKey = 'outbox.held_on_ms';
+  static const _packageSenderKey = 'outbox.package_sender';
+  static const _lastPackageKey = 'outbox.last_package';
+
+  String? _typedSender;
+  List<String> _lastPackage = const [];
 
   bool _autoSend = true;
   DateTime? _heldOn;
@@ -94,6 +104,8 @@ class Outbox extends ChangeNotifier {
     _autoSend = prefs.getBool(_autoSendKey) ?? true;
     final held = prefs.getInt(_heldOnKey);
     _heldOn = held == null ? null : DateTime.fromMillisecondsSinceEpoch(held);
+    _typedSender = prefs.getString(_packageSenderKey);
+    _lastPackage = prefs.getStringList(_lastPackageKey) ?? const [];
     await refresh();
   }
 
@@ -670,6 +682,229 @@ class Outbox extends ChangeNotifier {
     return OutboxSendResult(sent: sent, refused: refused, problem: problem);
   }
 
+  // The limits of MusicDatabase's package import (its hand-off
+  // `public-database-for-musicdatabaseapp.md`); a file over the inbox's own limit would be
+  // refused over HTTP too.
+  static const maxPackageFiles = 1000;
+  static const maxPackageFileBytes = 1 << 20;
+  static const maxPackageBytes = 50 << 20;
+
+  /// The name typed for packages while logged out, cleaned ([cleanSenderName]): `null` before
+  /// it was asked for, `''` when the user left it empty (packages without a name).
+  String? get typedSender => _typedSender;
+
+  /// Whether the first package still has to ask for a name: no account, nothing typed yet.
+  bool get asksForSender =>
+      _safeUserName(_userName()) == null && _typedSender == null;
+
+  /// Who packages are from: the logged-in account, else the name typed for packages; `null`
+  /// signs them with nothing.
+  String? get packageSender {
+    final account = _safeUserName(_userName());
+    if (account != null) return account;
+    final typed = _typedSender;
+    return typed == null || typed.isEmpty ? null : typed;
+  }
+
+  Future<void> setTypedSender(String typed) async {
+    _typedSender = cleanSenderName(typed) ?? '';
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setString(
+      _packageSenderKey,
+      _typedSender!,
+    );
+  }
+
+  /// The requests the last package held, still in `outbox/sent/` (for [rebuildLastPackage]).
+  List<String> get lastPackage => _lastPackage;
+
+  static final _senderPattern = RegExp(r'^[a-z0-9][a-z0-9_-]{1,31}$');
+
+  /// A typed name as MusicDatabase's inbox takes it (its username pattern): lowercase Latin
+  /// letters, digits, `_` and `-`, at most 32. Accents are stripped and Cyrillic spelled in Latin
+  /// letters, spaces become `-`, anything else is dropped; `null` when fewer than 2 characters
+  /// are left — the files then go without a name, rather than with an invented one.
+  static String? cleanSenderName(String typed) {
+    final latin = normalizeForSearch(typed).split('').map((c) {
+      return _cyrillic[c] ?? c;
+    }).join();
+    var name = latin
+        .replaceAll(' ', '-')
+        .replaceAll(RegExp(r'[^a-z0-9_-]'), '')
+        .replaceFirst(RegExp(r'^[_-]+'), '');
+    if (name.length > 32) name = name.substring(0, 32);
+    return _senderPattern.hasMatch(name) ? name : null;
+  }
+
+  static const _cyrillic = {
+    'а': 'a',
+    'б': 'b',
+    'в': 'v',
+    'г': 'g',
+    'ґ': 'g',
+    'д': 'd',
+    'е': 'e',
+    'ё': 'e',
+    'є': 'ye',
+    'ж': 'zh',
+    'з': 'z',
+    'и': 'i',
+    'і': 'i',
+    'ї': 'yi',
+    'й': 'y',
+    'к': 'k',
+    'л': 'l',
+    'м': 'm',
+    'н': 'n',
+    'о': 'o',
+    'п': 'p',
+    'р': 'r',
+    'с': 's',
+    'т': 't',
+    'у': 'u',
+    'ў': 'u',
+    'ф': 'f',
+    'х': 'kh',
+    'ц': 'ts',
+    'ч': 'ch',
+    'ш': 'sh',
+    'щ': 'shch',
+    'ъ': '',
+    'ы': 'y',
+    'ь': '',
+    'э': 'e',
+    'ю': 'yu',
+    'я': 'ya',
+  };
+
+  /// Packs the waiting requests into a `.zip` for the share sheet and counts them as sent: they
+  /// move to `outbox/sent/` as after an upload, so findings made meanwhile start new requests.
+  /// Unsigned requests get [packageSender] in their name on the way (never sent over HTTP, so
+  /// no token has to match it). `null` when nothing is waiting. [undoExport] puts them back if
+  /// the share sheet was closed without sharing.
+  Future<RequestPackage?> exportPackage() async {
+    final package = await _inTurn(() async {
+      final files = await pending();
+      if (files.isEmpty) return null;
+      final dir = await directory();
+      final sender = packageSender;
+      final chosen = <File>[];
+      var total = 0;
+      var refused = 0;
+      var leftOut = 0;
+      for (final file in files) {
+        final size = await file.length();
+        if (size > maxPackageFileBytes) {
+          await _moveTo(file, Directory('${dir.path}/rejected'));
+          refused++;
+        } else if (chosen.length >= maxPackageFiles ||
+            total + size > maxPackageBytes) {
+          leftOut++;
+        } else {
+          chosen.add(file);
+          total += size;
+        }
+      }
+      if (chosen.isEmpty) return null;
+      final sent = Directory('${dir.path}/sent');
+      final names = <String>[];
+      final originals = <String>[];
+      for (final file in chosen) {
+        final original = _baseName(file.path);
+        final name = sender != null && _userOf(file.path) == null
+            ? '${sender}_$original'
+            : original;
+        await _moveTo(file, sent, name: name);
+        names.add(name);
+        originals.add(original);
+      }
+      final previous = _lastPackage;
+      await _saveLastPackage(names);
+      return RequestPackage._(
+        file: await _zip(sent, names, sender),
+        names: names,
+        originals: originals,
+        previous: previous,
+        leftOut: leftOut,
+        refused: refused,
+      );
+    });
+    await refresh();
+    return package;
+  }
+
+  /// Takes back an export nobody received: the requests wait again under their old names.
+  Future<void> undoExport(RequestPackage package) async {
+    await _inTurn(() async {
+      final dir = await directory();
+      for (var i = 0; i < package.names.length; i++) {
+        final file = File('${dir.path}/sent/${package.names[i]}');
+        if (await file.exists()) {
+          await _moveTo(file, dir, name: package.originals[i]);
+        }
+      }
+      await _saveLastPackage(package.previous);
+      if (await package.file.exists()) await package.file.delete();
+    });
+    await refresh();
+  }
+
+  /// The last package again, from `outbox/sent/` ("Wyeksportuj ponownie ostatnią paczkę"), in
+  /// case it got lost on the way; MusicDatabase skips files it already has. `null` when none
+  /// of its requests are left.
+  Future<RequestPackage?> rebuildLastPackage() => _inTurn(() async {
+    final sent = Directory('${(await directory()).path}/sent');
+    final names = [
+      for (final name in _lastPackage)
+        if (File('${sent.path}/$name').existsSync()) name,
+    ];
+    if (names.isEmpty) return null;
+    return RequestPackage._(
+      file: await _zip(sent, names, packageSender),
+      names: names,
+      originals: names,
+      previous: _lastPackage,
+    );
+  });
+
+  Future<void> _saveLastPackage(List<String> names) async {
+    _lastPackage = names;
+    await (await SharedPreferences.getInstance()).setStringList(
+      _lastPackageKey,
+      names,
+    );
+  }
+
+  /// The `.zip` MusicDatabase's "Importuj paczkę" takes: the request files at the top level,
+  /// names and contents unchanged, nothing else. Only the newest package is kept on the phone.
+  Future<File> _zip(
+    Directory folder,
+    List<String> names,
+    String? sender,
+  ) async {
+    final archive = Archive();
+    for (final name in names) {
+      archive.addFile(
+        ArchiveFile.bytes(
+          name,
+          await File('${folder.path}/$name').readAsBytes(),
+        ),
+      );
+    }
+    final packages = Directory(
+      '${(await _storageRoot()).path}/outbox_packages',
+    );
+    if (await packages.exists()) await packages.delete(recursive: true);
+    await packages.create(recursive: true);
+    final now = _now();
+    final zip = File(
+      '${packages.path}/zgloszenia-${sender ?? 'leina-radio'}-'
+      '${_datePart(now)}_${_timePart(now)}.zip',
+    );
+    await zip.writeAsBytes(ZipEncoder().encodeBytes(archive));
+    return zip;
+  }
+
   /// How long to wait for the server before trying the next address (or giving up).
   static const sendTimeout = Duration(seconds: 8);
 
@@ -692,9 +927,13 @@ class Outbox extends ChangeNotifier {
     return response.statusCode;
   }
 
-  static Future<void> _moveTo(File file, Directory folder) async {
+  static Future<void> _moveTo(
+    File file,
+    Directory folder, {
+    String? name,
+  }) async {
     await folder.create(recursive: true);
-    await file.rename('${folder.path}/${_baseName(file.path)}');
+    await file.rename('${folder.path}/${name ?? _baseName(file.path)}');
     // A rollback journal SQLite may leave next to the file.
     final journal = File('${file.path}-journal');
     if (await journal.exists()) await journal.delete();
@@ -993,4 +1232,33 @@ class OutboxScope extends InheritedNotifier<Outbox> {
 
   static Outbox? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<OutboxScope>()?.notifier;
+}
+
+/// A `.zip` of requests made by [Outbox.exportPackage] or [Outbox.rebuildLastPackage].
+class RequestPackage {
+  const RequestPackage._({
+    required this.file,
+    required this.names,
+    required this.originals,
+    required this.previous,
+    this.leftOut = 0,
+    this.refused = 0,
+  });
+
+  final File file;
+
+  /// The request files in it.
+  final List<String> names;
+
+  /// [names] as they were while waiting (before a sender was added).
+  final List<String> originals;
+
+  /// [Outbox.lastPackage] before this one.
+  final List<String> previous;
+
+  /// Waiting requests over the package's limits, left for the next one.
+  final int leftOut;
+
+  /// Requests too big for MusicDatabase's inbox, put aside like ones the server refused.
+  final int refused;
 }

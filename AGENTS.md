@@ -20,7 +20,9 @@ dummy (the old `Atrapa: <ID>` snackbar) any more — what couldn't be built was 
 decision, 2026-10-16); [`docs/menu-map.md`](docs/menu-map.md) lists every element. Home's
 recommendation rows come from the listening stats and music.db (`home_recommendations.dart`). Real so
 far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `tag.db` from a remote
-or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)), scanning music
+or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)) or, with no server
+answering, from a GitHub Release (on by default, `shian1000/LeinaMusicDatabase`), outbox requests
+exported as a `.zip` package ("Wyślij paczkę…", [ADR 0014](docs/decisions/0014-github-database-and-request-packages.md)), scanning music
 folders on the phone into the phone's own `local.db`, song search over both databases, and
 ticking several songs with a long press for a shared action (queue, playlist, mood),
 playing phone files with a mini/full player, streaming a song's file from MusicDatabase's
@@ -146,9 +148,12 @@ moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and
 phone (`library_folders.dart`), not synced. Liked songs and songs saved "Na później" go as
 `/users/<name>/saved-songs`, links saved "Na później" as `/users/<name>/later-links`, one item at a
 time ([ADR 0013](docs/decisions/0013-saved-songs-sync.md); server side in a
-[hand-off](docs/handoffs/musicdatabase-saved-songs.md)). Decided, not built yet: the catalog also from a GitHub Release
-(`version.json` + `music.db` / `tag.db`, server first, GitHub second) and outbox files exported
-as a `.zip` package through the share sheet ([ADR 0014](docs/decisions/0014-github-database-and-request-packages.md)).
+[hand-off](docs/handoffs/musicdatabase-saved-songs.md)). Without a server: the catalog also comes from a GitHub
+Release (`https://github.com/<owner>/<repo>/releases/download/database/` — `version.json` +
+`music.db` / `tag.db`; a server first, GitHub second; default repo `shian1000/LeinaMusicDatabase`)
+and the outbox's files go as a `.zip` package through the share sheet, counting as sent
+([ADR 0014](docs/decisions/0014-github-database-and-request-packages.md); the contract is
+MusicDatabase's `docs/handoffs/public-database-for-musicdatabaseapp.md`).
 Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
@@ -188,9 +193,9 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `dayMonthLabel` in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
   `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
-- `lib/src/data/` — data: downloading MusicDatabase's files (`database_sync.dart`), reading
+- `lib/src/data/` — data: downloading MusicDatabase's files from a server or GitHub (`database_sync.dart`), reading
   `music.db` and `files.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
-  search over both (`combined_search.dart`), requests for MusicDatabase waiting to be sent
+  search over both (`combined_search.dart`), requests for MusicDatabase waiting to be sent, and their `.zip` packages
   (`outbox.dart`), the logged-in MusicDatabase user (`account.dart`), YouTube and Spotify links given to the app
   (`incoming_links.dart`, `video_link.dart`), links saved for later from the link sheet
   (`later_links.dart`), YouTube search / matching / audio

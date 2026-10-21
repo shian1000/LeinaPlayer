@@ -7,8 +7,15 @@ publishing to the release `database` (first publish 2026-10-21) and the package 
 built; its answer, with the final contract (`version.json` also carries `content_sha256`, to be
 ignored; a file may be briefly 404 or newer during a publish; sender names must match
 `^[a-z0-9][a-z0-9_-]{1,31}$` or be left out), is
-`../MusicDatabase/docs/handoffs/public-database-for-musicdatabaseapp.md`. The phone's side
-(GitHub source, packages) is not built yet.
+`../MusicDatabase/docs/handoffs/public-database-for-musicdatabaseapp.md`. The phone's side is
+built too (2026-10-21): the GitHub source in `DatabaseSync` (Ustawienia › Serwer) and packages in
+`Outbox.exportPackage` (Ustawienia › Zgłoszenia poprawek › "Wyślij paczkę…"). Details decided
+while building it: after a download from GitHub an existing `files.db` stays (it only comes from
+a server and still fits that server's files); requests waiting unsigned get the sender's name
+only as they go into a package (a signed name sent over HTTP without that user's token would be
+refused); closing the share sheet without sharing puts them back; requests over the inbox's
+1 MiB go to `outbox/rejected/`, ones over the package's limits wait for the next package; Cyrillic
+in a typed name is transliterated (a sender label, not a shown name).
 
 ## Context
 

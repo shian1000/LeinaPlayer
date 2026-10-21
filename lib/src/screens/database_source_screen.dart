@@ -6,12 +6,14 @@ import '../theme.dart';
 import '../widgets/common.dart';
 
 /// "Ustawienia › Serwer" — the addresses MusicDatabase's files are downloaded from (remote, and
-/// local for the home Wi-Fi) and the state of the last download.
+/// local for the home Wi-Fi; the GitHub repository when no server answers) and the state of the
+/// last download.
 class DatabaseSourceScreen extends StatefulWidget {
   const DatabaseSourceScreen({super.key});
 
   static const remoteFieldKey = Key('database.remoteAddress');
   static const localFieldKey = Key('database.localAddress');
+  static const gitHubFieldKey = Key('database.gitHubRepo');
 
   @override
   State<DatabaseSourceScreen> createState() => _DatabaseSourceScreenState();
@@ -20,8 +22,10 @@ class DatabaseSourceScreen extends StatefulWidget {
 class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
   final _remote = TextEditingController();
   final _local = TextEditingController();
+  final _gitHub = TextEditingController();
   String? _remoteError;
   String? _localError;
+  String? _gitHubError;
   bool _initialized = false;
   bool _readingWifi = false;
   bool _searchingServer = false;
@@ -34,12 +38,14 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     final sync = DatabaseSyncScope.of(context);
     _remote.text = sync.remoteUrl?.toString() ?? '';
     _local.text = sync.localUrl?.toString() ?? '';
+    _gitHub.text = sync.gitHubRepo;
   }
 
   @override
   void dispose() {
     _remote.dispose();
     _local.dispose();
+    _gitHub.dispose();
     super.dispose();
   }
 
@@ -53,22 +59,37 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     }
   }
 
+  static String? _validateRepo(String text) {
+    try {
+      DatabaseSync.normalizeGitHubRepo(text);
+      return null;
+    } on FormatException catch (e) {
+      return e.message;
+    }
+  }
+
   Future<void> _save(DatabaseSync sync) async {
     FocusScope.of(context).unfocus();
     final messenger = ScaffoldMessenger.of(context);
     final remoteError = _validate(_remote.text);
     final localError = _validate(_local.text);
+    final gitHubError = _validateRepo(_gitHub.text);
     setState(() {
       _remoteError = remoteError;
       _localError = localError;
+      _gitHubError = gitHubError;
     });
-    if (remoteError != null || localError != null) return;
+    if (remoteError != null || localError != null || gitHubError != null) {
+      return;
+    }
 
     await sync.setRemoteUrl(_remote.text);
     await sync.setLocalUrl(_local.text);
+    await sync.setGitHubRepo(_gitHub.text);
     setState(() {
       _remote.text = sync.remoteUrl?.toString() ?? '';
       _local.text = sync.localUrl?.toString() ?? '';
+      _gitHub.text = sync.gitHubRepo;
     });
     if (!sync.hasSource) {
       messenger.showSnackBar(
@@ -76,7 +97,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
           content: Text(
             sync.localUrl != null
                 ? 'Zapisano. Wybierz jeszcze sieć Wi-Fi albo podaj adres zdalny.'
-                : 'Usunięto adresy — baza nie będzie pobierana',
+                : 'Usunięto adresy, a GitHub jest wyłączony — baza nie będzie pobierana',
           ),
         ),
       );
@@ -156,12 +177,14 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     required String helper,
     required String? error,
     required VoidCallback onSubmitted,
+    bool enabled = true,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: TextField(
         key: key,
         controller: controller,
+        enabled: enabled,
         keyboardType: TextInputType.url,
         autocorrect: false,
         enableSuggestions: false,
@@ -213,6 +236,28 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
             hint: 'http://192.168.1.10:8002/',
             helper: 'Używany, gdy telefon jest w sieci Wi-Fi wybranej poniżej.',
             error: _localError,
+            onSubmitted: () => _save(sync),
+          ),
+          const SectionTitle('GitHub (publiczna kopia bazy)'),
+          SwitchListTile(
+            secondary: const Icon(Icons.public),
+            title: const Text('Pobieraj z GitHuba'),
+            subtitle: const Text(
+              'Gdy żaden serwer nie jest ustawiony albo nie odpowiada',
+            ),
+            value: sync.gitHubOn,
+            onChanged: sync.downloading ? null : sync.setGitHubOn,
+          ),
+          _addressField(
+            key: DatabaseSourceScreen.gitHubFieldKey,
+            controller: _gitHub,
+            hint: DatabaseSync.defaultGitHubRepo,
+            helper:
+                'Repozytorium (właściciel/nazwa), którego wydanie „database” zawiera '
+                'music.db i tag.db. Puste przywraca domyślne. Bez files.db — utwory z '
+                'serwera nadal wymagają serwera.',
+            error: _gitHubError,
+            enabled: sync.gitHubOn,
             onSubmitted: () => _save(sync),
           ),
           Padding(
@@ -328,7 +373,8 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
             child: Text(
               'Baza jest pobierana automatycznie raz dziennie przy uruchomieniu aplikacji. '
               'W wybranej sieci Wi-Fi z adresu sieci lokalnej (a gdy ten nie odpowiada — z '
-              'adresu zdalnego), poza nią z adresu zdalnego. Rozpoznanie sieci wymaga '
+              'adresu zdalnego), poza nią z adresu zdalnego. Gdy żaden serwer nie odpowiada, '
+              'z GitHuba (tylko pliki, które się zmieniły). Rozpoznanie sieci wymaga '
               'dostępu do lokalizacji i włączonej lokalizacji w telefonie.',
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
@@ -349,6 +395,7 @@ String _describeLastSync(DateTime d, DatabaseSource? source) {
   return switch (source) {
     DatabaseSource.local => '$when (sieć lokalna)',
     DatabaseSource.remote => '$when (połączenie zdalne)',
+    DatabaseSource.github => '$when (GitHub)',
     null => when,
   };
 }

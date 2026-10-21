@@ -14,9 +14,11 @@ import 'package:music_database_app/src/widgets/common.dart';
 
 void main() {
   // Lain (the default dark theme) draws section titles differently; these tests read Dummify's.
+  // GitHub off: the app would try to download the catalog on start.
   setUp(
     () => SharedPreferences.setMockInitialValues({
       'appearance.dark_theme': 'Dummify',
+      'database_sync.github_on': false,
     }),
   );
 
@@ -496,21 +498,41 @@ void main() {
       find.byKey(DatabaseSourceScreen.remoteFieldKey),
       'ftp://serwer/',
     );
-    await tester.ensureVisible(find.text('Zapisz'));
+    await tester.scrollUntilVisible(
+      find.text('Zapisz'),
+      200,
+      scrollable: settingsList,
+    );
+    await tester.pump();
     await tester.tap(find.text('Zapisz'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(DatabaseSourceScreen.remoteFieldKey),
+      -200,
+      scrollable: settingsList,
+    );
+    await tester.pump();
     expect(
       find.text('Nieprawidłowy adres (np. http://serwer:8002/)'),
       findsOneWidget,
     );
 
     await tester.enterText(find.byKey(DatabaseSourceScreen.remoteFieldKey), '');
-    await tester.ensureVisible(find.text('Zapisz'));
-    await tester.tap(find.text('Zapisz'));
+    // The keyboard's "done" saves too.
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     expect(
-      find.text('Usunięto adresy — baza nie będzie pobierana'),
+      find.text(
+        'Usunięto adresy, a GitHub jest wyłączony — baza nie będzie pobierana',
+      ),
       findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(DatabaseSourceScreen.gitHubFieldKey))
+          .controller!
+          .text,
+      'shian1000/LeinaMusicDatabase',
     );
   });
 

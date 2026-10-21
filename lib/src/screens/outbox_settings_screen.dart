@@ -1,22 +1,98 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../data/account.dart';
 import '../data/database_sync.dart';
 import '../data/outbox.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
 import 'outbox_contents_screen.dart';
 
 /// "Ustawienia › Zgłoszenia poprawek": the requests for MusicDatabase waiting in the phone's
-/// outbox (e.g. links YouTube no longer plays) and sending them.
+/// outbox (e.g. links YouTube no longer plays) and sending them — to the server, or as a package
+/// through the share sheet (ADR 0014).
 class OutboxSettingsScreen extends StatelessWidget {
   const OutboxSettingsScreen({super.key});
+
+  static String requestsLabel(int n) =>
+      '$n ${pluralWord(n, 'zgłoszenie', 'zgłoszenia', 'zgłoszeń')}';
+
+  /// Asks for the name packages are signed with; `false` when the user cancelled.
+  static Future<bool> _askForSender(BuildContext context, Outbox outbox) async {
+    final typed = await showDialog<String>(
+      context: context,
+      builder: (_) => TextInputDialog(
+        title: 'Podpis paczek ze zgłoszeniami',
+        hint: 'Imię lub pseudonim (puste — bez podpisu)',
+        initial: outbox.typedSender ?? '',
+      ),
+    );
+    if (typed == null) return false;
+    await outbox.setTypedSender(typed);
+    return true;
+  }
+
+  static Future<void> _sendPackage(BuildContext context, Outbox outbox) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (outbox.asksForSender && !await _askForSender(context, outbox)) return;
+    final package = await outbox.exportPackage();
+    if (package == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Nie ma zgłoszeń do wysłania')),
+      );
+      return;
+    }
+    final result = await _share(package);
+    if (result.status == ShareResultStatus.dismissed) {
+      await outbox.undoExport(package);
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          [
+            'Wyeksportowano ${requestsLabel(package.names.length)}',
+            if (package.leftOut > 0)
+              '${requestsLabel(package.leftOut)} nie zmieściło się — w następnej paczce',
+            if (package.refused > 0)
+              'za duże dla MusicDatabase: ${package.refused}',
+          ].join(' · '),
+        ),
+      ),
+    );
+  }
+
+  static Future<void> _sendAgain(BuildContext context, Outbox outbox) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final package = await outbox.rebuildLastPackage();
+    if (package == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Ostatniej paczki nie ma już na telefonie'),
+        ),
+      );
+      return;
+    }
+    await _share(package);
+  }
+
+  static Future<ShareResult> _share(RequestPackage package) =>
+      SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(package.file.path, mimeType: 'application/zip')],
+          subject: 'Zgłoszenia dla MusicDatabase',
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     final outbox = OutboxScope.of(context);
     final sync = DatabaseSyncScope.of(context);
+    final account = AccountScope.maybeOf(context)?.userName;
+    final canExport = !outbox.sending && outbox.waiting > 0;
     final palette = context.palette;
     final result = outbox.lastSend;
-    final canSend = !outbox.sending && outbox.waiting > 0 && sync.hasSource;
+    final canSend = !outbox.sending && outbox.waiting > 0 && sync.hasServer;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
@@ -42,16 +118,9 @@ class OutboxSettingsScreen extends StatelessWidget {
             subtitle: Text(
               outbox.sending
                   ? 'Wysyłanie…'
-                  : switch (outbox.waiting) {
-                      0 => 'Nic',
-                      1 => '1 zgłoszenie',
-                      final n
-                          when n % 10 >= 2 &&
-                              n % 10 <= 4 &&
-                              (n % 100 < 12 || n % 100 > 14) =>
-                        '$n zgłoszenia',
-                      final n => '$n zgłoszeń',
-                    },
+                  : outbox.waiting == 0
+                  ? 'Nic'
+                  : requestsLabel(outbox.waiting),
             ),
             trailing: outbox.sending
                 ? const SizedBox.square(
@@ -104,6 +173,46 @@ class OutboxSettingsScreen extends StatelessWidget {
             onTap: () async =>
                 outbox.send(await sync.serverAddresses(), manual: true),
           ),
+          ListTile(
+            enabled: canExport,
+            leading: Icon(
+              Icons.archive_outlined,
+              color: canExport ? palette.accent : palette.textSecondary,
+            ),
+            title: Text(
+              'Wyślij paczkę…',
+              style: TextStyle(
+                color: canExport ? palette.accent : palette.textSecondary,
+              ),
+            ),
+            subtitle: Text(
+              outbox.waiting == 0
+                  ? 'Plik .zip przez komunikator, e-mail…'
+                  : '${requestsLabel(outbox.waiting)} jako plik .zip przez '
+                        'komunikator, e-mail…',
+            ),
+            onTap: () => _sendPackage(context, outbox),
+          ),
+          if (outbox.lastPackage.isNotEmpty)
+            ListTile(
+              leading: const Icon(Icons.replay),
+              title: const Text('Wyeksportuj ponownie ostatnią paczkę'),
+              subtitle: Text(requestsLabel(outbox.lastPackage.length)),
+              onTap: () => _sendAgain(context, outbox),
+            ),
+          ListTile(
+            leading: const Icon(Icons.badge_outlined),
+            title: const Text('Podpis paczek'),
+            subtitle: Text(switch (outbox.typedSender) {
+              _ when account != null => '$account (nazwa konta)',
+              null => 'Zapytam przy pierwszej paczce',
+              '' => 'Bez podpisu',
+              final name => name,
+            }),
+            onTap: account != null
+                ? null
+                : () => _askForSender(context, outbox),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Text(
@@ -111,8 +220,10 @@ class OutboxSettingsScreen extends StatelessWidget {
               'odtwarza, razem z filmem znalezionym w zamian. Wysyłanie automatyczne próbuje przy '
               'uruchomieniu i powrocie do aplikacji, pod te same adresy co pobieranie bazy. Gdy '
               'serwer odmówi (pełna skrzynka odbiorcza, odłączony dysk), zgłoszenia czekają do '
-              'następnego dnia. W MusicDatabase przegląda się je w Manage database › Resolve new '
-              'requests.',
+              'następnego dnia. Bez serwera zgłoszenia można wysłać paczką (plik .zip) osobie, '
+              'która prowadzi MusicDatabase — importuje się ją w Manage database › Import a '
+              'request package. Wysłane w paczce liczą się jako wysłane. W MusicDatabase przegląda się je '
+              'w Manage database › Resolve new requests.',
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,

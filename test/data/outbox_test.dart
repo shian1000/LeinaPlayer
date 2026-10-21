@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/outbox.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
+import 'package:music_database_app/src/data/song_requests.dart';
 import 'package:music_database_app/src/data/youtube_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -638,5 +640,171 @@ void main() {
         ]);
       },
     );
+  });
+
+  group('packages', () {
+    Map<String, List<int>> unzip(RequestPackage package) => {
+      for (final f in ZipDecoder().decodeBytes(package.file.readAsBytesSync()))
+        f.name: f.content,
+    };
+
+    Future<List<String>> sentNames() async {
+      final sent = Directory('${(await newOutbox().directory()).path}/sent');
+      return [
+        if (sent.existsSync())
+          for (final f in sent.listSync()) f.path.split('/').last,
+      ]..sort();
+    }
+
+    test('cleaning a typed name', () {
+      expect(Outbox.cleanSenderName('Łukasz Żółć'), 'lukasz-zolc');
+      expect(Outbox.cleanSenderName('  Jan_Kowalski!! '), 'jan_kowalski');
+      expect(Outbox.cleanSenderName('Віктор Цой'), 'viktor-tsoy');
+      expect(Outbox.cleanSenderName('-Ola'), 'ola');
+      expect(Outbox.cleanSenderName('a' * 40), 'a' * 32);
+      expect(Outbox.cleanSenderName('Ż'), isNull, reason: 'too short');
+      expect(Outbox.cleanSenderName('東京'), isNull);
+      expect(Outbox.cleanSenderName(''), isNull);
+    });
+
+    test('the waiting requests go into a zip at the top level, signed, and count as sent', () async {
+      final outbox = newOutbox();
+      await outbox.load();
+      await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+      await outbox.requestSong(
+        const SongRequest(
+          title: 'Nowa',
+          artist: 'Ktoś',
+          source: SongRequestSource.youtube,
+        ),
+      );
+      final waiting = names(await outbox.pending());
+      final contents = {
+        for (final f in await outbox.pending())
+          f.path.split('/').last: f.readAsBytesSync(),
+      };
+      expect(waiting, hasLength(2));
+      expect(outbox.asksForSender, isTrue);
+
+      await outbox.setTypedSender('Łucja Nowak');
+      expect(outbox.asksForSender, isFalse);
+      expect(outbox.packageSender, 'lucja-nowak');
+      final package = (await outbox.exportPackage())!;
+
+      final signed = [for (final n in waiting) 'lucja-nowak_$n'];
+      expect(package.names, signed);
+      final zipped = unzip(package);
+      expect(zipped.keys, signed, reason: 'top level, nothing else');
+      for (final n in waiting) {
+        expect(zipped['lucja-nowak_$n'], contents[n], reason: 'unchanged');
+      }
+      expect(package.file.path, endsWith('.zip'));
+      expect(await outbox.pending(), isEmpty);
+      expect(outbox.waiting, 0);
+      expect(await sentNames(), signed..sort());
+      expect(outbox.lastPackage, package.names);
+
+      // The next finding starts a new request with the next number; the sent link stays known.
+      expect(
+        await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY'),
+        isFalse,
+      );
+      await outbox.reportDeadYouTubeLink(losingSleep, 'ad5ukUkNjgw');
+      expect(names(await outbox.pending()), ['2026-10-12_23-44-05_003.db']);
+    });
+
+    test(
+      'a logged-in phone signs with the account; other names stay',
+      () async {
+        user = 'kasia';
+        final outbox = newOutbox();
+        await outbox.load();
+        await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+        user = null;
+        await outbox.reportDeadYouTubeLink(losingSleep, 'ad5ukUkNjgw');
+        user = 'basia';
+        expect(outbox.asksForSender, isFalse);
+        final package = (await outbox.exportPackage())!;
+        expect(package.names, [
+          'kasia_2026-10-12_23-44-05_001.db',
+          'basia_2026-10-12_23-44-05_002.db',
+        ]);
+      },
+    );
+
+    test('a name left empty sends the files unsigned', () async {
+      final outbox = newOutbox();
+      await outbox.load();
+      await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+      await outbox.setTypedSender('?');
+      expect(outbox.typedSender, '');
+      expect(outbox.asksForSender, isFalse);
+      final package = (await outbox.exportPackage())!;
+      expect(package.names, ['2026-10-12_23-44-05_001.db']);
+
+      final again = newOutbox();
+      await again.load();
+      expect(again.typedSender, '', reason: 'asked only once');
+    });
+
+    test(
+      'closing the share sheet puts the requests back as they were',
+      () async {
+        final outbox = newOutbox();
+        await outbox.load();
+        await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+        await outbox.setTypedSender('ola');
+        final package = (await outbox.exportPackage())!;
+        await outbox.undoExport(package);
+        expect(names(await outbox.pending()), ['2026-10-12_23-44-05_001.db']);
+        expect(outbox.waiting, 1);
+        expect(await sentNames(), isEmpty);
+        expect(outbox.lastPackage, isEmpty);
+      },
+    );
+
+    test('the last package can be exported again from sent/', () async {
+      final outbox = newOutbox();
+      await outbox.load();
+      expect(await outbox.exportPackage(), isNull, reason: 'nothing waiting');
+      expect(await outbox.rebuildLastPackage(), isNull);
+
+      await outbox.reportDeadYouTubeLink(chromatic, '49JVQEOkNmY');
+      await outbox.setTypedSender('ola');
+      final first = (await outbox.exportPackage())!;
+      final firstBytes = unzip(first);
+
+      final reloaded = newOutbox();
+      await reloaded.load();
+      final again = (await reloaded.rebuildLastPackage())!;
+      expect(again.names, first.names);
+      expect(unzip(again), firstBytes);
+      expect(await reloaded.pending(), isEmpty, reason: 'nothing moves');
+    });
+
+    test('the limits: a file too big is put aside, the rest waits for the next package', () async {
+      final outbox = newOutbox();
+      await outbox.load();
+      final dir = await outbox.directory();
+      for (var n = 1; n <= Outbox.maxPackageFiles + 2; n++) {
+        File(
+          '${dir.path}/2026-10-12_23-44-05_${n.toString().padLeft(3, '0')}.db',
+        ).writeAsBytesSync([n % 256]);
+      }
+      File('${dir.path}/2026-10-12_23-44-05_${Outbox.maxPackageFiles + 3}.db')
+          .writeAsBytesSync(List.filled(Outbox.maxPackageFileBytes + 1, 0));
+      await outbox.setTypedSender('');
+      final package = (await outbox.exportPackage())!;
+      expect(package.names, hasLength(Outbox.maxPackageFiles));
+      expect(package.leftOut, 2);
+      expect(package.refused, 1);
+      expect(outbox.waiting, 2);
+      expect(
+        File(
+          '${dir.path}/rejected/2026-10-12_23-44-05_${Outbox.maxPackageFiles + 3}.db',
+        ).existsSync(),
+        isTrue,
+      );
+    });
   });
 }

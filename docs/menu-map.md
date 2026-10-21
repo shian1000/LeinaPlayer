@@ -262,11 +262,19 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
     SSID), saves the current Wi-Fi, then scans the phone's /24 subnet for a server answering
     `music.db` (SQLite) on the remote address's port and path, and saves the first hit as the
     local address (`DatabaseSync.discoverLocalServer`).
-  - "Ostatnie pobranie" (with which address was used), the last error if any, "Pobierz teraz".
+  - "GitHub (publiczna kopia bazy)" — "Pobieraj z GitHuba" (switch, on by default) and the
+    repository `<owner>/<repo>` (default `shian1000/LeinaMusicDatabase`; a pasted repository
+    link is accepted, empty brings the default back; saved with "Zapisz"). Only `music.db` /
+    `tag.db`, never `files.db`.
+  - "Ostatnie pobranie" (with which source was used: sieć lokalna / połączenie zdalne / GitHub),
+    the last error if any, "Pobierz teraz".
 
   On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
-  answer), elsewhere the remote one. The download also runs automatically once a day on start —
-  see [`decisions/0002-database-download.md`](decisions/0002-database-download.md).
+  answer), elsewhere the remote one; when no server is set or none answers, GitHub (reads
+  `version.json`, downloads only changed files, checks size + SHA-256 before swapping). The
+  download also runs automatically once a day on start — see
+  [`decisions/0002-database-download.md`](decisions/0002-database-download.md) and
+  [`decisions/0014-github-database-and-request-packages.md`](decisions/0014-github-database-and-request-packages.md).
 - Zgłoszenia poprawek **→ Zgłoszenia poprawek** (`outbox_settings_screen.dart`) — **implemented**:
   "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by default), "Czeka na wysłanie"
   (requests in the outbox; tapped, the reported songs with the phone's replacement —
@@ -274,8 +282,14 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   says so, with "Tak, tylko ten utwór" turning it into the `songs.artist_id` correction of the
   song it was made from, when that artist is the song's own; then the songs played that
   music.db doesn't have, asked to be added — `song_requests.dart`), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
-  jutro" after the server refused), "Wyślij teraz"
-  ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md)).
+  jutro" after the server refused), "Wyślij teraz" (needs a server), "Wyślij paczkę…" (the
+  waiting requests as a `.zip` through the share sheet; asks once for "Podpis paczek" when not
+  logged in; afterwards they count as sent — closing the sheet without sharing takes it back),
+  "Wyeksportuj ponownie ostatnią paczkę" (only after one; rebuilt from `outbox/sent/`), "Podpis
+  paczek" (the account's name when logged in, else the typed one, cleaned to MusicDatabase's
+  username pattern; empty — unsigned)
+  ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md),
+  [ADR 0014](decisions/0014-github-database-and-request-packages.md)).
 
 ### Słuchanie
 

@@ -1,31 +1,37 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Which of the two configured addresses a download used.
-enum DatabaseSource { remote, local }
+/// Where a download came from: one of the two server addresses, or the public copy on GitHub.
+enum DatabaseSource { remote, local, github }
 
 /// Keeps a local copy of MusicDatabase's SQLite files, downloaded from the addresses set under
 /// "Ustawienia › Serwer". See `docs/decisions/0002-database-download.md`.
 ///
 /// Two addresses can be set: a remote one (reachable from anywhere, e.g. over Tailscale) and a
 /// local one, used only while the phone is on the saved home Wi-Fi ([localWifi]). If the local
-/// server can't be reached there, the remote address is tried as well.
+/// server can't be reached there, the remote address is tried as well. When no server is set or
+/// none answers, the catalog comes from a GitHub Release ([gitHubRepo],
+/// `docs/decisions/0014-github-database-and-request-packages.md`).
 class DatabaseSync extends ChangeNotifier {
   DatabaseSync({
     Future<Directory> Function()? storageRoot,
     DateTime Function()? now,
     Future<String?> Function()? currentWifi,
     Future<String?> Function()? currentWifiIp,
+    Uri Function(String repo)? gitHubRelease,
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
        _now = now ?? DateTime.now,
        _currentWifi = currentWifi ?? readCurrentWifiName,
-       _currentWifiIp = currentWifiIp ?? readCurrentWifiIp;
+       _currentWifiIp = currentWifiIp ?? readCurrentWifiIp,
+       _gitHubRelease = gitHubRelease ?? gitHubReleaseUrl;
 
   static const fileNames = ['music.db', 'tag.db', ...optionalFileNames];
 
@@ -40,15 +46,32 @@ class DatabaseSync extends ChangeNotifier {
   static const _localWifiKey = 'database_sync.local_wifi';
   static const _lastSyncKey = 'database_sync.last_sync_ms';
   static const _lastSourceKey = 'database_sync.last_source';
+  static const _gitHubRepoKey = 'database_sync.github_repo';
+  static const _gitHubOnKey = 'database_sync.github_on';
+
+  /// The owner's public catalog, filled in on every phone until changed or switched off — public,
+  /// shared data, not anyone's private setting (ADR 0014).
+  static const defaultGitHubRepo = 'shian1000/LeinaMusicDatabase';
+
+  /// The files published on GitHub; `files.db` stays on the server (ADR 0010).
+  static const gitHubFileNames = ['music.db', 'tag.db'];
+
+  /// Where `<owner>/<repo>`'s release `database` serves its files (MusicDatabase's
+  /// `docs/handoffs/public-database-for-musicdatabaseapp.md`).
+  static Uri gitHubReleaseUrl(String repo) =>
+      Uri.parse('https://github.com/$repo/releases/download/database/');
 
   final Future<Directory> Function() _storageRoot;
   final DateTime Function() _now;
   final Future<String?> Function() _currentWifi;
   final Future<String?> Function() _currentWifiIp;
+  final Uri Function(String repo) _gitHubRelease;
 
   Uri? _remoteUrl;
   Uri? _localUrl;
   String? _localWifi;
+  String _gitHubRepo = defaultGitHubRepo;
+  bool _gitHubOn = true;
   DateTime? _lastSync;
   DatabaseSource? _lastSource;
   bool _downloading = false;
@@ -63,9 +86,19 @@ class DatabaseSync extends ChangeNotifier {
   /// Name (SSID) of the home Wi-Fi; `null` if not set.
   String? get localWifi => _localWifi;
 
-  /// Whether any address is usable at all, so "Pobierz teraz" makes sense.
-  bool get hasSource =>
+  /// `<owner>/<repo>` whose release `database` the catalog can come from (shown even while
+  /// [gitHubOn] is off).
+  String get gitHubRepo => _gitHubRepo;
+
+  /// Whether the catalog may come from GitHub when no server answers.
+  bool get gitHubOn => _gitHubOn;
+
+  /// Whether a MusicDatabase server is set (the outbox, the account and "Serwer" files need one).
+  bool get hasServer =>
       _remoteUrl != null || (_localUrl != null && _localWifi != null);
+
+  /// Whether any source is usable at all, so "Pobierz teraz" makes sense.
+  bool get hasSource => hasServer || _gitHubOn;
 
   /// When both files were last downloaded successfully, and from which address.
   DateTime? get lastSync => _lastSync;
@@ -80,6 +113,8 @@ class DatabaseSync extends ChangeNotifier {
     _remoteUrl = _parse(prefs.getString(_remoteUrlKey));
     _localUrl = _parse(prefs.getString(_localUrlKey));
     _localWifi = prefs.getString(_localWifiKey);
+    _gitHubRepo = prefs.getString(_gitHubRepoKey) ?? defaultGitHubRepo;
+    _gitHubOn = prefs.getBool(_gitHubOnKey) ?? true;
     final ms = prefs.getInt(_lastSyncKey);
     _lastSync = ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
     _lastSource = DatabaseSource.values
@@ -118,6 +153,50 @@ class DatabaseSync extends ChangeNotifier {
     }
     _localWifi = value;
     notifyListeners();
+  }
+
+  /// Saves the GitHub repository; an empty string brings back [defaultGitHubRepo].
+  /// Throws [FormatException] (with a Polish message) if it isn't `<owner>/<repo>`.
+  Future<void> setGitHubRepo(String raw) async {
+    final repo = normalizeGitHubRepo(raw) ?? defaultGitHubRepo;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_gitHubRepoKey, repo);
+    _gitHubRepo = repo;
+    _lastError = null;
+    notifyListeners();
+  }
+
+  Future<void> setGitHubOn(bool on) async {
+    await (await SharedPreferences.getInstance()).setBool(_gitHubOnKey, on);
+    _gitHubOn = on;
+    _lastError = null;
+    notifyListeners();
+  }
+
+  static final _repoPattern = RegExp(
+    r'^([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/([A-Za-z0-9._-]{1,100})$',
+  );
+
+  /// `<owner>/<repo>` from what the user typed: the pair itself or a pasted link to the
+  /// repository (or one of its pages); `null` for an empty input.
+  static String? normalizeGitHubRepo(String raw) {
+    var text = raw.trim();
+    if (text.isEmpty) return null;
+    text = text.replaceFirst(
+      RegExp(r'^(?:https?://)?(?:www\.)?github\.com/', caseSensitive: false),
+      '',
+    );
+    final parts = text.split('/').where((p) => p.isNotEmpty).take(2).toList();
+    if (parts.length == 2 && parts[1].endsWith('.git')) {
+      parts[1] = parts[1].substring(0, parts[1].length - 4);
+    }
+    final match = _repoPattern.firstMatch(parts.join('/'));
+    if (match == null || match.group(2) == '.' || match.group(2) == '..') {
+      throw const FormatException(
+        'Podaj repozytorium jako właściciel/nazwa (np. $defaultGitHubRepo)',
+      );
+    }
+    return match.group(0);
   }
 
   Future<Uri?> _store(String key, String? value) async {
@@ -240,7 +319,8 @@ class DatabaseSync extends ChangeNotifier {
 
   /// Downloads all files; returns whether it succeeded. The previous copy stays in place
   /// until all new files have arrived and look like SQLite databases, so a half-finished
-  /// download never leaves the files out of step with each other.
+  /// download never leaves the files out of step with each other. A server comes first (always
+  /// the freshest); GitHub only when no server is set or none answers.
   Future<bool> syncNow() async {
     if (!hasSource || _downloading) return false;
     _downloading = true;
@@ -248,26 +328,33 @@ class DatabaseSync extends ChangeNotifier {
     notifyListeners();
     try {
       final attempts = await _attempts();
-      if (attempts.isEmpty) {
+      if (attempts.isEmpty && !_gitHubOn) {
         throw const _SyncFailure(
           'Telefon nie jest w sieci lokalnej, a adres zdalny nie jest ustawiony',
         );
       }
-      Object? failure;
+      Object? serverFailure;
       for (final (source, url) in attempts) {
         try {
           await _downloadAll(url);
-          _lastSync = _now();
-          _lastSource = source;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setInt(_lastSyncKey, _lastSync!.millisecondsSinceEpoch);
-          await prefs.setString(_lastSourceKey, source.name);
+          await _succeeded(source);
           return true;
         } catch (e) {
-          failure = e;
+          serverFailure = e;
         }
       }
-      throw failure!;
+      if (!_gitHubOn) throw serverFailure!;
+      try {
+        await _downloadFromGitHub(_gitHubRepo);
+        await _succeeded(DatabaseSource.github);
+        return true;
+      } catch (e) {
+        _lastError = [
+          if (serverFailure != null) _describe(serverFailure),
+          'GitHub: ${_describeGitHub(e)}',
+        ].join(' · ');
+        return false;
+      }
     } catch (e) {
       _lastError = _describe(e);
       return false;
@@ -275,6 +362,14 @@ class DatabaseSync extends ChangeNotifier {
       _downloading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> _succeeded(DatabaseSource source) async {
+    _lastSync = _now();
+    _lastSource = source;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_lastSyncKey, _lastSync!.millisecondsSinceEpoch);
+    await prefs.setString(_lastSourceKey, source.name);
   }
 
   /// The addresses to try now, best first: the local one on the home Wi-Fi, then the remote one.
@@ -330,6 +425,133 @@ class DatabaseSync extends ChangeNotifier {
     } finally {
       client.close(force: true);
     }
+  }
+
+  /// The catalog from [repo]'s release: `version.json` first, then only the files whose hash
+  /// differs from the copy here. Everything downloaded must match its size and SHA-256 before
+  /// any file is swapped, so the pair stays consistent even when a publish is under way (a file
+  /// briefly missing, or already newer than `version.json`). `files.db` is left as it is: it only
+  /// comes from a server, and is still right for that server's files.
+  Future<void> _downloadFromGitHub(String repo) async {
+    final base = _gitHubRelease(repo);
+    final parts = <String, File>{};
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15);
+    try {
+      final version = _parseVersion(
+        await _fetchBytes(client, base.resolve('version.json'), 'version.json'),
+      );
+      final dir = await databaseDirectory();
+      for (final name in gitHubFileNames) {
+        final (size, hash) = version[name]!;
+        final current = File('${dir.path}/$name');
+        if (await current.exists() &&
+            await current.length() == size &&
+            await _sha256Of(current) == hash) {
+          continue;
+        }
+        final part = File('${dir.path}/$name.part');
+        parts[name] = part;
+        await _fetchTo(client, base.resolve(name), part, name);
+        if (await part.length() != size || await _sha256Of(part) != hash) {
+          throw _SyncFailure(
+            '$name nie zgadza się z version.json (trwa publikacja?)',
+          );
+        }
+        if (!await _looksLikeSqlite(part)) {
+          throw _SyncFailure('$name nie jest bazą SQLite');
+        }
+      }
+      for (final MapEntry(key: name, value: part) in parts.entries) {
+        await part.rename('${dir.path}/$name');
+      }
+    } catch (_) {
+      for (final part in parts.values) {
+        if (await part.exists()) await part.delete();
+      }
+      rethrow;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Each published file's size and SHA-256 from `version.json`. Keys it doesn't know (e.g.
+  /// `content_sha256`) are ignored; another `format` is a layout this app doesn't know.
+  static Map<String, (int, String)> _parseVersion(List<int> bytes) {
+    final Object? json;
+    try {
+      json = jsonDecode(utf8.decode(bytes));
+    } on FormatException {
+      throw const _SyncFailure('version.json jest nieczytelny');
+    }
+    if (json is! Map || json['format'] != 1) {
+      throw const _SyncFailure(
+        'nieznany format bazy — zostaje obecna kopia (zaktualizuj aplikację)',
+      );
+    }
+    final files = json['files'];
+    return {
+      for (final name in gitHubFileNames)
+        name: switch (files is Map ? files[name] : null) {
+          {'size': final int size, 'sha256': final String hash}
+              when RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hash) =>
+            (size, hash.toLowerCase()),
+          _ => throw _SyncFailure('version.json nie opisuje $name'),
+        },
+    };
+  }
+
+  static Future<String> _sha256Of(File file) async =>
+      (await sha256.bind(file.openRead()).first).toString();
+
+  static Future<List<int>> _fetchBytes(
+    HttpClient client,
+    Uri uri,
+    String name,
+  ) async {
+    final response = await _get(client, uri, name);
+    final bytes = <int>[];
+    await for (final chunk in response.timeout(const Duration(seconds: 30))) {
+      bytes.addAll(chunk);
+      if (bytes.length > 1 << 20) {
+        throw _SyncFailure('$name jest za duży');
+      }
+    }
+    return bytes;
+  }
+
+  static Future<void> _fetchTo(
+    HttpClient client,
+    Uri uri,
+    File target,
+    String name,
+  ) async {
+    final response = await _get(client, uri, name);
+    final sink = target.openWrite();
+    try {
+      await sink.addStream(response.timeout(const Duration(seconds: 30)));
+    } finally {
+      await sink.close();
+    }
+  }
+
+  /// A GET that follows GitHub's redirect to its file host (HttpClient does, up to 5).
+  static Future<HttpClientResponse> _get(
+    HttpClient client,
+    Uri uri,
+    String name,
+  ) async {
+    final request = await client.getUrl(uri);
+    final response = await request.close();
+    if (response.statusCode != HttpStatus.ok) {
+      await response.drain<void>().catchError((_) {});
+      throw _SyncFailure(
+        response.statusCode == HttpStatus.notFound
+            ? 'brak pliku $name (repozytorium bez wydania „database” albo trwa publikacja)'
+            : 'błąd ${response.statusCode} dla $name',
+      );
+    }
+    return response;
   }
 
   Future<Directory> databaseDirectory() async {
@@ -391,6 +613,14 @@ class DatabaseSync extends ChangeNotifier {
     TimeoutException() => 'Serwer nie odpowiada',
     HttpException() => 'Przerwane połączenie z serwerem',
     _ => 'Nie udało się pobrać bazy ($e)',
+  };
+
+  static String _describeGitHub(Object e) => switch (e) {
+    _SyncFailure(:final message) => message,
+    SocketException() => 'brak połączenia',
+    TimeoutException() => 'nie odpowiada',
+    HttpException() => 'przerwane połączenie',
+    _ => 'nie udało się pobrać bazy ($e)',
   };
 }
 
