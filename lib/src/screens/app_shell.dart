@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/app_updates.dart';
 import '../data/incoming_links.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
@@ -17,6 +18,7 @@ import '../playback/track_player.dart';
 import '../theme.dart';
 import '../widgets/queue_toast.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/update_dialog.dart';
 import 'discover_screen.dart';
 import 'home_screen.dart';
 import 'library_screen.dart';
@@ -69,6 +71,8 @@ class AppShellState extends State<AppShell> {
   int _currentTab = 0;
   StreamSubscription<String>? _linksSub;
   final _toast = QueueToast();
+  AppUpdates? _updates;
+  bool _updateOffered = false;
 
   @override
   void initState() {
@@ -77,7 +81,31 @@ class AppShellState extends State<AppShell> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final updates = context
+        .getInheritedWidgetOfExactType<AppUpdatesScope>()
+        ?.notifier;
+    if (updates == _updates) return;
+    _updates?.removeListener(_offerUpdate);
+    _updates = updates?..addListener(_offerUpdate);
+    _offerUpdate();
+  }
+
+  /// A newer release is offered once per start, until answered "Później".
+  void _offerUpdate() {
+    final updates = _updates;
+    final release = updates?.available;
+    if (_updateOffered || updates == null || !updates.shouldOffer) return;
+    _updateOffered = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showUpdateDialog(context, updates, release!);
+    });
+  }
+
+  @override
   void dispose() {
+    _updates?.removeListener(_offerUpdate);
     _linksSub?.cancel();
     _toast.dispose();
     super.dispose();

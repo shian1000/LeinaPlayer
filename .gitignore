@@ -53,3 +53,6 @@ app.*.map.json
 # Editor swap files
 *.kate-swp
 *.swp
+
+# Build-time settings pointing at the owner's services (tool/release.env.example)
+/tool/release.env

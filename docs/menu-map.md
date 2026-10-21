@@ -436,7 +436,13 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   [`agent-notes/youtube.md`](agent-notes/youtube.md)).
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: the
   version at the top ("Leina Radio — wersja": `version` from `pubspec.yaml`, the build number
-  and commit, e.g. "1.0.0 (kompilacja 26, c11e6c4+zmiany)" — see `tool/build_release_apk.sh`), "Tylko do
+  and commit, e.g. "1.0.0 (kompilacja 26, c11e6c4+zmiany)" — see `tool/build_release_apk.sh`); then,
+  only in builds with `tool/release.env`, "Aktualizacje" (the newest GitHub release: "Dostępna
+  wersja … — stuknij, żeby pobrać" in the accent colour opens the update dialog, otherwise the
+  last check; ⟳ "Sprawdź teraz") and "Sprawdzaj aktualizacje automatycznie" (switch, on — once a
+  day). A newer release is also offered once at start in "Dostępna nowa wersja …" (notes,
+  "Pobierz" → the APK in the browser, "Później") —
+  [`agent-notes/releases.md`](agent-notes/releases.md). "Tylko do
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).

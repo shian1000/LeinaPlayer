@@ -4,8 +4,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_name.dart';
+import '../data/app_updates.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/update_dialog.dart';
 
 /// "Ustawienia › Informacje i pomoc": the app's version and the terms it may be shared under.
 /// Mostly a reminder for the owner — the app is for private use only and must never go to an
@@ -64,6 +66,9 @@ class AboutScreen extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           _VersionTile(packageInfo: packageInfo ?? PackageInfo.fromPlatform),
+          if (AppUpdatesScope.maybeOf(context) case final updates?
+              when updates.configured)
+            ..._updateTiles(context, updates),
           const SectionTitle('Tylko do użytku prywatnego'),
           paragraph(
             'Aplikacja pobiera i odtwarza dźwięk z YouTube poza jego oficjalnym '
@@ -111,6 +116,54 @@ class AboutScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Aktualizacje" (the newest release on GitHub, tapped to download or to check now) and the
+/// daily check's switch; only in builds that know their releases ([AppUpdates.configured]).
+List<Widget> _updateTiles(BuildContext context, AppUpdates updates) {
+  final palette = context.palette;
+  final release = updates.available;
+  final last = updates.lastCheck;
+  String two(int n) => n.toString().padLeft(2, '0');
+  final subtitle = updates.checking
+      ? 'Sprawdzam…'
+      : release != null
+      ? 'Dostępna wersja ${release.label} — stuknij, żeby pobrać'
+      : updates.problem ??
+            (last == null
+                ? 'Jeszcze nie sprawdzano'
+                : 'Masz najnowszą wersję (sprawdzono '
+                      '${dayMonthLabel(last)}, ${two(last.hour)}:${two(last.minute)})');
+  return [
+    ListTile(
+      leading: Icon(
+        Icons.system_update_outlined,
+        color: release != null ? palette.accent : null,
+      ),
+      title: const Text('Aktualizacje'),
+      subtitle: Text(
+        subtitle,
+        style: release != null ? TextStyle(color: palette.accent) : null,
+      ),
+      trailing: IconButton(
+        tooltip: 'Sprawdź teraz',
+        icon: const Icon(Icons.refresh),
+        onPressed: updates.checking ? null : updates.check,
+      ),
+      onTap: updates.checking
+          ? null
+          : release != null
+          ? () => showUpdateDialog(context, updates, release)
+          : updates.check,
+    ),
+    SwitchListTile(
+      secondary: const Icon(Icons.schedule),
+      title: const Text('Sprawdzaj aktualizacje automatycznie'),
+      subtitle: const Text('Raz dziennie, w wydaniach aplikacji na GitHubie'),
+      value: updates.autoCheck,
+      onChanged: updates.setAutoCheck,
+    ),
+  ];
 }
 
 /// The commit a build was made from (`tool/build_release_apk.sh`), with "+zmiany" when its

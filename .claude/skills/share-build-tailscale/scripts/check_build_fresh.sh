@@ -16,6 +16,7 @@ fi
 
 inputs=(lib pubspec.yaml pubspec.lock android)
 [[ -d assets ]] && inputs+=(assets)
+[[ -f tool/release.env ]] && inputs+=(tool/release.env)
 
 newer="$(find "${inputs[@]}" -type f -newer "$APK" \
   -not -path 'android/.gradle/*' \

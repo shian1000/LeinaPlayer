@@ -217,6 +217,8 @@ const _sections = <(String, List<_SettingsEntry>)>[
         _openAbout,
         keywords: [
           'Wersja aplikacji',
+          'Aktualizacje',
+          'Sprawdzaj aktualizacje automatycznie',
           'Licencje bibliotek',
           'Tylko do użytku prywatnego',
         ],

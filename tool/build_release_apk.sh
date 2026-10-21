@@ -10,8 +10,18 @@ if [[ ! -f android/key.properties && -z "${ALLOW_DEBUG_KEY:-}" ]]; then
   exit 1
 fi
 
+# Build-time settings that point at the owner's own services (tool/release.env.example);
+# without the file the features that need them stay off.
+defines=()
+if [[ -f tool/release.env ]]; then
+  while IFS='=' read -r key value; do
+    [[ "$key" =~ ^(UPDATE_REPO)$ ]] && defines+=("--dart-define=$key=$value")
+  done < <(grep -E '^[A-Z_]+=' tool/release.env)
+fi
+
 read -r number commit < <(tool/build_info.sh)
 flutter build apk --release \
   --build-number="$number" \
-  --dart-define=GIT_COMMIT="$commit"
+  --dart-define=GIT_COMMIT="$commit" \
+  ${defines[@]+"${defines[@]}"}
 echo "$number $commit" > build/app/outputs/flutter-apk/app-release.version
