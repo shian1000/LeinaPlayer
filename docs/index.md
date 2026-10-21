@@ -7,4 +7,6 @@
 - [`ideas/`](ideas/) — UI ideas collected from elsewhere (e.g. a Spotify redesign) and what was taken.
 - [`handoffs/`](handoffs/) — instructions for agents working in other repos (MusicDatabase).
 
+- [`../PRIVACY.md`](../PRIVACY.md) — the public privacy note (same content as Ustawienia › Prywatność i połączenia).
+
 Start at [`../AGENTS.md`](../AGENTS.md) for the AI-agent entry point.

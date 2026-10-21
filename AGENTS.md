@@ -311,7 +311,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Every connection the app makes is listed on Ustawienia › Prywatność i połączenia
   (`privacy_screen.dart`) with why, when and what it sends, and with a way to the switch that
   stops it (or "Tylko gdy sam tego użyjesz") — a new service or a new kind of data sent goes
-  there in the same change, and a new automatic connection gets a switch (user's rule;
+  there and into `PRIVACY.md` (the public version; YouTube described neutrally, no NewPipe —
+  user's choice) in the same change, and a new automatic connection gets a switch (user's rule;
   the lyrics got "Pobieraj teksty piosenek" for it). Each section's "Teraz: …" line is computed
   from those switches (accent = connects, the theme's error red = doesn't) — a new switch must
   feed it.
