@@ -146,7 +146,10 @@ moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and
 phone (`library_folders.dart`), not synced. Liked songs and songs saved "Na później" go as
 `/users/<name>/saved-songs`, links saved "Na później" as `/users/<name>/later-links`, one item at a
 time ([ADR 0013](docs/decisions/0013-saved-songs-sync.md); server side in a
-[hand-off](docs/handoffs/musicdatabase-saved-songs.md)). Any other way of talking to MusicDatabase is not decided — check with the user
+[hand-off](docs/handoffs/musicdatabase-saved-songs.md)). Decided, not built yet: the catalog also from a GitHub Release
+(`version.json` + `music.db` / `tag.db`, server first, GitHub second) and outbox files exported
+as a `.zip` package through the share sheet ([ADR 0014](docs/decisions/0014-github-database-and-request-packages.md)).
+Any other way of talking to MusicDatabase is not decided — check with the user
   first, and record the decision as an ADR in `docs/decisions/`.
 
 ## Standard commands

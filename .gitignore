@@ -49,3 +49,7 @@ app.*.map.json
 
 # Private checklist for sharing the app (kept local only)
 /docs/udostepnienie-todo.txt
+
+# Editor swap files
+*.kate-swp
+*.swp
