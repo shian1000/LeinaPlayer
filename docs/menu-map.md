@@ -238,18 +238,16 @@ import, Wyświetlanie, Dane, Aplikacja.
 - Konto **→ Konto** (`account_screen.dart`) — **implemented**: logging in with a MusicDatabase
   user ("Nazwa użytkownika", "Hasło", "Zaloguj"; checked by the server, which hands back a
   token), or the logged-in user and "Wyloguj" (asks first)
-  ([ADR 0006](decisions/0006-musicdatabase-login.md)). Logged in, a "Playlisty" row shows how
-  the account's playlists last synced with MusicDatabase, with ⟳ "Synchronizuj teraz"; right
-  after logging in, phone-only playlists are offered to the account ("Dodać playlisty z
-  telefonu do konta?" — Nie teraz / Dodaj), and while any are left a row "Playlisty tylko na tym
-telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)). A
-  "Nastroje" row below it does the same for the account's moods, the login offer covers
-  phone-only moods too ("Dodać playlisty i nastroje z telefonu do konta?"), and a "Nastroje tylko
-  na tym telefonie: N" row adds them ([ADR 0008](decisions/0008-moods.md)). A "Foldery" row
-  does the same for Biblioteka's folders ("Foldery tylko na tym telefonie: N"; the login offer
-  lists them too — [ADR 0011](decisions/0011-folder-sync.md)). "Polubione i zapisane utwory" and
-  "Linki na później" rows show how those synced, with ⟳ — no offer: what was saved while logged
-  out joins the account by itself ([ADR 0013](decisions/0013-saved-songs-sync.md)).
+  ([ADR 0006](decisions/0006-musicdatabase-login.md)). Logged in, one row **"Synchronizuj"**
+  covers everything that syncs with the account — playlists, moods (and global-mood changes),
+  folders, listening stats, liked and saved songs, links saved for later — showing "Wszystko
+  zsynchronizowane (najpóźniej o HH:MM)", "Synchronizowanie…" or which part failed and why, with
+  ⟳ "Synchronizuj teraz" syncing all of it; a long press explains what syncs where. Right after
+  logging in, phone-only playlists, moods and folders are offered to the account ("Dodać
+  playlisty z telefonu do konta?" — Nie teraz / Dodaj), and while any are left rows "Playlisty /
+  Nastroje / Foldery tylko na tym telefonie: N" add them when tapped ([ADR 0007](decisions/0007-playlist-sync.md),
+  [0008](decisions/0008-moods.md), [0011](decisions/0011-folder-sync.md)); liked and saved songs
+  and later links join the account by themselves ([ADR 0013](decisions/0013-saved-songs-sync.md)).
   Below everything, once signed in for "Utwórz na YouTube": "Konto Google (playlisty na
   YouTube)" — the Google account's e-mail with **Wyloguj** (the next playlist asks for an
   account again).
@@ -335,9 +333,6 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   section *Wyszukiwanie*:
   - "Włącz szukanie w serwisie YouTube" — turns on the "Wyszukaj na YouTubie" button and
     looking up songs on YouTube when tapped (see song search below).
-  - "Wyszukuj playlisty na YouTube" (on) — the button also searches YouTube playlists; only
-    selectable while search is on, and only acts while "Wyszukuj playlisty" (search filters)
-    is on (the subtitle says so otherwise).
   - "Korzystaj z NewPipeExtractor" (on; Android only), "Korzystaj z pakietu youtube_explode"
     (on), "Korzystaj z yt-dlp przez serwer", "Korzystaj z API" — the search methods, tried top
     to bottom, the next one only when the previous fails (`YouTubeSearch`). Only selectable while search is on. **yt-dlp przez
@@ -346,6 +341,10 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   - "Kod YouTube API" — dialog for the Data API key, used by "Korzystaj z API"; the tile shows
     only its last four characters, empty input clears it. Stored in plain
     `shared_preferences`.
+  section *Playlisty* (below the search methods — user's choice: it's about playlists, not
+  songs): "Wyszukuj playlisty na YouTube" (on) — the online button also searches YouTube
+  playlists; only selectable while search is on, and only acts while "Wyszukuj playlisty"
+  (search filters) is on (the subtitle says so otherwise).
 - Spotify **→ Spotify** (`spotify_source_screen.dart`) — section *Wyszukiwanie*: "Wyszukuj
   playlisty na Spotify" (on; the search button also searches Spotify playlists, while
   "Wyszukuj playlisty" in the search filters is on), **Spotify API** (implemented: dialog for
@@ -445,7 +444,7 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   colour (plus "zalogowano jako …" for the server and Google), or "nie łączy się …" in the theme's
   error red — and rows that open the screen with its switch (Serwer, Konto, Kolejność
   odtwarzania, YouTube, Pamięć podręczna, Spotify, Źródła okładek, Oszczędzanie danych,
-  Informacje i pomoc) or "Tylko gdy sam tego użyjesz"; last "Kto widzi Twoje dane".
+  Informacje i pomoc) or "Tylko gdy sam tego użyjesz"; last "Synchronizacja danych".
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: the
   version at the top ("Leina Radio — wersja": `version` from `pubspec.yaml`, the build number
   and commit, e.g. "1.0.0 (kompilacja 26, c11e6c4+zmiany)" — see `tool/build_release_apk.sh`); then,
@@ -458,15 +457,16 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
-  Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków, and "Dlaczego
-  aplikacja tyle zajmuje" (the APK holds three CPU builds, ~22 MB each in use; the cache takes the
+  Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków, and "Rozmiar
+  aplikacji" (the APK holds three CPU builds, ~22 MB each in use; the cache takes the
   most while used) with "Pamięć podręczna — Zajęte X MB" → Pamięć podręczna.
 
 ## Explanations on a long press (`feature_info.dart`, texts in `feature_infos.dart`)
 
 A long press on these opens a sheet — what it is, what it's for, how it works, libraries, what it
-connects to, buttons (Prywatność i połączenia; Wyloguj z Google; Konto): Ustawienia › Konto ›
-the Google account's e-mail and the "Statystyki słuchania" sync row; Ja › Statystyki słuchania;
+connects to, buttons (Prywatność i połączenia; Wyloguj z Google; Konto): the bottom bar's Home
+and Odkrywaj; a song menu's "Przejdź do radia utworu" (`MenuSheetEntry.onLongPress`);
+Ustawienia › Konto › the Google account's e-mail and "Synchronizuj"; Ja › Statystyki słuchania;
 Ustawienia › Serwer and › Zgłoszenia poprawek; Sposoby odtwarzania YouTube › NewPipeExtractor and
 youtube_explode; YouTube › NewPipeExtractor, youtube_explode and "Korzystaj z API"; Spotify ›
 Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce").

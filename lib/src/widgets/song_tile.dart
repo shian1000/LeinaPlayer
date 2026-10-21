@@ -18,6 +18,8 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/track_player.dart';
 import '../theme.dart';
+import '../screens/feature_infos.dart';
+import 'feature_info.dart';
 import 'menu_sheet.dart';
 import 'mood_sheet.dart';
 import 'playing_bars.dart';
@@ -561,6 +563,7 @@ Future<void> showSongMenu(
           Icons.radio,
           'Przejdź do radia utworu',
           onTap: () => openSongRadio(context, song),
+          onLongPress: () => showFeatureInfo(context, FeatureInfos.songRadio),
         ),
       MenuSheetEntry(
         Icons.share_outlined,

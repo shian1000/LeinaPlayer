@@ -79,7 +79,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Aktualizacje'), findsOneWidget);
-    expect(find.text('Dlaczego aplikacja tyle zajmuje'), findsOneWidget);
+    expect(find.text('Rozmiar aplikacji'), findsOneWidget);
     expect(find.text('Zajęte 0.0 MB'), findsOneWidget);
     expect(
       find.text('Dostępna wersja 1.0.0 (58) — stuknij, żeby pobrać'),

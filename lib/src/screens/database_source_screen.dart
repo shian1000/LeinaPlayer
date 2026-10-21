@@ -224,8 +224,8 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
             controller: _remote,
             hint: 'http://serwer:8002/',
             helper:
-                'Używany poza siecią lokalną (np. przez Tailscale). Pobierane są pliki '
-                'music.db, tag.db i files.db (pliki muzyki na serwerze).',
+                'Używany poza siecią lokalną. Pobierane są pliki '
+                'music.db, tag.db i files.db (lokalizacja plików na serwerze).',
             error: _remoteError,
             onSubmitted: () => _save(sync),
           ),
@@ -254,8 +254,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
             hint: DatabaseSync.defaultGitHubRepo,
             helper:
                 'Repozytorium (właściciel/nazwa), którego wydanie „database” zawiera '
-                'music.db i tag.db. Puste przywraca domyślne. Bez files.db — utwory z '
-                'serwera nadal wymagają serwera.',
+                'music.db i tag.db. Puste przywraca domyślne.',
             error: _gitHubError,
             enabled: sync.gitHubOn,
             onSubmitted: () => _save(sync),
@@ -374,7 +373,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
               'Baza jest pobierana automatycznie raz dziennie przy uruchomieniu aplikacji. '
               'W wybranej sieci Wi-Fi z adresu sieci lokalnej (a gdy ten nie odpowiada — z '
               'adresu zdalnego), poza nią z adresu zdalnego. Gdy żaden serwer nie odpowiada, '
-              'z GitHuba (tylko pliki, które się zmieniły). Rozpoznanie sieci wymaga '
+              'z GitHuba. Rozpoznanie sieci wymaga '
               'dostępu do lokalizacji i włączonej lokalizacji w telefonie.',
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,

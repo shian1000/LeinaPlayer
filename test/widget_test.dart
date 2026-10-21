@@ -58,6 +58,27 @@ void main() {
     expect(find.text('Premium'), findsNothing);
   });
 
+  testWidgets('a long press on Home and Odkrywaj explains them', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.longPress(find.text('Odkrywaj'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Przeglądanie muzyki po jednym utworze naraz.'),
+      findsOneWidget,
+    );
+    Navigator.of(tester.element(find.text('Jak działa'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Strona główna: rzędy z Twoją muzyką i propozycjami.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Home with nothing played and no database says so', (
     tester,
   ) async {
@@ -213,11 +234,8 @@ void main() {
       expect(find.text('1.2.3 (kompilacja 45)'), findsOneWidget);
       expect(find.text('Tylko do użytku prywatnego'), findsOneWidget);
       // The size section, then below it, further down than one screen.
-      await tester.scrollUntilVisible(
-        find.text('Dlaczego aplikacja tyle zajmuje'),
-        200,
-      );
-      expect(find.text('Dlaczego aplikacja tyle zajmuje'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Rozmiar aplikacji'), 200);
+      expect(find.text('Rozmiar aplikacji'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('Linki z YouTube i Spotify'),
         200,
@@ -508,13 +526,8 @@ void main() {
       find.byKey(DatabaseSourceScreen.remoteFieldKey),
       'ftp://serwer/',
     );
-    await tester.scrollUntilVisible(
-      find.text('Zapisz'),
-      200,
-      scrollable: settingsList,
-    );
-    await tester.pump();
-    await tester.tap(find.text('Zapisz'));
+    // Saved with the keyboard's "done": "Zapisz" lands under the bottom bar here.
+    await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(DatabaseSourceScreen.remoteFieldKey),

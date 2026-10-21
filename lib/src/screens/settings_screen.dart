@@ -229,7 +229,7 @@ const _sections = <(String, List<_SettingsEntry>)>[
       _SettingsEntry(
         Icons.privacy_tip_outlined,
         'Prywatność i połączenia',
-        'Z kim i po co łączy się aplikacja • Jak to wyłączyć',
+        'Z czym i po co łączy się aplikacja • Jak to wyłączyć',
         _openPrivacy,
         keywords: [
           'Prywatność',

@@ -216,14 +216,11 @@ class OutboxSettingsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Text(
-              'Telefon zgłasza MusicDatabase m.in. linki z bazy, których YouTube już nie '
-              'odtwarza, razem z filmem znalezionym w zamian. Wysyłanie automatyczne próbuje przy '
+              'Telefon zgłasza m.in. linki z bazy, których YouTube już nie '
+              'odtwarza, razem z filmem znalezionym w zamian. Wysyłka automatyczna następuje przy '
               'uruchomieniu i powrocie do aplikacji, pod te same adresy co pobieranie bazy. Gdy '
-              'serwer odmówi (pełna skrzynka odbiorcza, odłączony dysk), zgłoszenia czekają do '
-              'następnego dnia. Bez serwera zgłoszenia można wysłać paczką (plik .zip) osobie, '
-              'która prowadzi MusicDatabase — importuje się ją w Manage database › Import a '
-              'request package. Wysłane w paczce liczą się jako wysłane. W MusicDatabase przegląda się je '
-              'w Manage database › Resolve new requests.',
+              'serwer odmówi, zgłoszenia czekają do '
+              'następnego dnia. Bez serwera zgłoszenia można wysłać paczką (plik .zip).',
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,

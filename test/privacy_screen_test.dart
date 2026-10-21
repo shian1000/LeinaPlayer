@@ -56,7 +56,7 @@ void main() {
         'Okładki: iTunes, Deezer, miniatury YouTube',
         'LRCLIB: teksty piosenek',
         'Przeglądarka i „Udostępnij”',
-        'Kto widzi Twoje dane',
+        'Synchronizacja danych',
       ]) {
         expect(find.text(title), findsOneWidget);
       }

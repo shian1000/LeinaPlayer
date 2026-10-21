@@ -34,11 +34,6 @@ class SpotifySourceScreen extends StatelessWidget {
           SwitchListTile(
             secondary: const Icon(Icons.queue_music),
             title: const Text('Wyszukuj playlisty na Spotify'),
-            subtitle: Text(
-              settings.playlistSearch
-                  ? 'Przyciskiem wyszukiwania w internecie, razem z YouTube'
-                  : 'Wyłączone w filtrach wyszukiwania („Wyszukuj playlisty”)',
-            ),
             value: settings.spotifyPlaylistSearch,
             onChanged: settings.setSpotifyPlaylistSearch,
           ),
@@ -61,10 +56,9 @@ class SpotifySourceScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
-              'Z kluczem Twojej aplikacji Spotify (developer.spotify.com) playlisty są '
+              'Z kluczem API Spotify (developer.spotify.com) playlisty są '
               'wyszukiwane przez oficjalne Web API. Bez klucza — albo gdy API zawiedzie — '
-              'tak jak robi to odtwarzacz na open.spotify.com bez logowania; to nieoficjalne i '
-              'może przestać działać.',
+              'tak jak robi to odtwarzacz na open.spotify.com bez logowania.',
               style: hint,
             ),
           ),

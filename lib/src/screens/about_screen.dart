@@ -76,15 +76,7 @@ class AboutScreen extends StatelessWidget {
             'odtwarzaczem, co jest niezgodne z regulaminem YouTube i zasadami sklepów. '
             'Nie publikuj jej w Google Play ani w żadnym innym sklepie.',
           ),
-          paragraph(
-            'Można ją za darmo udostępniać wąskiemu gronu znajomych — razem z dostępem do '
-            'kodu źródłowego (link poniżej).',
-          ),
-          paragraph(
-            'Odtwarzanie i wyszukiwanie w YouTube może przestać działać po zmianach po '
-            'stronie YouTube. Naprawa wymaga wtedy nowej wersji aplikacji.',
-          ),
-          const SectionTitle('Dlaczego aplikacja tyle zajmuje'),
+          const SectionTitle('Rozmiar aplikacji'),
           paragraph(
             'Sama aplikacja to ok. 22 MB: silnik Flutter, którym rysuje ekran, i jej kod '
             'skompilowany do kodu maszynowego, razem z biblioteką NewPipe i silnikiem JavaScript '
@@ -124,9 +116,7 @@ class AboutScreen extends StatelessWidget {
           ),
           const SectionTitle('Licencja'),
           paragraph(
-            'GNU General Public License v3 (GPLv3) — wymaga tego biblioteka NewPipeExtractor, '
-            'z której korzysta odtwarzanie z YouTube na Androidzie. Każdy, kto dostaje '
-            'aplikację, ma prawo do jej kodu źródłowego na tej samej licencji.',
+            'GNU General Public License v3 (GPLv3)',
           ),
           ListTile(
             leading: const Icon(Icons.code),

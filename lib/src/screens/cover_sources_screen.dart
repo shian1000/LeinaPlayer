@@ -46,7 +46,7 @@ class _CoverSourcesScreenState extends State<CoverSourcesScreen> {
         header: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            'Okładka albumu pochodzi z pierwszego włączonego źródła od góry, które ją ma. '
+            'Okładka albumu jest pobierana z pierwszego dostępnego źródła. '
             'Przeciągnij, aby zmienić kolejność. Pobrane okładki: Oszczędzanie danych i tryb '
             'offline › Pamięć podręczna.',
             style: TextStyle(

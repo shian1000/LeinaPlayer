@@ -101,9 +101,7 @@ class PrivacyScreen extends StatelessWidget {
         children: [
           text(
             'Aplikacja nie ma reklam, analityki ani raportów o awariach. Łączy się z siecią '
-            'tylko wtedy, gdy wymaga tego funkcja, której używasz albo którą masz włączoną. '
-            'Każdy serwis, z którym się łączy, widzi adres IP telefonu — jak przy każdym '
-            'połączeniu w internecie.',
+            'tylko wtedy, gdy wymaga tego funkcja, której używasz albo którą masz włączoną.',
             strong: true,
           ),
           text(
@@ -117,8 +115,7 @@ class PrivacyScreen extends StatelessWidget {
             'Baza utworów, Twoje pliki muzyczne (źródło „Serwer”) i zgłoszenia poprawek. Po '
             'zalogowaniu także synchronizacja konta: playlisty, nastroje, foldery, okładki, '
             'polubione, „Na później”, linki na później (z imieniem nadawcy) i każde '
-            'odtworzenie — co, kiedy, jak długo i skąd. Właściciel serwera widzi wszystko, co '
-            'na niego trafia.',
+            'odtworzenie — co, kiedy, jak długo i skąd.',
           ),
           if (sync != null)
             sync.hasServer
@@ -137,8 +134,7 @@ class PrivacyScreen extends StatelessWidget {
           const SectionTitle('GitHub'),
           text(
             'Publiczna kopia bazy utworów (gdy żaden serwer nie odpowiada) i sprawdzanie, czy '
-            'jest nowa wersja aplikacji. Raz dziennie przy otwarciu. Nie wysyła nic o Tobie — '
-            'tylko samo zapytanie.',
+            'jest nowa wersja aplikacji. Raz dziennie przy otwarciu.',
           ),
           if (sync != null)
             statusOf([
@@ -272,18 +268,9 @@ class PrivacyScreen extends StatelessWidget {
           status(false, 'nie łączy się sama'),
           onlyWhenUsed(),
 
-          const SectionTitle('Kto widzi Twoje dane'),
+          const SectionTitle('Synchronizacja danych'),
           text(
-            '• Właściciel serwera MusicDatabase, z którym się łączysz — zgłoszenia, a po '
-            'zalogowaniu Twoją Bibliotekę i historię słuchania.',
-          ),
-          text(
-            '• Osoba, której wyślesz paczkę zgłoszeń — zgłoszenia podpisane nazwą, którą '
-            'wpisałeś.',
-          ),
-          text(
-            '• Nikt inny. Imiona osób, które przysłały linki „Na później”, zostają na telefonie '
-            '(po zalogowaniu także na serwerze) — te osoby nic nie dostają.',
+            '• Możesz synchronizować dane z MusicDatabase, a także wysyłać zgłoszenia o utworach.',
           ),
         ],
       ),

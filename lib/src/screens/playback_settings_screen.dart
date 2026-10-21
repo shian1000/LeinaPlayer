@@ -73,7 +73,7 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
-              'Utwór gra z pierwszego źródła w kolejności, które go ma; z YouTube — '
+              'Utwór gra z pierwszego źródła w kolejności, w którym jest dostępny; z YouTube — '
               'pierwszym włączonym sposobem, który zadziała. Zapisane utwory: Oszczędzanie '
               'danych i tryb offline › Pamięć podręczna.',
               style: TextStyle(
@@ -130,10 +130,7 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
               'Gdy utwór dobiega końca, następny z kolejki zaczyna się tyle sekund wcześniej: '
-              'jeden cichnie, a drugi narasta. Tylko gdy kolejka przechodzi dalej sama — '
-              '„Następny” i wybrany utwór włączają się od razu. Utwór z YouTube, który trzeba '
-              'jeszcze wyszukać lub połączyć, przenika krócej (albo wcale), więc najlepiej '
-              'działa z zapisanymi z wyprzedzeniem następnymi utworami (Pamięć podręczna).',
+              'jeden cichnie, a drugi narasta.',
               style: TextStyle(
                 color: palette.textSecondary,
                 fontSize: AppFontSize.small,

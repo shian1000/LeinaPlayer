@@ -60,12 +60,12 @@ class AppearanceScreen extends StatelessWidget {
           SwitchListTile(
             secondary: const Icon(Icons.contrast),
             title: const Text('Przełącz na tryb ciemny'),
-            subtitle: Text(
-              themes.followSystem
-                  ? 'Sterowane przez system (teraz: '
-                        '${systemIsDark ? 'tryb ciemny' : 'tryb jasny'})'
-                  : 'Wyłączone: tryb jasny • Włączone: tryb ciemny',
-            ),
+            subtitle: themes.followSystem
+                ? Text(
+                    'Sterowane przez system (teraz: '
+                    '${systemIsDark ? 'tryb ciemny' : 'tryb jasny'})',
+                  )
+                : null,
             value: themes.followSystem ? systemIsDark : themes.darkMode,
             onChanged: themes.followSystem ? null : themes.setDarkMode,
           ),

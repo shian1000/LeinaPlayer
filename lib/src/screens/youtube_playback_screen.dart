@@ -40,7 +40,7 @@ class YouTubePlaybackScreen extends StatelessWidget {
         'Obecnie YouTube odrzuca pobieranie tą metodą (błąd 403)',
       YouTubePlaybackMethod.ytDlpServer =>
         'Jeszcze niedostępne — serwer bazy danych tego nie obsługuje',
-      YouTubePlaybackMethod.youtubeApp => 'Film otwiera się w aplikacji YouTube (bez niej w przeglądarce), poza tą aplikacją',
+      YouTubePlaybackMethod.youtubeApp => 'Film otwiera się w oficjalnej aplikacji YouTube',
     };
     IconData icon(YouTubePlaybackMethod m) => switch (m) {
       YouTubePlaybackMethod.cache => Icons.offline_pin_outlined,

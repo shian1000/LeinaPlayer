@@ -16,10 +16,12 @@ import '../data/youtube_search.dart';
 import '../playback/playback_queue.dart';
 import '../playback/track_player.dart';
 import '../theme.dart';
+import '../widgets/feature_info.dart';
 import '../widgets/queue_toast.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/update_dialog.dart';
 import 'discover_screen.dart';
+import 'feature_infos.dart';
 import 'home_screen.dart';
 import 'library_screen.dart';
 import 'now_playing.dart';
@@ -339,6 +341,14 @@ class _BottomBar extends StatelessWidget {
                 Expanded(
                   child: InkResponse(
                     onTap: () => onTap(i),
+                    onLongPress: switch (i) {
+                      0 => () => showFeatureInfo(context, FeatureInfos.home),
+                      1 => () => showFeatureInfo(
+                        context,
+                        FeatureInfos.discover,
+                      ),
+                      _ => null,
+                    },
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

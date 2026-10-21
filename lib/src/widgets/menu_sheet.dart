@@ -10,6 +10,7 @@ class MenuSheetEntry {
     this.premium = false,
     this.onTap,
     this.submenu,
+    this.onLongPress,
   });
 
   final IconData icon;
@@ -23,6 +24,10 @@ class MenuSheetEntry {
   /// Its own options, unfolded under it in the same sheet ("Dodaj do playlisty ›") instead of
   /// opening another sheet (Juxtopposed's Spotify redesign); built when unfolded.
   final List<MenuSheetEntry> Function()? submenu;
+
+  /// What a long press does — an explanation of the option ([showFeatureInfo]), opened over
+  /// the menu.
+  final VoidCallback? onLongPress;
 }
 
 /// Bottom-sheet menu used for all context menus (⋮), the "Utwórz" sheet and sort options.
@@ -108,6 +113,7 @@ Future<void> showMenuSheet(
                               ? Icons.expand_less
                               : Icons.chevron_right,
                         ),
+                  onLongPress: entry.onLongPress,
                   onTap: entry.submenu != null
                       ? () => setState(
                           () => open = open == entry.label ? null : entry.label,

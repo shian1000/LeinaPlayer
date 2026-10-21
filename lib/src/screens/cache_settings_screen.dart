@@ -227,8 +227,7 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Text(
-              'Zajęte razem: ${_mb(cacheBytesOf(context))} MB. Dzięki temu utwory i okładki '
-              'działają także bez internetu.',
+              'Zajęte razem: ${_mb(cacheBytesOf(context))} MB.',
               style: hint,
             ),
           ),
@@ -251,8 +250,8 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
-                'Utwory i playlisty pobrane przyciskiem „Pobierz” zostają na telefonie bez '
-                'limitu, także po „Wyczyść”. Muzyka z telefonu się do nich nie liczy.',
+                'Utwory i playlisty pobrane przyciskiem „Pobierz” zostają na telefonie. '
+                'Muzyka z telefonu nie liczy się do limitu pamięci podręcznej.',
                 style: hint,
               ),
             ),
@@ -339,13 +338,6 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Text(
-              'Przydatne po zmianie sposobu wyszukiwania. Po każdym pobraniu bazy danych '
-              'telefon sam zapomina to, co baza już rozstrzyga (link do filmu albo N/A). '
-              '„Nie znaleziono” wygasa też samo po '
-              '${YouTubeLibrary.notFoundFor.inDays} dniach.',
-              style: hint,
-            ),
           ),
           if (covers != null) ...[
             const SectionTitle('Okładki'),

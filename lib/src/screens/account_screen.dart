@@ -149,12 +149,8 @@ class _AccountScreenState extends State<AccountScreen> {
                   title: Text(account.userName!),
                   subtitle: const Text('Zalogowano'),
                 ),
-                const _PlaylistSyncTile(),
-                const _MoodSyncTile(),
-                const _FolderSyncTile(),
-                const _ListenSyncTile(),
-                const _SavedSongSyncTile(),
-                const _LaterLinkSyncTile(),
+                const _SyncAllTile(),
+                const _PhoneOnlyRows(),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: const LogOutButton(),
@@ -341,205 +337,156 @@ class _YouTubeAccountSection extends StatelessWidget {
   }
 }
 
-/// How the account's playlists last synced with MusicDatabase, and "sync now".
-class _PlaylistSyncTile extends StatelessWidget {
-  const _PlaylistSyncTile();
+/// One part of the account that syncs with MusicDatabase, for [_SyncAllTile].
+typedef _SyncPart = ({
+  String name,
+  bool syncing,
+  PlaylistSyncResult? last,
+  Future<void> Function() sync,
+});
+
+/// "Synchronizuj": every part of the account that syncs with MusicDatabase (playlists, moods,
+/// folders, plays, liked and saved songs, links saved for later) in one row — how it last went
+/// and ⟳ to sync it all now; a long press explains what syncs where.
+class _SyncAllTile extends StatelessWidget {
+  const _SyncAllTile();
+
+  @override
+  Widget build(BuildContext context) {
+    Future<List<Uri>> servers() =>
+        DatabaseSyncScope.of(context).serverAddresses();
+    final playlists = PlaylistLibraryScope.maybeOf(context);
+    final moods = MoodLibraryScope.maybeOf(context);
+    final folders = LibraryFoldersScope.maybeOf(context);
+    final listens = ListeningLogScope.maybeOf(context);
+    final songs = SavedSongsSyncScope.maybeOf(context);
+    final links = LaterLinksScope.maybeOf(context);
+    final parts = <_SyncPart>[
+      if (playlists != null)
+        (
+          name: 'Playlisty',
+          syncing: playlists.syncing,
+          last: playlists.lastSync,
+          sync: () async => playlists.sync(await servers()),
+        ),
+      if (moods != null)
+        (
+          name: 'Nastroje',
+          syncing: moods.syncing,
+          last: moods.lastSync,
+          sync: () async {
+            final addresses = await servers();
+            if (!context.mounted) return;
+            await AccountScope.of(context).refreshPermissions(addresses);
+            await moods.sync(addresses);
+          },
+        ),
+      if (folders != null)
+        (
+          name: 'Foldery',
+          syncing: folders.syncing,
+          last: folders.lastSync,
+          sync: () async => folders.sync(await servers()),
+        ),
+      if (listens != null)
+        (
+          name: 'Statystyki słuchania',
+          syncing: listens.syncing,
+          last: listens.lastSync,
+          sync: () async => listens.sync(await servers()),
+        ),
+      if (songs != null)
+        (
+          name: 'Polubione i zapisane utwory',
+          syncing: songs.syncing,
+          last: songs.lastSync,
+          sync: () async => songs.sync(await servers()),
+        ),
+      if (links != null)
+        (
+          name: 'Linki na później',
+          syncing: links.syncing,
+          last: links.lastSync,
+          sync: () async => links.sync(await servers()),
+        ),
+    ];
+    if (parts.isEmpty) return const SizedBox.shrink();
+
+    final error = Theme.of(context).colorScheme.error;
+    String two(int n) => n.toString().padLeft(2, '0');
+    final syncing = parts.any((p) => p.syncing);
+    final failed = [
+      for (final p in parts)
+        if (p.last?.problem != null) p,
+    ];
+    final done = [for (final p in parts) p.last?.at].nonNulls.toList()..sort();
+    final String subtitle;
+    if (syncing) {
+      subtitle = 'Synchronizowanie…';
+    } else if (failed.isNotEmpty) {
+      subtitle =
+          '${failed.map((p) => p.name).join(', ')}: ${failed.first.last!.problem}';
+    } else if (done.isEmpty) {
+      subtitle = 'Jeszcze nie synchronizowano';
+    } else {
+      // The oldest one: everything has synced at least since then.
+      final at = done.first;
+      subtitle =
+          'Wszystko zsynchronizowane (najpóźniej o ${two(at.hour)}:${two(at.minute)})';
+    }
+
+    return ListTile(
+      leading: Icon(
+        failed.isEmpty ? Icons.sync : Icons.sync_problem,
+        color: failed.isEmpty ? null : error,
+      ),
+      title: const Text('Synchronizuj'),
+      subtitle: Text(subtitle),
+      onLongPress: () => showFeatureInfo(context, FeatureInfos.accountSync),
+      trailing: IconButton(
+        tooltip: 'Synchronizuj teraz',
+        icon: const Icon(Icons.refresh),
+        onPressed: syncing
+            ? null
+            : () async {
+                for (final part in parts) {
+                  await part.sync();
+                }
+              },
+      ),
+    );
+  }
+}
+
+/// "Playlisty / Nastroje / Foldery tylko na tym telefonie: N": made before logging in (or
+/// before they synced), added to the account when tapped.
+class _PhoneOnlyRows extends StatelessWidget {
+  const _PhoneOnlyRows();
 
   @override
   Widget build(BuildContext context) {
     final playlists = PlaylistLibraryScope.maybeOf(context);
-    if (playlists == null) return const SizedBox.shrink();
-    final phoneOnly = playlists.playlists
-        .where((p) => p.account == null)
-        .length;
-    final syncTile = _SyncTile(
-      title: 'Playlisty',
-      syncing: playlists.syncing,
-      last: playlists.lastSync,
-      onSync: () async =>
-          playlists.sync(await DatabaseSyncScope.of(context).serverAddresses()),
-    );
-    if (phoneOnly == 0) return syncTile;
-    // Also for a phone logged in before playlists synced, which was never asked.
-    return Column(
-      children: [
-        syncTile,
-        ListTile(
-          leading: const Icon(Icons.phone_android),
-          title: Text('Playlisty tylko na tym telefonie: $phoneOnly'),
-          subtitle: const Text('Dotknij, aby dodać je do konta'),
-          onTap: playlists.addPhoneOnlyToAccount,
-        ),
-      ],
-    );
-  }
-}
-
-/// How the account's moods last synced with MusicDatabase (with this phone's changes to global
-/// moods), and "sync now".
-class _MoodSyncTile extends StatelessWidget {
-  const _MoodSyncTile();
-
-  @override
-  Widget build(BuildContext context) {
     final moods = MoodLibraryScope.maybeOf(context);
-    if (moods == null) return const SizedBox.shrink();
-    final syncTile = _SyncTile(
-      title: 'Nastroje',
-      syncing: moods.syncing,
-      last: moods.lastSync,
-      onSync: () async {
-        final servers = await DatabaseSyncScope.of(context).serverAddresses();
-        if (!context.mounted) return;
-        await AccountScope.of(context).refreshPermissions(servers);
-        await moods.sync(servers);
-      },
-    );
-    final phoneOnly = moods.phoneOnlyCount;
-    if (phoneOnly == 0) return syncTile;
-    return Column(
-      children: [
-        syncTile,
-        ListTile(
-          leading: const Icon(Icons.phone_android),
-          title: Text('Nastroje tylko na tym telefonie: $phoneOnly'),
-          subtitle: const Text('Dotknij, aby dodać je do konta'),
-          onTap: moods.addPhoneOnlyToAccount,
-        ),
-      ],
-    );
-  }
-}
-
-/// How the account's Biblioteka folders last synced with MusicDatabase, and "sync now".
-class _FolderSyncTile extends StatelessWidget {
-  const _FolderSyncTile();
-
-  @override
-  Widget build(BuildContext context) {
     final folders = LibraryFoldersScope.maybeOf(context);
-    if (folders == null) return const SizedBox.shrink();
-    final syncTile = _SyncTile(
-      title: 'Foldery',
-      syncing: folders.syncing,
-      last: folders.lastSync,
-      onSync: () async =>
-          folders.sync(await DatabaseSyncScope.of(context).serverAddresses()),
+    final playlistCount =
+        playlists?.playlists.where((p) => p.account == null).length ?? 0;
+    final moodCount = moods?.phoneOnlyCount ?? 0;
+    final folderCount = folders?.phoneOnlyCount ?? 0;
+    Widget row(String what, int count, VoidCallback onTap) => ListTile(
+      leading: const Icon(Icons.phone_android),
+      title: Text('$what tylko na tym telefonie: $count'),
+      subtitle: const Text('Dotknij, aby dodać je do konta'),
+      onTap: onTap,
     );
-    final phoneOnly = folders.phoneOnlyCount;
-    if (phoneOnly == 0) return syncTile;
     return Column(
       children: [
-        syncTile,
-        ListTile(
-          leading: const Icon(Icons.phone_android),
-          title: Text('Foldery tylko na tym telefonie: $phoneOnly'),
-          subtitle: const Text('Dotknij, aby dodać je do konta'),
-          onTap: folders.addPhoneOnlyToAccount,
-        ),
+        if (playlistCount > 0)
+          row('Playlisty', playlistCount, playlists!.addPhoneOnlyToAccount),
+        if (moodCount > 0)
+          row('Nastroje', moodCount, moods!.addPhoneOnlyToAccount),
+        if (folderCount > 0)
+          row('Foldery', folderCount, folders!.addPhoneOnlyToAccount),
       ],
-    );
-  }
-}
-
-/// How the account's plays (the listening stats) last synced with MusicDatabase, and "sync
-/// now".
-class _ListenSyncTile extends StatelessWidget {
-  const _ListenSyncTile();
-
-  @override
-  Widget build(BuildContext context) {
-    final listens = ListeningLogScope.maybeOf(context);
-    if (listens == null) return const SizedBox.shrink();
-    return _SyncTile(
-      title: 'Statystyki słuchania',
-      info: FeatureInfos.listeningStatsSync,
-      syncing: listens.syncing,
-      last: listens.lastSync,
-      onSync: () async =>
-          listens.sync(await DatabaseSyncScope.of(context).serverAddresses()),
-    );
-  }
-}
-
-/// How liked songs and songs saved "Na później" last synced with MusicDatabase, and "sync now".
-class _SavedSongSyncTile extends StatelessWidget {
-  const _SavedSongSyncTile();
-
-  @override
-  Widget build(BuildContext context) {
-    final songs = SavedSongsSyncScope.maybeOf(context);
-    if (songs == null) return const SizedBox.shrink();
-    return _SyncTile(
-      title: 'Polubione i zapisane utwory',
-      syncing: songs.syncing,
-      last: songs.lastSync,
-      onSync: () async =>
-          songs.sync(await DatabaseSyncScope.of(context).serverAddresses()),
-    );
-  }
-}
-
-/// How the links saved "Na później" last synced with MusicDatabase, and "sync now".
-class _LaterLinkSyncTile extends StatelessWidget {
-  const _LaterLinkSyncTile();
-
-  @override
-  Widget build(BuildContext context) {
-    final links = LaterLinksScope.maybeOf(context);
-    if (links == null) return const SizedBox.shrink();
-    return _SyncTile(
-      title: 'Linki na później',
-      syncing: links.syncing,
-      last: links.lastSync,
-      onSync: () async =>
-          links.sync(await DatabaseSyncScope.of(context).serverAddresses()),
-    );
-  }
-}
-
-class _SyncTile extends StatelessWidget {
-  const _SyncTile({
-    required this.title,
-    required this.syncing,
-    required this.last,
-    required this.onSync,
-    this.info,
-  });
-
-  final String title;
-  final bool syncing;
-  final PlaylistSyncResult? last;
-  final VoidCallback onSync;
-
-  /// What a long press explains.
-  final FeatureInfo? info;
-
-  @override
-  Widget build(BuildContext context) {
-    final last = this.last;
-    final error = Theme.of(context).colorScheme.error;
-    String two(int n) => n.toString().padLeft(2, '0');
-    return ListTile(
-      leading: Icon(
-        last?.problem == null ? Icons.sync : Icons.sync_problem,
-        color: last?.problem == null ? null : error,
-      ),
-      title: Text(title),
-      onLongPress: info == null ? null : () => showFeatureInfo(context, info!),
-      subtitle: Text(
-        syncing
-            ? 'Synchronizowanie…'
-            : last == null
-            ? 'Jeszcze nie synchronizowano'
-            : last.problem ??
-                  'Zsynchronizowano o ${two(last.at.hour)}:${two(last.at.minute)}',
-      ),
-      trailing: IconButton(
-        tooltip: 'Synchronizuj teraz',
-        icon: const Icon(Icons.refresh),
-        onPressed: syncing ? null : onSync,
-      ),
     );
   }
 }

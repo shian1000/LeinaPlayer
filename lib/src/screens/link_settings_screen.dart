@@ -88,15 +88,7 @@ class _LinkSettingsScreenState extends State<LinkSettingsScreen> {
             ),
           paragraph(
             'Po kliknięciu linku z YouTube albo Spotify $appName pyta, czym go otworzyć: '
-            '$appName, aplikacją YouTube lub Spotify albo przeglądarką. Zaznaczając tam '
-            '„Zapamiętaj wybór” ustawiasz go tutaj.',
-          ),
-          const SectionTitle('W $appName'),
-          paragraph(
-            'Film z YouTube i utwór ze Spotify od razu grają — z telefonu albo z bazy danych, '
-            'jeśli jest tam ten utwór; utwór ze Spotify, którego nie ma, jest wyszukiwany na '
-            'YouTube. Playlista albo album trafia do Biblioteki. Tak samo działa wysłanie linku '
-            'do $appName przez „Udostępnij” — wtedy bez pytania.',
+            '$appName, aplikacją YouTube lub Spotify albo przeglądarką.',
           ),
           const SectionTitle('Ustawienia telefonu'),
           paragraph(

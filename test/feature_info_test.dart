@@ -104,4 +104,19 @@ void main() {
     expect(find.textContaining('W budowie'), findsOneWidget);
     expect(find.text('Z czym się łączy'), findsOneWidget);
   });
+
+  testWidgets('YouTube playlist search has a section of its own', (
+    tester,
+  ) async {
+    await show(tester, const YouTubeSourceScreen());
+    final playlists = tester.getTopLeft(find.text('Playlisty')).dy;
+    expect(
+      tester.getTopLeft(find.text('Wyszukuj playlisty na YouTube')).dy,
+      greaterThan(playlists),
+    );
+    expect(
+      tester.getTopLeft(find.text(YouTubeMethod.api.label)).dy,
+      lessThan(playlists),
+    );
+  });
 }
