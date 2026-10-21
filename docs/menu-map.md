@@ -460,6 +460,15 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
   Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków.
 
+## Explanations on a long press (`feature_info.dart`, texts in `feature_infos.dart`)
+
+A long press on these opens a sheet — what it is, what it's for, how it works, libraries, what it
+connects to, buttons (Prywatność i połączenia; Wyloguj z Google; Konto): Ustawienia › Konto ›
+the Google account's e-mail and the "Statystyki słuchania" sync row; Ja › Statystyki słuchania;
+Ustawienia › Serwer and › Zgłoszenia poprawek; Sposoby odtwarzania YouTube › NewPipeExtractor and
+youtube_explode; YouTube › NewPipeExtractor, youtube_explode and "Korzystaj z API"; Spotify ›
+Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce").
+
 ## Home (`home_screen.dart`)
 
 - Filters (**implemented**, not remembered): Wszystko, Utwory (the rows of songs: Ostatnio

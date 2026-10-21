@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
+import '../widgets/feature_info.dart';
+import 'feature_infos.dart';
 
 /// Short name of a playback method for lists ("1. Pamięć podręczna, 2. NewPipe, ...").
 String shortPlaybackLabel(YouTubePlaybackMethod m) => switch (m) {
@@ -82,6 +84,17 @@ class YouTubePlaybackScreen extends StatelessWidget {
                     leading: Icon(icon(method)),
                     title: Text(method.label),
                     subtitle: Text(note(method)),
+                    onLongPress: switch (method) {
+                      YouTubePlaybackMethod.newPipe => () => showFeatureInfo(
+                        context,
+                        FeatureInfos.newPipePlayback,
+                      ),
+                      YouTubePlaybackMethod.explode => () => showFeatureInfo(
+                        context,
+                        FeatureInfos.explodePlayback,
+                      ),
+                      _ => null,
+                    },
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

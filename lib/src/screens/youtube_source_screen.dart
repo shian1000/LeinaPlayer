@@ -4,6 +4,8 @@ import '../data/source_settings.dart';
 import '../data/youtube_search.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/feature_info.dart';
+import 'feature_infos.dart';
 
 /// "Ustawienia › YouTube": searching YouTube ([YouTubeMethod]s, tried top to bottom). Playing it
 /// is in Ustawienia › Odtwarzanie.
@@ -76,20 +78,29 @@ class YouTubeSourceScreen extends StatelessWidget {
             onChanged: enabled ? settings.setYouTubePlaylistSearch : null,
           ),
           for (final method in YouTubeMethod.values)
-            SwitchListTile(
-              secondary: Icon(switch (method) {
-                YouTubeMethod.newPipe => Icons.smartphone,
-                YouTubeMethod.explode => Icons.smartphone_outlined,
-                YouTubeMethod.ytDlpServer => Icons.dns_outlined,
-                YouTubeMethod.api => Icons.api,
-              }),
-              title: Text(method.label),
-              subtitle: Text(methodNote(method)),
-              value: settings.methods.contains(method),
-              onChanged:
-                  enabled && (method != YouTubeMethod.newPipe || newPipeSearch)
-                  ? (v) => settings.setMethod(method, v)
-                  : null,
+            _LongPressInfo(
+              info: switch (method) {
+                YouTubeMethod.newPipe => FeatureInfos.newPipeSearch,
+                YouTubeMethod.explode => FeatureInfos.explodeSearch,
+                YouTubeMethod.api => FeatureInfos.youTubeApi,
+                YouTubeMethod.ytDlpServer => null,
+              },
+              child: SwitchListTile(
+                secondary: Icon(switch (method) {
+                  YouTubeMethod.newPipe => Icons.smartphone,
+                  YouTubeMethod.explode => Icons.smartphone_outlined,
+                  YouTubeMethod.ytDlpServer => Icons.dns_outlined,
+                  YouTubeMethod.api => Icons.api,
+                }),
+                title: Text(method.label),
+                subtitle: Text(methodNote(method)),
+                value: settings.methods.contains(method),
+                onChanged:
+                    enabled &&
+                        (method != YouTubeMethod.newPipe || newPipeSearch)
+                    ? (v) => settings.setMethod(method, v)
+                    : null,
+              ),
             ),
           ListTile(
             leading: const Icon(Icons.key),
@@ -116,3 +127,21 @@ class YouTubeSourceScreen extends StatelessWidget {
 /// Only the last characters, so the key isn't shown in full on screen.
 String _masked(String key) =>
     key.length <= 4 ? '••••' : '••••${key.substring(key.length - 4)}';
+
+/// A long press on [child] explains it ([info]); switch rows have no onLongPress of their own.
+class _LongPressInfo extends StatelessWidget {
+  const _LongPressInfo({required this.info, required this.child});
+
+  final FeatureInfo? info;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final info = this.info;
+    if (info == null) return child;
+    return GestureDetector(
+      onLongPress: () => showFeatureInfo(context, info),
+      child: child,
+    );
+  }
+}

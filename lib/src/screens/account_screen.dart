@@ -10,6 +10,8 @@ import '../data/playlist_library.dart';
 import '../data/playlist_sync.dart';
 import '../data/saved_songs.dart';
 import '../data/youtube_account.dart';
+import '../widgets/feature_info.dart';
+import 'feature_infos.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -327,6 +329,8 @@ class _YouTubeAccountSection extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.smart_display_outlined),
           title: Text(email),
+          onLongPress: () =>
+              showFeatureInfo(context, FeatureInfos.googleAccount),
           trailing: TextButton(
             onPressed: account.signOut,
             child: const Text('Wyloguj'),
@@ -449,6 +453,7 @@ class _ListenSyncTile extends StatelessWidget {
     if (listens == null) return const SizedBox.shrink();
     return _SyncTile(
       title: 'Statystyki słuchania',
+      info: FeatureInfos.listeningStatsSync,
       syncing: listens.syncing,
       last: listens.lastSync,
       onSync: () async =>
@@ -499,12 +504,16 @@ class _SyncTile extends StatelessWidget {
     required this.syncing,
     required this.last,
     required this.onSync,
+    this.info,
   });
 
   final String title;
   final bool syncing;
   final PlaylistSyncResult? last;
   final VoidCallback onSync;
+
+  /// What a long press explains.
+  final FeatureInfo? info;
 
   @override
   Widget build(BuildContext context) {
@@ -517,6 +526,7 @@ class _SyncTile extends StatelessWidget {
         color: last?.problem == null ? null : error,
       ),
       title: Text(title),
+      onLongPress: info == null ? null : () => showFeatureInfo(context, info!),
       subtitle: Text(
         syncing
             ? 'Synchronizowanie…'

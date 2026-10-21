@@ -198,7 +198,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog`, `pluralWord` (Polish plurals) and
   `dayMonthLabel` in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
-  `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `update_dialog.dart` — "Dostępna nowa wersja"; `song_names.dart` — `shownTitle` / `shownArtist` /
+  `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `update_dialog.dart` — "Dostępna nowa wersja"; `feature_info.dart` — the long-press explanation sheet (`showFeatureInfo`, texts in `screens/feature_infos.dart`); `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files from a server or GitHub (`database_sync.dart`), reading
   `music.db` and `files.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
@@ -314,6 +314,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   the lyrics got "Pobieraj teksty piosenek" for it). Each section's "Teraz: …" line is computed
   from those switches (accent = connects, the theme's error red = doesn't) — a new switch must
   feed it.
+- Some elements explain themselves on a long press (`showFeatureInfo`, texts in
+  `screens/feature_infos.dart`: what it is, what for, how it works, libraries, connections) —
+  only ones the user picked, and only where a long press isn't already used. The texts were
+  reviewed by the user: a change to how one of those features works updates its text in the
+  same change; something not tried in practice says so in `note` ("W budowie…").
 - No dummy elements: a feature is built or its button is left out (user's decision; the old
   `showDummy` / `Atrapa:` snackbar is gone). A `MenuSheetEntry` needs an `onTap` unless it has a
   `submenu`.

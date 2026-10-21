@@ -15,7 +15,9 @@ import 'link_settings_screen.dart';
 import 'local_music_screen.dart';
 import 'outbox_settings_screen.dart';
 import 'playback_settings_screen.dart';
+import 'feature_infos.dart';
 import 'privacy_screen.dart';
+import '../widgets/feature_info.dart';
 import 'spotify_source_screen.dart';
 import 'youtube_source_screen.dart';
 
@@ -27,6 +29,7 @@ class _SettingsEntry {
     this.opens, {
     this.keywords = const [],
     this.deeper = const [],
+    this.info,
   });
 
   final IconData icon;
@@ -39,7 +42,14 @@ class _SettingsEntry {
 
   /// Screens opened from its screen, with their own settings.
   final List<_SettingsEntry> deeper;
+
+  /// What a long press explains (a function: the texts aren't constants).
+  final FeatureInfo Function()? info;
 }
+
+FeatureInfo _serverInfo() => FeatureInfos.server;
+
+FeatureInfo _outboxInfo() => FeatureInfos.outbox;
 
 /// The entries under their section headers.
 const _sections = <(String, List<_SettingsEntry>)>[
@@ -64,6 +74,7 @@ const _sections = <(String, List<_SettingsEntry>)>[
         'Serwer',
         'Adresy serwera • Wi-Fi sieci lokalnej • Pobieranie bazy',
         _openServer,
+        info: _serverInfo,
         keywords: [
           'Adres serwera (połączenie zdalne)',
           'Adres serwera (sieć lokalna)',
@@ -76,6 +87,7 @@ const _sections = <(String, List<_SettingsEntry>)>[
         'Zgłoszenia poprawek',
         'Wysyłanie automatyczne • Czeka na wysłanie',
         _openOutbox,
+        info: _outboxInfo,
         keywords: [
           'Wysyłaj zgłoszenia poprawek automatycznie',
           'Ostatnie wysyłanie',
@@ -310,6 +322,9 @@ class SettingsScreen extends StatelessWidget {
                 leading: Icon(entry.icon, size: 28),
                 title: Text(entry.title),
                 subtitle: Text(entry.subtitle),
+                onLongPress: entry.info == null
+                    ? null
+                    : () => showFeatureInfo(context, entry.info!()),
                 onTap: () =>
                     Navigator.of(context)
                         .push(MaterialPageRoute<void>(builder: entry.opens)),

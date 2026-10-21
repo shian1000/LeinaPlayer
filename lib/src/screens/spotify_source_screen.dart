@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/source_settings.dart';
 import '../data/spotify_playlist.dart';
 import '../theme.dart';
+import '../widgets/feature_info.dart';
+import 'feature_infos.dart';
 import '../widgets/common.dart';
 
 /// "Ustawienia › Spotify": searching for Spotify playlists and where they come
@@ -43,6 +45,8 @@ class SpotifySourceScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.api),
             title: const Text('Spotify API'),
+            onLongPress: () =>
+                showFeatureInfo(context, FeatureInfos.spotifyApi),
             subtitle: Text(
               settings.spotifyApiKey == null
                   ? 'Nie ustawiono — wyszukiwanie bez klucza'

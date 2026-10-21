@@ -58,3 +58,4 @@ app.*.map.json
 /tool/release.env
 /docs/tabela-funkcji.md
 /docs/tabela-funkcji.xlsx
+/docs/opisy-przytrzymania.xlsx

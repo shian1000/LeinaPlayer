@@ -8,6 +8,8 @@ import '../data/listening_log.dart';
 import '../data/listening_summary.dart';
 import '../data/song_catalog.dart';
 import '../theme.dart';
+import '../widgets/feature_info.dart';
+import 'feature_infos.dart';
 import '../widgets/common.dart';
 import 'account_screen.dart';
 import 'later_links_screen.dart';
@@ -174,6 +176,8 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.show_chart,
             label: 'Statystyki słuchania',
             onTap: () => push(const ListeningStatsScreen()),
+            onLongPress: () =>
+                showFeatureInfo(context, FeatureInfos.listeningStats),
           ),
           _Row(
             icon: Icons.settings_outlined,
@@ -214,12 +218,14 @@ class _Row extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.subtitle,
+    this.onLongPress,
   });
 
   final IconData icon;
   final String label;
   final String? subtitle;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) => ListTile(
@@ -229,5 +235,6 @@ class _Row extends StatelessWidget {
     subtitle: subtitle == null ? null : Text(subtitle!),
     trailing: const Icon(Icons.chevron_right),
     onTap: onTap,
+    onLongPress: onLongPress,
   );
 }
