@@ -310,6 +310,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   shows, not for a notifier's field: `PlaylistLibrary.load` sets `playlists` before its second
   query and its `notifyListeners`, so waiting on the field let the test check the screen too
   early (and `find.text` also matches an open dialog's `TextField`).
+- After `tester.scrollUntilVisible(…)` call `await tester.pump()` before tapping what it found:
+  it ends with an `ensureVisible` jump but draws no frame, so `tap` aims where the last drag left
+  the widget. Where that is can depend on the screen's content — the listening stats test
+  failed only at 12:xx (a drag starting on the hour chart's bar lost its touch slop to the
+  bar's `Tooltip`, leaving the card under the app bar).
 - For UI changes, actually run the app and look at it — a green test suite does not confirm the
   screen looks right. Use the `run-on-physical-phone` skill (release build on the USB Huawei, with
   the Gradle memory precautions) or `share-build-tailscale` for the user's Pixel 7a; check screens
