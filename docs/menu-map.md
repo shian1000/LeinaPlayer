@@ -128,7 +128,8 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
     gap-fill while MusicDatabase has none) — time-synced lines follow the song, the current one
     bold and kept in view inside the card, tapping a line jumps there; else the plain text;
     "Szukam tekstu…", "Nie znalazłem tekstu tego utworu.", "Utwór instrumentalny." or no
-    connection with "Spróbuj ponownie"; "Teksty: LRCLIB" under it. Then Informacje o utworze.
+    connection with "Spróbuj ponownie"; "Teksty: LRCLIB" under it. Not shown at all (and LRCLIB
+    never asked) with Oszczędzanie danych › "Pobieraj teksty piosenek" off. Then Informacje o utworze.
   - Kolejka
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
     e.g. by caching ahead): opens at "Teraz odtwarzane"; scrolled up, "Poprzednie" — the last
@@ -393,6 +394,8 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   (`data_saver_screen.dart`) — **implemented**: "Zapisuj następne utwory z kolejki tylko przez
   Wi-Fi" (off by default; Wi-Fi = the phone has a Wi-Fi IP address), "Pobieraj okładki tylko
   przez Wi-Fi" (off by default; on cellular only cached covers and covers inside phone files show),
+  "Pobieraj teksty piosenek" (on by default; off hides the full player's lyrics card and never
+  asks LRCLIB — `SourceSettings.lyrics`),
   Pamięć podręczna **→ Pamięć podręczna** (`cache_settings_screen.dart`; subtitle: MB used in
   total) — every cache setting, nowhere else ("Pamięć podręczna" is the one name used in the UI):
   - "Zajęte razem: X MB" (with the downloaded songs).
@@ -434,6 +437,14 @@ telefonie: N" adds them when tapped ([ADR 0007](decisions/0007-playlist-sync.md)
   "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
   app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
   [`agent-notes/youtube.md`](agent-notes/youtube.md)).
+- Prywatność i połączenia **→ Prywatność i połączenia** (`privacy_screen.dart`) — **implemented**:
+  no ads / analytics / crash reports; what stays on the phone; then one section per service the
+  app talks to (Serwer MusicDatabase, GitHub, YouTube, Konto Google, Spotify, Okładki: iTunes,
+  Deezer, miniatury YouTube, LRCLIB, Przeglądarka i „Udostępnij”) — why, when, what it gets, a
+  "Teraz: …" line where there's a state (server set / logged in, GitHub and updates on, Google
+  account, lyrics on), and rows that open the screen with its switch (Serwer, Konto, Kolejność
+  odtwarzania, YouTube, Pamięć podręczna, Spotify, Źródła okładek, Oszczędzanie danych,
+  Informacje i pomoc) or "Tylko gdy sam tego użyjesz"; last "Kto widzi Twoje dane".
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: the
   version at the top ("Leina Radio — wersja": `version` from `pubspec.yaml`, the build number
   and commit, e.g. "1.0.0 (kompilacja 26, c11e6c4+zmiany)" — see `tool/build_release_apk.sh`); then,

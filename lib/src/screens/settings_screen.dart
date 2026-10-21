@@ -15,6 +15,7 @@ import 'link_settings_screen.dart';
 import 'local_music_screen.dart';
 import 'outbox_settings_screen.dart';
 import 'playback_settings_screen.dart';
+import 'privacy_screen.dart';
 import 'spotify_source_screen.dart';
 import 'youtube_source_screen.dart';
 
@@ -170,7 +171,7 @@ const _sections = <(String, List<_SettingsEntry>)>[
       _SettingsEntry(
         Icons.download_for_offline_outlined,
         'Oszczędzanie danych i tryb offline',
-        'Tylko przez Wi-Fi • Pamięć podręczna',
+        'Tylko przez Wi-Fi • Teksty piosenek • Pamięć podręczna',
         _openDataSaver,
         deeper: [
           _SettingsEntry(
@@ -192,7 +193,10 @@ const _sections = <(String, List<_SettingsEntry>)>[
             ],
           ),
         ],
-        keywords: ['Pobieraj okładki tylko przez Wi-Fi'],
+        keywords: [
+          'Pobieraj okładki tylko przez Wi-Fi',
+          'Pobieraj teksty piosenek',
+        ],
       ),
     ],
   ),
@@ -208,6 +212,19 @@ const _sections = <(String, List<_SettingsEntry>)>[
           'Linki YouTube',
           'Linki Spotify',
           'Otwieraj linki w Leina Radio',
+        ],
+      ),
+      _SettingsEntry(
+        Icons.privacy_tip_outlined,
+        'Prywatność i połączenia',
+        'Z kim i po co łączy się aplikacja • Jak to wyłączyć',
+        _openPrivacy,
+        keywords: [
+          'Prywatność',
+          'Połączenia z internetem',
+          'Kto widzi moje dane',
+          'NewPipe',
+          'LRCLIB',
         ],
       ),
       _SettingsEntry(
@@ -254,6 +271,8 @@ Widget _openCache(BuildContext context) => const CacheSettingsScreen();
 Widget _openLinks(BuildContext context) => const LinkSettingsScreen();
 
 Widget _openAbout(BuildContext context) => const AboutScreen();
+
+Widget _openPrivacy(BuildContext context) => const PrivacyScreen();
 
 /// "Ustawienia", opened from "Ja".
 class SettingsScreen extends StatelessWidget {

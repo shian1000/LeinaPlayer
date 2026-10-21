@@ -14,7 +14,7 @@ String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 /// next songs (downloaded into that audio cache), songs kept with "Pobierz" and album covers, in
 /// bytes.
 int cacheBytesOf(BuildContext context) =>
-    YouTubeLibraryScope.of(context).cachedBytes +
+    (YouTubeLibraryScope.maybeOf(context)?.cachedBytes ?? 0) +
     (DownloadsScope.maybeOf(context)?.bytes ?? 0) +
     (AlbumCoversScope.maybeOf(context)?.cachedBytes ?? 0);
 

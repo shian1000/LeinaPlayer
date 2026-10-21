@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/lyrics.dart';
+import '../data/source_settings.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
 import '../data/saved_songs.dart';
@@ -876,8 +877,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   ),
                   // The lyrics peek out under the player; the song's details below them.
                   if (queue.current != null) ...[
-                    const _LyricsCard(),
-                    const SizedBox(height: 16),
+                    if (SourceSettingsScope.maybeOf(context)?.lyrics ??
+                        true) ...[
+                      const _LyricsCard(),
+                      const SizedBox(height: 16),
+                    ],
                     SongInfoCard(hit: queue.current!, track: track),
                   ],
                   const SizedBox(height: 24),

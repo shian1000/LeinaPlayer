@@ -56,3 +56,5 @@ app.*.map.json
 
 # Build-time settings pointing at the owner's services (tool/release.env.example)
 /tool/release.env
+/docs/tabela-funkcji.md
+/docs/tabela-funkcji.xlsx

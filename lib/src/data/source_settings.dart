@@ -109,6 +109,7 @@ class SourceSettings extends ChangeNotifier {
   static const _coverCacheLimitKey = 'covers.cache_limit_mb';
   static const defaultCoverCacheLimitMb = 100;
   static const _coverWifiOnlyKey = 'data_saver.covers_wifi_only';
+  static const _lyricsKey = 'data_saver.lyrics';
   static const _crossfadeKey = 'playback.crossfade_seconds';
 
   /// The longest "Przenikanie utworów", as in the reference app.
@@ -136,6 +137,7 @@ class SourceSettings extends ChangeNotifier {
   Set<CoverSource> _coverSources = CoverSource.defaults;
   int _coverCacheLimitMb = defaultCoverCacheLimitMb;
   bool _coverWifiOnly = false;
+  bool _lyrics = true;
   int _crossfadeSeconds = 0;
 
   /// "Włącz szukanie w serwisie YouTube".
@@ -233,6 +235,10 @@ class SourceSettings extends ChangeNotifier {
   /// Download covers only on Wi-Fi (Oszczędzanie danych i tryb offline); cached ones still show.
   bool get coverWifiOnly => _coverWifiOnly;
 
+  /// Whether the full player looks up lyrics on LRCLIB (the only way it reaches LRCLIB); off
+  /// hides the lyrics card altogether.
+  bool get lyrics => _lyrics;
+
   /// How many files the cache really keeps: never so few that songs cached ahead for the queue
   /// push out the one playing (or each other) before they're played.
   int get cacheKeep => activeQueuePrefetch == 0
@@ -277,6 +283,7 @@ class SourceSettings extends ChangeNotifier {
     _coverCacheLimitMb =
         prefs.getInt(_coverCacheLimitKey) ?? _coverCacheLimitMb;
     _coverWifiOnly = prefs.getBool(_coverWifiOnlyKey) ?? _coverWifiOnly;
+    _lyrics = prefs.getBool(_lyricsKey) ?? _lyrics;
     _crossfadeSeconds = (prefs.getInt(_crossfadeKey) ?? _crossfadeSeconds)
         .clamp(0, maxCrossfadeSeconds);
     _playbackMethodOrder = _withAll(
@@ -483,6 +490,12 @@ class SourceSettings extends ChangeNotifier {
       _coverCacheLimitKey,
       _coverCacheLimitMb,
     );
+  }
+
+  Future<void> setLyrics(bool value) async {
+    _lyrics = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(_lyricsKey, value);
   }
 
   Future<void> setCoverWifiOnly(bool value) async {

@@ -41,6 +41,16 @@ class DataSaverScreen extends StatelessWidget {
             value: settings.coverWifiOnly,
             onChanged: settings.setCoverWifiOnly,
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.lyrics_outlined),
+            title: const Text('Pobieraj teksty piosenek'),
+            subtitle: const Text(
+              'Z serwisu LRCLIB, gdy otwarty jest odtwarzacz. Wyłączone: bez karty z tekstem '
+              'i bez połączeń z LRCLIB',
+            ),
+            value: settings.lyrics,
+            onChanged: settings.setLyrics,
+          ),
           const Divider(height: 24),
           ListTile(
             leading: const Icon(Icons.sd_storage_outlined),

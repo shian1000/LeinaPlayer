@@ -85,6 +85,8 @@ Changing a song's artist there is a proposal of another artist for that song (`s
 with a name), never a rename of the shared artist row — that's the separate "Popraw pisownię
 nazwy" ([hand-off](docs/handoffs/musicdatabase-song-artist.md)), which asks first when the new
 name doesn't resemble the old one (`nameResembles`).
+Ustawienia › Prywatność i połączenia lists every service the app talks to (no analytics or
+ads), with a way to each switch; the lyrics can be switched off (Oszczędzanie danych).
 New versions come as GitHub releases of this repo; a build with `tool/release.env` checks them
 once a day and offers a newer one in a dialog, downloaded through the browser
 ([`releases.md`](docs/agent-notes/releases.md), `app_updates.dart`).
@@ -305,6 +307,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Context menus are `showMenuSheet`: rare options go in `quickEntries` (a small block on top),
   and options with choices of their own unfold in place via `MenuSheetEntry.submenu` rather than
   opening a second sheet (Juxtopposed's redesign, user's choice).
+- Every connection the app makes is listed on Ustawienia › Prywatność i połączenia
+  (`privacy_screen.dart`) with why, when and what it sends, and with a way to the switch that
+  stops it (or "Tylko gdy sam tego użyjesz") — a new service or a new kind of data sent goes
+  there in the same change, and a new automatic connection gets a switch (user's rule;
+  the lyrics got "Pobieraj teksty piosenek" for it).
 - No dummy elements: a feature is built or its button is left out (user's decision; the old
   `showDummy` / `Atrapa:` snackbar is gone). A `MenuSheetEntry` needs an `onTap` unless it has a
   `submenu`.
