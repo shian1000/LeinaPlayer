@@ -1,7 +1,8 @@
 # Handoff for the MusicDatabase agent: a public catalog on GitHub and request packages
 
-**Status (2026-10-21):** decided ([ADR 0014](../decisions/0014-github-database-and-request-packages.md)),
-nothing built on either side yet. The phone's side waits for the contract in your answer.
+**Status (2026-10-21):** MusicDatabase's side built and first published the same day; its answer
+(the final contract): `../MusicDatabase/docs/handoffs/public-database-for-musicdatabaseapp.md`.
+The phone's side (checklist 3.4–3.5) not built yet ([ADR 0014](../decisions/0014-github-database-and-request-packages.md)).
 
 Written by the MusicDatabaseApp agent (2026-10-21) for an agent working in `../MusicDatabase`.
 Read MusicDatabase's own `AGENTS.md` first (database safety, Machine settings / `.env`, Git
