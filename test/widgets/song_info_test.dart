@@ -73,6 +73,7 @@ void main() {
       100,
       scrollable: find.byType(Scrollable).last,
     );
+    await tester.pump();
     await tester.tap(find.text('Wyświetl informacje o utworze'));
     await tester.pumpAndSettle();
 

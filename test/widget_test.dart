@@ -160,6 +160,7 @@ void main() {
     await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await scrollSettingsTo(tester, 'Otwieranie linków');
@@ -197,6 +198,7 @@ void main() {
       await tester.tap(find.text('Ja'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+      await tester.pump();
       await tester.tap(find.text('Ustawienia'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('Informacje i pomoc'), 200);
@@ -250,6 +252,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
 
@@ -264,6 +267,7 @@ void main() {
     await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
 
@@ -320,6 +324,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+      await tester.pump();
       await tester.tap(find.text('Ustawienia'));
       await tester.pumpAndSettle();
       await scrollSettingsTo(tester, 'Wygląd');
@@ -372,6 +377,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Muzyka na telefonie'));
@@ -396,6 +402,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await scrollSettingsTo(tester, 'YouTube');
@@ -458,6 +465,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Serwer'));
