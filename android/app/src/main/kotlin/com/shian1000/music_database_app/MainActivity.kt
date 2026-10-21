@@ -127,6 +127,15 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
                     .apply()
                 result.success(null)
             }
+            // For "Zgłoś problem": which phone and Android a report comes from.
+            "deviceInfo" -> result.success(
+                mapOf(
+                    "manufacturer" to android.os.Build.MANUFACTURER,
+                    "model" to android.os.Build.MODEL,
+                    "release" to android.os.Build.VERSION.RELEASE,
+                    "sdk" to android.os.Build.VERSION.SDK_INT,
+                ),
+            )
             "laterLinks" -> result.success(LaterLinks.all(context))
             "addLaterPerson" -> result.success(
                 LaterLinks.addPerson(context, call.argument<String>("name")!!),

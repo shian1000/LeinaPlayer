@@ -263,7 +263,9 @@ class PrivacyScreen extends StatelessWidget {
           text(
             'Linki w Informacjach o utworze (MusicBrainz, Apple Music, Deezer, Spotify), kod '
             'źródłowy i pobranie nowej wersji otwierają się w przeglądarce. Paczka zgłoszeń, '
-            'linki i podsumowania trafiają do aplikacji, którą wybierzesz w „Udostępnij”.',
+            'raport problemu (wersja aplikacji, model telefonu, Twój opis i dziennik błędów), '
+            'linki i podsumowania trafiają do aplikacji, którą wybierzesz w „Udostępnij”. '
+            'Dziennik błędów jest zapisywany tylko na telefonie (ostatnie 14 dni).',
           ),
           status(false, 'nie łączy się sama'),
           onlyWhenUsed(),

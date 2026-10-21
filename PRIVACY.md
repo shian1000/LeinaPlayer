@@ -29,7 +29,7 @@ as they appear in it.)
 | **Spotify** | importing playlists, albums and tracks from links; searching Spotify playlists | when you open a Spotify link or search for playlists | the playlist / album / track id or the text you search for (and your API key, if you enter one) | Ustawienia › Spotify |
 | **iTunes (Apple), Deezer, YouTube thumbnails** | album covers | for songs without a cover in the file (the result is cached) | artist and album (or title), or a video id | Ustawienia › Okładki albumów (each source separately); Oszczędzanie danych › Wi-Fi only |
 | **LRCLIB** (a community project) | song lyrics | while the full player is open | title, artist, album and length of the song | Oszczędzanie danych › "Pobieraj teksty piosenek" |
-| **Browser and "Udostępnij" (share)** | links (MusicBrainz, Apple Music, Deezer, Spotify, GitHub), the correction-report package, shared links and summaries | only when you tap them | whatever you choose | — |
+| **Browser and "Udostępnij" (share)** | links (MusicBrainz, Apple Music, Deezer, Spotify, GitHub), the correction-report package, a problem report ("Zgłoś problem": app version, phone model, Android version, your description and the error log), shared links and summaries | only when you tap them | whatever you choose | — |
 
 ## Who sees your data
 
@@ -45,6 +45,10 @@ as they appear in it.)
 - On the phone, in the app's data: Android Settings › Apps › Leina Radio › Storage › "Clear
   data" deletes everything (as does uninstalling). The cache alone (songs, covers) is cleared in
   the app: Oszczędzanie danych › Pamięć podręczna.
+- The error log ("Dziennik błędów") — what went wrong in the app over the last 14 days, for
+  problem reports — is kept only on the phone, with tokens and passwords cut out; it leaves the
+  phone only in a report you send yourself. Informacje i pomoc › Dziennik błędów shows and clears
+  it.
 - On a MusicDatabase server: with its owner — deleting an account's data is arranged with them.
 
 ## Keys and passwords

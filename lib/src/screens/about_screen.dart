@@ -5,10 +5,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../app_name.dart';
 import '../data/app_updates.dart';
+import '../data/error_log.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/update_dialog.dart';
 import 'cache_settings_screen.dart';
+import 'error_log_screen.dart';
+import 'problem_report_screen.dart';
 
 /// "Ustawienia › Informacje i pomoc": the app's version and the terms it may be shared under.
 /// Mostly a reminder for the owner — the app is for private use only and must never go to an
@@ -76,6 +79,37 @@ class AboutScreen extends StatelessWidget {
             'odtwarzaczem, co jest niezgodne z regulaminem YouTube i zasadami sklepów. '
             'Nie publikuj jej w Google Play ani w żadnym innym sklepie.',
           ),
+          const SectionTitle('Problemy'),
+          ListTile(
+            leading: const Icon(Icons.bug_report_outlined),
+            title: const Text('Zgłoś problem'),
+            subtitle: const Text(
+              'Raport z wersją, telefonem i ostatnimi błędami — wysyłasz go sam',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ProblemReportScreen(),
+              ),
+            ),
+          ),
+          ListenableBuilder(
+            listenable: ErrorLog.instance,
+            builder: (context, _) => ListTile(
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('Dziennik błędów'),
+              subtitle: Text(
+                ErrorLog.instance.entries.isEmpty
+                    ? 'Pusty'
+                    : 'Wpisów: ${ErrorLog.instance.entries.length} '
+                          '(ostatnie ${ErrorLog.keepFor.inDays} dni, tylko na telefonie)',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const ErrorLogScreen()),
+              ),
+            ),
+          ),
           const SectionTitle('Rozmiar aplikacji'),
           paragraph(
             'Sama aplikacja to ok. 22 MB: silnik Flutter, którym rysuje ekran, i jej kod '
@@ -115,9 +149,7 @@ class AboutScreen extends StatelessWidget {
             '$appName: Ustawienia › Otwieranie linków.',
           ),
           const SectionTitle('Licencja'),
-          paragraph(
-            'GNU General Public License v3 (GPLv3)',
-          ),
+          paragraph('GNU General Public License v3 (GPLv3)'),
           ListTile(
             leading: const Icon(Icons.code),
             title: const Text('Kod źródłowy'),

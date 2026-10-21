@@ -10,6 +10,7 @@ import 'src/data/album_covers.dart';
 import 'src/data/app_updates.dart';
 import 'src/data/custom_covers.dart';
 import 'src/data/database_sync.dart';
+import 'src/data/error_log.dart';
 import 'src/data/incoming_links.dart';
 import 'src/data/home_layout.dart';
 import 'src/data/later_links.dart';
@@ -46,6 +47,13 @@ import 'src/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // From the very start, so start-up failures can be reported too ("Zgłoś problem").
+  ErrorLog.captureApp();
+  unawaited(
+    ErrorLog.instance.load().catchError(
+      (Object e) => debugPrint('Reading the error log failed: $e'),
+    ),
+  );
   // Media notification, lock-screen and headset controls; while music plays, the foreground
   // service behind them keeps Android from killing the app.
   MediaSession? mediaSession;

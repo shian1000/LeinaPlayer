@@ -460,7 +460,11 @@ import, Wyświetlanie, Dane, Aplikacja.
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
-  Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków, and "Rozmiar
+  Section "Problemy": **Zgłoś problem** (`problem_report_screen.dart`: "Co się stało?" field, a
+  note on what the report holds, "Wyślij" → a `.txt` through "Udostępnij", "Podgląd raportu" —
+  version, build, commit, small/large APK, phone model, Android, the description, the error log)
+  and **Dziennik błędów** (`error_log_screen.dart`: the last 14 days newest first, "Wyczyść" after
+  asking; subtitle "Wpisów: N" or "Pusty"). Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków, and "Rozmiar
   aplikacji" (the APK holds three CPU builds, ~22 MB each in use; the cache takes the
   most while used) with "Pamięć podręczna — Zajęte X MB" → Pamięć podręczna.
 
