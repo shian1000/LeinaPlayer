@@ -171,6 +171,11 @@ void main() {
       -300,
       scrollable: find.byType(Scrollable).first,
     );
+    // scrollUntilVisible ends with an ensureVisible jump but no frame: without this pump the
+    // tap hits where the last drag left the card. That place depends on the hour (the drags
+    // start over the hour chart, and over a bar with plays they lose the touch slop to its
+    // Tooltip) – at 12:xx it was under the app bar.
+    await tester.pump();
     await tester.tap(find.text('Rok $year'));
     await tester.pumpAndSettle();
     expect(find.text('Twój rok $year'), findsOneWidget);
