@@ -329,8 +329,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   same change; something not tried in practice says so in `note` ("W budowie…").
 - Failures are reported with `debugPrint` ("Loading … failed: $e"): `main` routes every
   `debugPrint` and uncaught error into the on-phone error log (`error_log.dart`, 14 days /
-  500 KB, tokens and passwords scrubbed) that "Zgłoś problem" sends — so log what helps
-  diagnose, never a secret, and don't swallow an error silently.
+  500 KB, tokens and passwords scrubbed, server IPs and Tailscale / home-network names turned
+  into `<Tailscale>` / `<sieć domowa>` / `<IP>` — the report goes to someone else, user's
+  choice) that "Zgłoś problem" sends — so log what helps diagnose, never a secret, and don't
+  swallow an error silently.
 - Something new the phone keeps for the user goes into the backup (`user_backup.dart`) by
   itself when it's a `shared_preferences` key or a `local.db` table; a secret or a key that only
   describes this phone's state goes into `UserBackup.keptKeys`, a cache table whose files aren't

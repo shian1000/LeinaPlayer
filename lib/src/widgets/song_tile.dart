@@ -91,10 +91,13 @@ Future<void> runQueueAction(
 ) async {
   final messenger = ScaffoldMessenger.of(context);
   // Clearing the queue too: a fast answer would otherwise wait behind "Szukam…".
-  void say(String text, {Duration duration = const Duration(seconds: 4)}) =>
-      messenger
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(text), duration: duration));
+  // The screen may be gone by the time YouTube answers (its messenger with it).
+  void say(String text, {Duration duration = const Duration(seconds: 4)}) {
+    if (!messenger.mounted) return;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(text), duration: duration));
+  }
 
   var announced = false;
   final outcome = await action((status) {
@@ -104,7 +107,7 @@ Future<void> runQueueAction(
   final message = outcome?.message;
   if (message != null) {
     say(message);
-  } else if (announced) {
+  } else if (announced && messenger.mounted) {
     messenger.clearSnackBars();
   }
 }
@@ -636,6 +639,7 @@ MenuSheetEntry? hideEntry(BuildContext context, SearchHit hit) {
           'Ukryj utwór',
           onTap: () async {
             await hidden.toggle(hit);
+            if (!messenger.mounted) return;
             messenger
               ..clearSnackBars()
               ..showSnackBar(
@@ -675,6 +679,7 @@ MenuSheetEntry? downloadEntry(BuildContext context, SearchHit hit) {
     'Pobierz utwór',
     onTap: () async {
       final failed = await downloads.download([hit]);
+      if (!messenger.mounted) return;
       messenger
         ..clearSnackBars()
         ..showSnackBar(

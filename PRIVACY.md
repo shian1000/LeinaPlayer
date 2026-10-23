@@ -50,7 +50,8 @@ as they appear in it.)
   data" deletes everything (as does uninstalling). The cache alone (songs, covers) is cleared in
   the app: Oszczędzanie danych › Pamięć podręczna.
 - The error log ("Dziennik błędów") — what went wrong in the app over the last 14 days, for
-  problem reports — is kept only on the phone, with tokens and passwords cut out; it leaves the
+  problem reports — is kept only on the phone, with tokens, passwords and server addresses (IP
+  addresses, Tailscale and home-network names) cut out; it leaves the
   phone only in a report you send yourself. Informacje i pomoc › Dziennik błędów shows and clears
   it.
 - On a MusicDatabase server: with its owner — deleting an account's data is arranged with them.

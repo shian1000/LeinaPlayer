@@ -81,6 +81,54 @@ void main() {
     expect(ErrorLog.scrub('Nothing secret here'), 'Nothing secret here');
   });
 
+  test('server addresses become the kind of network', () {
+    expect(
+      ErrorLog.scrub(
+        'Playlist sync on http://100.116.249.111:8002/ failed: SocketException: '
+        'Connection refused, address = 100.116.249.111, port = 49530',
+      ),
+      'Playlist sync on http://<Tailscale>:8002/ failed: SocketException: '
+      'Connection refused, address = <Tailscale>, port = 49530',
+    );
+    expect(
+      ErrorLog.scrub('http://192.168.1.20:8002/ and 10.0.0.5 and 172.20.1.1'),
+      'http://<sieć domowa>:8002/ and <sieć domowa> and <sieć domowa>',
+    );
+    expect(ErrorLog.scrub('address = 8.8.8.8'), 'address = <IP>');
+    expect(
+      ErrorLog.scrub('http://serwer.tail1234.ts.net:8002/ [fd7a:115c:a1e0::1]'),
+      'http://<Tailscale>:8002/ <Tailscale>',
+    );
+    expect(
+      ErrorLog.scrub('http://jethro.local:8002/ fe80::1%wlan0'),
+      'http://<sieć domowa>:8002/ <sieć domowa>',
+    );
+    const kept =
+        'Asking itunes for a cover failed: Failed host lookup: \'itunes.apple.com\' '
+        'TimeoutException after 0:00:08.000000 (app.dart:1590) wersja 1.0.0';
+    expect(ErrorLog.scrub(kept), kept);
+  });
+
+  test(
+    'addresses in a file written before scrubbing are cut on reading',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('error_log_ip');
+      addTearDown(() => dir.delete(recursive: true));
+      final now = DateTime.now();
+      String two(int n) => n.toString().padLeft(2, '0');
+      await File('${dir.path}/error_log.txt').writeAsString(
+        '${now.year}-${two(now.month)}-${two(now.day)} 10:00:00 '
+        'Sync on http://100.116.249.111:8002/ failed\n',
+      );
+      final log = ErrorLog(directory: () async => dir, now: () => now);
+      await log.load();
+      expect(
+        log.entries.single.message,
+        'Sync on http://<Tailscale>:8002/ failed',
+      );
+    },
+  );
+
   test('clear empties memory and the file', () async {
     final log = newLog()..record('something');
     await log.flush();

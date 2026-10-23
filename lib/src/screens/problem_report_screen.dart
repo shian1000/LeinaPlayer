@@ -107,7 +107,8 @@ class _ProblemReportScreenState extends State<ProblemReportScreen> {
           Text(
             'Raport zawiera wersję aplikacji, model telefonu, wersję Androida, Twój opis i '
             'dziennik błędów z ostatnich ${ErrorLog.keepFor.inDays} dni. W dzienniku mogą '
-            'być tytuły utworów i adresy serwera; tokeny i hasła są z niego wycinane. '
+            'być tytuły utworów; adresy serwera (IP, nazwy w Tailscale i sieci domowej), '
+            'tokeny i hasła są z niego wycinane. '
             'Aplikacja niczego nie wysyła sama — „Wyślij” otwiera „Udostępnij”, a Ty wybierasz, '
             'komu i jak.',
             style: TextStyle(

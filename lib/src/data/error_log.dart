@@ -50,7 +50,8 @@ class ErrorLog extends ChangeNotifier {
   /// Oldest first.
   List<ErrorLogEntry> get entries => List.unmodifiable(_entries);
 
-  /// Tokens, passwords and API keys are replaced with "…" before a message is kept.
+  /// Tokens, passwords and API keys are replaced with "…", and IP addresses and the names of
+  /// Tailscale / home-network machines with the kind of network, before a message is kept.
   static String scrub(String message) => message
       // The whole header value: "Bearer <token>" must go with it.
       .replaceAllMapped(
@@ -71,7 +72,49 @@ class ErrorLog extends ChangeNotifier {
           caseSensitive: false,
         ),
         (m) => '${m[1]}${m[2]}…',
-      );
+      )
+      .replaceAllMapped(_ipv4, (m) => _ipv4Label(m))
+      .replaceAll(_tailscaleName, '<Tailscale>')
+      .replaceAll(_tailscaleIpv6, '<Tailscale>')
+      .replaceAll(_localIpv6, '<sieć domowa>')
+      .replaceAll(_localName, '<sieć domowa>');
+
+  // A server's address tells whoever gets the report where the sender's server is (sharing
+  // checklist 4.3); which kind of network it was is enough to diagnose. Public services'
+  // names (itunes.apple.com…) stay.
+  static final _ipv4 = RegExp(
+    r'(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.]*\d)',
+  );
+  static final _tailscaleName = RegExp(
+    r'\b[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.ts\.net\b',
+    caseSensitive: false,
+  );
+  static final _tailscaleIpv6 = RegExp(
+    r'\[?fd7a:115c:a1e0:[0-9a-f:]*\]?',
+    caseSensitive: false,
+  );
+  static final _localIpv6 = RegExp(
+    r'\[?\b(fe80|f[cd][0-9a-f]{2}):[0-9a-f:%a-z]*\]?',
+    caseSensitive: false,
+  );
+  static final _localName = RegExp(
+    r'\b[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.(local|lan|home|internal|home\.arpa)\b',
+    caseSensitive: false,
+  );
+
+  static String _ipv4Label(Match m) {
+    final b = [for (var i = 1; i <= 4; i++) int.parse(m[i]!)];
+    if (b.any((n) => n > 255)) return m[0]!;
+    if (b[0] == 100 && b[1] >= 64 && b[1] < 128) return '<Tailscale>';
+    if (b[0] == 10 ||
+        b[0] == 127 ||
+        (b[0] == 172 && b[1] >= 16 && b[1] < 32) ||
+        (b[0] == 192 && b[1] == 168) ||
+        (b[0] == 169 && b[1] == 254)) {
+      return '<sieć domowa>';
+    }
+    return '<IP>';
+  }
 
   /// Reads the file, dropping what's too old or too much.
   Future<void> load() async {
@@ -152,13 +195,17 @@ class ErrorLog extends ChangeNotifier {
               int.parse(m[5]!),
               int.parse(m[6]!),
             ),
-            line.substring(m.end),
+            // Lines written before addresses were scrubbed get it on reading.
+            scrub(line.substring(m.end)),
           ),
         );
       } else if (line.startsWith('    ') && entries.isNotEmpty) {
         final last = entries.removeLast();
         entries.add(
-          ErrorLogEntry(last.at, '${last.message}\n${line.substring(4)}'),
+          ErrorLogEntry(
+            last.at,
+            '${last.message}\n${scrub(line.substring(4))}',
+          ),
         );
       }
     }

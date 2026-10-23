@@ -48,6 +48,10 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Links reach Dart through LinksBridge only. With Flutter's own deep linking on, a
+                 link forwarded by LinkChooserActivity was also pushed as a named route, which this
+                 app doesn't have — "Null check operator" in _onUnknownRoute (Pixel, 2026-10-22). -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
