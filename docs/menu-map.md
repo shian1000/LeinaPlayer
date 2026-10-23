@@ -30,6 +30,13 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   with the app; Spotify ones arrive through "Udostępnij". On Android 12+ YouTube links reach the app only after the user allows it (see
   Informacje i pomoc).
 
+## First start (`first_run_screen.dart`)
+
+A fresh install (no catalog downloaded, "Pobieraj z GitHuba" never set) opens over `AppShell` a
+full screen "Witaj w Leina Radio" — "Pobierać bazę danych muzyki z GitHuba?", without a way back:
+- **Tak, pobieraj z GitHuba** — the switch stays on, the catalog downloads at once.
+- **Nie, bez GitHuba** — Ustawienia › Serwer › "Pobieraj z GitHuba" is switched off.
+
 ## Player (`lib/src/screens/now_playing.dart`, `lib/src/playback/player_controller.dart`)
 
 - Media notification (and lock screen): title, artist, progress, previous / pause-play / next —
@@ -266,7 +273,9 @@ import, Wyświetlanie, Dane, Aplikacja.
     link is accepted, empty brings the default back; saved with "Zapisz adresy i pobierz bazę"). Only `music.db` /
     `tag.db`, never `files.db`.
   - "Ostatnie pobranie" (with which source was used: sieć lokalna / połączenie zdalne / GitHub),
-    the last error if any, "Pobierz teraz".
+    the last error if any, "Serwer udostępnia pustą bazę" when the server's music.db has no songs
+    and the phone kept its own (or GitHub's) — with "Użyj pustej" (after a confirmation) to take
+    it anyway, "Pobierz teraz".
 
   On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
   answer), elsewhere the remote one; when no server is set or none answers, GitHub (reads

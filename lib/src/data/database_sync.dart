@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Where a download came from: one of the two server addresses, or the public copy on GitHub.
 enum DatabaseSource { remote, local, github }
@@ -27,11 +28,13 @@ class DatabaseSync extends ChangeNotifier {
     Future<String?> Function()? currentWifi,
     Future<String?> Function()? currentWifiIp,
     Uri Function(String repo)? gitHubRelease,
+    Future<int?> Function(File musicDb)? countSongs,
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
        _now = now ?? DateTime.now,
        _currentWifi = currentWifi ?? readCurrentWifiName,
        _currentWifiIp = currentWifiIp ?? readCurrentWifiIp,
-       _gitHubRelease = gitHubRelease ?? gitHubReleaseUrl;
+       _gitHubRelease = gitHubRelease ?? gitHubReleaseUrl,
+       _countSongs = countSongs ?? countSongsIn;
 
   static const fileNames = ['music.db', 'tag.db', ...optionalFileNames];
 
@@ -48,6 +51,7 @@ class DatabaseSync extends ChangeNotifier {
   static const _lastSourceKey = 'database_sync.last_source';
   static const _gitHubRepoKey = 'database_sync.github_repo';
   static const _gitHubOnKey = 'database_sync.github_on';
+  static const _serverEmptyKey = 'database_sync.server_empty';
 
   /// The owner's public catalog, filled in on every phone until changed or switched off — public,
   /// shared data, not anyone's private setting (ADR 0014).
@@ -66,15 +70,18 @@ class DatabaseSync extends ChangeNotifier {
   final Future<String?> Function() _currentWifi;
   final Future<String?> Function() _currentWifiIp;
   final Uri Function(String repo) _gitHubRelease;
+  final Future<int?> Function(File musicDb) _countSongs;
 
   Uri? _remoteUrl;
   Uri? _localUrl;
   String? _localWifi;
   String _gitHubRepo = defaultGitHubRepo;
   bool _gitHubOn = true;
+  bool _gitHubChosen = true;
   DateTime? _lastSync;
   DatabaseSource? _lastSource;
   bool _downloading = false;
+  bool _serverEmpty = false;
   String? _lastError;
 
   /// Address used outside the home Wi-Fi; `null` if not set.
@@ -93,6 +100,11 @@ class DatabaseSync extends ChangeNotifier {
   /// Whether the catalog may come from GitHub when no server answers.
   bool get gitHubOn => _gitHubOn;
 
+  /// A fresh install that hasn't answered the first start's question about GitHub yet
+  /// ([setGitHubOn] answers it); nothing is downloaded on its own until then. A phone that
+  /// already downloaded a catalog, or set the switch, counts as having answered.
+  bool get needsGitHubChoice => !_gitHubChosen;
+
   /// Whether a MusicDatabase server is set (the outbox, the account and "Serwer" files need one).
   bool get hasServer =>
       _remoteUrl != null || (_localUrl != null && _localWifi != null);
@@ -105,6 +117,11 @@ class DatabaseSync extends ChangeNotifier {
   DatabaseSource? get lastSource => _lastSource;
   bool get downloading => _downloading;
 
+  /// Whether the last download found the server's `music.db` without a single song while the
+  /// phone's copy has some, and so kept the phone's copy (or took GitHub's) instead —
+  /// `syncNow(acceptEmptyServer: true)` takes the empty one after all.
+  bool get serverEmpty => _serverEmpty;
+
   /// Why the most recent download failed, in Polish for display; `null` after a success.
   String? get lastError => _lastError;
 
@@ -115,8 +132,10 @@ class DatabaseSync extends ChangeNotifier {
     _localWifi = prefs.getString(_localWifiKey);
     _gitHubRepo = prefs.getString(_gitHubRepoKey) ?? defaultGitHubRepo;
     _gitHubOn = prefs.getBool(_gitHubOnKey) ?? true;
+    _serverEmpty = prefs.getBool(_serverEmptyKey) ?? false;
     final ms = prefs.getInt(_lastSyncKey);
     _lastSync = ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
+    _gitHubChosen = prefs.containsKey(_gitHubOnKey) || ms != null;
     _lastSource = DatabaseSource.values
         .where((s) => s.name == prefs.getString(_lastSourceKey))
         .firstOrNull;
@@ -169,6 +188,7 @@ class DatabaseSync extends ChangeNotifier {
   Future<void> setGitHubOn(bool on) async {
     await (await SharedPreferences.getInstance()).setBool(_gitHubOnKey, on);
     _gitHubOn = on;
+    _gitHubChosen = true;
     _lastError = null;
     notifyListeners();
   }
@@ -304,7 +324,8 @@ class DatabaseSync extends ChangeNotifier {
   }
 
   /// The once-a-day download: runs only if an address is set and nothing was downloaded yet
-  /// today. A failed attempt doesn't count, so the next start tries again.
+  /// today — and not before the first start's question ([needsGitHubChoice]). A failed attempt
+  /// doesn't count, so the next start tries again.
   Future<void> syncIfDue() async {
     final last = _lastSync;
     final now = _now();
@@ -313,7 +334,7 @@ class DatabaseSync extends ChangeNotifier {
         last.year == now.year &&
         last.month == now.month &&
         last.day == now.day;
-    if (!hasSource || doneToday) return;
+    if (!hasSource || doneToday || needsGitHubChoice) return;
     await syncNow();
   }
 
@@ -321,10 +342,16 @@ class DatabaseSync extends ChangeNotifier {
   /// until all new files have arrived and look like SQLite databases, so a half-finished
   /// download never leaves the files out of step with each other. A server comes first (always
   /// the freshest); GitHub only when no server is set or none answers.
-  Future<bool> syncNow() async {
+  ///
+  /// A server whose `music.db` has no songs (MusicDatabase started "with an empty database")
+  /// doesn't replace a copy that has some unless [acceptEmptyServer]: it is passed over like a
+  /// server that doesn't answer, and [serverEmpty] tells the screen.
+  Future<bool> syncNow({bool acceptEmptyServer = false}) async {
     if (!hasSource || _downloading) return false;
     _downloading = true;
     _lastError = null;
+    final wasEmpty = _serverEmpty;
+    _serverEmpty = false;
     notifyListeners();
     try {
       final attempts = await _attempts();
@@ -336,14 +363,20 @@ class DatabaseSync extends ChangeNotifier {
       Object? serverFailure;
       for (final (source, url) in attempts) {
         try {
-          await _downloadAll(url);
+          await _downloadAll(url, acceptEmpty: acceptEmptyServer);
           await _succeeded(source);
           return true;
+        } on _EmptyServer {
+          _serverEmpty = true;
         } catch (e) {
           serverFailure = e;
         }
       }
-      if (!_gitHubOn) throw serverFailure!;
+      if (!_gitHubOn) {
+        // The phone keeps its copy on purpose; the screen explains it through [serverEmpty].
+        if (_serverEmpty) return false;
+        throw serverFailure!;
+      }
       try {
         await _downloadFromGitHub(_gitHubRepo);
         await _succeeded(DatabaseSource.github);
@@ -360,7 +393,37 @@ class DatabaseSync extends ChangeNotifier {
       return false;
     } finally {
       _downloading = false;
+      if (_serverEmpty != wasEmpty) {
+        await (await SharedPreferences.getInstance()).setBool(
+          _serverEmptyKey,
+          _serverEmpty,
+        );
+      }
       notifyListeners();
+    }
+  }
+
+  /// How many songs [musicDb] has, or `null` when it can't be read as a music.db.
+  static Future<int?> countSongsIn(
+    File musicDb, {
+    DatabaseFactory? factory,
+  }) async {
+    if (!await musicDb.exists()) return null;
+    try {
+      final db = await (factory ?? databaseFactory).openDatabase(
+        musicDb.path,
+        options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+      );
+      try {
+        return Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM songs'),
+        );
+      } finally {
+        await db.close();
+      }
+    } catch (e) {
+      debugPrint('Counting songs in ${musicDb.path} failed: $e');
+      return null;
     }
   }
 
@@ -390,7 +453,7 @@ class DatabaseSync extends ChangeNotifier {
     for (final (_, url) in await _attempts()) url,
   ];
 
-  Future<void> _downloadAll(Uri base) async {
+  Future<void> _downloadAll(Uri base, {required bool acceptEmpty}) async {
     final parts = <File>[];
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15);
@@ -408,6 +471,12 @@ class DatabaseSync extends ChangeNotifier {
           optional: optionalFileNames.contains(name),
         );
         if (!found) missing.add(name);
+      }
+      if (!acceptEmpty &&
+          await _countSongs(parts.first) == 0 &&
+          (await _countSongs(File('${dir.path}/${fileNames.first}')) ?? 0) >
+              0) {
+        throw const _EmptyServer();
       }
       for (var i = 0; i < fileNames.length; i++) {
         final target = File('${dir.path}/${fileNames[i]}');
@@ -648,6 +717,10 @@ Future<String?> readCurrentWifiIp() async {
     debugPrint('Reading Wi-Fi IP failed: $e');
     return null;
   }
+}
+
+class _EmptyServer implements Exception {
+  const _EmptyServer();
 }
 
 class _SyncFailure implements Exception {

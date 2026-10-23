@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_updates.dart';
+import '../data/database_sync.dart';
 import '../data/incoming_links.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
@@ -22,6 +23,7 @@ import '../widgets/song_tile.dart';
 import '../widgets/update_dialog.dart';
 import 'discover_screen.dart';
 import 'feature_infos.dart';
+import 'first_run_screen.dart';
 import 'home_screen.dart';
 import 'library_screen.dart';
 import 'now_playing.dart';
@@ -75,6 +77,8 @@ class AppShellState extends State<AppShell> {
   final _toast = QueueToast();
   AppUpdates? _updates;
   bool _updateOffered = false;
+  DatabaseSync? _sync;
+  bool _firstRunShown = false;
 
   @override
   void initState() {
@@ -88,10 +92,28 @@ class AppShellState extends State<AppShell> {
     final updates = context
         .getInheritedWidgetOfExactType<AppUpdatesScope>()
         ?.notifier;
-    if (updates == _updates) return;
-    _updates?.removeListener(_offerUpdate);
-    _updates = updates?..addListener(_offerUpdate);
-    _offerUpdate();
+    if (updates != _updates) {
+      _updates?.removeListener(_offerUpdate);
+      _updates = updates?..addListener(_offerUpdate);
+      _offerUpdate();
+    }
+
+    final sync = context
+        .getInheritedWidgetOfExactType<DatabaseSyncScope>()
+        ?.notifier;
+    if (sync == _sync) return;
+    _sync?.removeListener(_askFirstRun);
+    _sync = sync?..addListener(_askFirstRun);
+    _askFirstRun();
+  }
+
+  /// A fresh install's question about GitHub, once its settings are read (`DatabaseSync.load`).
+  void _askFirstRun() {
+    if (_firstRunShown || !(_sync?.needsGitHubChoice ?? false)) return;
+    _firstRunShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) FirstRunScreen.show(context);
+    });
   }
 
   /// A newer release is offered once per start, until answered "Później".
@@ -108,6 +130,7 @@ class AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _updates?.removeListener(_offerUpdate);
+    _sync?.removeListener(_askFirstRun);
     _linksSub?.cancel();
     _toast.dispose();
     super.dispose();

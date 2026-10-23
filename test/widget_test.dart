@@ -8,6 +8,7 @@ import 'package:music_database_app/main.dart';
 import 'package:music_database_app/src/screens/settings_screen.dart';
 import 'package:music_database_app/src/screens/about_screen.dart';
 import 'package:music_database_app/src/screens/database_source_screen.dart';
+import 'package:music_database_app/src/screens/first_run_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/theme_controller.dart';
 import 'package:music_database_app/src/widgets/common.dart';
@@ -45,6 +46,36 @@ void main() {
     final themes = ThemeController();
     await themes.load();
     expect(themes.dark, same(lainTheme));
+  });
+
+  for (final gitHub in [true, false]) {
+    testWidgets('a fresh install asks about GitHub first — '
+        '${gitHub ? 'Tak' : 'Nie'}', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'appearance.dark_theme': 'Dummify',
+      });
+      await pumpApp(tester);
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Pobierać bazę danych muzyki z GitHuba?'),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(gitHub ? FirstRunScreen.yesKey : FirstRunScreen.noKey),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Pobierać bazę danych muzyki z GitHuba?'), findsNothing);
+      expect(find.text('Biblioteka'), findsWidgets);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('database_sync.github_on'), gitHub);
+    });
+  }
+
+  testWidgets('a phone that answered is not asked again', (tester) async {
+    await pumpApp(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('Pobierać bazę danych muzyki z GitHuba?'), findsNothing);
   });
 
   testWidgets('shows bottom navigation with all tabs', (tester) async {

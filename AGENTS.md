@@ -24,7 +24,8 @@ decision, 2026-10-16); [`docs/menu-map.md`](docs/menu-map.md) lists every elemen
 recommendation rows come from the listening stats and music.db (`home_recommendations.dart`). Real so
 far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `tag.db` from a remote
 or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)) or, with no server
-answering, from a GitHub Release (on by default, `shian1000/LeinaMusicDatabase`), outbox requests
+answering, from a GitHub Release (`shian1000/LeinaMusicDatabase`; a fresh install's first start asks
+whether to use it — `first_run_screen.dart`, shown by `AppShell`), outbox requests
 exported as a `.zip` package ("Wyślij paczkę…", [ADR 0014](docs/decisions/0014-github-database-and-request-packages.md)), scanning music
 folders on the phone into the phone's own `local.db`, song search over both databases, and
 ticking several songs with a long press for a shared action (queue, playlist, mood),

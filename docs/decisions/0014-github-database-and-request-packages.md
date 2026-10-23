@@ -56,13 +56,19 @@ Two **additional** ways of talking to MusicDatabase. They replace nothing: the H
   GitHub token lives in MusicDatabase's `.env` (fine-grained, write access to that one repo
   only), never in git.
 - **On the phone: a third source, "GitHub"**, next to the remote and home addresses, holding
-  `<owner>/<repo>`. **A fresh install has `shian1000/LeinaMusicDatabase` filled in** and downloads
-  it on first start, so the app works from the first minute; it can be changed (a friend's
-  fork) or switched off. This is public, shared data — not the owner's private settings
+  `<owner>/<repo>`. **A fresh install has `shian1000/LeinaMusicDatabase` filled in**; its first
+  start asks (a full screen, `first_run_screen.dart`) whether to download the catalog from GitHub
+  — "Tak" leaves the switch on and downloads it at once, "Nie" switches it off. Nothing is
+  downloaded before the answer; a phone that already downloaded a catalog isn't asked (owner's
+  decision, 2026-10-23). The repository can be changed (a friend's fork) or switched off later. This is public, shared data — not the owner's private settings
   (checklist 1.5).
 - **Order:** a configured, reachable MusicDatabase server first (always the freshest); GitHub
   when no server is set or none answers. Same once-a-day rhythm and "Pobierz teraz" as ADR 0002;
-  the download screen shows which source the current copy came from.
+  the download screen shows which source the current copy came from. A server whose `music.db`
+  has no songs (MusicDatabase started "with an empty database") counts as not answering while the
+  phone's copy has some: the phone keeps it (or takes GitHub's), and Ustawienia › Serwer says
+  "Serwer udostępnia pustą bazę" with "Użyj pustej" to take it after all (sharing checklist
+  4.2b, 2026-10-23).
 
 ### 2. Request packages
 

@@ -2,11 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 final _sqlite = [...'SQLite format 3\u0000'.codeUnits, 1, 2, 3];
+
+/// A music.db without songs, as `countSongs` in [newSync] sees it (every other file has some).
+final _empty = [...'SQLite format 3\u0000'.codeUnits, 0];
 
 void main() {
   late Directory storage;
@@ -28,6 +33,11 @@ void main() {
     gitHubRelease: (repo) => Uri.parse(
       'http://127.0.0.1:${gitHub.port}/$repo/releases/download/database/',
     ),
+    countSongs: (file) async => !file.existsSync()
+        ? null
+        : listEquals(file.readAsBytesSync(), _empty)
+        ? 0
+        : 3,
   );
 
   Map<String, Object?> describe(Map<String, List<int>> files) => {
@@ -206,6 +216,88 @@ void main() {
     expect(leftovers, isEmpty);
   });
 
+  group('a server with an empty music.db', () {
+    test('does not replace a copy that has songs', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      expect(await sync.syncNow(), isTrue);
+
+      now = now.add(const Duration(days: 1));
+      served['music.db'] = _empty;
+      served['tag.db'] = [..._sqlite, 4];
+      expect(await sync.syncNow(), isFalse);
+      expect(sync.serverEmpty, isTrue);
+      expect(sync.lastError, isNull);
+      expect(sync.lastSync, DateTime(2026, 10, 10, 9));
+      expect(
+        await localContent(sync, 'music.db'),
+        String.fromCharCodes(_sqlite),
+      );
+      expect(await localContent(sync, 'tag.db'), String.fromCharCodes(_sqlite));
+      final leftovers = (await sync.databaseDirectory()).listSync().where(
+        (e) => e.path.endsWith('.part'),
+      );
+      expect(leftovers, isEmpty);
+
+      final restarted = newSync();
+      await restarted.load();
+      expect(restarted.serverEmpty, isTrue);
+    });
+
+    test('is taken when asked for', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      expect(await sync.syncNow(), isTrue);
+
+      served['music.db'] = _empty;
+      expect(await sync.syncNow(), isFalse);
+      expect(await sync.syncNow(acceptEmptyServer: true), isTrue);
+      expect(sync.serverEmpty, isFalse);
+      expect(
+        await localContent(sync, 'music.db'),
+        String.fromCharCodes(_empty),
+      );
+    });
+
+    test('is taken when the phone has no songs either', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      served['music.db'] = _empty;
+      expect(await sync.syncNow(), isTrue);
+      expect(sync.serverEmpty, isFalse);
+      expect(
+        await localContent(sync, 'music.db'),
+        String.fromCharCodes(_empty),
+      );
+    });
+  });
+
+  test('countSongsIn reads the songs table', () async {
+    sqfliteFfiInit();
+    Future<File> create(String name, int songs) async {
+      final file = File('${storage.path}/$name');
+      final db = await databaseFactoryFfi.openDatabase(file.path);
+      await db.execute('CREATE TABLE songs (id INTEGER PRIMARY KEY)');
+      for (var i = 0; i < songs; i++) {
+        await db.insert('songs', {'id': i + 1});
+      }
+      await db.close();
+      return file;
+    }
+
+    Future<int?> count(File file) =>
+        DatabaseSync.countSongsIn(file, factory: databaseFactoryFfi);
+    expect(await count(await create('empty.db', 0)), 0);
+    expect(await count(await create('two.db', 2)), 2);
+    expect(await count(File('${storage.path}/missing.db')), isNull);
+    final garbage = File('${storage.path}/garbage.db')
+      ..writeAsBytesSync(_sqlite);
+    expect(await count(garbage), isNull);
+  });
+
   test('reports an unreachable server', () async {
     final sync = newSync();
     await sync.load();
@@ -311,7 +403,13 @@ void main() {
       expect(sync.gitHubRepo, 'shian1000/LeinaMusicDatabase');
       expect(sync.hasServer, isFalse);
       expect(sync.hasSource, isTrue);
+      expect(sync.needsGitHubChoice, isTrue);
 
+      await sync.syncIfDue();
+      expect(gitHubRequests, isEmpty, reason: 'not before the first question');
+
+      await sync.setGitHubOn(true);
+      expect(sync.needsGitHubChoice, isFalse);
       await sync.syncIfDue();
       expect(sync.lastError, isNull);
       expect(sync.lastSource, DatabaseSource.github);
@@ -319,6 +417,30 @@ void main() {
       expect(await localBytes(sync, 'music.db'), released['music.db']);
       expect(await localBytes(sync, 'tag.db'), released['tag.db']);
       expect(gitHubRequests, ['version.json', 'music.db', 'tag.db']);
+    });
+
+    test('"Nie" on the first start: nothing comes from GitHub', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setGitHubOn(false);
+      await sync.syncIfDue();
+      expect(gitHubRequests, isEmpty);
+      expect(sync.hasSource, isFalse);
+
+      final restarted = newSync();
+      await restarted.load();
+      expect(restarted.needsGitHubChoice, isFalse);
+      expect(restarted.gitHubOn, isFalse);
+    });
+
+    test('a phone that already downloaded a catalog is not asked', () async {
+      SharedPreferences.setMockInitialValues({
+        'database_sync.last_sync_ms': now.millisecondsSinceEpoch,
+      });
+      final sync = newSync();
+      await sync.load();
+      expect(sync.needsGitHubChoice, isFalse);
+      expect(sync.gitHubOn, isTrue);
     });
 
     test('downloads only the files whose hash changed', () async {
@@ -402,6 +524,24 @@ void main() {
       expect(await sync.syncNow(), isTrue);
       expect(sync.lastSource, DatabaseSource.remote);
       expect(gitHubRequests, isEmpty);
+    });
+
+    test('GitHub instead of a server with an empty music.db', () async {
+      final sync = newSync();
+      await sync.load();
+      expect(await sync.syncNow(), isTrue);
+
+      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      served['music.db'] = _empty;
+      expect(await sync.syncNow(), isTrue);
+      expect(sync.lastSource, DatabaseSource.github);
+      expect(sync.serverEmpty, isTrue);
+      expect(await localBytes(sync, 'music.db'), released['music.db']);
+
+      served['music.db'] = _sqlite;
+      expect(await sync.syncNow(), isTrue);
+      expect(sync.lastSource, DatabaseSource.remote);
+      expect(sync.serverEmpty, isFalse);
     });
 
     test('GitHub when the server is down, keeping files.db', () async {

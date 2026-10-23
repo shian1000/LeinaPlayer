@@ -55,7 +55,7 @@ abstract final class FeatureInfos {
     title: 'Serwer MusicDatabase',
     what: 'Adres Twojego serwera MusicDatabase — programu, który prowadzi bazę utworów i Twoją bibliotekę muzyki.',
     why: 'Jeśli jest to skonfigurowane, to z serwera telefon pobiera bazę utworów (raz dziennie), odtwarza pliki z Twojej biblioteki (źródło „Serwer”), wysyła zgłoszenia poprawek i — po zalogowaniu — synchronizuje Bibliotekę i statystyki. Bez serwera aplikacja wciąż działa: bazę pobiera z GitHuba, a reszta zostaje na telefonie.',
-    how: 'Można wpisać dwa adresy: zdalny (np. przez Tailscale) i domowy, z nazwą domowej sieci Wi-Fi — w domu telefon próbuje najpierw adresu domowego. Rozpoznanie sieci Wi-Fi wymaga zgody na lokalizację (zasada Androida). „Użyj bieżącego połączenia” sam szuka serwera w sieci. Gdy żaden serwer nie odpowiada, baza przychodzi z GitHuba.',
+    how: 'Można wpisać dwa adresy: zdalny (np. przez Tailscale) i domowy, z nazwą domowej sieci Wi-Fi — w domu telefon próbuje najpierw adresu domowego. Rozpoznanie sieci Wi-Fi wymaga zgody na lokalizację (zasada Androida). „Użyj bieżącego połączenia” sam szuka serwera w sieci. Gdy żaden serwer nie odpowiada, baza przychodzi z GitHuba. Pusta baza z serwera (0 utworów) nie zastępuje bez pytania tej, którą telefon już ma.',
     libraries: 'HttpClient (Dart), network_info_plus, permission_handler',
     connects: 'Wpisane adresy serwera; GitHub, gdy serwer nie odpowiada (wyłączalne).',
     actions: [_privacy],
