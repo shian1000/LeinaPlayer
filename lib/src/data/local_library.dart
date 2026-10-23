@@ -171,6 +171,9 @@ class LocalLibrary extends ChangeNotifier {
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
        _now = now ?? DateTime.now;
 
+  /// `local.db`'s version; a backup from a newer one isn't restored (`user_backup.dart`).
+  static const schemaVersion = 19;
+
   static const _foldersKey = 'local_music.folders';
   static const _lastScanKey = 'local_music.last_scan_ms';
 
@@ -236,7 +239,7 @@ class LocalLibrary extends ChangeNotifier {
     return (factoryOverride ?? databaseFactory).openDatabase(
       '${dir.path}/local.db',
       options: OpenDatabaseOptions(
-        version: 19,
+        version: schemaVersion,
         onCreate: (db, _) async {
           await db.execute('''
           CREATE TABLE local_songs (

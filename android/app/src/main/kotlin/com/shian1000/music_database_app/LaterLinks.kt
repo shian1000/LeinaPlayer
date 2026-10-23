@@ -43,6 +43,17 @@ object LaterLinks {
         .put(LINKS, JSONArray(read(context, LINKS)))
         .toString()
 
+    /** Puts [json] (what [all] gives) in place of everything: a restored backup. */
+    fun replaceAll(context: Context, json: String) {
+        val all = JSONObject(json)
+        val people = all.optJSONArray(PEOPLE) ?: JSONArray()
+        val links = all.optJSONArray(LINKS) ?: JSONArray()
+        prefs(context).edit()
+            .putString(PEOPLE, people.toString())
+            .putString(LINKS, links.toString())
+            .commit()
+    }
+
     /** The person called [name] (case aside), added when there's none; returns its id. */
     fun addPerson(context: Context, name: String): String {
         val people = read(context, PEOPLE)

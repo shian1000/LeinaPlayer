@@ -37,6 +37,10 @@ as they appear in it.)
   log in, your library and listening history. If you don't set a server, nobody.
 - **Whoever you send a correction-report package to** ("Wyślij paczkę…"): the reports, signed
   with the name you typed.
+- **Wherever you put a backup** (Ustawienia › Kopia zapasowa — a `.zip` you share yourself:
+  Google Drive, e-mail, a computer): your playlists, moods, listening stats and history, liked
+  and saved songs, links saved for later with their senders' names, and settings. Never the
+  login, Google account or API keys.
 - **Nobody else.** The names of people who sent you links saved for later stay on the phone (and,
   when logged in, on the server) — those people receive nothing.
 

@@ -137,6 +137,10 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
                 ),
             )
             "laterLinks" -> result.success(LaterLinks.all(context))
+            "replaceLaterLinks" -> {
+                LaterLinks.replaceAll(context, call.arguments as String)
+                result.success(null)
+            }
             "addLaterPerson" -> result.success(
                 LaterLinks.addPerson(context, call.argument<String>("name")!!),
             )

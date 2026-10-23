@@ -438,6 +438,16 @@ import, Wyświetlanie, Dane, Aplikacja.
     (MB used and image count; confirm dialog).
   - "Wyczyść wszystko" — YouTube songs and covers (confirm dialog; the downloaded database and
     phone music stay).
+- Kopia zapasowa **→ Kopia zapasowa** (`backup_screen.dart`, `user_backup.dart`; sharing
+  checklist 4.1, for people without a MusicDatabase account) — **implemented**:
+  "Zrób kopię zapasową…" (a `.zip` of `local.db` without its cache tables, the outbox, picked
+  covers, the settings without secrets / this phone's state — `UserBackup.keptKeys` — and the
+  links saved for later, through the share sheet; only the newest kept on the phone),
+  "Ostatnia kopia" (date), "Przywróć z pliku…" (file picker → "Przywrócić kopię zapasową?" with
+  the backup's date → the backup is unpacked to `backup_restore/`, the links go to
+  `LaterLinks.kt` at once, and the app closes (`exit(0)`); `main` puts the rest in place on the
+  next start before anything opens it; the subtitle then says which backup was restored). A
+  backup from a newer `local.db` version is refused. A note lists what's in and what isn't.
 
 ### Aplikacja
 

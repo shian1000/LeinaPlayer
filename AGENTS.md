@@ -91,6 +91,8 @@ nazwy" ([hand-off](docs/handoffs/musicdatabase-song-artist.md)), which asks firs
 name doesn't resemble the old one (`nameResembles`).
 Ustawienia › Prywatność i połączenia lists every service the app talks to (no analytics or
 ads), with a way to each switch; the lyrics can be switched off (Oszczędzanie danych).
+Ustawienia › Kopia zapasowa saves the user's data to a `.zip` shared by hand and restores it
+on the next start (`user_backup.dart`) — for people without a MusicDatabase account.
 New versions come as GitHub releases of this repo; a build with `tool/release.env` checks them
 once a day and offers a newer one in a dialog, downloaded through the browser
 ([`releases.md`](docs/agent-notes/releases.md), `app_updates.dart`).
@@ -232,7 +234,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
   (`network_errors.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
-  port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
+  port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
@@ -329,6 +331,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `debugPrint` and uncaught error into the on-phone error log (`error_log.dart`, 14 days /
   500 KB, tokens and passwords scrubbed) that "Zgłoś problem" sends — so log what helps
   diagnose, never a secret, and don't swallow an error silently.
+- Something new the phone keeps for the user goes into the backup (`user_backup.dart`) by
+  itself when it's a `shared_preferences` key or a `local.db` table; a secret or a key that only
+  describes this phone's state goes into `UserBackup.keptKeys`, a cache table whose files aren't
+  in the backup into `_cacheTables`, and data in a folder of its own or kept natively needs
+  adding there.
 - No dummy elements: a feature is built or its button is left out (user's decision; the old
   `showDummy` / `Atrapa:` snackbar is gone). A `MenuSheetEntry` needs an `onTap` unless it has a
   `submenu`.
@@ -371,7 +378,12 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `dumpsys media_session` for the state. The
   Huawei has only a swipe lock: wake it (`input keyevent KEYCODE_WAKEUP`) and unlock it with
   `input swipe 540 1800 540 600 300` rather than waiting for the user. It also shows no app logs
-  (`logcat -s flutter` stays empty) — diagnose there from the screen.
+  (`logcat -s flutter` stays empty) — diagnose there from the screen. The release build allows no
+  `run-as`, so the app's files can't be read over adb: check its data on screen, or make a backup
+  (Kopia zapasowa) and save it locally with Total Commander from the share sheet (it lands in
+  `/sdcard/Download/`, pullable). On the Huawei the YouTube app takes a tapped YouTube link
+  itself; reach the "Otwórz w…" sheet with `am start -a android.intent.action.VIEW -d <url> -n
+  com.shian1000.music_database_app/.LinkChooserActivity`.
 - The user's MusicDatabase `sharing_server.py` (systemd service) listens on port 8002 on both the
   Tailscale and LAN addresses. Run test servers on another port and stop them by their own PID —
   never by "whatever listens on the port".

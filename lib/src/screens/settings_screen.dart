@@ -6,6 +6,7 @@ import '../widgets/common.dart';
 import 'about_screen.dart';
 import 'account_screen.dart';
 import 'appearance_screen.dart';
+import 'backup_screen.dart';
 import 'cache_settings_screen.dart';
 import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
@@ -210,6 +211,19 @@ const _sections = <(String, List<_SettingsEntry>)>[
           'Pobieraj teksty piosenek',
         ],
       ),
+      _SettingsEntry(
+        Icons.settings_backup_restore,
+        'Kopia zapasowa',
+        'Zapisz dane do pliku • Przywróć z pliku',
+        _openBackup,
+        keywords: [
+          'Zrób kopię zapasową',
+          'Przywróć z pliku',
+          'Eksport danych',
+          'Import danych',
+          'Nowy telefon',
+        ],
+      ),
     ],
   ),
   (
@@ -281,6 +295,8 @@ Widget _openCoverSources(BuildContext context) => const CoverSourcesScreen();
 Widget _openDataSaver(BuildContext context) => const DataSaverScreen();
 
 Widget _openCache(BuildContext context) => const CacheSettingsScreen();
+
+Widget _openBackup(BuildContext context) => const BackupScreen();
 
 Widget _openLinks(BuildContext context) => const LinkSettingsScreen();
 
