@@ -448,7 +448,7 @@ class TrackPlayer {
         catalog.status != CatalogStatus.ready) {
       return;
     }
-    final request = SongRequest.of(hit);
+    final request = SongRequest.of(hit, artistNamed: catalog.artistNamed);
     if (request == null || catalog.rejectedSongRequests.rejects(request)) {
       return;
     }

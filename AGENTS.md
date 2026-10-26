@@ -289,7 +289,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   go through `parseYouTubeTrack()` and the catalog (`hitForVideoLink` / `hitForSearchedVideo`
   in `video_link.dart`, `PlaylistLibrary`) — otherwise the song request sent to MusicDatabase
   asks for the channel as artist and the whole video title as title (it happened with search
-  results).
+  results). A video title naming no artist still leaves the channel as the artist: a request
+  goes through `SongRequest.of(hit, artistNamed: catalog.artistNamed)`, which turns a name
+  that is one of an artist's `artists.synonyms` / `name_latin` into music.db's name
+  ("familyboombox" → "Бумбокс").
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
   reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.

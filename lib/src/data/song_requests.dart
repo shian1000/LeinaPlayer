@@ -19,14 +19,23 @@ class SongRequest {
   });
 
   /// What [hit] would be asked as; `null` for a song music.db has, or one with no title.
-  static SongRequest? of(SearchHit hit) {
+  /// [artistNamed] (`SongCatalog.artistNamed`) gives music.db's name of an artist known by
+  /// another name: a video's channel or a file's tag may be one of its `artists.synonyms`
+  /// ("familyboombox" is "Бумбокс"), and the request then asks for the artist music.db has.
+  static SongRequest? of(
+    SearchHit hit, {
+    String? Function(String name)? artistNamed,
+  }) {
     if (hit.inMainDatabase || hit.title.trim().isEmpty) return null;
     final file = hit.onPhone ? hit.phoneFiles.first : null;
-    final artist = file != null ? file.artist : hit.artistLabel;
+    final shown = file != null ? file.artist : hit.artistLabel;
+    final artist = shown == null || shown == unknownArtist
+        ? null
+        : artistNamed?.call(shown) ?? shown;
     final videoId = hit.playlistVideoId ?? hit.youtubeVideoId;
     return SongRequest(
       title: hit.title,
-      artist: artist == null || artist == unknownArtist ? null : artist,
+      artist: artist,
       source: file != null
           ? SongRequestSource.phoneFile
           : videoId == null && hit.spotifyTrackId != null

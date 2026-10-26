@@ -18,7 +18,7 @@ for again.
 ```sql
 CREATE TABLE song_requests (
   title TEXT NOT NULL,          -- as the phone shows it
-  artist TEXT,                  -- as the phone shows it; NULL = it knows none
+  artist TEXT,                  -- as the phone shows it, or music.db's name when that is one of an artist's synonyms (a channel: "familyboombox" -> "Бумбокс"); NULL = it knows none
   album TEXT,                   -- a phone file's tags
   year INTEGER,
   duration_s INTEGER,           -- not filled yet (NULL)

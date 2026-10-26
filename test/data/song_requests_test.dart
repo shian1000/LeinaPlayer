@@ -72,6 +72,25 @@ void main() {
     expect(SongRequest.of(inMusicDb), isNull);
   });
 
+  test('an artist known by another name is asked as music.db spells it', () {
+    String? artistNamed(String name) =>
+        name == 'familyboombox' ? 'Бумбокс' : null;
+    final request = SongRequest.of(
+      video('Ангела (feat. Крихітка)', 'familyboombox', 'YoCl9HzwCm0'),
+      artistNamed: artistNamed,
+    )!;
+    expect(request.artist, 'Бумбокс');
+    expect(request.title, 'Ангела (feat. Крихітка)');
+    // One music.db doesn't know stays as shown.
+    expect(
+      SongRequest.of(
+        video('Unseen', 'Elise Trouw', 'v1'),
+        artistNamed: artistNamed,
+      )!.artist,
+      'Elise Trouw',
+    );
+  });
+
   test('a song is asked for once, by name or by its video', () async {
     final outbox = newOutbox();
 

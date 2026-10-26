@@ -174,6 +174,13 @@ void main() {
       expect(catalog.search('gruppa kino').single.id, 6);
       expect(catalog.search('khochesh').single.id, 8);
       expect(catalog.findExact(title: 'Группа крови', artist: 'Kino')?.id, 6);
+
+      // An artist by any of its names: a channel name, a Latin form.
+      expect(catalog.artistNamed('FamilyBoomBox'), 'Бумбокс');
+      expect(catalog.artistNamed('Kino'), 'Кино');
+      expect(catalog.artistNamed('Бумбокс'), 'Бумбокс');
+      expect(catalog.artistNamed('led zeppelin'), 'Led Zeppelin');
+      expect(catalog.artistNamed('Nobody'), isNull);
     });
 
     test('no Latin forms in a music.db from before them', () async {

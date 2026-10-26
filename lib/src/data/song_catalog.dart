@@ -492,6 +492,7 @@ class SongCatalog extends ChangeNotifier {
         _idChanges = idChanges;
         _searchTexts = null;
         _byTitle = null;
+        _artistByName = null;
         _byYouTubeId = null;
         _byId = null;
         _status = CatalogStatus.ready;
@@ -506,6 +507,7 @@ class SongCatalog extends ChangeNotifier {
     } finally {
       _searchTexts = null;
       _byTitle = null;
+      _artistByName = null;
       _byYouTubeId = null;
       _byId = null;
       _loading = null;
@@ -806,6 +808,7 @@ class SongCatalog extends ChangeNotifier {
   }
 
   Map<String, List<CatalogSong>>? _byTitle;
+  Map<String, String?>? _artistByName;
   Map<String, CatalogSong>? _byYouTubeId;
 
   /// The song MusicDatabase links to this YouTube video, or `null`.
@@ -851,6 +854,29 @@ class SongCatalog extends ChangeNotifier {
     return byTitle[normalizeForSearch(title)]
         ?.where((s) => s._normalizedArtists.contains(normalizedArtist))
         .firstOrNull;
+  }
+
+  /// music.db's name of the artist that goes by [name]: its name, its Latin form or one of its
+  /// `artists.synonyms` (a channel name — "familyboombox" is "Бумбокс"), compared after
+  /// normalization. `null` when no artist goes by it, or more than one does.
+  String? artistNamed(String name) {
+    final byName = _artistByName ??= () {
+      final index = <String, String?>{};
+      for (final song in _songs) {
+        final target = song.youTubeTarget;
+        for (final artist in [...target.mainArtists, ...target.featArtists]) {
+          for (final other in artist.names) {
+            final key = normalizeForSearch(other);
+            if (key.isEmpty) continue;
+            index[key] = index.containsKey(key) && index[key] != artist.name
+                ? null
+                : artist.name;
+          }
+        }
+      }
+      return index;
+    }();
+    return byName[normalizeForSearch(name)];
   }
 
   /// Songs whose selected [searchFields] together contain every word of [query] (after
