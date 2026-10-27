@@ -106,6 +106,48 @@ void main() {
     expect((tracks[3].artist, tracks[3].title), ('Nieznany', 'Utwór'));
   });
 
+  test('a track without its own length takes its video\'s from music.db, '
+      'else its library file\'s; the rest count as unknown', () async {
+    await addVideoDurations((await sync.localFile('music.db')).path, {
+      'X2XWBcd5jn0': 245,
+      'own12345678': 100,
+    });
+    await writeFilesDb(
+      (await sync.localFile('files.db')).path,
+      [(10, 'Led Zeppelin/Going to California.mp3', 6000, 2)],
+      durations: {10: 211},
+    );
+    await catalog.ensureLoaded();
+
+    final saved = await playlists.create('Mieszana', [
+      // music.db's video.
+      SearchHit.main(catalog.byId(1)!, const []),
+      // No video in music.db: its library file.
+      SearchHit.main(catalog.byId(2)!, const []),
+      // "N/A": no video, no file.
+      SearchHit.main(catalog.byId(3)!, const []),
+      // Its own video.
+      SearchHit.youTubeOnly(
+        title: 'Klip',
+        artistLabel: 'Ktoś',
+        videoId: 'own12345678',
+        playlistVideoId: 'own12345678',
+      ),
+    ]);
+    expect(saved.duration, const Duration(seconds: 245 + 211 + 100));
+    expect(saved.unknownLengths, 1);
+    // Worked out when reading, never written back (the rows sync).
+    final tracks = await playlists.tracks(saved.id);
+    expect([for (final t in tracks) t.duration], everyElement(isNull));
+
+    // A track's own length goes first.
+    final imported = await playlists.importYouTube(
+      data([v('X2XWBcd5jn0', 'Dawid Podsiadło - Małomiasteczkowy', 'x', 250)]),
+    );
+    expect(imported.playlist.duration, const Duration(seconds: 250));
+    expect(imported.playlist.unknownLengths, 0);
+  });
+
   test(
     'keeps the first tracks of each playlist for its cover collage',
     () async {

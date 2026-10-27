@@ -90,13 +90,16 @@ class UserYouTubeLinks {
 /// downloaded `files.db` (MusicDatabase's `files_index.py`), played over HTTP as
 /// `GET /library/<id>` (hand-off `musicdatabase-server-files.md`).
 class ServerFile {
-  const ServerFile({required this.id, required this.path});
+  const ServerFile({required this.id, required this.path, this.duration});
 
   /// `files.id`; never reused for another file.
   final int id;
 
   /// Relative to the library folder, with `/` separators ("Artist/Album/01 Song.mp3").
   final String path;
+
+  /// `files.duration_s`; `null` when the index couldn't read it.
+  final Duration? duration;
 
   String get fileName => path.split('/').last;
 }
@@ -402,6 +405,14 @@ class SongCatalog extends ChangeNotifier {
   /// Videos MusicDatabase found bad (`bad_youtube_videos`).
   BadVideos get badVideos => _badVideos;
 
+  Map<String, Duration> _videoDurations = const {};
+
+  /// How long YouTube video [videoId] is, as MusicDatabase asked YouTube
+  /// (`youtube_video_durations`, hand-off `video-durations-for-musicdatabaseapp.md`); `null`:
+  /// unknown — a live stream, a gone video, one not asked about yet, or an older music.db.
+  Duration? videoDuration(String? videoId) =>
+      videoId == null ? null : _videoDurations[videoId];
+
   RejectedSongRequests _rejectedSongRequests = RejectedSongRequests.none;
 
   /// Songs MusicDatabase's owner doesn't want added (`rejected_song_requests`): not asked for
@@ -474,6 +485,7 @@ class SongCatalog extends ChangeNotifier {
       if (!await file.exists()) {
         _songs = const [];
         _badVideos = BadVideos.none;
+        _videoDurations = const {};
         _rejectedSongRequests = RejectedSongRequests.none;
         _status = CatalogStatus.noDatabase;
       } else {
@@ -482,12 +494,14 @@ class SongCatalog extends ChangeNotifier {
           await _readServerFiles(await _sync.localFile('files.db')),
         );
         final badVideos = await _readBadVideos(file);
+        final videoDurations = await _readVideoDurations(file);
         final rejected = await _readRejectedSongRequests(file);
         final idChanges = await _readIdChanges(file);
         // All at once, with the indexes below: a search between two awaits would otherwise
         // read the new songs through the old search texts.
         _songs = songs;
         _badVideos = badVideos;
+        _videoDurations = videoDurations;
         _rejectedSongRequests = rejected;
         _idChanges = idChanges;
         _searchTexts = null;
@@ -502,6 +516,7 @@ class SongCatalog extends ChangeNotifier {
       debugPrint('Loading music.db failed: $e');
       _songs = const [];
       _badVideos = BadVideos.none;
+      _videoDurations = const {};
       _rejectedSongRequests = RejectedSongRequests.none;
       _status = CatalogStatus.error;
     } finally {
@@ -537,15 +552,24 @@ class SongCatalog extends ChangeNotifier {
         options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
       );
       try {
+        final duration = await _hasColumn(db, 'files', 'duration_s')
+            ? 'duration_s'
+            : 'NULL';
         final found = <int, ServerFile>{};
         for (final row in await db.rawQuery(
-          'SELECT id, path, song_id FROM files WHERE song_id IS NOT NULL '
-          'ORDER BY size DESC, id',
+          'SELECT id, path, song_id, $duration AS duration_s FROM files '
+          'WHERE song_id IS NOT NULL ORDER BY size DESC, id',
         )) {
+          final seconds = row['duration_s'] as int?;
           found.putIfAbsent(
             row['song_id']! as int,
-            () =>
-                ServerFile(id: row['id']! as int, path: row['path']! as String),
+            () => ServerFile(
+              id: row['id']! as int,
+              path: row['path']! as String,
+              duration: seconds == null || seconds <= 0
+                  ? null
+                  : Duration(seconds: seconds),
+            ),
           );
         }
         return found;
@@ -763,6 +787,32 @@ class SongCatalog extends ChangeNotifier {
         }
       }
       return BadVideos(everySong: everySong, forSong: forSong);
+    } finally {
+      await db.close();
+    }
+  }
+
+  /// `youtube_video_durations` (MusicDatabase's migration 0017); empty before it.
+  Future<Map<String, Duration>> _readVideoDurations(File file) async {
+    final db = await (factoryOverride ?? databaseFactory).openDatabase(
+      file.path,
+      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+    );
+    try {
+      final hasTable = await db.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'youtube_video_durations'",
+      );
+      if (hasTable.isEmpty) return const {};
+      return {
+        for (final row in await db.rawQuery(
+          'SELECT video_id, duration_s FROM youtube_video_durations '
+          'WHERE duration_s > 0',
+        ))
+          row['video_id']! as String: Duration(
+            seconds: row['duration_s']! as int,
+          ),
+      };
     } finally {
       await db.close();
     }

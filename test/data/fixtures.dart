@@ -41,11 +41,12 @@ Future<void> writeMusicDb(String path) async {
 }
 
 /// A `files.db` like MusicDatabase's music library index (`files_index.py`): each of [files]
-/// is (id, path, size, song id).
+/// is (id, path, size, song id); [durations] gives some of them `duration_s` (by file id).
 Future<void> writeFilesDb(
   String path,
-  List<(int, String, int, int?)> files,
-) async {
+  List<(int, String, int, int?)> files, {
+  Map<int, int> durations = const {},
+}) async {
   final db = await databaseFactoryFfi.openDatabase(path);
   await db.execute(
     'CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, path VARCHAR NOT NULL UNIQUE, '
@@ -60,7 +61,26 @@ Future<void> writeFilesDb(
       'size': size,
       'mtime': 0,
       'song_id': songId,
+      'duration_s': durations[id],
       'indexed_at': '2026-10-14T12:00:00+00:00',
+    });
+  }
+  await db.close();
+}
+
+/// Adds music.db's `youtube_video_durations` (MusicDatabase's migration 0017) with [seconds]
+/// per video id.
+Future<void> addVideoDurations(String path, Map<String, int> seconds) async {
+  final db = await databaseFactoryFfi.openDatabase(path);
+  await db.execute(
+    'CREATE TABLE youtube_video_durations (video_id TEXT PRIMARY KEY NOT NULL, '
+    'duration_s INTEGER NOT NULL, fetched_at TEXT NOT NULL)',
+  );
+  for (final MapEntry(:key, :value) in seconds.entries) {
+    await db.insert('youtube_video_durations', {
+      'video_id': key,
+      'duration_s': value,
+      'fetched_at': '2026-10-27 12:00:00',
     });
   }
   await db.close();

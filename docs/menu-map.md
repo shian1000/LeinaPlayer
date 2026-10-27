@@ -811,7 +811,9 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   avatar + name (the YouTube channel / Spotify user; "YouTube"/"Spotify" when unknown,
   "MusicDatabase" for a folder; made on the phone: the account it syncs with, else "Leina
   Radio"), source icon
-  (YouTube / Spotify) + "N utworów • X godz. Y min" (sum of the known lengths).
+  (YouTube / Spotify) + "N utworów • X godz. Y min" (sum of the known lengths — a track's own,
+  else music.db's video length, else its library file's; "ponad X godz. Y min" while some are
+  unknown).
 - Menu (⋮) **→ sheet**, IDs `Playlista › Menu (⋮) › <pozycja>`: **Udostępnij** (implemented, the
   same sheet as the icon below), **Dodaj do kolejki** / **Odtwórz jako następną** (implemented:
   the whole playlist into the queue, remembered as played from it; also in a preview's ⋮),

@@ -14,7 +14,13 @@ fetching, title cleanup), `screens/playlist_import.dart`, `screens/playlist_scre
   playlists imported before v8 need re-importing to get it; `play_history` got the same column).
 - `playlist_tracks`: (playlist_id, position) key, artist, title, `main_db_id` (MusicDatabase
   `songs.id` when recognised), `youtube_video_id` (always for YouTube imports, never for Spotify
-  ones), `duration_s`.
+  ones), `duration_s` (what the source said; often empty for songs added from music.db).
+- A playlist's length is worked out when reading (`playlistTrackLength`, MusicDatabase's hand-off
+  `video-durations-for-musicdatabaseapp.md`): the track's own `duration_s`, else music.db's
+  `youtube_video_durations` for its video (its own, else its song's current link), else the
+  song's `files.db` `duration_s`. Never written back to `playlist_tracks` (they sync; a newer
+  music.db would disagree). Tracks still without one are `PlaylistSummary.unknownLengths`, and
+  the header then says "ponad …". `PlaylistLibrary` reloads when a new music.db is loaded.
 - Re-importing the same playlist replaces its tracks instead of adding a duplicate — except
   YouTube tracks whose video YouTube removed (below). Its name stays as it is on the phone (the
   user may have renamed it, ⋮ › Zmień nazwę); there's no flag telling a renamed one apart, so a

@@ -34,6 +34,7 @@ class PlaylistSummary {
     required this.owner,
     required this.trackCount,
     required this.duration,
+    this.unknownLengths = 0,
     required this.updatedAt,
     this.createdAt,
     this.source,
@@ -53,8 +54,11 @@ class PlaylistSummary {
   final String? owner;
   final int trackCount;
 
-  /// Sum of the known track lengths.
+  /// Sum of the known track lengths ([playlistTrackLength]).
   final Duration duration;
+
+  /// How many tracks have no known length: [duration] is then only "at least".
+  final int unknownLengths;
   final DateTime updatedAt;
 
   /// When it was saved on the phone (or made on another device, for a synced one); `null` for a
@@ -138,6 +142,19 @@ class PlaylistTrack {
   String? get playableVideoId => videoRemoved ? null : youtubeVideoId;
 }
 
+/// How long [track] is, worked out when reading (hand-off
+/// `video-durations-for-musicdatabaseapp.md`): its own length (what YouTube, Spotify or the file
+/// said), else music.db's length of the video it plays (its own, else its song's), else the
+/// song's library file in `files.db`. Never written back to `playlist_tracks`: those rows sync,
+/// and a newer music.db would disagree with them.
+Duration? playlistTrackLength(PlaylistTrack track, SongCatalog catalog) {
+  if (track.duration case final own? when own > Duration.zero) return own;
+  final song = track.mainDbId == null ? null : catalog.current(track.mainDbId!);
+  return catalog.videoDuration(track.playableVideoId) ??
+      catalog.videoDuration(song?.youtubeVideoId) ??
+      song?.serverFile?.duration;
+}
+
 /// What an import did, for the message shown afterwards.
 typedef PlaylistImportResult = ({
   PlaylistSummary playlist,
@@ -182,7 +199,9 @@ class PlaylistLibrary extends ChangeNotifier {
     this.covers,
   }) : _now = now ?? DateTime.now,
        _userName = userName ?? (() => null),
-       _authToken = authToken ?? (() => null);
+       _authToken = authToken ?? (() => null) {
+    _catalog.addListener(_catalogChanged);
+  }
 
   final Future<Database> Function() _database;
   final SongCatalog _catalog;
@@ -218,15 +237,51 @@ class PlaylistLibrary extends ChangeNotifier {
           );
   }
 
+  /// The catalog [load] last worked out track lengths from: a newer one reloads them.
+  (CatalogStatus, DateTime?)? _lengthsFrom;
+
+  void _catalogChanged() {
+    final from = (_catalog.status, _catalog.loadedSyncTime);
+    if (_lengthsFrom == null ||
+        _lengthsFrom == from ||
+        _catalog.status == CatalogStatus.loading ||
+        _catalog.status == CatalogStatus.notLoaded) {
+      return;
+    }
+    load();
+  }
+
+  @override
+  void dispose() {
+    _catalog.removeListener(_catalogChanged);
+    super.dispose();
+  }
+
   Future<void> load() async {
     final scope = _scope('p.');
+    _lengthsFrom = (_catalog.status, _catalog.loadedSyncTime);
     final rows = await (await _database()).rawQuery('''
       SELECT p.id, p.uid, p.name, p.owner, p.created_at, p.updated_at, p.source, p.source_id, p.account,
              p.cover_sha256, p.youtube_copy_id, p.youtube_copy_done,
-             COUNT(t.position) AS tracks, COALESCE(SUM(t.duration_s), 0) AS seconds
+             COUNT(t.position) AS tracks
       FROM playlists p LEFT JOIN playlist_tracks t ON t.playlist_id = p.id
       WHERE p.deleted_at IS NULL AND ${scope.where}
       GROUP BY p.id ORDER BY p.updated_at DESC''', scope.args);
+    final lead = <int, List<PlaylistTrack>>{};
+    final lengths = <int, ({Duration known, int unknown})>{};
+    for (final row in await (await _database()).rawQuery('''
+      SELECT t.* FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id
+      WHERE p.deleted_at IS NULL AND ${scope.where}
+      ORDER BY t.playlist_id, t.position''', scope.args)) {
+      final id = row['playlist_id']! as int;
+      final track = _track(row);
+      if (track.position < leadTrackCount) (lead[id] ??= []).add(track);
+      final length = playlistTrackLength(track, _catalog);
+      final sum = lengths[id] ?? (known: Duration.zero, unknown: 0);
+      lengths[id] = length == null
+          ? (known: sum.known, unknown: sum.unknown + 1)
+          : (known: sum.known + length, unknown: sum.unknown);
+    }
     _playlists = [
       for (final row in rows)
         PlaylistSummary(
@@ -235,7 +290,8 @@ class PlaylistLibrary extends ChangeNotifier {
           name: row['name']! as String,
           owner: row['owner'] as String?,
           trackCount: row['tracks']! as int,
-          duration: Duration(seconds: row['seconds']! as int),
+          duration: lengths[row['id']]?.known ?? Duration.zero,
+          unknownLengths: lengths[row['id']]?.unknown ?? 0,
           updatedAt: DateTime.fromMillisecondsSinceEpoch(
             row['updated_at']! as int,
           ),
@@ -250,16 +306,6 @@ class PlaylistLibrary extends ChangeNotifier {
           youTubeCopyDone: row['youtube_copy_done'] as int?,
         ),
     ];
-    final lead = <int, List<PlaylistTrack>>{};
-    for (final row in await (await _database()).rawQuery(
-      '''
-      SELECT t.* FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id
-      WHERE t.position < ? AND p.deleted_at IS NULL AND ${scope.where}
-      ORDER BY t.playlist_id, t.position''',
-      [leadTrackCount, ...scope.args],
-    )) {
-      (lead[row['playlist_id']! as int] ??= []).add(_track(row));
-    }
     _leadTracks = lead;
     notifyListeners();
   }

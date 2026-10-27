@@ -415,16 +415,21 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       SpotifyPlaylistData(:final name, :final owner) => (name, owner),
       _ => (found.name, found.owner),
     };
-    final tracks = _tracks;
+    // Not a dependency: also read from callbacks, and the screen rebuilds with the catalog anyway.
+    final catalog = context
+        .getInheritedWidgetOfExactType<SongCatalogScope>()
+        ?.notifier;
+    final lengths = [
+      for (final t in _tracks ?? const <PlaylistTrack>[])
+        catalog == null ? t.duration : playlistTrackLength(t, catalog),
+    ];
     return PlaylistSummary(
       id: -1,
       name: name,
       owner: owner,
-      trackCount: tracks?.length ?? found.trackCount ?? 0,
-      duration: (tracks ?? const <PlaylistTrack>[]).fold(
-        Duration.zero,
-        (sum, t) => sum + (t.duration ?? Duration.zero),
-      ),
+      trackCount: _tracks?.length ?? found.trackCount ?? 0,
+      duration: lengths.nonNulls.fold(Duration.zero, (sum, d) => sum + d),
+      unknownLengths: lengths.where((d) => d == null).length,
       updatedAt: DateTime.now(),
       source: found.source,
       sourceId: found.id,
@@ -920,7 +925,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             [
                               trackCountLabel(_playlist.trackCount),
                               if (_playlist.duration > Duration.zero)
-                                _length(_playlist.duration),
+                                playlistLengthLabel(_playlist),
                             ].join(' • '),
                             style: TextStyle(color: palette.textSecondary),
                           ),
@@ -1083,10 +1088,14 @@ String trackCountLabel(int n) {
   return '$n $word';
 }
 
-/// "3 godz. 12 min" / "45 min".
-String _length(Duration d) => d.inHours > 0
-    ? '${d.inHours} godz. ${d.inMinutes % 60} min'
-    : '${d.inMinutes} min';
+/// "3 godz. 12 min" / "45 min"; "ponad 3 godz. 12 min" when some tracks' lengths are unknown.
+String playlistLengthLabel(PlaylistSummary playlist) {
+  final d = playlist.duration;
+  final length = d.inHours > 0
+      ? '${d.inHours} godz. ${d.inMinutes % 60} min'
+      : '${d.inMinutes} min';
+  return playlist.unknownLengths > 0 ? 'ponad $length' : length;
+}
 
 /// "Pobierz" for the whole playlist: ⬇ downloads every song not on the phone yet, a spinner
 /// while it works, a filled mark once all are — tapped then, it asks before taking them off.

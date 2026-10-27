@@ -123,6 +123,31 @@ void main() {
       expect(again.byId(3)!.serverFile, isNull);
     });
 
+    test('video lengths come from youtube_video_durations, file lengths from '
+        'files.db; unknown without them', () async {
+      await loadSample();
+      expect(catalog.videoDuration('X2XWBcd5jn0'), isNull);
+
+      final path = (await sync.localFile('music.db')).path;
+      await addVideoDurations(path, {'X2XWBcd5jn0': 245});
+      await writeFilesDb(
+        (await sync.localFile('files.db')).path,
+        [
+          (10, 'Led Zeppelin/Going to California.mp3', 6000, 2),
+          (11, 'Afina/Pay Your Respect.mp3', 6000, 3),
+        ],
+        durations: {10: 211},
+      );
+      final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      addTearDown(again.dispose);
+      await again.ensureLoaded();
+      expect(again.videoDuration('X2XWBcd5jn0'), const Duration(seconds: 245));
+      expect(again.videoDuration('other123456'), isNull);
+      expect(again.videoDuration(null), isNull);
+      expect(again.byId(2)!.serverFile!.duration, const Duration(seconds: 211));
+      expect(again.byId(3)!.serverFile!.duration, isNull);
+    });
+
     test('Latin forms of names in another alphabet: music.db\'s, else an '
         'artist\'s Latin synonym; found by search', () async {
       final path = (await sync.localFile('music.db')).path;
