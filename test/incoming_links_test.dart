@@ -180,6 +180,18 @@ void main() {
         expect((request.artist, request.title), ('Бумбокс', 'Твiй на 100%'));
         expect(request.youtubeVideoId, 'Ws-hd5C5STg');
 
+        // The left part is the song, the right one only junk: the channel is the artist.
+        final lyricVideo = SongRequest.of(
+          searched(
+            const YouTubeVideo(
+              id: 'QrS48ruO-8U',
+              title: 'Glow - Lyric Video (English / French)',
+              channel: 'Attic Ocean',
+            ),
+          ),
+        )!;
+        expect((lyricVideo.artist, lyricVideo.title), ('Attic Ocean', 'Glow'));
+
         final known = searched(
           const YouTubeVideo(
             id: 'aaaaaaaaaaa',

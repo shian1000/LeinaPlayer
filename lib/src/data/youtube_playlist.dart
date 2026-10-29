@@ -1,3 +1,4 @@
+import 'text_normalizer.dart';
 import 'youtube_video.dart';
 
 /// A YouTube playlist as fetched for import.
@@ -34,7 +35,8 @@ String? extractPlaylistId(String raw) {
 /// `build_metadata_from_item()` (`src/utils/youtube/import_from_playlist.py`; ADR 0003): drops
 /// "| channel" suffixes, hashtags and junk brackets ("(Official Video)", "[HD]", "(2019)"), takes
 /// the artist from a "`<Artist> - Topic`" channel, else splits "Artist - Title", else uses the
-/// channel name. Real version markers (Remix, Live, feat., …) are kept.
+/// channel name. "Title - Lyric Video (English / French)" — junk only after the separator — is
+/// the left part by the channel. Real version markers (Remix, Live, feat., …) are kept.
 ({String artist, String title}) parseYouTubeTrack(
   String videoTitle,
   String channel,
@@ -54,8 +56,13 @@ String? extractPlaylistId(String raw) {
     song = title;
   } else {
     final split = _splitSpaced(title);
-    artist = split?.$1 ?? _cleanChannel(channel);
-    song = split?.$2 ?? title;
+    if (split != null && _isJunkOnly(split.$2, split.$1, channel)) {
+      artist = _cleanChannel(channel);
+      song = split.$1;
+    } else {
+      artist = split?.$1 ?? _cleanChannel(channel);
+      song = split?.$2 ?? title;
+    }
   }
   song = _stripArtist(song, artist);
   song = _stripJunkSuffix(song).replaceAll(_doubleQuotes, '').trim();
@@ -131,6 +138,28 @@ String _stripJunkSuffix(String title) {
     }
   }
   return null;
+}
+
+/// Words a "`<song> - <junk>`" title's right part is made of (lite counterpart of the
+/// junk-only-title check of MusicDatabase's song request recovery).
+final _junkOnlyWords = RegExp(
+  r'\b(official|music|lyric|lyrics|video|videoclip|clip|audio|visualiser|visualizer|'
+  r'animation|animated|hd|hq|4k|teledysk|tekst|oficial|officiel)\b',
+  caseSensitive: false,
+);
+
+/// [right] holds nothing but junk words once brackets are dropped ("Lyric Video (English /
+/// French)"). Not when [left] is the channel's own name: then it is the artist ("India.Arie -
+/// Video" by India.Arie), nor without a channel to take the artist from.
+bool _isJunkOnly(String right, String left, String channel) {
+  final words = right.replaceAll(_anyBracket, ' ');
+  if (normalizeForSearch(words).isEmpty ||
+      normalizeForSearch(words.replaceAll(_junkOnlyWords, ' ')).isNotEmpty) {
+    return false;
+  }
+  final name = normalizeForSearch(_cleanChannel(channel)).replaceAll(' ', '');
+  return name.isNotEmpty &&
+      normalizeForSearch(left).replaceAll(' ', '') != name;
 }
 
 /// "DawidPodsiadloVEVO" → "DawidPodsiadlo", "Kamp! Official" → "Kamp!".

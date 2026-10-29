@@ -88,7 +88,10 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    playlist it knew had 19 — an empty result counts as that method failing.
 2. Each video → artist/title with `parseYouTubeTrack()`, a lite version of MusicDatabase's
    `build_metadata_from_item()` (Topic channel = artist; "Artist - Title"; junk brackets, pipe
-   suffix, hashtags dropped; real versions like Remix/Live kept). ADR 0003.
+   suffix, hashtags dropped; real versions like Remix/Live kept). When the part after " - " is
+   junk only ("Glow - Lyric Video (English / French)" by Attic Ocean) the left part is the
+   title and the channel (no VEVO) the artist — unless the left part is the channel's own name.
+   The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
 3. Recognising the MusicDatabase song (`PlaylistLibrary.matchSong`): **by the video first** —
    music.db's `youtube_video_id`, then a video the phone matched earlier (`youtube_matches`) —
    then exact title + artist (`SongCatalog.findExact`). A recognised track stores MusicDatabase's

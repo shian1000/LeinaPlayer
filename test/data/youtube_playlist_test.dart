@@ -58,6 +58,26 @@ void main() {
       ));
     });
 
+    test('junk only after the separator: the left part by the channel', () {
+      expect(p('Glow - Lyric Video (English / French)', 'Attic Ocean'), (
+        artist: 'Attic Ocean',
+        title: 'Glow',
+      ));
+      expect(p('Pidvalia - Official Music Video', 'DakhaBrakhaVEVO'), (
+        artist: 'DakhaBrakha',
+        title: 'Pidvalia',
+      ));
+      expect(p('Attic Ocean - Glow', 'Attic Ocean'), (
+        artist: 'Attic Ocean',
+        title: 'Glow',
+      ));
+      // The channel's own name on the left is the artist, even before a junk-looking title.
+      expect(p('India.Arie - Video', 'India.Arie'), (
+        artist: 'India.Arie',
+        title: 'Video',
+      ));
+    });
+
     test('real versions are kept', () {
       expect(
         p('Björk - Army of Me (Sucker Punch Remix) [From Sucker Punch]', 'x'),
