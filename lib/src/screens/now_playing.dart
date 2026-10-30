@@ -754,9 +754,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             ),
                             Material(
                               color: palette.textPrimary,
-                              shape: palette.rounded
-                                  ? const CircleBorder()
-                                  : const RoundedRectangleBorder(),
+                              shape: palette.buttonShape,
                               child: IconButton(
                                 tooltip: player.playing ? 'Pauza' : 'Odtwórz',
                                 iconSize: 44,

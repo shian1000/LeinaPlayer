@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart'
+    show LicenseEntryWithLineBreaks, LicenseRegistry;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -48,6 +50,11 @@ import 'src/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'Rajdhani',
+    ], await rootBundle.loadString('assets/fonts/rajdhani/OFL.txt'));
+  });
   // From the very start, so start-up failures can be reported too ("Zgłoś problem").
   ErrorLog.captureApp();
   unawaited(

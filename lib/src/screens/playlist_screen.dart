@@ -974,9 +974,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         tooltip: 'Odtwórz playlistę',
                         backgroundColor: palette.accent,
                         foregroundColor: palette.onAccent,
-                        shape: palette.rounded
-                            ? const CircleBorder()
-                            : const RoundedRectangleBorder(),
+                        shape: palette.buttonShape,
                         onPressed: hits.isEmpty
                             ? null
                             : () => runQueueAction(

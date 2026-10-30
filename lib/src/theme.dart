@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
@@ -43,7 +45,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.likedGradient,
     this.outline,
     this.rounded = true,
+    this.chamfered = false,
     this.panelHeaders = false,
+    this.uppercaseTitles = false,
   });
 
   final Color background;
@@ -76,8 +80,16 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// False gives square corners everywhere.
   final bool rounded;
 
-  /// Section headings drawn as window title bars ("NAZWA ×") instead of plain bold text.
+  /// Cut corners (`ChamferedBorder`) on chips, cards, buttons and sheets instead of rounded or
+  /// square ones; what's clipped with [radius] (covers) stays square.
+  final bool chamfered;
+
+  /// Section headings drawn as window title bars ("NAZWA ×") instead of plain bold text; with
+  /// [chamfered], as a tab with a cut corner.
   final bool panelHeaders;
+
+  /// Tab titles in capitals. Song, artist and playlist names keep their own spelling.
+  final bool uppercaseTitles;
 
   BorderRadius radius(double value) =>
       BorderRadius.circular(rounded ? value : 0);
@@ -86,16 +98,30 @@ class AppPalette extends ThemeExtension<AppPalette> {
       outline == null ? BorderSide.none : BorderSide(color: outline!);
 
   /// Shape for chips and pill buttons.
-  OutlinedBorder get pillShape => rounded
+  OutlinedBorder get pillShape => chamfered
+      ? ChamferedBorder(side: outlineSide, cut: 6)
+      : rounded
       ? StadiumBorder(side: outlineSide)
       : RoundedRectangleBorder(side: outlineSide);
 
   /// Shape for cards, tiles and banners with the given corner radius.
-  RoundedRectangleBorder boxShape(double cornerRadius) =>
-      RoundedRectangleBorder(
-        borderRadius: radius(cornerRadius),
-        side: outlineSide,
-      );
+  OutlinedBorder boxShape(double cornerRadius) => chamfered
+      ? ChamferedBorder(
+          side: outlineSide,
+          cut: cornerRadius.clamp(6, 12),
+          notch: accent,
+        )
+      : RoundedRectangleBorder(
+          borderRadius: radius(cornerRadius),
+          side: outlineSide,
+        );
+
+  /// Shape for round icon buttons (play, the playlist's play button).
+  OutlinedBorder get buttonShape => chamfered
+      ? const ChamferedBorder(cut: 12)
+      : rounded
+      ? const CircleBorder()
+      : const RoundedRectangleBorder();
 
   /// Deterministic colour per title, so placeholders look varied but stay stable between rebuilds.
   Color colorForSeed(String seed) {
@@ -110,6 +136,74 @@ class AppPalette extends ThemeExtension<AppPalette> {
   @override
   AppPalette lerp(AppPalette? other, double t) =>
       other == null || t < 0.5 ? this : other;
+}
+
+/// A box with its top-left and bottom-right corners cut off and, given a [notch] colour, a small
+/// filled triangle in the top-right corner — the panels and buttons of cyberpunk HUD wallpapers.
+class ChamferedBorder extends OutlinedBorder {
+  const ChamferedBorder({super.side, this.cut = 8, this.notch});
+
+  final double cut;
+  final Color? notch;
+
+  Path _path(Rect rect) {
+    final c = math.min(cut, rect.shortestSide / 2);
+    return Path()
+      ..moveTo(rect.left + c, rect.top)
+      ..lineTo(rect.right, rect.top)
+      ..lineTo(rect.right, rect.bottom - c)
+      ..lineTo(rect.right - c, rect.bottom)
+      ..lineTo(rect.left, rect.bottom)
+      ..lineTo(rect.left, rect.top + c)
+      ..close();
+  }
+
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.all(side.strokeInset);
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) => _path(rect);
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) =>
+      _path(rect.deflate(side.strokeInset));
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    if (side.style != BorderStyle.none && side.width > 0) {
+      canvas.drawPath(_path(rect.deflate(side.width / 2)), side.toPaint());
+    }
+    if (notch != null && rect.shortestSide >= 32) {
+      final size = math.min(8.0, rect.shortestSide / 5);
+      final corner = rect.topRight.translate(-3, 3);
+      canvas.drawPath(
+        Path()
+          ..moveTo(corner.dx - size, corner.dy)
+          ..lineTo(corner.dx, corner.dy)
+          ..lineTo(corner.dx, corner.dy + size)
+          ..close(),
+        Paint()..color = notch!,
+      );
+    }
+  }
+
+  @override
+  ShapeBorder scale(double t) =>
+      ChamferedBorder(side: side.scale(t), cut: cut * t, notch: notch);
+
+  @override
+  ChamferedBorder copyWith({BorderSide? side}) =>
+      ChamferedBorder(side: side ?? this.side, cut: cut, notch: notch);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChamferedBorder &&
+      other.side == side &&
+      other.cut == cut &&
+      other.notch == notch;
+
+  @override
+  int get hashCode => Object.hash(side, cut, notch);
 }
 
 extension AppPaletteContext on BuildContext {
@@ -207,6 +301,45 @@ const lainTheme = AppThemeDef(
   fontFamily: 'monospace',
 );
 
+/// After cyberpunk HUD phone wallpapers (user's Pins folder, red/cyan "cyberdeck" ones): a
+/// near-black page with a red tint, red frames and subtitles, cyan accents, cut corners with a
+/// notch, tab-like section headings and the narrow technical Rajdhani font (bundled, OFL).
+const cyberpunkTheme = AppThemeDef(
+  'Cyberpunk',
+  AppPalette(
+    background: Color(0xFF0E0A0D),
+    surface: Color(0xFF170F13),
+    surfaceHigh: Color(0xFF16191D),
+    chip: Color(0xFF1C2226),
+    accent: Color(0xFF5FE3E8),
+    onAccent: Color(0xFF051416),
+    textPrimary: Color(0xFFD8F4F5),
+    textSecondary: Color(0xFFD65A50),
+    badge: Color(0xFFE0524A),
+    divider: Color(0xFF3A1D20),
+    navBar: Color(0xFF0A0C0F),
+    snackBackground: Color(0xFF0F2A2D),
+    snackForeground: Color(0xFF8FF3F6),
+    coverColors: [
+      Color(0xFF7A2420),
+      Color(0xFF16585C),
+      Color(0xFF9E3A33),
+      Color(0xFF0F3E42),
+      Color(0xFF5A1A26),
+      Color(0xFF1F6F73),
+      Color(0xFF3B1418),
+      Color(0xFF24474F),
+    ],
+    likedGradient: [Color(0xFF8C2A2A), Color(0xFF5FE3E8)],
+    outline: Color(0xFFB8403A),
+    rounded: false,
+    chamfered: true,
+    panelHeaders: true,
+    uppercaseTitles: true,
+  ),
+  fontFamily: 'Rajdhani',
+);
+
 /// Light counterpart of Dummify: white background, near-black text, a darker green so the
 /// accent stays readable as text on white.
 const dummifyLightTheme = AppThemeDef(
@@ -281,7 +414,7 @@ const redesignLightTheme = AppThemeDef(
 const lightThemes = [dummifyLightTheme, redesignLightTheme];
 
 /// Themes offered under "Motyw ciemny".
-const darkThemes = [dummifyTheme, lainTheme];
+const darkThemes = [dummifyTheme, lainTheme, cyberpunkTheme];
 
 ThemeData buildAppTheme(AppThemeDef def) {
   final p = def.palette;
@@ -356,13 +489,36 @@ ThemeData buildAppTheme(AppThemeDef def) {
       backgroundColor: p.surfaceHigh,
       dragHandleColor: p.textSecondary,
       showDragHandle: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(p.rounded ? 28 : 0),
-        ),
-        side: p.outlineSide,
-      ),
+      shape: p.chamfered
+          ? ChamferedBorder(side: p.outlineSide, cut: 20)
+          : RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(p.rounded ? 28 : 0),
+              ),
+              side: p.outlineSide,
+            ),
     ),
+    dialogTheme: p.chamfered ? DialogThemeData(shape: p.boxShape(12)) : null,
+    filledButtonTheme: p.chamfered
+        ? FilledButtonThemeData(
+            style: FilledButton.styleFrom(shape: p.pillShape),
+          )
+        : null,
+    outlinedButtonTheme: p.chamfered
+        ? OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(shape: p.pillShape),
+          )
+        : null,
+    textButtonTheme: p.chamfered
+        ? TextButtonThemeData(
+            style: TextButton.styleFrom(shape: const ChamferedBorder(cut: 6)),
+          )
+        : null,
+    elevatedButtonTheme: p.chamfered
+        ? ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(shape: p.pillShape),
+          )
+        : null,
     drawerTheme: DrawerThemeData(
       backgroundColor: p.surface,
       shape: RoundedRectangleBorder(side: p.outlineSide),

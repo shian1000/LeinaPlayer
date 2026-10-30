@@ -90,7 +90,9 @@ class SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     if (palette.panelHeaders) {
-      return _PanelTitleBar(text, icon: icon, trailing: trailing);
+      return palette.chamfered
+          ? _TabTitleBar(text, icon: icon, trailing: trailing)
+          : _PanelTitleBar(text, icon: icon, trailing: trailing);
     }
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 20, trailing == null ? 16 : 4, 10),
@@ -166,6 +168,63 @@ class _PanelTitleBar extends StatelessWidget {
   }
 }
 
+/// Section heading as a filled tab with a cut corner, then a thin line in the same colour to the
+/// edge — the panel labels of cyberpunk HUD wallpapers.
+class _TabTitleBar extends StatelessWidget {
+  const _TabTitleBar(this.text, {this.icon, this.trailing});
+
+  final String text;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final colour = palette.outline ?? palette.accent;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 20, trailing == null ? 16 : 4, 10),
+      child: Row(
+        children: [
+          Flexible(
+            flex: 4,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(10, 3, 18, 3),
+              decoration: ShapeDecoration(
+                color: colour,
+                shape: const ChamferedBorder(cut: 10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 16, color: palette.textPrimary),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      text.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppFontSize.listTitle,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(child: Divider(color: colour, height: 1)),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+}
+
 /// Top bar of each bottom-nav tab: a title (or other [content], e.g. Home's filter chips), then
 /// optional actions. No avatar: the profile is the "Ja" tab, down by the thumb (Juxtopposed's
 /// Spotify redesign).
@@ -198,12 +257,17 @@ class TabHeader extends StatelessWidget {
               child:
                   content ??
                   Text(
-                    title!,
+                    context.palette.uppercaseTitles
+                        ? title!.toUpperCase()
+                        : title!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: AppFontSize.tabTitle,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: context.palette.uppercaseTitles
+                          ? 1.5
+                          : null,
                     ),
                   ),
             ),

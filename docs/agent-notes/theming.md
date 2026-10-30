@@ -3,9 +3,9 @@
 - A theme is an `AppThemeDef` in `lib/src/theme.dart`: a name, an `AppPalette` and an optional
   `fontFamily`. `buildAppTheme()` turns it into `ThemeData` and attaches the palette as a
   `ThemeExtension`.
-- Screens never hard-code colours, corner radii or pill/stadium shapes. They use
+- Screens never hard-code colours, corner radii or pill/stadium/circle shapes. They use
   `context.palette` (`accent`, `textSecondary`, `colorForSeed()`, `radius()`, `pillShape`,
-  `boxShape()`, `outlineSide`…) plus the defaults `ThemeData` already applies (list tiles, app bars,
+  `boxShape()`, `buttonShape`, `outlineSide`…) plus the defaults `ThemeData` already applies (list tiles, app bars,
   dividers, snackbars, sheets, switches). A literal `Colors.white` in a screen will look wrong in
   other themes.
 - `ThemeController` (`lib/src/theme_controller.dart`) sits above `MaterialApp` and holds the
@@ -32,12 +32,24 @@
   folder): near-black navy, cyan accent, steel-blue window chrome (`outline`), square corners
   (`rounded: false`), section headings as window title bars with "×" (`panelHeaders: true`), and
   Android's built-in `monospace` font (nothing bundled).
+- **Cyberpunk** (dark) — after red/cyan cyberpunk HUD phone wallpapers (user's Pins folder; the
+  user picked this palette over black/yellow and green ones): near-black page, red frames
+  (`outline`) and subtitles (`textSecondary`), cyan accent, `chamfered: true` — `ChamferedBorder`
+  cuts the top-left and bottom-right corners of chips, cards, buttons, dialogs and sheets, and
+  cards (`boxShape`) get a small accent triangle in the top-right corner; what's clipped with
+  `radius()` (covers) stays square. Section headings are a red tab with a cut corner and a line
+  to the edge; `uppercaseTitles` puts tab titles in capitals (song, artist and playlist names
+  keep their spelling — user's choice; AppBar titles aren't uppercased). Font: Rajdhani
+  (`assets/fonts/rajdhani/`, SIL OFL, its licence registered in `main()` for Licencje
+  bibliotek); it has Latin Extended but no Cyrillic, which falls back to the system font. The
+  native "Otwórz w…" sheet only knows `monospace`, so there it uses the system font.
 
 ## Adding a theme
 
 1. Add a `const AppThemeDef(...)` in `theme.dart` and append it to `darkThemes`, or — with
    `brightness: Brightness.light` — to `lightThemes`.
-2. Fill every palette field; `coverColors` needs at least two entries (the picker previews the
+2. Fill every palette field (`rounded`, `chamfered`, `panelHeaders`, `uppercaseTitles` are
+   optional switches); `coverColors` needs at least two entries (the picker previews the
    first two).
 3. Check the Wygląd picker preview and the main screens on the phone; wide fonts may need
    `FittedBox`/ellipsis in tight spots (see the quick tiles in `settings_screen.dart`).

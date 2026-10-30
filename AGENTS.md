@@ -255,6 +255,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `LaterLinks.kt` (links saved for later), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
+- `assets/fonts/rajdhani/` — the Cyberpunk theme's font (OFL, licence in `OFL.txt`).
 - `third_party/audio_service/` — a patched copy of audio_service 0.18.19 (`dependency_overrides`
   in `pubspec.yaml`): without the patch the notification's and lock screen's buttons die for
   good once Android stops the service while the app's engine lives on (seen on the Pixel after
@@ -410,7 +411,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 
 ## Topic notes (`docs/agent-notes/`)
 
-- [`theming.md`](docs/agent-notes/theming.md) — themes (Dummify, Lain), `context.palette`, how to add
+- [`theming.md`](docs/agent-notes/theming.md) — themes (Dummify, Lain, Cyberpunk), `context.palette`, how to add
   one.
 - [`local-library.md`](docs/agent-notes/local-library.md) — phone music scan, matching files to
   MusicDatabase (tags first — user's decision), `local.db`, search availability (incl. YouTube
