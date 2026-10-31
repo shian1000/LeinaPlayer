@@ -106,7 +106,11 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    own spelling.
 
 When shown, `playlistHit()` also re-checks the video against music.db, so a song MusicDatabase
-links later shows as recognised without re-importing. `PlaylistScreen` calls
+links later shows as recognised without re-importing; failing that, exact title + artist
+(`playlistSongByName`; never for a track without an artist). `PlaylistLibrary.load` also writes
+a song found by name into `main_db_id` and marks the playlist dirty (not `updated_at`, which
+would reorder Biblioteka) so MusicDatabase's copy gets it (owner's choice, 2026-10-31) — once
+per run per track, so a server dropping the id can't loop syncs. `PlaylistScreen` calls
 `SongCatalog.ensureLoaded()` itself: music.db is otherwise only read when search opens, and
 without it no track looks recognised.
 

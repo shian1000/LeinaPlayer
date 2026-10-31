@@ -311,6 +311,41 @@ void main() {
     );
   }
 
+  testWidgets('a track saved before music.db had its song is in the database '
+      'by its title and artist', (tester) async {
+    await pumpLibrary(
+      tester,
+      before: () async {
+        await importDoAuta();
+        await (await library.database()).insert('playlist_tracks', {
+          'playlist_id': playlists.playlists.single.id,
+          'position': 2,
+          'title': 'Pusty',
+          'artist': 'Artur Rojek',
+          'youtube_video_id': 'p1',
+        });
+      },
+    );
+    await tester.tap(find.text('Do auta'));
+    await settle(tester, until: find.text('Pusty'));
+    expect(find.byTooltip('Spoza bazy danych'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Menu playlisty (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+    );
+    await settle(tester, until: find.text('Poza bazą danych: 1 z 3'));
+    expect(find.text('Utwór'), findsOneWidget);
+    expect(find.text('Pusty'), findsNothing);
+  });
+
   testWidgets(
     'holding a track ticks it; Back unticks; the ticked tracks go to a new '
     'playlist',

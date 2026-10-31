@@ -106,6 +106,69 @@ void main() {
     expect((tracks[3].artist, tracks[3].title), ('Nieznany', 'Utwór'));
   });
 
+  test(
+    'a track saved without its MusicDatabase song is recognised by title and '
+    'artist, and the song is written into the playlist to sync',
+    () async {
+      final result = await playlists.importYouTube(
+        data([
+          v('X2XWBcd5jn0', 'Jakiś zupełnie inny tytuł', 'Kanał'),
+          v('gtc', 'Led Zeppelin - Going To California', 'x'),
+          v('p1', 'Pusty', 'Artur Rojek - Topic'),
+        ]),
+      );
+      final id = result.playlist.id;
+      final db = await local.database();
+      // As saved before music.db had the songs; "gtc" lost its artist too.
+      await db.update('playlist_tracks', {'main_db_id': null});
+      await db.update('playlist_tracks', {
+        'artist': null,
+      }, where: 'position = 1');
+      await db.update('playlists', {'dirty': 0});
+      final updatedAt = (await db.query('playlists')).single['updated_at'];
+
+      final saved = await playlists.tracks(id);
+      expect(
+        [
+          for (final t in saved)
+            playlistHit(t, catalog, local, youTube).mainSong?.id,
+        ],
+        [1, null, 4],
+      );
+
+      await playlists.load();
+      expect(
+        [for (final t in await playlists.tracks(id)) t.mainDbId],
+        [
+          // Found by its video: music.db's link is enough, nothing to write.
+          null,
+          // No artist, no guess.
+          null,
+          4,
+        ],
+      );
+      final row = (await db.query('playlists')).single;
+      expect(row['dirty'], 1);
+      expect(row['updated_at'], updatedAt);
+
+      // MusicDatabase sent it back without the song: not written (and sent) again this run.
+      await db.update('playlist_tracks', {'main_db_id': null});
+      await db.update('playlists', {'dirty': 0});
+      await playlists.load();
+      expect((await playlists.tracks(id))[2].mainDbId, isNull);
+      expect((await db.query('playlists')).single['dirty'], 0);
+      expect(
+        playlistHit(
+          (await playlists.tracks(id))[2],
+          catalog,
+          local,
+          youTube,
+        ).mainSong?.id,
+        4,
+      );
+    },
+  );
+
   test('a track without its own length takes its video\'s from music.db, '
       'else its library file\'s; the rest count as unknown', () async {
     await addVideoDurations((await sync.localFile('music.db')).path, {

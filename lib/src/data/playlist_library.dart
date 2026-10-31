@@ -147,6 +147,16 @@ class PlaylistTrack {
   String? get playableVideoId => videoRemoved ? null : youtubeVideoId;
 }
 
+/// The MusicDatabase song [track] is by its exact title and artist ([SongCatalog.findExact]),
+/// for a track saved before music.db had the song (or from a server folder, never matched on
+/// import). A track without an artist isn't guessed at.
+CatalogSong? playlistSongByName(PlaylistTrack track, SongCatalog catalog) {
+  final artist = track.artist;
+  return artist == null
+      ? null
+      : catalog.findExact(title: track.title, artist: artist);
+}
+
 /// How long [track] is, worked out when reading (hand-off
 /// `video-durations-for-musicdatabaseapp.md`): its own length (what YouTube, Spotify or the file
 /// said), else music.db's length of the video it plays (its own, else its song's), else the
@@ -243,6 +253,9 @@ class PlaylistLibrary extends ChangeNotifier {
           );
   }
 
+  /// "playlist:position:song" of the tracks [_linkByName] has linked in this run.
+  final _linkedByName = <String>{};
+
   /// The catalog [load] last worked out track lengths from: a newer one reloads them.
   (CatalogStatus, DateTime?)? _lengthsFrom;
 
@@ -266,6 +279,7 @@ class PlaylistLibrary extends ChangeNotifier {
   Future<void> load() async {
     final scope = _scope('p.');
     _lengthsFrom = (_catalog.status, _catalog.loadedSyncTime);
+    final linked = await _linkByName();
     final rows = await (await _database()).rawQuery('''
       SELECT p.id, p.uid, p.name, p.owner, p.created_at, p.updated_at, p.source, p.source_id, p.account,
              p.cover_sha256, p.youtube_copy_id, p.youtube_copy_done,
@@ -314,6 +328,59 @@ class PlaylistLibrary extends ChangeNotifier {
     ];
     _leadTracks = lead;
     notifyListeners();
+    if (linked) onChanged?.call();
+  }
+
+  /// Writes the MusicDatabase song found by title and artist ([playlistSongByName]) into the
+  /// tracks that have none and whose video music.db doesn't know, so MusicDatabase's copy of the
+  /// playlist gets it too (owner's choice, 2026-10-31). `updated_at` stays: the playlist didn't
+  /// change for the user, and a bump would move it to the top of Biblioteka. Whether any was.
+  /// Each link is written once per run ([_linkedByName]): a server that drops the id again
+  /// would otherwise make every sync's [load] send the playlist once more, endlessly.
+  Future<bool> _linkByName() async {
+    if (_catalog.status != CatalogStatus.ready) return false;
+    final scope = _scope('p.');
+    final db = await _database();
+    final found = <({int playlist, int position, int song})>[];
+    for (final row in await db.rawQuery('''
+      SELECT t.* FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id
+      WHERE p.deleted_at IS NULL AND ${scope.where}
+        AND t.main_db_id IS NULL AND t.artist IS NOT NULL''', scope.args)) {
+      final track = _track(row);
+      final videoId = track.playableVideoId;
+      if (videoId != null && _catalog.findByYouTubeId(videoId) != null) {
+        continue;
+      }
+      final song = playlistSongByName(track, _catalog);
+      if (song == null) continue;
+      final key = '${row['playlist_id']}:${track.position}:${song.id}';
+      if (!_linkedByName.add(key)) continue;
+      found.add((
+        playlist: row['playlist_id']! as int,
+        position: track.position,
+        song: song.id,
+      ));
+    }
+    if (found.isEmpty) return false;
+    await db.transaction((txn) async {
+      for (final link in found) {
+        await txn.update(
+          'playlist_tracks',
+          {'main_db_id': link.song},
+          where: 'playlist_id = ? AND position = ? AND main_db_id IS NULL',
+          whereArgs: [link.playlist, link.position],
+        );
+      }
+      for (final id in {for (final link in found) link.playlist}) {
+        await txn.update(
+          'playlists',
+          {'dirty': 1},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+    });
+    return true;
   }
 
   Future<List<PlaylistTrack>> tracks(int playlistId) async {

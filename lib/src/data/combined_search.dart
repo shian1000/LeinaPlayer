@@ -346,7 +346,8 @@ List<FoundAlbum> searchAlbums(
 }
 
 /// The row for a playlist track: the MusicDatabase song when it was recognised (by its
-/// `main_db_id`, or by the video if music.db has linked it since), with its phone files; otherwise
+/// `main_db_id`, by the video if music.db has linked it since, or by its title and artist —
+/// [playlistSongByName]), with its phone files; otherwise
 /// just the playlist's YouTube video, or a phone file not in MusicDatabase with the same title and
 /// artist (a saved queue's), or — with none (Spotify) — its title and artist; with what
 /// the phone learned on YouTube since ([withPhoneYouTube]).
@@ -359,7 +360,8 @@ SearchHit playlistHit(
   final videoId = track.playableVideoId;
   final song =
       (track.mainDbId == null ? null : catalog.byId(track.mainDbId!)) ??
-      (videoId == null ? null : catalog.findByYouTubeId(videoId));
+      (videoId == null ? null : catalog.findByYouTubeId(videoId)) ??
+      playlistSongByName(track, catalog);
   if (song != null) {
     return withPhoneYouTube(
       SearchHit.main(
