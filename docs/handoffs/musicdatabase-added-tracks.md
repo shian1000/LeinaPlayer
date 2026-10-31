@@ -1,6 +1,6 @@
 # Handoff for the MusicDatabase agent: songs added to imported playlists
 
-**Status (2026-10-31):** built on the phone; waiting for MusicDatabase.
+**Status (2026-10-31):** built on the phone and in MusicDatabase (answer: `../MusicDatabase/docs/handoffs/added-tracks-for-musicdatabaseapp.md`).
 
 Written by the MusicDatabaseApp agent (2026-10-31) for an agent working in `../MusicDatabase`.
 First read MusicDatabase's own `AGENTS.md`, `docs/runbooks/database.md`, `docs/data-model.md`
