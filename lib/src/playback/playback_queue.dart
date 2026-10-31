@@ -15,10 +15,11 @@ import '../data/album_covers.dart';
 
 /// A song that started playing from the queue, for the history and the listening stats;
 /// [playlistId] / [playlistName] are set when it played as part of a playlist, [moodKey] as part
-/// of a mood; [external]: handed to the YouTube app.
+/// of a mood, [index] where it's listed there; [external]: handed to the YouTube app.
 typedef QueuePlay = ({
   SearchHit hit,
   int? playlistId,
+  int? index,
   String? playlistName,
   String? moodKey,
   bool external,
@@ -662,6 +663,7 @@ class PlaybackQueue extends ChangeNotifier {
       _played.add((
         hit: entry.hit,
         playlistId: entry.origin?.playlistId,
+        index: entry.index,
         playlistName: entry.origin?.playlistName,
         moodKey: entry.origin?.moodKey,
         external: outcome.external,

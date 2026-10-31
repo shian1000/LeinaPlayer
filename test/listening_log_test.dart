@@ -198,6 +198,7 @@ void main() {
       played.add((
         hit: song(title),
         playlistId: playlistId,
+        index: playlistId == null ? null : 0,
         playlistName: playlistId == null ? null : 'Do auta',
         moodKey: null,
         external: false,
@@ -251,6 +252,7 @@ void main() {
       played.add((
         hit: song('Kukushka'),
         playlistId: null,
+        index: null,
         playlistName: null,
         moodKey: null,
         external: true,

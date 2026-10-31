@@ -878,6 +878,10 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   video found is remembered (full icon from then on). Opening the
   playlist that's playing jumps to the song playing, third row under the app bar (as far as the
   list can scroll; the entry playing, when queued from this playlist, knows its place in it).
+  The song last played from a saved playlist has an accent bookmark before its source icon
+  ("Ostatnio odtwarzany z tej playlisty"; `PlaylistBookmarks` in `playlist_bookmarks.dart` —
+  the row it was queued at, else the same song where it is now; phone only, not synced), and
+  with nothing from the playlist playing, opening it jumps to that song the same way.
 - Track ⋮ **→ the song's menu** (the same as search's, `showSongMenu`), IDs `Playlista › Utwór ›
   Menu (⋮) › <pozycja>`, with Usuń z tej playlisty (**implemented**, every saved playlist; synced;
   an imported one's next import leaves the track out) after the queue entries.

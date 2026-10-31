@@ -6,6 +6,7 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/library_folders.dart';
 import '../data/local_library.dart';
+import '../data/playlist_bookmarks.dart';
 import '../data/playlist_library.dart';
 import '../data/youtube_account.dart';
 import '../data/playlist_search.dart';
@@ -361,7 +362,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         ? _indexOf(wanted, tracks)
         : _savedId != null && playing?.origin?.playlistId == _savedId
         ? playing!.index
-        : null;
+        : _bookmarkedIndex(tracks);
     if (index == null || index < 0 || index >= tracks.length) return;
     // Rows all have the first one's height; rows far down aren't built yet to measure.
     final first = _firstRowKey.currentContext?.findRenderObject() as RenderBox?;
@@ -377,15 +378,31 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   /// Where [track] is in the playlist: by MusicDatabase song, else video, else title.
   static int _indexOf(TrackRef track, List<PlaylistTrack> tracks) {
-    bool Function(PlaylistTrack) test = track.mainDbId != null
-        ? (t) => t.mainDbId == track.mainDbId
-        : track.videoId != null
-        ? (t) => t.youtubeVideoId == track.videoId
-        : (t) => t.title == track.title;
-    final found = tracks.indexWhere(test);
+    final found = tracks.indexWhere(_sameSong(track));
     return found >= 0
         ? found
         : tracks.indexWhere((t) => t.title == track.title);
+  }
+
+  static bool Function(PlaylistTrack) _sameSong(TrackRef track) =>
+      track.mainDbId != null
+      ? (t) => t.mainDbId == track.mainDbId
+      : track.videoId != null
+      ? (t) => t.youtubeVideoId == track.videoId
+      : (t) => t.title == track.title;
+
+  /// The row of the song last played from this playlist: where it was listed then, unless
+  /// "Sortuj" or an edit has moved it since; `null` when there's none or it's gone.
+  int? _bookmarkedIndex(List<PlaylistTrack> tracks) {
+    final id = _savedId;
+    final bookmark = id == null
+        ? null
+        : PlaylistBookmarksScope.maybeOf(context)?.of(id);
+    if (bookmark == null) return null;
+    final at = bookmark.index;
+    if (at < tracks.length && _sameSong(bookmark.track)(tracks[at])) return at;
+    final found = _indexOf(bookmark.track, tracks);
+    return found >= 0 ? found : null;
   }
 
   bool get _searching => _searchEntry != null;
@@ -776,30 +793,39 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         top: MediaQuery.paddingOf(context).top + kToolbarHeight,
         bottom: 24,
       ),
-      children: [for (final (i, hit) in matches) _trackTile(hits, i, hit)],
+      children: [
+        for (final (i, hit) in matches)
+          _trackTile(hits, i, hit, bookmarked: _bookmarkedIndex(_tracks!)),
+      ],
     );
   }
 
-  Widget _trackTile(List<SearchHit> hits, int i, SearchHit hit, {Key? key}) =>
-      SongTile(
-        key: key,
-        hit: hit,
-        selectionKey: i,
-        // Tapping a track queues the whole playlist, starting at that track.
-        queue: hits,
-        queueIndex: i,
-        playlistId: _savedId,
-        youTubeListId: _playlist.youTubeId,
-        playlistName: _playlist.name,
-        // Like the reference app's playlists: just the artist.
-        subtitle: hit.shownArtist(context),
-        trailing: IconButton(
-          tooltip: 'Menu utworu (⋮)',
-          icon: Icon(Icons.more_vert, color: context.palette.textSecondary),
-          onPressed: () => _showTrackMenu(hit, i),
-        ),
-        onLongPress: () => _showTrackMenu(hit, i),
-      );
+  Widget _trackTile(
+    List<SearchHit> hits,
+    int i,
+    SearchHit hit, {
+    Key? key,
+    int? bookmarked,
+  }) => SongTile(
+    key: key,
+    hit: hit,
+    bookmarked: i == bookmarked,
+    selectionKey: i,
+    // Tapping a track queues the whole playlist, starting at that track.
+    queue: hits,
+    queueIndex: i,
+    playlistId: _savedId,
+    youTubeListId: _playlist.youTubeId,
+    playlistName: _playlist.name,
+    // Like the reference app's playlists: just the artist.
+    subtitle: hit.shownArtist(context),
+    trailing: IconButton(
+      tooltip: 'Menu utworu (⋮)',
+      icon: Icon(Icons.more_vert, color: context.palette.textSecondary),
+      onPressed: () => _showTrackMenu(hit, i),
+    ),
+    onLongPress: () => _showTrackMenu(hit, i),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -813,6 +839,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       for (final track in tracks ?? const <PlaylistTrack>[])
         playlistHit(track, catalog, library, youTube),
     ];
+    final bookmarked = tracks == null ? null : _bookmarkedIndex(tracks);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -1063,7 +1090,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   )
                 else
                   for (final (i, hit) in hits.indexed)
-                    _trackTile(hits, i, hit, key: i == 0 ? _firstRowKey : null),
+                    _trackTile(
+                      hits,
+                      i,
+                      hit,
+                      key: i == 0 ? _firstRowKey : null,
+                      bookmarked: bookmarked,
+                    ),
                 const SizedBox(height: 24),
               ],
             ),

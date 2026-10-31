@@ -80,13 +80,16 @@ for hours after the user had moved on. This skill should leave nothing running a
 scrcpy.
 
 ```bash
+export JAVA_HOME=/snap/android-studio/current/jbr PATH=/snap/android-studio/current/jbr/bin:$PATH
 tool/build_release_apk.sh
-(cd android && JAVA_HOME=/snap/android-studio/current/jbr ./gradlew --stop)
+(cd android && ./gradlew --stop)
 adb -s <device-id> install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
 `JAVA_HOME` must point at the JDK Flutter builds with (Android Studio's bundled JBR, see
-`flutter doctor -v`): `./gradlew --stop` only stops daemons running on the same JVM, so with the
+`flutter doctor -v`), in the same Bash call as the build: the agent's shell has no `java` on its
+PATH, and without it the build fails at once ("JAVA_HOME is not set and no 'java' command could be
+found"). `./gradlew --stop` only stops daemons running on the same JVM, so with the
 system Java it prints nothing useful and leaves the ~2 GB daemon alive. Confirm it reports
 `1 Daemon stopped` (or that `pgrep -af GradleDaemon` is empty afterwards).
 

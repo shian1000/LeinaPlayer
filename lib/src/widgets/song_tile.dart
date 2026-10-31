@@ -210,6 +210,7 @@ class SongTile extends StatelessWidget {
     this.onLongPress,
     this.selectionKey,
     this.menuIdPrefix = 'Utwór › Menu (⋮)',
+    this.bookmarked = false,
   });
 
   final SearchHit hit;
@@ -251,6 +252,10 @@ class SongTile extends StatelessWidget {
 
   /// What the menu's dummy entries report, as `<menuIdPrefix> › <label>`.
   final String menuIdPrefix;
+
+  /// The song last played from this playlist ([PlaylistBookmarks]): a bookmark before the
+  /// source icon.
+  final bool bookmarked;
 
   static const coverSize = 48.0;
 
@@ -348,13 +353,22 @@ class SongTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: trailing == null
+      trailing: trailing == null && !bookmarked
           ? SourceIcons(hit: hit)
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (bookmarked)
+                  Tooltip(
+                    message: 'Ostatnio odtwarzany z tej playlisty',
+                    child: Icon(
+                      Icons.bookmark,
+                      size: 18,
+                      color: palette.accent,
+                    ),
+                  ),
                 SourceIcons(hit: hit),
-                trailing,
+                ?trailing,
               ],
             ),
       onTap: selecting

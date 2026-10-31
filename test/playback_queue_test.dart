@@ -279,8 +279,14 @@ void main() {
       expect(queue.isMain(queue.currentEntry!), isTrue);
       await flush();
       expect(
-        [for (final p in plays) (p.hit.title, p.playlistName)],
-        [('a1', 'A'), ('b3', null), ('b1', 'B'), ('b2', 'B'), ('a2', 'A')],
+        [for (final p in plays) (p.hit.title, p.playlistName, p.index)],
+        [
+          ('a1', 'A', 0),
+          ('b3', null, null),
+          ('b1', 'B', 0),
+          ('b2', 'B', 1),
+          ('a2', 'A', 1),
+        ],
       );
 
       // "Poprzedni" walks back through the queue, whatever each song came from.

@@ -7,6 +7,7 @@ import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/library_folders.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/playlist_bookmarks.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/saved_songs.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
@@ -47,6 +48,7 @@ void main() {
   late FakeYouTubeApi youTubeApi;
   late YouTubeAccount youTubeAccount;
   late LikedSongs liked;
+  late PlaylistBookmarks bookmarks;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -60,6 +62,7 @@ void main() {
   });
 
   tearDown(() async {
+    bookmarks.dispose();
     queue.dispose();
     liked.dispose();
     youTubeAccount.dispose();
@@ -103,6 +106,7 @@ void main() {
       settings = SourceSettings();
       folders = LibraryFolders();
       liked = LikedSongs();
+      bookmarks = PlaylistBookmarks();
       player = PlayerController();
       await writeMusicDb((await sync.localFile('music.db')).path);
       await catalog.ensureLoaded();
@@ -175,9 +179,12 @@ void main() {
                             notifier: youTubeAccount,
                             child: LikedSongsScope(
                               notifier: liked,
-                              child: MaterialApp(
-                                theme: buildAppTheme(dummifyTheme),
-                                home: const Scaffold(body: LibraryScreen()),
+                              child: PlaylistBookmarksScope(
+                                notifier: bookmarks,
+                                child: MaterialApp(
+                                  theme: buildAppTheme(dummifyTheme),
+                                  home: const Scaffold(body: LibraryScreen()),
+                                ),
                               ),
                             ),
                           ),
@@ -485,6 +492,39 @@ void main() {
     await tester.tap(find.text('Sortuj'));
     await tester.pumpAndSettle();
     expect(find.text('Ostatnio dodane'), findsNothing);
+  });
+
+  testWidgets('the song last played from a playlist has a bookmark, found '
+      'again when it has moved', (tester) async {
+    await pumpLibrary(tester, before: importDoAuta);
+    final bookmark = find.byTooltip('Ostatnio odtwarzany z tej playlisty');
+    final id = playlists.playlists.single.id;
+    final song = SearchHit.youTubeOnly(
+      title: 'Utwór',
+      artistLabel: 'Nieznany',
+      videoId: 'nn',
+    );
+    // Listed first when it was queued, second now.
+    await tester.runAsync(() => bookmarks.record(id, 0, song));
+    await tester.tap(find.text('Do auta'));
+    await settle(tester, until: find.text('Utwór'));
+    expect(bookmark, findsOneWidget);
+    expect(
+      find.ancestor(of: bookmark, matching: find.byType(SongTile)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.ancestor(of: bookmark, matching: find.byType(SongTile)),
+        matching: find.text('Utwór'),
+      ),
+      findsOneWidget,
+    );
+
+    // Another playlist's bookmark leaves this one's alone.
+    await tester.runAsync(() => bookmarks.record(id + 1, 0, song));
+    await tester.pump();
+    expect(bookmark, findsOneWidget);
   });
 
   testWidgets('⋮ › Zmień nazwę renames the playlist', (tester) async {

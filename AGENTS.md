@@ -220,7 +220,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
   folders (synced), sort order and "last opened" (`library_folders.dart`), songs saved for
   later and liked songs (`saved_songs.dart`, synced item by item with `item_sync.dart`'s `ItemSync`
-  like the later links), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), dynamic playlists (`smart_playlists.dart`), Home's row layout
+  like the later links), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), the song last played from each playlist, marked with a bookmark (`playlist_bookmarks.dart`, phone only), dynamic playlists (`smart_playlists.dart`), Home's row layout
   (`home_layout.dart`) — all three phone only, syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
@@ -273,7 +273,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   until there is an actual feature that needs it.
 - App-wide state is a `ChangeNotifier` created in `main.dart` and exposed through an
   `InheritedNotifier` scope (`ThemeScope`, `DatabaseSyncScope`, `SongCatalogScope`,
-  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `AppUpdatesScope`, `SavedSongsScope`, `LikedSongsScope`, `SavedSongsSyncScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
+  `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `PlaylistBookmarksScope`, `AppUpdatesScope`, `SavedSongsScope`, `LikedSongsScope`, `SavedSongsSyncScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
   `PlaybackQueueScope`, `SourceSettingsScope`; plus

@@ -38,7 +38,7 @@ The script only compares file times. If the user says code changed in a way it c
 Follow **Step 2b (memory check)** and **Step 3 (build)** of
 `.claude/skills/run-on-physical-phone/SKILL.md`, but skip the install. That means: stop leftover
 Gradle daemons, check `free -m` (ask the user before building below 2500 MB available), run
-`tool/build_release_apk.sh` (the release build with its version numbering), then stop the Gradle daemon with the Studio JBR as `JAVA_HOME`.
+`tool/build_release_apk.sh` (the release build with its version numbering) with the Studio JBR as `JAVA_HOME`, then stop the Gradle daemon.
 Don't copy those commands here from memory; read that file so both skills stay in sync.
 
 Re-run `check_build_fresh.sh` afterwards; it must print `fresh`.
