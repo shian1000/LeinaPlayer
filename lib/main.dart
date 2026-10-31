@@ -513,7 +513,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         BadVideos(
           everySong: {
             for (final v in bad.everySong)
-              if (catalog.findByYouTubeId(v) == null) v,
+              if (catalog.findByOwnYouTubeId(v) == null) v,
           },
           forSong: bad.forSong,
         ),
@@ -541,7 +541,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       }
       // Also those found dead before the outbox existed; already reported ones are skipped.
       for (final videoId in _youTubeLibrary.removedVideos) {
-        final song = catalog.findByYouTubeId(videoId);
+        final song = catalog.findByOwnYouTubeId(videoId);
         if (song == null) continue;
         if (!await _outbox.reportDeadYouTubeLink(song, videoId)) continue;
         final found = await _youTubeLibrary.matchDetailsFor(song.id);

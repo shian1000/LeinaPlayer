@@ -106,7 +106,8 @@ full screen "Witaj w Leina Radio" — "Pobierać bazę danych muzyki z GitHuba?"
     be trimmed later): the whole music.db `songs` row (also columns added later, by their raw
     name), former ids (`song_id_changes`), each artist's row with its role, the album's row with
     MusicBrainz / iTunes / Deezer / Spotify links and its `album_covers`, the YouTube / Spotify
-    links (music.db's and the phone's or the playlist's when different), moods (global and own,
+    links (music.db's and the phone's or the playlist's when different; music.db's other uploads of the
+    song, `additional_youtube_videos`, and videos it turned down, `bad_youtube_videos`), moods (global and own,
     from `MoodLibrary`) and the other tag.db tags, the files on the phone and what it plays
     from. Tapping a link opens it (the song's YouTube videos from where the player is, pausing it,
     like Otwórz w YouTube; Spotify can't be told where to start — its app opens a track link as

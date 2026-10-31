@@ -9,6 +9,14 @@ private use only ([ADR 0004](../decisions/0004-license-and-distribution.md)).
 `songs.youtube_video_id`: a video id (linked), `N/A` (MusicDatabase's `NO_VIDEO_SENTINEL`:
 confirmed not on YouTube — never search), NULL/empty (unknown — the phone may search).
 
+`additional_youtube_videos` (migration 0018, MusicDatabase's hand-off
+`additional-videos-for-musicdatabaseapp.md`): other uploads of a song (a Topic upload, a live
+reupload), only for recognising a video — `SongCatalog.findByYouTubeId` looks there after the
+songs' own links (a `bad_youtube_videos` mark for that song wins), so such a video is the known
+song and no song request goes for it. Never the song's link: what is about the link itself (a
+dead link, a bad mark not to drop) uses `findByOwnYouTubeId`. N/A songs can have rows too.
+Shown in Informacje o utworze as "YouTube (inne wydanie w MusicDatabase)".
+
 ## Search (`youtube_search.dart`)
 
 Methods tried in order, the next only when one fails: NewPipeExtractor (Android only, `search` on

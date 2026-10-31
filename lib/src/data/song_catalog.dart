@@ -413,6 +413,14 @@ class SongCatalog extends ChangeNotifier {
   Duration? videoDuration(String? videoId) =>
       videoId == null ? null : _videoDurations[videoId];
 
+  Map<String, int> _additionalVideos = const {};
+
+  /// Other uploads of the same recording MusicDatabase knows (`additional_youtube_videos`,
+  /// hand-off `additional-videos-for-musicdatabaseapp.md`), by video id: the song id. Only for
+  /// recognising a video ([findByYouTubeId]), never a song's link.
+  Map<String, int> get additionalVideos =>
+      UnmodifiableMapView(_additionalVideos);
+
   RejectedSongRequests _rejectedSongRequests = RejectedSongRequests.none;
 
   /// Songs MusicDatabase's owner doesn't want added (`rejected_song_requests`): not asked for
@@ -485,6 +493,7 @@ class SongCatalog extends ChangeNotifier {
       if (!await file.exists()) {
         _songs = const [];
         _badVideos = BadVideos.none;
+        _additionalVideos = const {};
         _videoDurations = const {};
         _rejectedSongRequests = RejectedSongRequests.none;
         _status = CatalogStatus.noDatabase;
@@ -494,6 +503,7 @@ class SongCatalog extends ChangeNotifier {
           await _readServerFiles(await _sync.localFile('files.db')),
         );
         final badVideos = await _readBadVideos(file);
+        final additionalVideos = await _readAdditionalVideos(file);
         final videoDurations = await _readVideoDurations(file);
         final rejected = await _readRejectedSongRequests(file);
         final idChanges = await _readIdChanges(file);
@@ -501,6 +511,7 @@ class SongCatalog extends ChangeNotifier {
         // read the new songs through the old search texts.
         _songs = songs;
         _badVideos = badVideos;
+        _additionalVideos = additionalVideos;
         _videoDurations = videoDurations;
         _rejectedSongRequests = rejected;
         _idChanges = idChanges;
@@ -516,6 +527,7 @@ class SongCatalog extends ChangeNotifier {
       debugPrint('Loading music.db failed: $e');
       _songs = const [];
       _badVideos = BadVideos.none;
+      _additionalVideos = const {};
       _videoDurations = const {};
       _rejectedSongRequests = RejectedSongRequests.none;
       _status = CatalogStatus.error;
@@ -792,6 +804,31 @@ class SongCatalog extends ChangeNotifier {
     }
   }
 
+  /// `additional_youtube_videos` (MusicDatabase's migration 0018); empty before it.
+  Future<Map<String, int>> _readAdditionalVideos(File file) async {
+    final db = await (factoryOverride ?? databaseFactory).openDatabase(
+      file.path,
+      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+    );
+    try {
+      final hasTable = await db.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'additional_youtube_videos'",
+      );
+      if (hasTable.isEmpty) return const {};
+      return {
+        for (final row in await db.rawQuery(
+          'SELECT video_id, song_id FROM additional_youtube_videos',
+        ))
+          if ((row['video_id'] as String?)?.trim() case final video?
+              when video.isNotEmpty)
+            video: row['song_id']! as int,
+      };
+    } finally {
+      await db.close();
+    }
+  }
+
   /// `youtube_video_durations` (MusicDatabase's migration 0017); empty before it.
   Future<Map<String, Duration>> _readVideoDurations(File file) async {
     final db = await (factoryOverride ?? databaseFactory).openDatabase(
@@ -861,8 +898,18 @@ class SongCatalog extends ChangeNotifier {
   Map<String, String?>? _artistByName;
   Map<String, CatalogSong>? _byYouTubeId;
 
-  /// The song MusicDatabase links to this YouTube video, or `null`.
-  CatalogSong? findByYouTubeId(String videoId) => (_byYouTubeId ??= {
+  /// The song this YouTube video is: the one music.db links to it, else the one music.db lists
+  /// it as another upload of (unless marked wrong for that song); `null` when neither.
+  CatalogSong? findByYouTubeId(String videoId) {
+    if (findByOwnYouTubeId(videoId) case final song?) return song;
+    final id = _additionalVideos[videoId];
+    if (id == null || _badVideos.isWrongFor(id, videoId)) return null;
+    return byId(id);
+  }
+
+  /// The song whose own link (`songs.youtube_video_id`) is this video, or `null` — for what is
+  /// about the link itself (a dead link, a bad mark), where another upload doesn't count.
+  CatalogSong? findByOwnYouTubeId(String videoId) => (_byYouTubeId ??= {
     for (final song in _songs)
       if (song.youtubeVideoId != null) song.youtubeVideoId!: song,
   })[videoId];

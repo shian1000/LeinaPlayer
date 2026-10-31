@@ -100,6 +100,57 @@ void main() {
       },
     );
 
+    test('recognises other uploads of a song after its own link; '
+        'none without the table', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final before = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      await before.ensureLoaded();
+      expect(before.status, CatalogStatus.ready);
+      expect(before.findByYouTubeId('live1234567'), isNull);
+      before.dispose();
+
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('''
+        CREATE TABLE additional_youtube_videos (
+          video_id TEXT PRIMARY KEY NOT NULL, song_id INTEGER NOT NULL,
+          source TEXT NOT NULL, added_at TEXT NOT NULL)''');
+      await db.execute('''
+        CREATE TABLE bad_youtube_videos (
+          id INTEGER PRIMARY KEY, video_id TEXT NOT NULL, song_id INTEGER,
+          reason TEXT NOT NULL, marked_at TEXT NOT NULL)''');
+      for (final (video, song) in [
+        ('live1234567', 1),
+        ('topic123456', 3),
+        ('X2XWBcd5jn0', 2),
+        ('wrong123456', 2),
+      ]) {
+        await db.insert('additional_youtube_videos', {
+          'video_id': video,
+          'song_id': song,
+          'source': 'folder_playlist',
+          'added_at': '2026-10-31 12:00:00',
+        });
+      }
+      await db.insert('bad_youtube_videos', {
+        'video_id': 'wrong123456',
+        'song_id': 2,
+        'reason': 'wrong_for_song',
+        'marked_at': '2026-10-31 12:00:00',
+      });
+      await db.close();
+      await catalog.ensureLoaded();
+
+      expect(catalog.findByYouTubeId('live1234567')?.id, 1);
+      // An N/A song's uploads are recognised; it still has no link.
+      expect(catalog.findByYouTubeId('topic123456')?.id, 3);
+      expect(catalog.byId(3)!.youtubeVideoId, isNull);
+      // A song's own link wins.
+      expect(catalog.findByYouTubeId('X2XWBcd5jn0')?.id, 1);
+      expect(catalog.findByYouTubeId('wrong123456'), isNull);
+      expect(catalog.findByOwnYouTubeId('live1234567'), isNull);
+    });
+
     test('files on the server come from files.db, the largest one per song; '
         'none without it', () async {
       await loadSample();

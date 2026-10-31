@@ -696,6 +696,21 @@ class _SongInfoCardState extends State<SongInfoCard> {
         ),
       if (hit.notFoundOnYouTube)
         const _Field('YouTube', 'telefon niedawno szukał i nie znalazł'),
+      for (final other in details?.additionalVideos ?? const <DbRow>[])
+        _Field(
+          'YouTube (inne wydanie w MusicDatabase)',
+          [
+            '${other['video_id']}',
+            switch (other['source']) {
+              'folder_playlist' => 'z playlisty folderu',
+              'song_merge' => 'z połączenia utworów',
+              final source => '$source',
+            },
+            if (other['added_at'] != null) '${other['added_at']}',
+          ].join(' · '),
+          link: video('${other['video_id']}'),
+          fromPlayer: fromPlayer,
+        ),
       for (final bad in details?.badVideos ?? const <DbRow>[])
         _Field(
           'YouTube (odrzucony w MusicDatabase)',

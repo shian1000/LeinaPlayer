@@ -18,6 +18,7 @@ class SongDetails {
     this.tags = const [],
     this.formerIds = const [],
     this.badVideos = const [],
+    this.additionalVideos = const [],
   });
 
   /// The `songs` row.
@@ -43,6 +44,10 @@ class SongDetails {
 
   /// `bad_youtube_videos` rows of this song: videos MusicDatabase turned down for it.
   final List<DbRow> badVideos;
+
+  /// `additional_youtube_videos` rows of this song: other uploads of it, only for recognising
+  /// them.
+  final List<DbRow> additionalVideos;
 }
 
 /// Reads [SongDetails] of `songs.id` [songId] from the files [sync] downloaded, or `null` when
@@ -141,9 +146,18 @@ Future<SongDetails?> readSongDetails(
             [songId],
           );
 
+    final additionalVideos = !tables.contains('additional_youtube_videos')
+        ? const <DbRow>[]
+        : await db.rawQuery(
+            'SELECT * FROM additional_youtube_videos WHERE song_id = ? '
+            'ORDER BY added_at',
+            [songId],
+          );
+
     return SongDetails(
       song: song,
       badVideos: badVideos,
+      additionalVideos: additionalVideos,
       artists: artists,
       album: album,
       albumArtist: albumArtist,
