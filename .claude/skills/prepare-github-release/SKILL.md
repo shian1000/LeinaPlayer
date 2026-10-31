@@ -37,9 +37,13 @@ Memory first, as in `run-on-physical-phone` Step 2b (`free -m`; stop leftover Gr
 below 2500 MB available ask the owner before building). Then, in the background:
 
 ```bash
+export JAVA_HOME=/snap/android-studio/current/jbr PATH=/snap/android-studio/current/jbr/bin:$PATH
 tool/prepare_release.sh
-(cd android && JAVA_HOME=/snap/android-studio/current/jbr ./gradlew --stop)
+(cd android && ./gradlew --stop)
 ```
+
+The `export` is needed: the agent's shell has no `java` on PATH, and without it Gradle fails at
+once ("JAVA_HOME is not set…") — as in `run-on-physical-phone` Step 3.
 
 It prints `TAG=`, `APK_UNIVERSAL=`, `APK_ARM64=`, `COMMIT=`. The owner can also run it from the
 desktop shortcut "Przygotuj wydanie Leina Radio" — never both at once (two Gradle builds don't fit
