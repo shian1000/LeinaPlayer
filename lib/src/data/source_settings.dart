@@ -111,6 +111,7 @@ class SourceSettings extends ChangeNotifier {
   static const _coverWifiOnlyKey = 'data_saver.covers_wifi_only';
   static const _lyricsKey = 'data_saver.lyrics';
   static const _crossfadeKey = 'playback.crossfade_seconds';
+  static const _swipePlaysNextKey = 'playback.swipe_right_plays_next';
 
   /// The longest "Przenikanie utworów", as in the reference app.
   static const maxCrossfadeSeconds = 12;
@@ -139,6 +140,7 @@ class SourceSettings extends ChangeNotifier {
   bool _coverWifiOnly = false;
   bool _lyrics = true;
   int _crossfadeSeconds = 0;
+  bool _swipePlaysNext = true;
 
   /// "Włącz szukanie w serwisie YouTube".
   bool get youTubeSearchEnabled => _youTubeSearchEnabled;
@@ -215,6 +217,10 @@ class SourceSettings extends ChangeNotifier {
   /// "Przenikanie utworów" (Ustawienia › Odtwarzanie), 0 = off.
   int get crossfadeSeconds => _crossfadeSeconds;
 
+  /// What dragging a song row to the right does (Ustawienia › Odtwarzanie): "Odtwórz jako
+  /// następny" (true, the default) or "Dodaj do kolejki".
+  bool get swipePlaysNext => _swipePlaysNext;
+
   /// Cache ahead only on Wi-Fi (Oszczędzanie danych i tryb offline).
   bool get queuePrefetchWifiOnly => _queuePrefetchWifiOnly;
 
@@ -286,6 +292,7 @@ class SourceSettings extends ChangeNotifier {
     _lyrics = prefs.getBool(_lyricsKey) ?? _lyrics;
     _crossfadeSeconds = (prefs.getInt(_crossfadeKey) ?? _crossfadeSeconds)
         .clamp(0, maxCrossfadeSeconds);
+    _swipePlaysNext = prefs.getBool(_swipePlaysNextKey) ?? _swipePlaysNext;
     _playbackMethodOrder = _withAll(
       YouTubePlaybackMethod.values,
       prefs.getStringList(_playbackMethodOrderKey),
@@ -451,6 +458,15 @@ class SourceSettings extends ChangeNotifier {
     await (await SharedPreferences.getInstance()).setInt(
       _crossfadeKey,
       _crossfadeSeconds,
+    );
+  }
+
+  Future<void> setSwipePlaysNext(bool value) async {
+    _swipePlaysNext = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _swipePlaysNextKey,
+      value,
     );
   }
 

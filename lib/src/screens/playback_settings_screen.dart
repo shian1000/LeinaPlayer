@@ -8,8 +8,8 @@ import 'hidden_songs_screen.dart';
 import 'playback_order_screen.dart';
 import 'youtube_playback_screen.dart';
 
-/// "Ustawienia › Odtwarzanie": which source plays a song, the ways of playing YouTube, and
-/// "Przenikanie utworów".
+/// "Ustawienia › Odtwarzanie": which source plays a song, the ways of playing YouTube,
+/// "Przenikanie utworów", and what dragging a song row to the right does.
 class PlaybackSettingsScreen extends StatefulWidget {
   const PlaybackSettingsScreen({super.key});
 
@@ -131,6 +131,40 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
             child: Text(
               'Gdy utwór dobiega końca, następny z kolejki zaczyna się tyle sekund wcześniej: '
               'jeden cichnie, a drugi narasta.',
+              style: TextStyle(
+                color: palette.textSecondary,
+                fontSize: AppFontSize.small,
+              ),
+            ),
+          ),
+          const SectionTitle('Przeciągnięcie utworu w prawo'),
+          RadioGroup<bool>(
+            groupValue: settings.swipePlaysNext,
+            onChanged: (value) {
+              if (value != null) settings.setSwipePlaysNext(value);
+            },
+            child: const Column(
+              children: [
+                RadioListTile<bool>(
+                  value: true,
+                  secondary: Icon(Icons.playlist_play),
+                  title: Text('Odtwórz jako następny'),
+                ),
+                RadioListTile<bool>(
+                  value: false,
+                  secondary: Icon(Icons.queue_music),
+                  title: Text('Dodaj do kolejki'),
+                  subtitle: Text('Na sam koniec kolejki'),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(
+              'Utwór przeciągnięty w prawo na liście (wyniki, playlisty, nastroje, kolejka) '
+              'zagra zaraz po obecnym albo trafi na koniec kolejki. W lewo: usuwa go z '
+              'kolejki, playlisty lub nastroju.',
               style: TextStyle(
                 color: palette.textSecondary,
                 fontSize: AppFontSize.small,

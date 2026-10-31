@@ -812,14 +812,7 @@ class _YouTubeTile extends StatelessWidget {
         );
       },
     );
-    return SwipeActions(
-      right: SwipeAction(
-        icon: Icons.queue_music,
-        label: 'Dodaj do kolejki',
-        onTriggered: () => addToQueue(context, hit),
-      ),
-      child: tile,
-    );
+    return SwipeActions(right: queueSwipe(context, hit), child: tile);
   }
 }
 

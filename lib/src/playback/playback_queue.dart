@@ -111,11 +111,61 @@ class QueueEntry {
   final int key;
 }
 
+/// A queue of more than one song that playing something else replaced, kept so "Przywróć
+/// poprzednią kolejkę" can bring it back with its order, shuffle and the song's position.
+class ReplacedQueue {
+  ReplacedQueue._(this._state, {required this.position, this.duration});
+
+  factory ReplacedQueue.fromJson(
+    Map<String, Object?> json,
+    SearchHit Function(TrackRef) resolve,
+  ) {
+    final durationMs = json['duration_ms'] as int?;
+    return ReplacedQueue._(
+      PlaybackQueue._decode((json['queue'] as Map).cast(), resolve),
+      position: Duration(milliseconds: json['position_ms'] as int? ?? 0),
+      duration: durationMs == null ? null : Duration(milliseconds: durationMs),
+    );
+  }
+
+  final _QueueState _state;
+
+  /// Where the song playing then was.
+  final Duration position;
+  final Duration? duration;
+
+  int get songCount => _state.history.length + 1 + _state.upcoming.length;
+
+  /// The playlist / search the queue was filled from, for the button's tooltip.
+  String? get name {
+    final origin = _state.mainOrigin;
+    final query = origin?.searchQuery;
+    return origin?.playlistName ?? (query == null ? null : '„$query”');
+  }
+
+  SearchHit get current => _state.current.hit;
+
+  Map<String, Object?> toJson() => {
+    'queue': PlaybackQueue._encode(_state),
+    'position_ms': position.inMilliseconds,
+    'duration_ms': duration?.inMilliseconds,
+  };
+}
+
+typedef _QueueState = ({
+  List<QueueEntry> history,
+  QueueEntry current,
+  List<QueueEntry> upcoming,
+  QueueOrigin? mainOrigin,
+  bool shuffle,
+  QueueRepeat repeat,
+});
+
 /// What's played, what's playing and what comes next. Tapping a song in a playlist / results
-/// replaces the whole queue with them (the "main" songs, the only ones shuffle mixes); songs and
-/// whole playlists added with "Odtwórz jako następny" (right after the current song) or "Dodaj do
-/// kolejki" (after the ones added before, ahead of the rest of the main songs) keep where they
-/// were queued from, for the player, the history and "Otwórz w YouTube".
+/// replaces the whole queue with them (the "main" songs, the only ones shuffle mixes) — the
+/// queue it replaces is kept as [replaced]; songs and whole playlists added with "Odtwórz jako
+/// następny" (right after the current song) or "Dodaj do kolejki" (at the very end) keep where
+/// they were queued from, for the player, the history and "Otwórz w YouTube".
 /// When a song ends the next one starts; "Poprzedni" restarts the song, or within its first
 /// [restartThreshold] goes back to the previous one in the queue. After each song starts, the
 /// next [SourceSettings.activeQueuePrefetch] songs are downloaded to the cache.
@@ -251,6 +301,89 @@ class PlaybackQueue extends ChangeNotifier {
   List<QueueEntry> get history => List.unmodifiable(_history.where(_shown));
 
   bool get hasNext => _upcoming.any(_shown);
+
+  ReplacedQueue? _replaced;
+
+  /// The last queue of more than one song that [start] replaced; `null` when there's none.
+  ReplacedQueue? get replaced => _replaced;
+
+  /// The queue before an app restart ([QueueSession]).
+  void restoreReplaced(ReplacedQueue? replaced) {
+    _replaced = replaced;
+    notifyListeners();
+  }
+
+  _QueueState? _state() {
+    final current = _current;
+    if (current == null) return null;
+    return (
+      history: [..._history],
+      current: current,
+      upcoming: [..._upcoming],
+      mainOrigin: _mainOrigin,
+      shuffle: _shuffle,
+      repeat: _repeat,
+    );
+  }
+
+  /// The queue as it is now, as a [ReplacedQueue] — only when it has more than one song.
+  ReplacedQueue? _putAside() {
+    final state = _state();
+    if (state == null || state.history.isEmpty && state.upcoming.isEmpty) {
+      return null;
+    }
+    final player = _tracks.player;
+    return ReplacedQueue._(
+      state,
+      position: player.currentPosition,
+      duration: player.duration,
+    );
+  }
+
+  /// Filled from the very place [origin] names, with nothing added by hand: tapping another
+  /// song of the playlist playing doesn't push out the queue kept before it.
+  bool _sameMain(QueueOrigin origin) {
+    final main = _mainOrigin;
+    if (main == null ||
+        main.playlistId != origin.playlistId ||
+        main.moodKey != origin.moodKey ||
+        main.youTubeListId != origin.youTubeListId ||
+        main.searchQuery != origin.searchQuery ||
+        main.playlistName != origin.playlistName) {
+      return false;
+    }
+    final named = [
+      origin.playlistId,
+      origin.moodKey,
+      origin.youTubeListId,
+      origin.searchQuery,
+      origin.playlistName,
+    ].any((field) => field != null);
+    return named && [?_current, ..._upcoming].every(isMain);
+  }
+
+  /// "Przywróć poprzednią kolejkę": [replaced] comes back, its song where it was, playing; the
+  /// queue it replaces is kept in its place, so pressing it again swaps back.
+  Future<PlayOutcome?> playReplaced({
+    void Function(String status)? onStatus,
+  }) async {
+    final replaced = _replaced;
+    if (replaced == null) return null;
+    _replaced = _putAside();
+    _generation++;
+    _apply(replaced._state);
+    PlayOutcome? outcome;
+    final player = _tracks.player;
+    await player.park(
+      shown(replaced._state.current),
+      () async => outcome = await playCurrent(onStatus: onStatus),
+      position: replaced.position,
+      duration: replaced.duration,
+    );
+    await player.togglePlay();
+    return outcome;
+  }
+
   bool get hasPrevious => _history.any(_shown);
 
   /// Replaces the whole queue with [entries] and plays the one at [index] (with [shuffle] on,
@@ -275,6 +408,7 @@ class PlaybackQueue extends ChangeNotifier {
       moodKey: moodKey,
       searchQuery: searchQuery,
     );
+    if (!_sameMain(origin)) _replaced = _putAside() ?? _replaced;
     _mainOrigin = origin;
     if (shuffle != null) _shuffle = shuffle;
     final all = [
@@ -420,30 +554,37 @@ class PlaybackQueue extends ChangeNotifier {
   void _refill(List<QueueEntry> mainSongs) {
     final songs = mainSongs.iterator;
     final refilled = <QueueEntry>[];
+    // The rest go after the last main song, ahead of songs added at the end ("Dodaj do kolejki").
+    var rest = -1;
     for (final e in _upcoming) {
       if (!isMain(e) || e.pinned) {
         refilled.add(e);
       } else if (songs.moveNext()) {
         refilled.add(songs.current);
+        rest = refilled.length;
       }
     }
+    final more = <QueueEntry>[];
     while (songs.moveNext()) {
-      refilled.add(songs.current);
+      more.add(songs.current);
     }
+    refilled.insertAll(rest < 0 ? refilled.length : rest, more);
     _upcoming
       ..clear()
       ..addAll(refilled);
   }
 
-  /// "Dodaj do kolejki": [hits] play after the current song and the songs added (or moved)
-  /// before them, ahead of the rest of the main songs. [origin]: the playlist they were added from as a
-  /// whole. With nothing playing the first one starts right away.
+  /// "Dodaj do kolejki": [hits] play at the very end of the queue, after everything in it
+  /// (ahead only of the rounds "Powtarzaj" queued again and not started yet). [origin]: the
+  /// playlist they were added from as a whole. With nothing playing the first one starts right
+  /// away.
   Future<PlayOutcome?> add(
     List<SearchHit> hits, {
     QueueOrigin? origin,
     void Function(String status)? onStatus,
   }) {
-    final at = _upcoming.indexWhere((e) => isMain(e) && !e.pinned);
+    final playing = _current?.round;
+    final at = _upcoming.indexWhere((e) => e.repeated && e.round != playing);
     return _insert(
       at < 0 ? _upcoming.length : at,
       hits,
@@ -795,8 +936,11 @@ class PlaybackQueue extends ChangeNotifier {
 
   /// Everything needed to rebuild the queue after the app restarts; `null` when empty.
   Map<String, Object?>? snapshot() {
-    final current = _current;
-    if (current == null) return null;
+    final state = _state();
+    return state == null ? null : _encode(state);
+  }
+
+  static Map<String, Object?> _encode(_QueueState state) {
     final origins = <QueueOrigin>[];
     int? originAt(QueueOrigin? origin) {
       if (origin == null) return null;
@@ -813,21 +957,20 @@ class PlaybackQueue extends ChangeNotifier {
       if (e.pinned) 'pinned': true,
       'round': ?e.round,
     };
-    final mainOrigin = _mainOrigin;
+    final mainOrigin = state.mainOrigin;
     return {
       'version': 2,
       'main_origin': mainOrigin == null ? null : originAt(mainOrigin),
-      'history': [for (final e in _history) json(e)],
-      'current': json(current),
-      'upcoming': [for (final e in _upcoming) json(e)],
-      'shuffle': _shuffle,
-      'repeat': _repeat.name,
+      'history': [for (final e in state.history) json(e)],
+      'current': json(state.current),
+      'upcoming': [for (final e in state.upcoming) json(e)],
+      'shuffle': state.shuffle,
+      'repeat': state.repeat.name,
       'origins': [for (final o in origins) o.toJson()],
     };
   }
 
-  /// Puts back a [snapshot] without playing anything; [resolve] finds each song again.
-  void restore(
+  static _QueueState _decode(
     Map<String, Object?> json,
     SearchHit Function(TrackRef) resolve,
   ) {
@@ -848,20 +991,39 @@ class PlaybackQueue extends ChangeNotifier {
       );
     }
 
-    _generation++;
     final mainOrigin = json['main_origin'] as int?;
-    _mainOrigin = mainOrigin == null ? null : origins[mainOrigin];
+    return (
+      history: (json['history'] as List).map(entry).toList(),
+      current: entry(json['current']),
+      upcoming: (json['upcoming'] as List).map(entry).toList(),
+      mainOrigin: mainOrigin == null ? null : origins[mainOrigin],
+      shuffle: json['shuffle'] as bool,
+      repeat:
+          QueueRepeat.values.asNameMap()[json['repeat'] as String?] ??
+          QueueRepeat.off,
+    );
+  }
+
+  /// Puts back a [snapshot] without playing anything; [resolve] finds each song again.
+  void restore(
+    Map<String, Object?> json,
+    SearchHit Function(TrackRef) resolve,
+  ) {
+    _generation++;
+    _apply(_decode(json, resolve));
+  }
+
+  void _apply(_QueueState state) {
+    _mainOrigin = state.mainOrigin;
     _history
       ..clear()
-      ..addAll((json['history'] as List).map(entry));
-    _current = entry(json['current']);
+      ..addAll(state.history);
+    _current = state.current;
     _upcoming
       ..clear()
-      ..addAll((json['upcoming'] as List).map(entry));
-    _shuffle = json['shuffle'] as bool;
-    _repeat =
-        QueueRepeat.values.asNameMap()[json['repeat'] as String?] ??
-        QueueRepeat.off;
+      ..addAll(state.upcoming);
+    _shuffle = state.shuffle;
+    _repeat = state.repeat;
     notifyListeners();
   }
 

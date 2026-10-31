@@ -27,8 +27,8 @@ class SwipeAction {
   final Color? foreground;
 }
 
-/// A row that can be dragged sideways, like the reference app's song rows: right adds ("Dodaj
-/// do kolejki"), left takes away. Past [threshold] the colour fills in and the phone ticks;
+/// A row that can be dragged sideways, like the reference app's song rows: right queues the
+/// song, left takes it away. Past [threshold] the colour fills in and the phone ticks;
 /// letting go there triggers the action, and the row slides back either way.
 class SwipeActions extends StatefulWidget {
   const SwipeActions({super.key, required this.child, this.right, this.left});

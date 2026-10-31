@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../data/combined_search.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
+import '../data/album_covers.dart';
+import '../widgets/menu_sheet.dart';
+import '../widgets/song_cover.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
@@ -49,7 +52,33 @@ class SongListScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          if (hits.isNotEmpty)
+            IconButton(
+              tooltip: 'Menu (⋮)',
+              icon: const Icon(Icons.more_vert),
+              onPressed: () => showMenuSheet(
+                context,
+                idPrefix: '$title › Menu (⋮)',
+                header: MenuSheetHeader(
+                  cover: SongCover(
+                    cover: CoverRequest.of(hits.first),
+                    size: 56,
+                  ),
+                  title: title,
+                  subtitle: subtitle,
+                ),
+                entries: queueAllEntries(
+                  context,
+                  hits,
+                  origin: QueueOrigin(playlistName: title),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: SongSelectionArea(
         all: () => {for (final hit in hits) SongSelection.keyOf(hit): hit},
         child: ListView(

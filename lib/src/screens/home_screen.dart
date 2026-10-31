@@ -6,6 +6,7 @@ import '../data/account.dart';
 import '../data/home_layout.dart';
 import '../data/home_recommendations.dart';
 import '../data/latin_names.dart';
+import '../data/library_folders.dart';
 import '../data/listening_log.dart';
 import '../data/listening_stats.dart';
 import '../data/local_library.dart';
@@ -26,6 +27,7 @@ import '../widgets/mood_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_tile.dart';
+import 'library_screen.dart';
 import 'listening_stats_screen.dart';
 import 'mood_screen.dart';
 import 'playlist_screen.dart';
@@ -596,6 +598,7 @@ class _SongCard extends StatelessWidget {
     title: hit.shownTitle(context),
     subtitle: hit.shownArtist(context),
     onTap: () => onTap(context),
+    onLongPress: () => showSongMenu(context, hit, idPrefix: '$_id › Utwór'),
   );
 }
 
@@ -616,6 +619,12 @@ class _PlaylistCard extends StatelessWidget {
         builder: (_) => PlaylistScreen(playlist: playlist),
       ),
     ),
+    onLongPress: () => showLibraryEntryMenu(
+      context,
+      PlaylistEntry(playlist),
+      PlaylistCover(playlist: playlist, size: 56),
+      playlist.source == PlaylistSource.spotifyAlbum ? 'Album' : 'Playlista',
+    ),
   );
 }
 
@@ -630,6 +639,12 @@ class _MoodCard extends StatelessWidget {
     title: mood.name,
     subtitle: mood.global ? 'Nastrój globalny' : 'Twój nastrój',
     onTap: () => MoodScreen.open(context, mood),
+    onLongPress: () => showLibraryEntryMenu(
+      context,
+      MoodEntry(mood),
+      MoodCover(mood: mood, size: 56),
+      mood.global ? 'Nastrój globalny' : 'Twój nastrój',
+    ),
   );
 }
 
@@ -682,6 +697,7 @@ class _Card extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.onLongPress,
   });
 
   final Widget cover;
@@ -689,9 +705,13 @@ class _Card extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
+  /// The card's menu: "Dodaj do kolejki", "Odtwórz jako następny"…
+  final VoidCallback? onLongPress;
+
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
+    onLongPress: onLongPress,
     child: SizedBox(
       width: _cardWidth,
       child: Column(
@@ -729,6 +749,13 @@ class _ArtistCard extends StatelessWidget {
         : artist.name;
     return InkWell(
       onTap: () => openArtistSongs(context, artist.name),
+      onLongPress: () => showSongsMenu(
+        context,
+        cover: CoverArt(seed: artist.name, size: 56, icon: Icons.person),
+        title: name,
+        subtitle: 'Wykonawca',
+        hits: artistSongs(context, artist.name),
+      ),
       child: SizedBox(
         width: _cardWidth,
         child: Column(
@@ -779,6 +806,13 @@ class _AlbumCard extends StatelessWidget {
       title: album.name,
       subtitle: album.detail ?? 'Album',
       onTap: () => openAlbumSongs(context, album.name),
+      onLongPress: () => showSongsMenu(
+        context,
+        cover: CoverArt(seed: album.name, size: 56, icon: Icons.album),
+        title: album.name,
+        subtitle: album.detail ?? 'Album',
+        hits: albumSongs(context, album.name),
+      ),
     );
   }
 }

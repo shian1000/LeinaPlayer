@@ -8,6 +8,8 @@ import '../data/saved_songs.dart';
 import '../data/smart_playlists.dart';
 import '../data/song_catalog.dart';
 import '../data/text_normalizer.dart';
+import '../data/combined_search.dart';
+import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
@@ -647,12 +649,14 @@ class LibraryEntryTile extends StatelessWidget {
       ),
       MoodEntry(:final mood) => MoodScreen.open(context, mood),
     };
-    final VoidCallback? menu = folders == null
-        ? null
-        : () => switch (entry) {
-            FolderEntry(:final folder) => showFolderMenu(context, folder),
-            _ => showMoveToFolderSheet(context, entry.key),
-          };
+    void menu() => switch (entry) {
+      FolderEntry(:final folder) when folders != null => showFolderMenu(
+        context,
+        folder,
+      ),
+      FolderEntry() => null,
+      _ => showLibraryEntryMenu(context, entry, leading, subtitle),
+    };
     if (gridSize != null) {
       return InkWell(
         onTap: open,
@@ -926,4 +930,84 @@ class _EmptyLibrary extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A playlist's or mood's menu (a long press in Biblioteka or on Home's card): into the queue
+/// as a whole, or to a folder.
+Future<void> showLibraryEntryMenu(
+  BuildContext context,
+  LibraryEntry entry,
+  Widget cover,
+  String subtitle,
+) {
+  final catalog = SongCatalogScope.of(context);
+  final library = LocalLibraryScope.of(context);
+  final youTube = YouTubeLibraryScope.of(context);
+  final (
+    QueueOrigin origin,
+    Future<List<SearchHit>> Function() songs,
+  ) = switch (entry) {
+    PlaylistEntry(:final playlist) => (
+      QueueOrigin(
+        playlistId: playlist.id,
+        youTubeListId: playlist.youTubeId,
+        playlistName: playlist.name,
+      ),
+      () async => [
+        for (final track in await PlaylistLibraryScope.of(
+          context,
+        ).tracks(playlist.id))
+          playlistHit(track, catalog, library, youTube),
+      ],
+    ),
+    MoodEntry(:final mood) => (
+      QueueOrigin(playlistName: mood.name, moodKey: mood.key),
+      () async => moodHits(mood, catalog, library, youTube),
+    ),
+    FolderEntry() => throw ArgumentError.value(entry),
+  };
+  final playlist = entry is PlaylistEntry;
+  final feminine =
+      entry is PlaylistEntry &&
+      entry.playlist.source != PlaylistSource.spotifyAlbum;
+  Future<void> queue(bool next) async {
+    final hits = await songs();
+    if (!context.mounted) return;
+    if (hits.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              playlist ? 'Ta playlista jest pusta.' : 'Ten nastrój jest pusty.',
+            ),
+          ),
+        );
+      return;
+    }
+    await queueSongs(context, hits, next: next, origin: origin);
+  }
+
+  return showMenuSheet(
+    context,
+    idPrefix: '$_id › ${playlist ? 'Playlista' : 'Nastrój'} › Menu',
+    header: MenuSheetHeader(
+      cover: cover,
+      title: entry.name,
+      subtitle: subtitle,
+    ),
+    entries: [
+      MenuSheetEntry(
+        Icons.queue_music,
+        'Dodaj do kolejki',
+        onTap: () => queue(false),
+      ),
+      MenuSheetEntry(
+        Icons.playlist_play,
+        feminine ? 'Odtwórz jako następną' : 'Odtwórz jako następny',
+        onTap: () => queue(true),
+      ),
+      ?moveToFolderEntry(context, entry.key),
+    ],
+  );
 }

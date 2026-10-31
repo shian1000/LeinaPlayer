@@ -7,6 +7,7 @@ import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
+import '../widgets/menu_sheet.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
@@ -43,7 +44,25 @@ class SavedSongsScreen extends StatelessWidget {
         resolveTrack(ref, catalog, library, youTube),
     ];
     return Scaffold(
-      appBar: AppBar(title: Text(id)),
+      appBar: AppBar(
+        title: Text(id),
+        actions: [
+          if (hits.isNotEmpty)
+            IconButton(
+              tooltip: 'Menu (⋮)',
+              icon: const Icon(Icons.more_vert),
+              onPressed: () => showMenuSheet(
+                context,
+                idPrefix: '$id › Menu (⋮)',
+                entries: queueAllEntries(
+                  context,
+                  hits,
+                  origin: QueueOrigin(playlistName: id),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: SongSelectionArea(
         all: () => {for (final hit in hits) SongSelection.keyOf(hit): hit},
         child: ListView(
@@ -101,6 +120,8 @@ class SavedSongsScreen extends StatelessWidget {
                     idPrefix: '$id › Utwór › Menu (⋮)',
                   ),
                 ),
+                onSwipeRemove: saved == null ? null : () => saved.toggle(hit),
+                swipeRemoveLabel: 'Usuń z „$id”',
               ),
           ],
         ),

@@ -209,33 +209,50 @@ void main() {
     },
   );
 
-  test('"Dodaj do kolejki" plays after the songs added before, ahead of the playlist', () async {
-    await queue.start([_file('a'), _file('b'), _file('c')], 0);
-    await queue.add([_file('x')]);
-    await queue.add([_file('y')]);
-    expect(titles(queue.upcoming), ['x', 'y', 'b', 'c']);
+  test(
+    '"Dodaj do kolejki" plays at the very end, after the playlist',
+    () async {
+      await queue.start([_file('a'), _file('b'), _file('c')], 0);
+      await queue.add([_file('x')]);
+      await queue.add([_file('y')]);
+      expect(titles(queue.upcoming), ['b', 'c', 'x', 'y']);
 
-    await queue.next();
-    expect(queue.current?.title, 'x');
-    // "Poprzedni" goes back in the queue, and the song left comes next again.
-    expect((await queue.previous())?.played, isTrue);
-    expect(queue.current?.title, 'a');
-    expect(titles(queue.upcoming), ['x', 'y', 'b', 'c']);
+      await queue.next();
+      expect(queue.current?.title, 'b');
+      // "Poprzedni" goes back in the queue, and the song left comes next again.
+      expect((await queue.previous())?.played, isTrue);
+      expect(queue.current?.title, 'a');
+      expect(titles(queue.upcoming), ['b', 'c', 'x', 'y']);
 
-    await queue.next();
-    backend.finish();
-    await flush();
-    expect(queue.current?.title, 'y');
-    backend.finish();
-    await flush();
-    expect(queue.current?.title, 'b');
-  });
+      await queue.jumpTo(queue.upcoming[1]);
+      backend.finish();
+      await flush();
+      expect(queue.current?.title, 'x');
+      backend.finish();
+      await flush();
+      expect(queue.current?.title, 'y');
+    },
+  );
+
+  test(
+    '"Dodaj do kolejki" goes ahead of a round "Powtarzaj" queued again',
+    () async {
+      await queue.start([_file('a'), _file('b')], 0, playlistName: 'P');
+      queue.setRepeat(QueueRepeat.all);
+      await queue.next();
+      expect(titles(queue.upcoming), ['a', 'b']);
+      await queue.add([_file('x')]);
+      expect(titles(queue.upcoming), ['x', 'a', 'b']);
+    },
+  );
 
   test('"Odtwórz jako następny" plays right after the current song', () async {
     await queue.start([_file('a'), _file('b')], 0);
     await queue.add([_file('x')]);
     await queue.playNext([_file('n')]);
-    expect(titles(queue.upcoming), ['n', 'x', 'b']);
+    expect(titles(queue.upcoming), ['n', 'b', 'x']);
+    await queue.next();
+    expect(queue.current?.title, 'n');
   });
 
   test('adding with nothing playing starts the song', () async {
@@ -297,6 +314,42 @@ void main() {
     },
   );
 
+  test(
+    'the queue a new one replaces is kept, and comes back where it was',
+    () async {
+      await queue.start(
+        [_file('a'), _file('b'), _file('c')],
+        1,
+        playlistName: 'A',
+      );
+      await queue.add([_file('x')]);
+      backend.at(const Duration(seconds: 30));
+      await flush();
+      await queue.start([_file('p'), _file('q')], 0, playlistName: 'P');
+      expect(queue.replaced?.songCount, 4);
+      expect(queue.replaced?.name, 'A');
+
+      // Another song of the playlist playing: the queue kept before stays.
+      await queue.start([_file('p'), _file('q')], 1, playlistName: 'P');
+      expect(queue.replaced?.name, 'A');
+
+      // "Przywróć poprzednią kolejkę": back to b at 0:30, P kept in its place.
+      await queue.playReplaced();
+      expect(queue.current?.title, 'b');
+      expect(titles(queue.history), ['a']);
+      expect(titles(queue.upcoming), ['c', 'x']);
+      expect(backend.opened.last, '/music/b.mp3');
+      expect(backend.seeks.last, const Duration(seconds: 30));
+      expect(queue.replaced?.name, 'P');
+
+      // A single song isn't kept: what was kept before stays.
+      await queue.start([_file('z')], 0);
+      expect(queue.replaced?.name, 'A');
+      await queue.start([_file('y')], 0);
+      expect(queue.replaced?.name, 'A');
+    },
+  );
+
   test('a new queue replaces everything, the added songs too', () async {
     await queue.start([_file('a'), _file('b')], 0);
     await queue.add([_file('x')]);
@@ -309,18 +362,16 @@ void main() {
   test('jumping to, removing, putting back and clearing', () async {
     await queue.start([_file('a'), _file('b'), _file('c'), _file('d')], 0);
     await queue.add([_file('x')]);
-    final c = queue.upcoming[2];
+    final c = queue.upcoming[1];
     final at = queue.remove(c);
-    expect(titles(queue.upcoming), ['x', 'b', 'd']);
+    expect(titles(queue.upcoming), ['b', 'd', 'x']);
     queue.reinsert(c, at);
-    expect(titles(queue.upcoming), ['x', 'b', 'c', 'd']);
+    expect(titles(queue.upcoming), ['b', 'c', 'd', 'x']);
     queue.remove(c);
 
-    await queue.jumpTo(
-      queue.upcoming[2],
-    ); // d: x is dropped, b counts as played
+    await queue.jumpTo(queue.upcoming[1]); // d: b counts as played
     expect(queue.current?.title, 'd');
-    expect(queue.upcoming, isEmpty);
+    expect(titles(queue.upcoming), ['x']);
     expect(queue.hasPrevious, isTrue);
     await queue.previous();
     expect(queue.current?.title, 'b');
@@ -339,7 +390,7 @@ void main() {
     await queue.jumpBack(queue.history[1]);
     expect(backend.opened.last, '/music/b.mp3');
     expect(titles(queue.history), ['a']);
-    expect(titles(queue.upcoming), ['c', 'x', 'd']);
+    expect(titles(queue.upcoming), ['c', 'd', 'x']);
   });
 
   test('moving songs; a moved song keeps where it came from', () async {
@@ -349,30 +400,32 @@ void main() {
       playlistName: 'A',
     );
     await queue.add([_file('x')]);
-    queue.move(queue.upcoming[0], 2); // x between b and c
+    queue.move(queue.upcoming[3], 2); // x between c and d
     expect(titles(queue.upcoming), ['b', 'c', 'x', 'd']);
     queue.move(queue.upcoming[3], 0); // d first
     expect(titles(queue.upcoming), ['d', 'b', 'c', 'x']);
     expect(queue.upcoming.first.origin?.playlistName, 'A');
     expect(queue.upcoming[3].origin, isNull);
-    // "Dodaj do kolejki" goes before the first song of the playlist still in place.
+    // "Dodaj do kolejki" goes at the very end.
     await queue.add([_file('y')]);
-    expect(titles(queue.upcoming), ['d', 'y', 'b', 'c', 'x']);
+    expect(titles(queue.upcoming), ['d', 'b', 'c', 'x', 'y']);
   });
 
   test('shuffle mixes only the playlist songs, in their places', () async {
     final songs = [for (var i = 0; i < 20; i++) _file('$i')];
     await queue.start(songs, 0);
     await queue.add([_file('x')]);
-    queue.move(queue.upcoming[6], 1); // "6" pinned second
+    queue.move(queue.upcoming[5], 1); // "6" pinned second
     queue.setShuffle(true);
-    expect(titles(queue.upcoming).take(2), ['x', '6']);
+    expect(titles(queue.upcoming)[1], '6');
+    expect(titles(queue.upcoming).last, 'x');
     queue.setShuffle(false);
     expect(titles(queue.upcoming), [
-      'x',
+      '1',
       '6',
-      for (var i = 1; i < 20; i++)
+      for (var i = 2; i < 20; i++)
         if (i != 6) '$i',
+      'x',
     ]);
   });
 
@@ -412,19 +465,19 @@ void main() {
       _file('p'),
       _file('q'),
     ], origin: QueueOrigin(playlistName: 'B'));
-    queue.move(queue.upcoming.last, 0);
+    queue.move(queue.upcoming.first, 2);
     final saved = jsonDecode(jsonEncode(queue.snapshot())) as Map;
     final other = PlaybackQueue(tracks, prefetchDelay: Duration.zero);
     addTearDown(other.dispose);
     other.restore(saved.cast(), (ref) => _file(ref.title));
-    expect(titles(other.upcoming), ['c', 'p', 'q']);
-    expect(other.upcoming.first.pinned, isTrue);
+    expect(titles(other.upcoming), ['p', 'q', 'c']);
+    expect(other.upcoming.last.pinned, isTrue);
     expect(
-      identical(other.upcoming[1].origin, other.upcoming[2].origin),
+      identical(other.upcoming[0].origin, other.upcoming[1].origin),
       isTrue,
     );
-    expect(other.upcoming[1].origin?.playlistName, 'B');
-    expect(other.isMain(other.upcoming.first), isTrue);
+    expect(other.upcoming[0].origin?.playlistName, 'B');
+    expect(other.isMain(other.upcoming.last), isTrue);
     expect(other.current?.title, 'b');
     expect(other.hasPrevious, isTrue);
   });
@@ -536,7 +589,9 @@ void main() {
       await tester.tap(find.text('c'));
       await tester.pump();
       expect(backend.opened.last, '/music/c.mp3');
-      expect(find.text('Następne w kolejce'), findsNothing);
+      // The songs added are after the playlist: still to come.
+      expect(find.text('Następne z: Do auta'), findsNothing);
+      expect(find.text('Następne w kolejce'), findsOneWidget);
 
       await tester.tap(find.text('Losowo: wył.'));
       await tester.pump();
@@ -690,9 +745,7 @@ void main() {
     expect(queue.upcoming.first.pinned, isTrue);
   });
 
-  testWidgets('dragging a song row to the right adds it to the queue', (
-    tester,
-  ) async {
+  testWidgets('dragging a song row to the right plays it next', (tester) async {
     await tester.runAsync(() => queue.start([_file('a')], 0));
     await tester.pumpWidget(
       PlayerScope(
@@ -718,9 +771,76 @@ void main() {
     await tester.drag(find.text('b'), const Offset(300, 0));
     await tester.pumpAndSettle();
     expect(titles(queue.upcoming), ['b']);
-    expect(find.text('Dodano do kolejki'), findsOneWidget);
+    expect(find.text('Zagra jako następny'), findsOneWidget);
     expect(backend.opened, ['/music/a.mp3'], reason: 'a keeps playing');
   });
+
+  testWidgets('dragging right adds to the end when the user chose so; '
+      'a row with a remove action is dragged left to remove it', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'playback.swipe_right_plays_next': false,
+    });
+    final settings = SourceSettings();
+    await tester.runAsync(settings.load);
+    await tester.runAsync(
+      () => queue.start([_file('a'), _file('b')], 0, playlistName: 'P'),
+    );
+    var removed = 0;
+    await tester.pumpWidget(
+      PlayerScope(
+        notifier: player,
+        child: PlaybackQueueScope(
+          notifier: queue,
+          child: SourceSettingsScope(
+            notifier: settings,
+            child: MaterialApp(
+              theme: buildAppTheme(dummifyTheme),
+              home: Scaffold(
+                body: ListView(
+                  children: [
+                    SongTile(hit: _file('x'), onSwipeRemove: () => removed++),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.drag(find.text('x'), const Offset(300, 0));
+    await tester.pumpAndSettle();
+    expect(titles(queue.upcoming), ['b', 'x']);
+    expect(find.text('Dodano do kolejki'), findsOneWidget);
+    expect(removed, 0);
+
+    await tester.drag(find.text('x'), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(removed, 1);
+  });
+
+  testWidgets(
+    '"Kolejka": "Przywróć poprzednią kolejkę" brings the replaced one back',
+    (tester) async {
+      await tester.runAsync(() async {
+        await queue.start([_file('a'), _file('b')], 0, playlistName: 'A');
+        await queue.start([_file('p')], 0);
+      });
+      await showQueue(tester);
+      expect(find.text('a'), findsNothing);
+      await tester.tap(
+        find.byTooltip('Przywróć poprzednią kolejkę: A, 2 utwory'),
+      );
+      await tester.runAsync(flush);
+      await tester.pump();
+      expect(queue.current?.title, 'a');
+      expect(find.text('b'), findsOneWidget);
+      // "p" was one song: nothing to swap back to.
+      expect(find.byIcon(Icons.restore), findsNothing);
+    },
+  );
 
   testWidgets('in the app shell, adding shows a short note with "Otwórz"', (
     tester,
@@ -759,11 +879,11 @@ void main() {
     await tester.drag(find.text('b'), const Offset(300, 0));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Dodano do kolejki'), findsOneWidget);
+    expect(find.text('Zagra jako następny'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
     await tester.pump(QueueToast.duration);
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Dodano do kolejki'), findsNothing);
+    expect(find.text('Zagra jako następny'), findsNothing);
 
     // "Otwórz" opens the queue.
     await tester.drag(find.text('b'), const Offset(300, 0));
@@ -866,11 +986,11 @@ void main() {
       await queue.start([_file('a'), _file('b')], 0, playlistName: 'P');
       await queue.add([_file('x')]);
       queue.setRepeat(QueueRepeat.all);
-      expect(titles(queue.upcoming), ['x', 'b']);
+      expect(titles(queue.upcoming), ['b', 'x']);
 
-      await queue.next();
-      await queue.next();
+      await queue.jumpTo(queue.upcoming.first);
       expect(queue.current?.title, 'b');
+      queue.remove(queue.upcoming.first);
       expect(titles(queue.upcoming), ['a', 'b']);
 
       backend.finish();
@@ -1319,7 +1439,7 @@ void main() {
       await showRow(tester, song(2, 'b', {'dance'}));
       await tester.drag(find.text('b'), const Offset(300, 0));
       await tester.pumpAndSettle();
-      expect(find.text('Dodano do kolejki'), findsOneWidget);
+      expect(find.text('Zagra jako następny'), findsOneWidget);
       expect(filter.active, isTrue);
     });
   });

@@ -202,6 +202,10 @@ class _MoodScreenState extends State<MoodScreen> {
                   onPressed: () => _showSongMenu(context, mood, hit, editable),
                 ),
                 onLongPress: () => _showSongMenu(context, mood, hit, editable),
+                onSwipeRemove: editable
+                    ? () => _swipeRemove(context, mood, hit)
+                    : null,
+                swipeRemoveLabel: 'Usuń z tego nastroju',
               ),
           ],
         ),
@@ -283,6 +287,25 @@ class _MoodScreenState extends State<MoodScreen> {
         ),
     ],
   );
+
+  /// Dragged left: out of the mood, with "Cofnij".
+  void _swipeRemove(BuildContext context, Mood mood, SearchHit hit) {
+    final moods = MoodLibraryScope.of(context);
+    final id = hit.mainSong!.id;
+    moods.setSong(mood, id, false);
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Usunięto z nastroju: „${hit.title}”'),
+          persist: false,
+          action: SnackBarAction(
+            label: 'Cofnij',
+            onPressed: () => moods.setSong(mood, id, true),
+          ),
+        ),
+      );
+  }
 
   Future<void> _rename(BuildContext context, Mood mood) async {
     final moods = MoodLibraryScope.of(context);

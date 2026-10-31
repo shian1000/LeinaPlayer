@@ -825,7 +825,20 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       onPressed: () => _showTrackMenu(hit, i),
     ),
     onLongPress: () => _showTrackMenu(hit, i),
+    onSwipeRemove: _preview ? null : () => _swipeRemove(hit, i),
+    swipeRemoveLabel: 'Usuń z tej playlisty',
   );
+
+  /// Dragged left: like "Usuń z tej playlisty", saying so.
+  Future<void> _swipeRemove(SearchHit hit, int index) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await _removeTrack(index);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('Usunięto z playlisty: „${hit.title}”')),
+      );
+  }
 
   @override
   Widget build(BuildContext context) {

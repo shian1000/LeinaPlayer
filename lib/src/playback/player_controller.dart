@@ -586,12 +586,18 @@ class PlayerController extends ChangeNotifier {
     await backend.seek(Duration.zero);
   }
 
-  /// Pauses whatever is loaded and shows [track] instead, not loaded; play calls [resume] (the
-  /// queue stopping on a song it couldn't reach for want of a connection).
-  Future<void> park(NowPlaying track, Future<void> Function() resume) async {
+  /// Pauses whatever is loaded and shows [track] instead, not loaded, at [position]; play calls
+  /// [resume] (the queue stopping on a song it couldn't reach for want of a connection, or
+  /// bringing back the queue it replaced).
+  Future<void> park(
+    NowPlaying track,
+    Future<void> Function() resume, {
+    Duration position = Duration.zero,
+    Duration? duration,
+  }) async {
     _fadePending = false;
     await _backend?.pause();
-    showRestored(track, position: Duration.zero, resume: resume);
+    showRestored(track, position: position, duration: duration, resume: resume);
   }
 
   /// Loads and starts [track]; returns whether it could be opened. Called by the queue

@@ -12,10 +12,13 @@ import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
+import '../data/spotify_playlist.dart';
+import '../playback/playback_queue.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/song_tile.dart';
 import 'app_shell.dart';
 
 const _id = 'Na później';
@@ -195,6 +198,16 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
           onTap: () => _open(link),
         ),
         MenuSheetEntry(
+          Icons.queue_music,
+          'Dodaj do kolejki',
+          onTap: () => _queue(link, next: false),
+        ),
+        MenuSheetEntry(
+          Icons.playlist_play,
+          _isPlaylist(link) ? 'Odtwórz jako następną' : 'Odtwórz jako następny',
+          onTap: () => _queue(link, next: true),
+        ),
+        MenuSheetEntry(
           link.opened
               ? Icons.radio_button_unchecked
               : Icons.check_circle_outline,
@@ -228,6 +241,66 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
         ),
       ],
     );
+  }
+
+  static bool _isPlaylist(LaterLink link) => link.service == LinkService.youtube
+      ? parseYouTubeLink(link.url) is YouTubePlaylistLink
+      : parseSpotifyLink(link.url)?.kind == SpotifyLinkKind.playlist;
+
+  /// The link's song — or a playlist's / album's songs — into the queue, without opening it.
+  Future<void> _queue(LaterLink link, {required bool next}) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Sprawdzam link…'),
+          duration: Duration(seconds: 30),
+        ),
+      );
+    String problem;
+    try {
+      final found = await songsForLaterLink(
+        link,
+        catalog: SongCatalogScope.of(context),
+        library: LocalLibraryScope.of(context),
+        youTube: YouTubeLibraryScope.of(context),
+        playlists: PlaylistLibraryScope.of(context),
+        search: YouTubeScope.searchOf(context),
+        youTubePlaylists: YouTubeScope.playlistsOf(context),
+        spotify: YouTubeScope.spotifyOf(context),
+        settings: SourceSettingsScope.of(context),
+      );
+      if (!mounted) return;
+      if (found.hits.isNotEmpty) {
+        messenger.clearSnackBars();
+        final name = found.name;
+        await queueSongs(
+          context,
+          found.hits,
+          next: next,
+          origin: name == null
+              ? null
+              : QueueOrigin(
+                  playlistName: name,
+                  youTubeListId: found.youTubeListId,
+                ),
+        );
+        return;
+      }
+      problem = 'W tym linku nie ma utworów do dodania.';
+    } on YouTubeSearchException catch (e) {
+      problem = e.message;
+    } on SpotifyException catch (e) {
+      problem = e.message;
+    } catch (e) {
+      debugPrint('Queueing ${link.url} failed: $e');
+      problem = 'Nie udało się odczytać linku.';
+    }
+    if (!messenger.mounted) return;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(problem)));
   }
 
   Future<void> _openOutside(LinkService service, Uri uri) async {

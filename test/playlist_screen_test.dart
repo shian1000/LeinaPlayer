@@ -583,7 +583,10 @@ void main() {
 
     await tester.longPress(find.text('Do auta'));
     await tester.pumpAndSettle();
-    expect(find.text('Przenieś do folderu'), findsOneWidget);
+    expect(find.text('Dodaj do kolejki'), findsOneWidget);
+    expect(find.text('Odtwórz jako następną'), findsOneWidget);
+    await tester.tap(find.text('Przenieś do folderu'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Nowy folder'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Podróże');
@@ -613,6 +616,8 @@ void main() {
 
     // Out of the folder again, from its own screen.
     await tester.longPress(find.text('Do auta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Przenieś do folderu'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bez folderu'));
     await tester.pumpAndSettle();

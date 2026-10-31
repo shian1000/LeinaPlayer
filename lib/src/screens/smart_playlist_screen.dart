@@ -233,10 +233,11 @@ class SmartPlaylistScreen extends StatelessWidget {
               idPrefix: '$_id › Menu (⋮)',
               entries: [
                 if (hits.isNotEmpty) ...[
-                  MenuSheetEntry(
-                    Icons.queue_music,
-                    'Dodaj do kolejki',
-                    onTap: () => queueSongs(context, hits, next: false),
+                  ...queueAllEntries(
+                    context,
+                    hits,
+                    origin: QueueOrigin(playlistName: playlist.name),
+                    feminine: true,
                   ),
                   ?playlistMenuEntry(context, hits),
                 ],

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'combined_search.dart';
 import 'incoming_links.dart';
 import 'item_sync.dart';
 import 'local_library.dart';
@@ -578,5 +579,87 @@ Future<({String title, String? artist})?> describeLaterLink(
   } catch (e) {
     debugPrint('Describing ${link.url} failed: $e');
     return null;
+  }
+}
+
+/// The songs a saved link stands for, for "Dodaj do kolejki" / "Odtwórz jako następny": the
+/// song of a video or track, or every track of a playlist or album (read the way a preview of
+/// it is, nothing saved to Biblioteka). [name] / [youTubeListId]: the playlist's, for the queue.
+/// Throws [YouTubeSearchException] / [SpotifyException] when it can't be read.
+Future<
+  ({List<SearchHit> hits, String? name, String? youTubeListId, bool album})
+>
+songsForLaterLink(
+  LaterLink link, {
+  required SongCatalog catalog,
+  required LocalLibrary library,
+  required YouTubeLibrary youTube,
+  required PlaylistLibrary playlists,
+  required YouTubeSearch search,
+  required YouTubePlaylists youTubePlaylists,
+  required SpotifyPlaylists spotify,
+  required SourceSettings settings,
+}) async {
+  List<SearchHit> hitsOf(List<PlaylistTrack> tracks) => [
+    for (final track in tracks) playlistHit(track, catalog, library, youTube),
+  ];
+  if (link.service == LinkService.youtube) {
+    switch (parseYouTubeLink(link.url)) {
+      case null:
+        return (
+          hits: <SearchHit>[],
+          name: null,
+          youTubeListId: null,
+          album: false,
+        );
+      case YouTubePlaylistLink(:final listId):
+        final data = await youTubePlaylists.fetch(listId, settings);
+        return (
+          hits: hitsOf(await playlists.previewYouTube(data)),
+          name: data.name,
+          youTubeListId: listId,
+          album: false,
+        );
+      case final YouTubeVideoLink video:
+        final hit = await hitForVideoLink(
+          video,
+          catalog: catalog,
+          library: library,
+          youTube: youTube,
+          search: search,
+          settings: settings,
+        );
+        return (hits: [hit], name: null, youTubeListId: null, album: false);
+    }
+  }
+  var target = parseSpotifyLink(link.url);
+  if (target == null) {
+    final short = findSpotifyShortLink(link.url);
+    if (short != null) target = await spotify.resolveShortLink(short);
+  }
+  if (target == null) {
+    return (hits: <SearchHit>[], name: null, youTubeListId: null, album: false);
+  }
+  switch (target.kind) {
+    case SpotifyLinkKind.track:
+      final hit = await hitForSpotifyTrack(
+        await spotify.fetchTrack(target.id),
+        catalog: catalog,
+        playlists: playlists,
+        library: library,
+        youTube: youTube,
+      );
+      return (hits: [hit], name: null, youTubeListId: null, album: false);
+    case SpotifyLinkKind.album || SpotifyLinkKind.playlist:
+      final album = target.kind == SpotifyLinkKind.album;
+      final data = album
+          ? await spotify.fetchAlbum(target.id)
+          : await spotify.fetch(target.id);
+      return (
+        hits: hitsOf(await playlists.previewSpotify(data)),
+        name: data.name,
+        youTubeListId: null,
+        album: album,
+      );
   }
 }

@@ -144,7 +144,7 @@ void main() {
         isEmpty,
         reason: 'nothing loaded until play',
       );
-      expect([for (final e in after.queue.upcoming) e.hit.title], ['x', 'c']);
+      expect([for (final e in after.queue.upcoming) e.hit.title], ['c', 'x']);
       expect(after.queue.currentEntry?.origin?.playlistId, 7);
       expect(after.queue.currentEntry?.origin?.moodKey, 'u3');
       expect(after.queue.hasPrevious, isTrue, reason: 'a played before b');
@@ -172,12 +172,57 @@ void main() {
       playlistId: 3,
       playlistName: 'P',
     );
-    await a.queue.add([_file('x')]);
+    await a.queue.playNext([_file('x')]);
     await a.queue.next();
     await flush();
     expect(
       [for (final p in plays) (p.hit.title, p.playlistId)],
       [('a', 3), ('x', null)],
     );
+  });
+
+  test('the queue a new one replaced is kept across a restart, and comes back '
+      'playing where it was', () async {
+    final before = app();
+    final session = QueueSession(
+      queue: before.queue,
+      player: before.player,
+      resolve: _resolve,
+    );
+    await session.restore();
+    await before.queue.start(
+      [_file('a'), _file('b'), _file('c')],
+      1,
+      playlistName: 'Do auta',
+    );
+    before.backend.at(const Duration(seconds: 42));
+    await flush();
+    await before.queue.start([_file('z')], 0);
+    expect(before.queue.replaced?.songCount, 3);
+    expect(before.queue.replaced?.name, 'Do auta');
+    await session.save();
+    session.dispose();
+
+    final after = app();
+    await QueueSession(
+      queue: after.queue,
+      player: after.player,
+      resolve: _resolve,
+    ).restore();
+    expect(after.player.current?.title, 'z');
+    expect(after.queue.replaced?.current.title, 'b');
+
+    after.backend.playingStateLater = true;
+    await after.queue.playReplaced();
+    expect(after.queue.current?.title, 'b');
+    expect([for (final e in after.queue.upcoming) e.hit.title], ['c']);
+    expect(after.queue.hasPrevious, isTrue, reason: 'a played before b');
+    expect(after.backend.opened, ['/music/b.mp3']);
+    expect(
+      after.backend.calls,
+      containsAllInOrder(['open', 'seek 42', 'play']),
+    );
+    // A single song isn't worth keeping: nothing to swap back to.
+    expect(after.queue.replaced, isNull);
   });
 }

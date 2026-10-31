@@ -31,11 +31,14 @@ folders on the phone into the phone's own `local.db`, song search over both data
 ticking several songs with a long press for a shared action (queue, playlist, mood),
 playing phone files with a mini/full player, streaming a song's file from MusicDatabase's
 music library on the server when its `files.db` knows one (source "Serwer";
-[ADR 0010](docs/decisions/0010-server-files.md)), a play queue (playlists, "Dodaj do kolejki" /
-"Odtwórz jako następny" for songs and whole playlists, each entry remembering the playlist it
-was queued from, shuffle, the queue screen with reordering and swipe-to-remove, caching the next
-songs ahead; remembered across restarts), crossfading into the next song (Ustawienia ›
-Odtwarzanie, 0–12 s), dragging a song row right to queue it and a
+[ADR 0010](docs/decisions/0010-server-files.md)), a play queue (playlists, "Dodaj do kolejki" —
+at the very end — / "Odtwórz jako następny" for songs, playlists, moods, albums and links
+saved "Na później", each entry remembering the playlist it was queued from, shuffle, the queue
+screen with reordering and swipe-to-remove, caching the next songs ahead; remembered across
+restarts, and so is the queue of several songs that playing something else replaced, brought
+back by Kolejka's "Przywróć poprzednią kolejkę"), crossfading into the next song (Ustawienia ›
+Odtwarzanie, 0–12 s), dragging a song row right to play it next or add it to the queue (as
+set in Odtwarzanie) and left to take it out of a playlist / mood / Na później, and a
 media notification with previous/next (keeps playing in the background); scrolled down, the full
 player shows everything music.db / tag.db / the phone know about the song (all of it for now,
 to be trimmed later — user's request), and its own fields can be corrected there (the pencil),
@@ -75,7 +78,7 @@ MusicDatabase or a mood; Biblioteka as categories, with "Polubione utwory" (like
 "Dodaj do playlisty" sheet / submenu — the full player's ⊕ turns into an accent ✓, Spotify-like),
 songs saved "Na później" (both `saved_songs.dart`, synced with the account —
 [ADR 0013](docs/decisions/0013-saved-songs-sync.md)) and dynamic playlists — a saved search filter
-(`smart_playlists.dart`, phone only); the queue opens in place of the full player's cover, and lyrics (looked
+(`smart_playlists.dart`, phone only); the full player's queue button opens the whole queue, and lyrics (looked
 up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the player, above
 "Informacje o utworze" (user's layout: bottom row YouTube, mood filter, share, queue, ⋮; a mood
 button where "Polub" was); song menus unfold "Dodaj do playlisty ›" / "Przejdź do
@@ -200,7 +203,9 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   use it); `showAddToPlaylistSheet` in `playlist_picker.dart`; `youtube_export_dialog.dart` — "Utwórz na YouTube"; `folder_sheet.dart` — "Przenieś do
   folderu" for Biblioteka;
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
-  queues a song, left removes from the queue); `QueueToast` — the short note above the mini player after
+  queues a song — `queueSwipe`, as `SourceSettings.swipePlaysNext` says —, left takes it out —
+  `removeSwipe`, `SongTile.onSwipeRemove`); `queueAllEntries` — "Dodaj do kolejki" / "Odtwórz
+  jako następny" for a whole list of songs, for any new list's menu; `QueueToast` — the short note above the mini player after
   adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player (also from a song's menu, `showSongInfoSheet`); `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog`, `pluralWord` (Polish plurals) and

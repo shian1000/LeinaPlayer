@@ -84,8 +84,13 @@ full screen "Witaj w Leina Radio" — "Pobierać bazę danych muzyki z GitHuba?"
     "Otwórz w YouTube" follow the song playing. A whole playlist added from its ⋮ keeps its
     origin; a single song added from its ⋮ has none, even if it's on a playlist (user's
     decision). "Odtwórz jako następny" puts songs right after the current one; "Dodaj do
-    kolejki" after the songs added (or moved) before, ahead of the rest of the main songs; with
-    nothing playing the first one starts at once. Shuffle on: the main songs not played yet
+    kolejki" at the very end of the queue, whatever it was filled from (user's decision,
+    2026-10-31; only a round "Powtarzaj" queued again and not started yet stays after them);
+    with nothing playing the first one starts at once. A queue of more than one song that
+    playing something else replaces is kept (`PlaybackQueue.replaced`, saved across restarts
+    by `QueueSession` under `playback.replaced_session`) — not when another song of the same
+    playlist / search is tapped with nothing added by hand; Kolejka's "Przywróć poprzednią
+    kolejkę" brings it back. Shuffle on: the main songs not played yet
     (also those listed before the tapped one) take the main songs' places in random order;
     off: back to the playlist order after the main song played last; songs added or moved by
     hand stay where they are. When a song ends the next one plays, skipping songs that can't
@@ -127,9 +132,9 @@ full screen "Witaj w Leina Radio" — "Pobierać bazę danych muzyki z GitHuba?"
   - Bottom row, five icons spread evenly (user's order): Otwórz w YouTube (above), Filtr
     nastrojów (**implemented**: filter icon, accent while on, **→ Filtr nastrojów**), Udostępnij
     (**→ Udostępnij utwór**, see below; IDs `Odtwarzacz › Udostępnij › …`), Kolejka
-    (**implemented**: shows in place of the cover, accent while shown, tapped again — or × —
-    brings the cover back; "Następne" — the songs coming up, tapping one plays it — and "Cała
-    kolejka" **→ Kolejka**), `Odtwarzacz › Menu (⋮)` (**→ the song's menu**).
+    (**implemented**: opens the whole queue at once **→ Kolejka**; it used to show a short list
+    in place of the cover first — removed, user's decision 2026-10-31), `Odtwarzacz › Menu (⋮)`
+    (**→ the song's menu**).
   - Scrolled down: **Tekst** (**implemented**, a card right under the player, scrolling inside
     itself): the lyrics from LRCLIB (`data/lyrics.dart`, kept in memory for the run; a lite
     gap-fill while MusicDatabase has none) — time-synced lines follow the song, the current one
@@ -155,7 +160,8 @@ full screen "Witaj w Leina Radio" — "Pobierać bazę danych muzyki z GitHuba?"
     Cofnij). Each row has a drag handle (≡) to move it anywhere —
     it keeps its origin, and shuffle no longer moves it. Dragging a row left takes it out
     ("Usunięto z kolejki" with Cofnij — the reference app does the same), right makes it play
-    next ("Usunięto z kolejki" is the screen's own SnackBar — it goes after 4 s, even with
+    next — or moves it to the end, with Ustawienia › Odtwarzanie › "Przeciągnięcie utworu w
+    prawo" set to "Dodaj do kolejki" ("Usunięto z kolejki" is the screen's own SnackBar — it goes after 4 s, even with
     Cofnij, and with the screen). Tapping a row plays it (added songs before it are dropped, main songs before it
     count as played). "Losowo: wł./wył." and "Nastroje: wł./wył." (**→ Filtr nastrojów**) at the
     bottom; songs the filter hides aren't listed. The moon in the app bar **→ Nastrój dla
@@ -163,7 +169,11 @@ full screen "Witaj w Leina Radio" — "Pobierać bazę danych muzyki z GitHuba?"
     "Zapisz kolejkę jako playlistę" (**implemented**, `Icons.playlist_add` in the app bar): asks
     for a name and saves every song listed, in the screen's order, as a new Biblioteka
     playlist (synced with the account like any other); the note "Zapisano w Bibliotece: …" has
-    "Pokaż", which opens it.
+    "Pokaż", which opens it. Left of it, "Przywróć poprzednią kolejkę" (**implemented**,
+    `Icons.restore`, only while there is one; the tooltip names it and its song count): the
+    queue of more than one song that playing something else replaced comes back, its song
+    playing from where it was; the queue it replaces is kept in its place (swapping back),
+    unless it was a single song.
 
 ## Bottom navigation (`lib/src/screens/app_shell.dart`)
 
@@ -225,7 +235,9 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   Zmień nazwę / Usuń osobę — with their links, asks first), rows newest first (service icon,
   title and artist looked up by the app, else the kind; "od: <osoba>", date; a dot until
   opened). Tap opens it like a link given to the app (plays / imports) and marks it listened;
-  ⋮ / long press: Otwórz w Leina Radio, Oznacz jako (nie)odsłuchany, Zmień, od kogo jest (incl.
+  ⋮ / long press: Otwórz w Leina Radio, Dodaj do kolejki / Odtwórz jako następny (następną
+  for a playlist — the song of a video / track, or every track of a playlist / album read like a
+  preview, nothing saved; `songsForLaterLink`), Oznacz jako (nie)odsłuchany, Zmień, od kogo jest (incl.
   Nowa osoba), Otwórz w aplikacji YouTube/Spotify, Kopiuj link, Usuń z „Na później”.
   The links sync with the account (the sender by name; [ADR 0013](decisions/0013-saved-songs-sync.md)).
 
@@ -323,7 +335,9 @@ import, Wyświetlanie, Dane, Aplikacja.
   "Przenikanie utworów" — slider Wył.–12 s (1 s steps, default off, saved on release): the
   next queue song starts that long before the current one ends, one fading out as the other
   fades in; only when the queue moves on by itself ("Następny" and tapped songs switch at
-  once). See [`agent-notes/local-library.md`](agent-notes/local-library.md).
+  once). See [`agent-notes/local-library.md`](agent-notes/local-library.md). Section
+  *Przeciągnięcie utworu w prawo*: Odtwórz jako następny (default) / Dodaj do kolejki (na sam
+  koniec) — what dragging a song row right does (also in Kolejka: play next / move to the end).
 - Muzyka na telefonie **→ Muzyka na telefonie** (`local_music_screen.dart`) — **implemented**:
   - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
     and opens Android's folder picker (`file_picker`).
@@ -509,7 +523,9 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   cards (no "Pokaż wszystko"). From the phone (**implemented**; left out while empty):
   Ostatnio odtwarzane (the history's last 12 songs), Polubione utwory (the 12 last liked), Twoje playlisty, Twoje nastroje, Na później
   (saved songs); rows added from Biblioteka (a playlist's / mood's first 12 songs). Song cards
-  play the row from the tapped song; playlist / mood cards open it. Then the recommendations
+  play the row from the tapped song; playlist / mood cards open it. A long press: a song card
+  **→ the song's menu**, a playlist / mood card **→ its Biblioteka menu** (below), an artist /
+  album card a menu with Dodaj do kolejki / Odtwórz jako następny for all its songs. Then the recommendations
   (**implemented**, ids `rec:…`, `HomeRecommendations` in `data/home_recommendations.dart` from
   the listening stats over everything and music.db; each left out while it has nothing):
   Twoi najczęściej słuchani wykonawcy (round covers of their most played song **→ the artist's
@@ -625,7 +641,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Polub / Usuń z polubionych,
     Nowa playlista, then every playlist made on the phone) and Przejdź do wykonawców › (each artist of the song — **→ its
     songs**: `openArtistSongs`, every song in music.db and on the phone with that artist, a song
-    list with Odtwórz / Losowo; `song_list_screen.dart`).
+    list with Odtwórz / Losowo and a ⋮ with Dodaj do kolejki / Odtwórz jako następny for all
+    its songs; `song_list_screen.dart`).
   - **The song menu** (`showSongMenu` in `song_tile.dart`): the same entries as this ⋮ — Dodaj do
     kolejki, Odtwórz jako następny, Dodaj do nastroju (for a song not in MusicDatabase it says
     only database songs can be in a mood), Dodaj do playlisty, the dummies, Udostępnij — open
@@ -641,11 +658,15 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     order they were ticked. Back (and ✕) unticks everything first. In search the ticks stay
     while the query changes.
   - Gestures on song rows (search results — YouTube ones too —, playlists, Ostatnie, every
-    `SongTile`; `SwipeActions` in `swipe_actions.dart`): dragging a row right adds the song to
-    the queue, like the reference app — past a quarter of the row (at most 120 px) the strip
-    under it fills with the accent colour and the phone ticks; letting go there adds it, the
-    row slides back either way. Dragging left does nothing yet (the reference app adds the
-    song to Polubione utwory, which the app doesn't have).
+    `SongTile`; `SwipeActions` in `swipe_actions.dart`): dragging a row right queues the song,
+    like the reference app — "Odtwórz jako następny" by default, or "Dodaj do kolejki" (Ustawienia
+    › Odtwarzanie › "Przeciągnięcie utworu w prawo", `SourceSettings.swipePlaysNext`,
+    `queueSwipe`); past a quarter of the row (at most 120 px) the strip under it fills with the
+    accent colour and the phone ticks; letting go there does it, the row slides back either
+    way. Dragging left (red strip, `removeSwipe`) takes the song out where the list can lose it:
+    a saved playlist ("Usunięto z playlisty", like "Usuń z tej playlisty" — no Cofnij), a mood
+    the user may edit ("Usunięto z nastroju" with Cofnij), Na później and Polubione utwory;
+    elsewhere it does nothing (`SongTile.onSwipeRemove`).
   - Adding to the queue (gesture, ⋮ of a song or playlist) says so in a note right above the
     mini player, like the reference app's (`QueueToast` in `queue_toast.dart`, not a
     SnackBar): just "Dodano do kolejki" / "Zagra jako następny" (a playlist: "następna"),
@@ -692,7 +713,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   nastrojów" and how to add one when there are none), Foldery (only folders), Wykonawcy
   (**implemented**, `ArtistsScreen`: every artist in music.db and of the phone's songs not in it,
   with song counts, alphabetically, a field to narrow it — **→ the artist's songs**), Na później **→ Na później** (`saved_songs_screen.dart`: saved songs newest first,
-  "Odtwórz", song rows; saved / taken out with the song menu's "Zapisz na później" / "Usuń z „Na
+  "Odtwórz", song rows (dragged left: taken out — also in Polubione utwory), ⋮: Dodaj do kolejki /
+  Odtwórz jako następny (every song); saved / taken out with the song menu's "Zapisz na później" / "Usuń z „Na
   później”" or Odkrywaj's bookmark — `SavedSongs`, synced with the account, ADR 0013), Dynamiczne playlisty **→
   Dynamiczne playlisty** (`smart_playlist_screen.dart`, below). A category shows its playlists /
   moods outside folders plus the folders holding any of them (inside, only those).
@@ -702,7 +724,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   saved filter — a song-search field (Tytuł, Wykonawca, Album, Rok, Język, Pochodzenie
   wykonawcy, Nastrój) and a value; its songs are searched in music.db and on the phone each time
   it opens. "Nowa" asks for the field, value and name. A playlist: rule and count, Odtwórz,
-  Losowo, song rows; ⋮: Dodaj do kolejki, Dodaj do playlisty, Usuń dynamiczną playlistę.
+  Losowo, song rows; ⋮: Dodaj do kolejki, Odtwórz jako następną, Dodaj do playlisty, Usuń
+  dynamiczną playlistę.
 - Sort button (shows current order) **→ sheet "Sortuj wg"** — **implemented**
   (`LibraryFolders` in `data/library_folders.dart`, remembered on the phone; also in a folder):
   - Ostatnie: last opened (playlist, mood or folder; a folder also by its newest item), else
@@ -717,8 +740,10 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   Utwórz › Folder or "Nowy folder" in "Przenieś do folderu"; row "Folder • N playlist, M
   nastrojów" **→ Folder** (`FolderScreen`: its items in the same order, sort button, ⋮ = the
   folder menu, "Pusty folder…" when empty). A **long press** on a playlist / mood row (here or in
-  a folder) **→ sheet "Przenieś do folderu"** (`folder_sheet.dart`: Nowy folder, Bez folderu,
-  every folder by name, the current one ticked); on a folder row **→ folder menu**
+  a folder) **→ its menu** (`showLibraryEntryMenu`: Dodaj do kolejki, Odtwórz jako następną /
+  następny — the whole playlist or mood, queued from it — and Przenieś do folderu **→ sheet
+  "Przenieś do folderu"** (`folder_sheet.dart`: Nowy folder, Bez folderu,
+  every folder by name, the current one ticked)); on a folder row **→ folder menu**
   (`Biblioteka › Folder › Menu (⋮)`: Zmień nazwę, Usuń folder — its items go back to
   Biblioteka). Folders don't nest; an item is in one folder at most.
 - **Playing playlist / mood** — **implemented**: the row of the playlist or mood the playing

@@ -11,7 +11,8 @@ import 'player_controller.dart';
 
 /// Remembers the queue and the song in the player across app restarts, like the reference app:
 /// after a restart the mini player shows the last song paused where it was, and "Odtwórz"
-/// carries on from there with the same playlist, order and added songs.
+/// carries on from there with the same playlist, order and added songs. The queue playing
+/// something else replaced ([PlaybackQueue.replaced]) is kept too.
 class QueueSession {
   QueueSession({
     required this.queue,
@@ -20,6 +21,7 @@ class QueueSession {
   });
 
   static const _key = 'playback.session';
+  static const _replacedKey = 'playback.replaced_session';
 
   /// While music plays the position is saved this often, so it's roughly right even when
   /// Android kills the app in the background.
@@ -34,12 +36,24 @@ class QueueSession {
   Timer? _timer;
   bool _started = false;
 
+  /// What [save] last stored under [_replacedKey].
+  ReplacedQueue? _savedReplaced;
+
   /// Puts back the saved session (unless something is already playing), then keeps saving.
   Future<void> restore() async {
     try {
-      final raw = (await SharedPreferences.getInstance()).getString(_key);
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key);
       if (raw != null && player.current == null && queue.current == null) {
         _restore(jsonDecode(raw) as Map<String, Object?>);
+      }
+      final replaced = prefs.getString(_replacedKey);
+      if (replaced != null && queue.replaced == null) {
+        _savedReplaced = ReplacedQueue.fromJson(
+          (jsonDecode(replaced) as Map).cast(),
+          resolve,
+        );
+        queue.restoreReplaced(_savedReplaced);
       }
     } catch (e) {
       debugPrint('Restoring the play queue failed: $e');
@@ -84,6 +98,16 @@ class QueueSession {
     final snapshot = queue.snapshot();
     try {
       final prefs = await SharedPreferences.getInstance();
+      final replaced = queue.replaced;
+      if (!identical(replaced, _savedReplaced)) {
+        _savedReplaced = replaced;
+        replaced == null
+            ? await prefs.remove(_replacedKey)
+            : await prefs.setString(
+                _replacedKey,
+                jsonEncode(replaced.toJson()),
+              );
+      }
       if (snapshot == null) {
         await prefs.remove(_key);
         return;

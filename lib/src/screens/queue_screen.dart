@@ -4,6 +4,7 @@ import '../data/combined_search.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
+import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
@@ -22,7 +23,8 @@ import '../widgets/song_names.dart';
 /// a heading for each run of songs queued from the same place — songs added one by one, a
 /// playlist added as a whole, the playlist / results the queue was filled with. Tapping a song
 /// plays it (skipping the ones before it); the handle moves it; dragging a row left takes it out,
-/// right makes it play next.
+/// right makes it play next or moves it to the end ([SourceSettings.swipePlaysNext]). The queue
+/// that playing something else replaced comes back with "Przywróć poprzednią kolejkę".
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
 
@@ -149,6 +151,17 @@ class QueueScreen extends StatelessWidget {
           backgroundColor: palette.surface,
           title: const Text('Kolejka'),
           actions: [
+            if (queue.replaced case final replaced?)
+              IconButton(
+                tooltip:
+                    'Przywróć poprzednią kolejkę: '
+                    '${[?replaced.name, trackCountLabel(replaced.songCount)].join(', ')}',
+                icon: const Icon(Icons.restore),
+                onPressed: () => runQueueAction(
+                  context,
+                  (onStatus) => queue.playReplaced(onStatus: onStatus),
+                ),
+              ),
             if (current != null &&
                 PlaylistLibraryScope.maybeOf(context) != null)
               // Its context is under the screen's own messenger, which shows the note.
@@ -445,18 +458,17 @@ class _UpcomingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final queue = PlaybackQueueScope.of(context);
+    final next = SourceSettingsScope.maybeOf(context)?.swipePlaysNext ?? true;
     return SwipeActions(
       right: SwipeAction(
-        icon: Icons.playlist_play,
-        label: 'Odtwórz jako następny',
-        onTriggered: () => queue.move(entry, 0),
+        icon: next ? Icons.playlist_play : Icons.queue_music,
+        label: next ? 'Odtwórz jako następny' : 'Przenieś na koniec kolejki',
+        onTriggered: () => queue.move(entry, next ? 0 : queue.upcoming.length),
       ),
-      left: SwipeAction(
-        icon: Icons.delete_outline,
-        label: 'Usuń z kolejki',
-        color: Theme.of(context).colorScheme.error,
-        foreground: Theme.of(context).colorScheme.onError,
-        onTriggered: () => _remove(context, queue),
+      left: removeSwipe(
+        context,
+        'Usuń z kolejki',
+        () => _remove(context, queue),
       ),
       child: _QueueRow(
         hit: entry.hit,

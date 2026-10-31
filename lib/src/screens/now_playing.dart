@@ -582,16 +582,7 @@ class NowPlayingScreen extends StatefulWidget {
   State<NowPlayingScreen> createState() => _NowPlayingScreenState();
 }
 
-/// What the full player shows where the cover is.
-enum _Stage { cover, queue }
-
 class _NowPlayingScreenState extends State<NowPlayingScreen> {
-  _Stage _stage = _Stage.cover;
-
-  /// Tapping the shown one's button again brings the cover back.
-  void _toggle(_Stage stage) =>
-      setState(() => _stage = _stage == stage ? _Stage.cover : stage);
-
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -675,20 +666,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             const SizedBox(width: 48),
                           ],
                         ),
-                        // Lyrics and the queue open here, so the controls stay where they
-                        // are, under the thumb (Juxtopposed's Spotify redesign).
                         Expanded(
-                          child: switch (_stage) {
-                            _Stage.cover => Center(
-                              child: SongCover(
-                                cover: track.cover,
-                                size: coverSize,
-                              ),
+                          child: Center(
+                            child: SongCover(
+                              cover: track.cover,
+                              size: coverSize,
                             ),
-                            _Stage.queue => _QueuePanel(
-                              onClose: () => _toggle(_Stage.queue),
-                            ),
-                          },
+                          ),
                         ),
                         Row(
                           children: [
@@ -846,13 +830,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             ),
                             IconButton(
                               tooltip: 'Kolejka',
-                              icon: Icon(
-                                Icons.queue_music,
-                                color: _stage == _Stage.queue
-                                    ? palette.accent
-                                    : null,
-                              ),
-                              onPressed: () => _toggle(_Stage.queue),
+                              icon: const Icon(Icons.queue_music),
+                              onPressed: () => QueueScreen.open(context),
                             ),
                             IconButton(
                               tooltip: 'Menu odtwarzacza (⋮)',
@@ -1080,117 +1059,6 @@ class _LyricsCardState extends State<_LyricsCard> {
       ),
     );
   }
-}
-
-/// What plays next, in place of the cover: tapping a song plays it; the whole queue
-/// (reordering, removing, "Poprzednie") is one tap away.
-class _QueuePanel extends StatelessWidget {
-  const _QueuePanel({required this.onClose});
-
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final queue = PlaybackQueueScope.of(context);
-    final upcoming = queue.upcoming;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
-      decoration: BoxDecoration(
-        color: palette.surfaceHigh.withValues(alpha: 0.7),
-        borderRadius: palette.radius(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: _PanelHeader(
-              title: 'Następne',
-              onClose: onClose,
-              action: TextButton(
-                onPressed: () => QueueScreen.open(context),
-                child: const Text('Cała kolejka'),
-              ),
-            ),
-          ),
-          Expanded(
-            child: upcoming.isEmpty
-                ? Center(
-                    child: Text(
-                      'Po tym utworze nic więcej nie zagra.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: palette.textSecondary),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: upcoming.length,
-                    itemBuilder: (context, i) {
-                      final entry = upcoming[i];
-                      return ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
-                        leading: SongCover(
-                          cover: CoverRequest.of(entry.hit),
-                          size: 40,
-                        ),
-                        title: Text(
-                          entry.hit.shownTitle(context),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          withFullAlbumLabel(
-                            entry.hit,
-                            entry.hit.shownArtist(context),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => runQueueAction(
-                          context,
-                          (onStatus) => queue.jumpTo(entry, onStatus: onStatus),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PanelHeader extends StatelessWidget {
-  const _PanelHeader({required this.title, required this.onClose, this.action});
-
-  final String title;
-  final VoidCallback onClose;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Expanded(
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: AppFontSize.listTitle,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      ?action,
-      IconButton(
-        tooltip: 'Pokaż okładkę',
-        icon: const Icon(Icons.close),
-        onPressed: onClose,
-      ),
-    ],
-  );
 }
 
 /// The song's moods (accent when it's in any), tapped to change them; in place of "Polub".

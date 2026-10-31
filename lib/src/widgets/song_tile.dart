@@ -112,8 +112,8 @@ Future<void> runQueueAction(
   }
 }
 
-/// "Dodaj do kolejki" from a song's ⋮ menu: plays after the current song and the ones added
-/// before it (right away when nothing plays).
+/// "Dodaj do kolejki" from a song's ⋮ menu: plays at the very end of the queue (right away
+/// when nothing plays).
 Future<void> addToQueue(BuildContext context, SearchHit hit) =>
     queueSongs(context, [hit], next: false);
 
@@ -121,8 +121,59 @@ Future<void> addToQueue(BuildContext context, SearchHit hit) =>
 Future<void> playNextInQueue(BuildContext context, SearchHit hit) =>
     queueSongs(context, [hit], next: true);
 
-/// Adds [hits] to the queue — right after the current song ([next]) or after the songs added
-/// before them — saying so; [origin] is the playlist they're added from as a whole.
+/// "Dodaj do kolejki" and "Odtwórz jako następn…" for a whole list of songs (a playlist, an
+/// album, a mood), queued together from [origin]; [feminine]: "następną" (a playlist).
+List<MenuSheetEntry> queueAllEntries(
+  BuildContext context,
+  List<SearchHit> hits, {
+  QueueOrigin? origin,
+  bool feminine = false,
+}) => [
+  if (hits.isNotEmpty) ...[
+    MenuSheetEntry(
+      Icons.queue_music,
+      'Dodaj do kolejki',
+      onTap: () => queueSongs(context, hits, next: false, origin: origin),
+    ),
+    MenuSheetEntry(
+      Icons.playlist_play,
+      feminine ? 'Odtwórz jako następną' : 'Odtwórz jako następny',
+      onTap: () => queueSongs(context, hits, next: true, origin: origin),
+    ),
+  ],
+];
+
+/// Dragging a song row to the right: "Odtwórz jako następny" or "Dodaj do kolejki", as the
+/// user chose (Ustawienia › Odtwarzanie).
+SwipeAction queueSwipe(BuildContext context, SearchHit hit) {
+  final next = SourceSettingsScope.maybeOf(context)?.swipePlaysNext ?? true;
+  return SwipeAction(
+    icon: next ? Icons.playlist_play : Icons.queue_music,
+    label: next ? 'Odtwórz jako następny' : 'Dodaj do kolejki',
+    onTriggered: () =>
+        next ? playNextInQueue(context, hit) : addToQueue(context, hit),
+  );
+}
+
+/// Dragging a row to the left to take it out (of the queue, a playlist, a mood), in the
+/// theme's error red.
+SwipeAction removeSwipe(
+  BuildContext context,
+  String label,
+  VoidCallback onTriggered,
+) {
+  final scheme = Theme.of(context).colorScheme;
+  return SwipeAction(
+    icon: Icons.delete_outline,
+    label: label,
+    color: scheme.error,
+    foreground: scheme.onError,
+    onTriggered: onTriggered,
+  );
+}
+
+/// Adds [hits] to the queue — right after the current song ([next]) or at its very end —
+/// saying so; [origin] is the playlist they're added from as a whole.
 Future<void> queueSongs(
   BuildContext context,
   List<SearchHit> hits, {
@@ -211,6 +262,8 @@ class SongTile extends StatelessWidget {
     this.selectionKey,
     this.menuIdPrefix = 'Utwór › Menu (⋮)',
     this.bookmarked = false,
+    this.onSwipeRemove,
+    this.swipeRemoveLabel = 'Usuń',
   });
 
   final SearchHit hit;
@@ -256,6 +309,13 @@ class SongTile extends StatelessWidget {
   /// The song last played from this playlist ([PlaylistBookmarks]): a bookmark before the
   /// source icon.
   final bool bookmarked;
+
+  /// Dragging the row to the left takes the song out of the list shown (a playlist, a mood);
+  /// `null`: it can't be dragged left.
+  final VoidCallback? onSwipeRemove;
+
+  /// Read out by screen readers for [onSwipeRemove].
+  final String swipeRemoveLabel;
 
   static const coverSize = 48.0;
 
@@ -386,11 +446,10 @@ class SongTile extends StatelessWidget {
     if (selecting) return tile;
     // Like the reference app: dragging a song to the right queues it.
     return SwipeActions(
-      right: SwipeAction(
-        icon: Icons.queue_music,
-        label: 'Dodaj do kolejki',
-        onTriggered: () => addToQueue(context, hit),
-      ),
+      right: queueSwipe(context, hit),
+      left: onSwipeRemove == null
+          ? null
+          : removeSwipe(context, swipeRemoveLabel, onSwipeRemove!),
       child: tile,
     );
   }
@@ -619,22 +678,25 @@ Future<void> openArtistSongs(BuildContext context, String artist) =>
       context,
       title: artist,
       subtitle: 'Wykonawca',
-      songs: (context) {
-        final wanted = normalizeForSearch(artist);
-        return [
-          for (final hit in searchEverywhere(
-            artist,
-            SongCatalogScope.of(context),
-            LocalLibraryScope.of(context),
-            youTube: YouTubeLibraryScope.of(context),
-            fields: const {SearchField.artist},
-          ))
-            if (artistNamesOf(hit.artistLabel)
-                .any((name) => normalizeForSearch(name) == wanted))
-              hit,
-        ];
-      },
+      songs: (context) => artistSongs(context, artist),
     );
+
+/// The songs [openArtistSongs] lists.
+List<SearchHit> artistSongs(BuildContext context, String artist) {
+  final wanted = normalizeForSearch(artist);
+  return [
+    for (final hit in searchEverywhere(
+      artist,
+      SongCatalogScope.of(context),
+      LocalLibraryScope.of(context),
+      youTube: YouTubeLibraryScope.of(context),
+      fields: const {SearchField.artist},
+    ))
+      if (artistNamesOf(hit.artistLabel)
+          .any((name) => normalizeForSearch(name) == wanted))
+        hit,
+  ];
+}
 
 /// The songs of the album called [album] (a lite album page).
 /// "Ukryj utwór" / "Przestań ukrywać" in a song's menu; `null` without [HiddenSongs].
@@ -755,20 +817,39 @@ Future<void> openAlbumSongs(BuildContext context, String album) =>
       context,
       title: album,
       subtitle: 'Album',
-      songs: (context) {
-        final hits = [
-          for (final hit in searchEverywhere(
-            album,
-            SongCatalogScope.of(context),
-            LocalLibraryScope.of(context),
-            youTube: YouTubeLibraryScope.of(context),
-            fields: const {SearchField.album},
-          ))
-            if (hit.album == album) hit,
-        ];
-        return [
-          ...hits.where((hit) => hit.isFullAlbum),
-          ...hits.where((hit) => !hit.isFullAlbum),
-        ];
-      },
+      songs: (context) => albumSongs(context, album),
     );
+
+/// The songs [openAlbumSongs] lists: a full album recording first.
+List<SearchHit> albumSongs(BuildContext context, String album) {
+  final hits = [
+    for (final hit in searchEverywhere(
+      album,
+      SongCatalogScope.of(context),
+      LocalLibraryScope.of(context),
+      youTube: YouTubeLibraryScope.of(context),
+      fields: const {SearchField.album},
+    ))
+      if (hit.album == album) hit,
+  ];
+  return [
+    ...hits.where((hit) => hit.isFullAlbum),
+    ...hits.where((hit) => !hit.isFullAlbum),
+  ];
+}
+
+/// The menu of a list of songs shown as a card (an album, an artist): into the queue as a whole.
+Future<void> showSongsMenu(
+  BuildContext context, {
+  required Widget cover,
+  required String title,
+  required String subtitle,
+  required List<SearchHit> hits,
+}) => showMenuSheet(
+  context,
+  idPrefix: '$title › Menu',
+  header: MenuSheetHeader(cover: cover, title: title, subtitle: subtitle),
+  entries: [
+    ...queueAllEntries(context, hits, origin: QueueOrigin(playlistName: title)),
+  ],
+);

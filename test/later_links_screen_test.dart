@@ -81,6 +81,19 @@ void main() {
     await pump(tester);
     await tester.longPress(find.text('Wideo Oli'));
     await tester.pumpAndSettle();
+    expect(find.text('Dodaj do kolejki'), findsOneWidget);
+    expect(find.text('Odtwórz jako następny'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Usuń z „Na później”'),
+      100,
+      scrollable: find
+          .descendant(
+            of: find.byType(BottomSheet),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pump();
     await tester.tap(find.text('Usuń z „Na później”'));
     await tester.pumpAndSettle();
     expect(find.text('Wideo Oli'), findsNothing);
