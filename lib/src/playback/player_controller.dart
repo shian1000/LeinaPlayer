@@ -626,7 +626,12 @@ class PlayerController extends ChangeNotifier {
       _resumeAt = null;
       return true;
     } catch (e) {
-      debugPrint('Playing ${track.source} failed: $e');
+      // A phone file by its name only: its folders may name people, and the report goes to
+      // someone else.
+      final shown = track.serverFileId != null || track.isStream
+          ? track.source
+          : track.source.split('/').last;
+      debugPrint('Playing $shown failed: $e');
       _lastError = track.serverFileId != null
           ? 'Nie udało się odtworzyć utworu „${track.title}” z serwera'
           : track.isStream

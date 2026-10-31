@@ -50,9 +50,14 @@ class ErrorLog extends ChangeNotifier {
   /// Oldest first.
   List<ErrorLogEntry> get entries => List.unmodifiable(_entries);
 
-  /// Tokens, passwords and API keys are replaced with "…", and IP addresses and the names of
-  /// Tailscale / home-network machines with the kind of network, before a message is kept.
+  /// Tokens, passwords and API keys are replaced with "…", IP addresses and the names of
+  /// Tailscale / home-network machines with the kind of network, and the account's name in
+  /// `/users/<name>` and YouTube's signed stream addresses with placeholders, before a message
+  /// is kept.
   static String scrub(String message) => message
+      // Before the IPs: the stream's query carries the phone's IP and session ids.
+      .replaceAll(_googleVideo, 'https://<googlevideo>')
+      .replaceAllMapped(_userPath, (m) => '${m[1]}<konto>')
       // The whole header value: "Bearer <token>" must go with it.
       .replaceAllMapped(
         RegExp(
@@ -85,6 +90,12 @@ class ErrorLog extends ChangeNotifier {
   static final _ipv4 = RegExp(
     r'(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.]*\d)',
   );
+  static final _googleVideo = RegExp(
+    r'https?://[A-Za-z0-9.-]*\.googlevideo\.com/\S*',
+    caseSensitive: false,
+  );
+  // The report goes to someone else, who doesn't need to know the sender's login.
+  static final _userPath = RegExp(r'(/users/)[^/?#\s]+');
   static final _tailscaleName = RegExp(
     r'\b[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.ts\.net\b',
     caseSensitive: false,

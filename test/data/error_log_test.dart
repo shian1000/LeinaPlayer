@@ -84,8 +84,8 @@ void main() {
   test('server addresses become the kind of network', () {
     expect(
       ErrorLog.scrub(
-        'Playlist sync on http://100.116.249.111:8002/ failed: SocketException: '
-        'Connection refused, address = 100.116.249.111, port = 49530',
+        'Playlist sync on http://100.101.102.103:8002/ failed: SocketException: '
+        'Connection refused, address = 100.101.102.103, port = 49530',
       ),
       'Playlist sync on http://<Tailscale>:8002/ failed: SocketException: '
       'Connection refused, address = <Tailscale>, port = 49530',
@@ -103,6 +103,21 @@ void main() {
       ErrorLog.scrub('http://jethro.local:8002/ fe80::1%wlan0'),
       'http://<sieć domowa>:8002/ <sieć domowa>',
     );
+    expect(
+      ErrorLog.scrub(
+        'Syncing later-links on http://<Tailscale>:8002/users/jan.kowalski/later-links?since=18 '
+        'and /users/jan/folders',
+      ),
+      'Syncing later-links on http://<Tailscale>:8002/users/<konto>/later-links?since=18 '
+      'and /users/<konto>/folders',
+    );
+    expect(
+      ErrorLog.scrub(
+        'Playing https://rr4---sn-abc.googlevideo.com/videoplayback?expire=1&ip=83.1.2.3'
+        '&cpn=xyz failed: Connection aborted',
+      ),
+      'Playing https://<googlevideo> failed: Connection aborted',
+    );
     const kept =
         'Asking itunes for a cover failed: Failed host lookup: \'itunes.apple.com\' '
         'TimeoutException after 0:00:08.000000 (app.dart:1590) wersja 1.0.0';
@@ -118,7 +133,7 @@ void main() {
       String two(int n) => n.toString().padLeft(2, '0');
       await File('${dir.path}/error_log.txt').writeAsString(
         '${now.year}-${two(now.month)}-${two(now.day)} 10:00:00 '
-        'Sync on http://100.116.249.111:8002/ failed\n',
+        'Sync on http://100.101.102.103:8002/ failed\n',
       );
       final log = ErrorLog(directory: () async => dir, now: () => now);
       await log.load();

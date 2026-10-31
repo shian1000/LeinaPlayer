@@ -353,8 +353,11 @@ class _SyncAllTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Future<List<Uri>> servers() =>
-        DatabaseSyncScope.of(context).serverAddresses();
+    // Read here, not in servers(): the parts sync one after another, and once the user has
+    // left the screen the context can no longer look scopes up (Pixel, 2026-10-30).
+    final databaseSync = DatabaseSyncScope.of(context);
+    final account = AccountScope.of(context);
+    Future<List<Uri>> servers() => databaseSync.serverAddresses();
     final playlists = PlaylistLibraryScope.maybeOf(context);
     final moods = MoodLibraryScope.maybeOf(context);
     final folders = LibraryFoldersScope.maybeOf(context);
@@ -376,8 +379,7 @@ class _SyncAllTile extends StatelessWidget {
           last: moods.lastSync,
           sync: () async {
             final addresses = await servers();
-            if (!context.mounted) return;
-            await AccountScope.of(context).refreshPermissions(addresses);
+            await account.refreshPermissions(addresses);
             await moods.sync(addresses);
           },
         ),
