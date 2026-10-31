@@ -65,7 +65,7 @@ MenuSheetEntry? playlistSubmenuEntry(
           said('Utworzono playlistę „$name”');
         },
       ),
-      for (final playlist in library.editable)
+      for (final playlist in library.playlists)
         MenuSheetEntry(
           Icons.queue_music,
           playlist.name,
@@ -147,8 +147,6 @@ Future<void> showAddToPlaylistSheet(
     isScrollControlled: true,
     builder: (sheetContext) {
       final palette = sheetContext.palette;
-      final editable = library.editable;
-      final imported = library.playlists.length - editable.length;
       return ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
@@ -199,7 +197,7 @@ Future<void> showAddToPlaylistSheet(
                 said('Utworzono playlistę „$name”');
               },
             ),
-            for (final playlist in editable)
+            for (final playlist in library.playlists)
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 leading: PlaylistCover(playlist: playlist, size: 48),
@@ -216,15 +214,6 @@ Future<void> showAddToPlaylistSheet(
                   await library.addSongs(playlist.id, hits);
                   said('Dodano do playlisty „${playlist.name}”');
                 },
-              ),
-            if (imported > 0)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: Text(
-                  'Playlist zaimportowanych z YouTube i Spotify nie można tu '
-                  'zmieniać — ponowny import zastąpiłby dodane utwory.',
-                  style: TextStyle(color: palette.textSecondary),
-                ),
               ),
           ],
         ),

@@ -172,7 +172,7 @@ class LocalLibrary extends ChangeNotifier {
        _now = now ?? DateTime.now;
 
   /// `local.db`'s version; a backup from a newer one isn't restored (`user_backup.dart`).
-  static const schemaVersion = 19;
+  static const schemaVersion = 20;
 
   static const _foldersKey = 'local_music.folders';
   static const _lastScanKey = 'local_music.last_scan_ms';
@@ -280,6 +280,7 @@ class LocalLibrary extends ChangeNotifier {
           await _createListensTable(db);
           await _addDownloadTables(db);
           await _createDownloadQueueTable(db);
+          await _addAddedTrackColumn(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -300,8 +301,22 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 17) await _createListensTable(db);
           if (from < 18) await _addDownloadTables(db);
           if (from < 19) await _createDownloadQueueTable(db);
+          if (from < 20) await _addAddedTrackColumn(db);
         },
       ),
+    );
+  }
+
+  /// Version 20: a track the user added to an imported playlist by hand, kept when the
+  /// playlist is imported again (`playlist_library.dart`).
+  static Future<void> _addAddedTrackColumn(Database db) async {
+    // Every phone has the table since version 3; only a database made up in a test may not.
+    final tables = await db.rawQuery(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'playlist_tracks'",
+    );
+    if (tables.isEmpty) return;
+    await db.execute(
+      'ALTER TABLE playlist_tracks ADD COLUMN added INTEGER NOT NULL DEFAULT 0',
     );
   }
 

@@ -22,7 +22,8 @@ fetching, title cleanup), `screens/playlist_import.dart`, `screens/playlist_scre
   music.db would disagree). Tracks still without one are `PlaylistSummary.unknownLengths`, and
   the header then says "ponad …". `PlaylistLibrary` reloads when a new music.db is loaded.
 - Re-importing the same playlist replaces its tracks instead of adding a duplicate — except
-  YouTube tracks whose video YouTube removed (below). Its name stays as it is on the phone (the
+  YouTube tracks whose video YouTube removed (below) and songs the user added by hand ("Made
+  on the phone" below). Its name stays as it is on the phone (the
   user may have renamed it, ⋮ › Zmień nazwę); there's no flag telling a renamed one apart, so a
   name changed at the source doesn't come through either.
 - `youtube_removed` (v9): such a track's video is gone; `PlaylistTrack.playableVideoId` is then
@@ -42,10 +43,17 @@ another phone, or once renamed, it's searched on YouTube like a Spotify track.
 
 "Utwórz nową playlistę" makes an empty one the same way, and "Dodaj do playlisty"
 (`playlist_picker.dart`, also the selection bar's) appends with `PlaylistLibrary.addSongs`, kept
-like `create` keeps them. Only `source` NULL playlists are offered (`PlaylistLibrary.editable`):
-re-importing an imported one replaces all its tracks, which would silently drop what was added.
-The playlist screen's Dodaj / Edytuj chips follow the same rule (shown only for `source` NULL);
-Edytuj saves with `PlaylistLibrary.rearrange` (kept positions in the new order, the rest
+like `create` keeps them — to any saved playlist, imported ones too (the owner called the old
+"phone-made only" rule a bug). In an imported one the tracks get `playlist_tracks.added` (v20):
+`_save`'s re-import (`_withAddedTracks`) puts them back after the source track they followed
+(the first ones at the start; one whose track left the source moves up to the one before), and
+`importYouTube` doesn't check their videos as vanished ones. Removing an added track doesn't go
+into `excluded_tracks` (it would drop the source's own track with that video). The mark syncs as
+the track's `added` ([hand-off](../handoffs/musicdatabase-added-tracks.md)); MusicDatabase
+drops the key until that's built, so `_applyRemote` keeps the phone's own marks when the answer
+lacks it, matched by title + artist + ids. The playlist screen's Dodaj chip is on every saved
+playlist; Edytuj only on `source` NULL ones (an imported one's order and tracks come from the
+source). Edytuj saves with `PlaylistLibrary.rearrange` (kept positions in the new order, the rest
 deleted, renumbered through negative positions like `removeTrack`). Sortuj works on every
 playlist but only reorders what the screen lists and queues — `_tracks` is kept sorted, so the
 indexes the screen hands to the queue and to "Usuń z tej playlisty" stay right; `_ownOrder` is

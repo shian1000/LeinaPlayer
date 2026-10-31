@@ -119,6 +119,7 @@ class PlaylistTrack {
     this.spotifyTrackId,
     this.duration,
     this.videoRemoved = false,
+    this.added = false,
   });
 
   /// 0-based.
@@ -137,6 +138,10 @@ class PlaylistTrack {
   /// YouTube removed [youtubeVideoId] (it dropped out of the playlist and the video is gone);
   /// the track stays, to be found on YouTube again.
   final bool videoRemoved;
+
+  /// Added to an imported playlist by hand ([PlaylistLibrary.addSongs]): not at its source, so
+  /// importing the playlist again keeps it.
+  final bool added;
 
   /// The video to play and show, unless YouTube removed it.
   String? get playableVideoId => videoRemoved ? null : youtubeVideoId;
@@ -182,7 +187,8 @@ typedef _NewTrack = ({
 typedef _KeptTrack = ({PlaylistTrack track, bool videoRemoved});
 
 /// The user's playlists, in the phone's `local.db` (tables created by `LocalLibrary`). So far
-/// only imported from YouTube or Spotify; importing the same playlist again replaces its tracks.
+/// only imported from YouTube or Spotify; importing the same playlist again replaces its tracks
+/// (all but those the user added by hand).
 ///
 /// While a MusicDatabase user is logged in, new playlists belong to that account and [sync]
 /// exchanges them with MusicDatabase ([ADR 0007](../../../docs/decisions/0007-playlist-sync.md)).
@@ -331,6 +337,7 @@ class PlaylistLibrary extends ChangeNotifier {
         ? null
         : Duration(seconds: row['duration_s']! as int),
     videoRemoved: row['youtube_removed'] == 1,
+    added: row['added'] == 1,
   );
 
   /// How many tracks from the start [leadTracks] keeps: enough to find four different albums
@@ -469,6 +476,8 @@ class PlaylistLibrary extends ChangeNotifier {
     final keptAfter = <String?, List<_KeptTrack>>{};
     String? anchor;
     for (final track in before) {
+      // [_save] keeps these where they were.
+      if (track.added) continue;
       final videoId = track.youtubeVideoId;
       if (videoId != null && fetched.contains(videoId)) {
         anchor = videoId;
@@ -585,8 +594,9 @@ class PlaylistLibrary extends ChangeNotifier {
     return _playlists.firstWhere((p) => p.id == playlistId);
   }
 
-  /// Puts [songs] at the end of the playlist made on the phone [playlistId], kept like
-  /// [create] keeps them; synced like any change.
+  /// Puts [songs] at the end of the playlist [playlistId], kept like [create] keeps them;
+  /// synced like any change. In an imported playlist they're marked [PlaylistTrack.added], so
+  /// importing it again keeps them.
   Future<void> addSongs(int playlistId, List<SearchHit> songs) async {
     if (songs.isEmpty) return;
     final db = await _database();
@@ -596,7 +606,19 @@ class PlaylistLibrary extends ChangeNotifier {
         'WHERE playlist_id = ?',
         [playlistId],
       );
-      await _insertSongs(txn, playlistId, rows.first['next']! as int, songs);
+      final playlist = await txn.query(
+        'playlists',
+        columns: ['source'],
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+      await _insertSongs(
+        txn,
+        playlistId,
+        rows.first['next']! as int,
+        songs,
+        added: playlist.firstOrNull?['source'] != null,
+      );
       await txn.update(
         'playlists',
         {'updated_at': _now().millisecondsSinceEpoch, 'dirty': 1},
@@ -645,11 +667,11 @@ class PlaylistLibrary extends ChangeNotifier {
         whereArgs: [playlistId],
       )).first;
       final source = PlaylistSource.values.asNameMap()[playlist['source']];
-      final key = _sourceKey(
-        source,
-        track.youtubeVideoId,
-        track.spotifyTrackId,
-      );
+      // A track added by hand isn't at the source: excluding its video would also drop the
+      // source's own track with it.
+      final key = track.added
+          ? null
+          : _sourceKey(source, track.youtubeVideoId, track.spotifyTrackId);
       final excluded = _decodeExcluded(playlist['excluded_tracks']);
       await txn.update(
         'playlists',
@@ -730,17 +752,13 @@ class PlaylistLibrary extends ChangeNotifier {
       ? {for (final id in jsonDecode(column) as List) id as String}
       : {};
 
-  /// Playlists made on the phone (not imported, which re-importing would overwrite), the ones
-  /// songs can be added to.
-  List<PlaylistSummary> get editable =>
-      _playlists.where((p) => p.source == null).toList();
-
   static Future<void> _insertSongs(
     Transaction txn,
     int playlistId,
     int firstPosition,
-    List<SearchHit> songs,
-  ) async {
+    List<SearchHit> songs, {
+    bool added = false,
+  }) async {
     final batch = txn.batch();
     for (final (i, hit) in songs.indexed) {
       final song = hit.mainSong;
@@ -757,6 +775,7 @@ class PlaylistLibrary extends ChangeNotifier {
         'youtube_video_id':
             hit.playlistVideoId ?? (song == null ? hit.youtubeVideoId : null),
         'spotify_track_id': hit.spotifyTrackId,
+        'added': added ? 1 : 0,
       });
     }
     await batch.commit(noResult: true);
@@ -784,6 +803,7 @@ class PlaylistLibrary extends ChangeNotifier {
     final scope = _scope();
     late int playlistId;
     late List<Object> saved;
+    var recognised = 0;
     var updated = false;
     await db.transaction((txn) async {
       // A playlist deleted here but not yet on MusicDatabase comes back under its own id.
@@ -814,6 +834,23 @@ class PlaylistLibrary extends ChangeNotifier {
           }))
             entry,
       ];
+      recognised = saved
+          .where(
+            (t) => switch (t) {
+              _NewTrack(:final song) => song != null,
+              _KeptTrack(:final track) => track.mainDbId != null,
+              _ => false,
+            },
+          )
+          .length;
+      if (existing.isNotEmpty) {
+        saved = await _withAddedTracks(
+          txn,
+          existing.first['id']! as int,
+          source,
+          saved,
+        );
+      }
       if (existing.isEmpty) {
         playlistId = await txn.insert('playlists', {
           'name': name,
@@ -865,6 +902,7 @@ class PlaylistLibrary extends ChangeNotifier {
               'spotify_track_id': track.spotifyTrackId,
               'duration_s': track.duration?.inSeconds,
               'youtube_removed': entry.videoRemoved ? 1 : 0,
+              'added': track.added ? 1 : 0,
             },
             _ => throw ArgumentError.value(entry),
           },
@@ -876,18 +914,66 @@ class PlaylistLibrary extends ChangeNotifier {
     onChanged?.call();
     return (
       playlist: _playlists.firstWhere((p) => p.id == playlistId),
-      recognised: saved
-          .where(
-            (t) => switch (t) {
-              _NewTrack(:final song) => song != null,
-              _KeptTrack(:final track) => track.mainDbId != null,
-              _ => false,
-            },
-          )
-          .length,
+      recognised: recognised,
       updated: updated,
       removedVideos: removedVideos,
     );
+  }
+
+  /// [tracks] about to replace the imported playlist [playlistId]'s, with the tracks the user
+  /// added to it by hand put back: each after the source track it followed, the first ones
+  /// at the start; one whose source track is gone moves up to the one before it.
+  static Future<List<Object>> _withAddedTracks(
+    Transaction txn,
+    int playlistId,
+    PlaylistSource source,
+    List<Object> tracks,
+  ) async {
+    String? keyOf(Object entry) => switch (entry) {
+      _NewTrack(:final videoId, :final spotifyTrackId) => _sourceKey(
+        source,
+        videoId,
+        spotifyTrackId,
+      ),
+      _KeptTrack(:final track) => _sourceKey(
+        source,
+        track.youtubeVideoId,
+        track.spotifyTrackId,
+      ),
+      _ => null,
+    };
+    final keys = {for (final entry in tracks) ?keyOf(entry)};
+    final addedAfter = <String?, List<_KeptTrack>>{};
+    String? anchor;
+    for (final row in await txn.query(
+      'playlist_tracks',
+      where: 'playlist_id = ?',
+      whereArgs: [playlistId],
+      orderBy: 'position',
+    )) {
+      final track = _track(row);
+      if (!track.added) {
+        final key = _sourceKey(
+          source,
+          track.youtubeVideoId,
+          track.spotifyTrackId,
+        );
+        if (keys.contains(key)) anchor = key;
+        continue;
+      }
+      (addedAfter[anchor] ??= []).add((
+        track: track,
+        videoRemoved: track.videoRemoved,
+      ));
+    }
+    if (addedAfter.isEmpty) return tracks;
+    return [
+      ...?addedAfter.remove(null),
+      for (final entry in tracks) ...[
+        entry,
+        ...?addedAfter.remove(keyOf(entry)),
+      ],
+    ];
   }
 
   /// The MusicDatabase song a Spotify track is: exact title (as Spotify has it, then without
@@ -1199,6 +1285,7 @@ class PlaylistLibrary extends ChangeNotifier {
           'spotify_track_id': t.spotifyTrackId,
           'youtube_removed': t.videoRemoved,
           'duration_s': t.duration?.inSeconds,
+          'added': t.added,
         },
     ],
   };
@@ -1223,6 +1310,19 @@ class PlaylistLibrary extends ChangeNotifier {
         row['id']! as int,
     ];
     final id = intoId ?? sameUid.firstOrNull;
+    // A server from before added tracks doesn't keep the mark: the phone's own tracks keep
+    // theirs, found by what they are.
+    final addedHere = <String, int>{};
+    if (id != null) {
+      for (final row in await txn.query(
+        'playlist_tracks',
+        where: 'playlist_id = ? AND added = 1',
+        whereArgs: [id],
+      )) {
+        final key = _trackIdentity(row);
+        addedHere[key] = (addedHere[key] ?? 0) + 1;
+      }
+    }
     for (final other in sameUid.where((other) => other != id)) {
       await txn.delete(
         'playlist_tracks',
@@ -1269,6 +1369,21 @@ class PlaylistLibrary extends ChangeNotifier {
     final batch = txn.batch();
     for (final (position, track) in (remote['tracks']! as List).indexed) {
       final t = track as Map<String, Object?>;
+      final bool added;
+      if (t['added'] case final bool remoteAdded) {
+        added = remoteAdded;
+      } else {
+        final key = _trackIdentity({
+          'title': t['title'],
+          'artist': t['artist'],
+          'main_db_id': t['song_id'],
+          'youtube_video_id': t['youtube_video_id'],
+          'spotify_track_id': t['spotify_track_id'],
+        });
+        final left = addedHere[key] ?? 0;
+        added = left > 0;
+        if (added) addedHere[key] = left - 1;
+      }
       batch.insert('playlist_tracks', {
         'playlist_id': playlistId,
         'position': position,
@@ -1279,10 +1394,19 @@ class PlaylistLibrary extends ChangeNotifier {
         'spotify_track_id': t['spotify_track_id'],
         'youtube_removed': t['youtube_removed'] == true ? 1 : 0,
         'duration_s': t['duration_s'],
+        'added': added ? 1 : 0,
       });
     }
     await batch.commit(noResult: true);
   }
+
+  static String _trackIdentity(Map<String, Object?> row) => [
+    row['title'],
+    row['artist'],
+    row['main_db_id'],
+    row['youtube_video_id'],
+    row['spotify_track_id'],
+  ].join('\u0000');
 }
 
 /// An answer that ends a [PlaylistLibrary.sync] early, with why (Polish, for display).

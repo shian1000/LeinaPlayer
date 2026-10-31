@@ -482,12 +482,14 @@ void main() {
     expect(find.text('Lubiany'), findsNothing);
   });
 
-  testWidgets('an imported playlist can be sorted, not edited', (tester) async {
+  testWidgets('an imported playlist can be sorted and added to, not edited', (
+    tester,
+  ) async {
     await pumpLibrary(tester, before: importDoAuta);
     await tester.tap(find.text('Do auta'));
     await settle(tester, until: find.text('Utwór'));
     expect(find.text('Sortuj'), findsOneWidget);
-    expect(find.text('Dodaj'), findsNothing);
+    expect(find.text('Dodaj'), findsOneWidget);
     expect(find.text('Edytuj'), findsNothing);
     await tester.tap(find.text('Sortuj'));
     await tester.pumpAndSettle();

@@ -639,7 +639,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`). Entries with › unfold their options under them in
     the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Polub / Usuń z polubionych,
-    Nowa playlista, then every playlist made on the phone) and Przejdź do wykonawców › (each artist of the song — **→ its
+    Nowa playlista, then every saved playlist) and Przejdź do wykonawców › (each artist of the song — **→ its
     songs**: `openArtistSongs`, every song in music.db and on the phone with that artist, a song
     list with Odtwórz / Losowo and a ⋮ with Dodaj do kolejki / Odtwórz jako następny for all
     its songs; `song_list_screen.dart`).
@@ -786,9 +786,9 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
 - Header with the song (or "N utworów"); "Polubione utwory" (heart cover, song count; ⊕, or an
   accent ✓ when all these songs are liked — tapping likes them, or unlikes them when all are
   liked; `LikedSongs`, synced with the account — the only place a song is liked, user's decision); "Nowa
-  playlista" (name dialog; a new playlist of these songs); then every playlist made on the phone (not imported — re-importing would replace the
-  added songs; a note says so when there are imported ones) — tapping one puts the songs at its
-  end, synced like any change.
+  playlista" (name dialog; a new playlist of these songs); then every saved playlist, imported ones too — tapping one puts the songs at its
+  end, synced like any change (in an imported one marked as added by hand, so its next import
+  keeps them — `playlists.md`).
 
 ## Sheet "Dodaj do nastroju" (`mood_sheet.dart`)
 
@@ -846,8 +846,8 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   **`Usuń z
   Biblioteki`** (implemented: confirm dialog, deletes the playlist — not the songs), **Zmień
   nazwę** (implemented: synced like any change; importing the playlist again keeps the phone's
-  name), **Dodaj do tej playlisty** / **Edytuj playlistę** (implemented, made on the phone only — the
-  chips below), **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**
+  name), **Dodaj do tej playlisty** (every saved playlist) / **Edytuj playlistę** (made on the phone
+  only) (implemented — the chips below), **Dodaj okładkę** / **Zmień okładkę** and **Usuń okładkę**
   (implemented, like a mood's), **Wyświetl utwory, których nie ma w bazie danych**
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
   tracks not recognised as MusicDatabase songs, "Poza bazą danych: N z M", rows like the
@@ -883,8 +883,8 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   (**implemented**: queues the playlist shuffled, from a random track), Odtwórz playlistę
   (**implemented**: queues the playlist from its first track, shuffle off),
   chips (**implemented**):
-  - **Dodaj** and **Edytuj** — only on a playlist made on the phone (`source` NULL): an imported one's
-    next import replaces its tracks. Dodaj **→ `playlist_add_screen.dart`**: song search (music.db
+  - **Dodaj** — every saved playlist; **Edytuj** — only on a playlist made on the phone (`source`
+    NULL): an imported one's order comes from its source. Dodaj **→ `playlist_add_screen.dart`**: song search (music.db
     and the phone), ⊕ puts a song at the end at once (`PlaylistLibrary.addSongs`), ✓ when it's
     already there (tapped again: a note). Edytuj **→ `playlist_edit_screen.dart`**: the tracks in
     their own order, dragged by the handle, ⊖ takes one out; nothing changes until "Zapisz"

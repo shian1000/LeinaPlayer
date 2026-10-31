@@ -9,7 +9,7 @@ import '../theme.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
-/// "Dodaj" on a playlist made on the phone: song search (music.db and the phone, as Wyszukaj
+/// "Dodaj" on a saved playlist: song search (music.db and the phone, as Wyszukaj
 /// finds them), each song with ⊕ putting it at the playlist's end at once, ✓ once it's there.
 /// Tapping a row plays it, as everywhere else.
 class PlaylistAddScreen extends StatefulWidget {

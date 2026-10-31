@@ -462,7 +462,6 @@ void main() {
     await catalog.ensureLoaded();
     final saved = await playlists.create('Pusta', const []);
     expect(saved.trackCount, 0);
-    expect(playlists.editable.single.id, saved.id);
 
     await playlists.addSongs(saved.id, [
       SearchHit.main(catalog.byId(2)!, const []),
@@ -558,4 +557,56 @@ void main() {
     );
     expect(await playlists.tracks(fresh.playlist.id), hasLength(2));
   });
+
+  test('songs added to an imported playlist stay when it is imported again, '
+      'after the track they followed', () async {
+    await catalog.ensureLoaded();
+    final first = await playlists.importYouTube(
+      data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x'), v('c', 'C - 3', 'x')]),
+    );
+    final id = first.playlist.id;
+    await playlists.addSongs(id, [SearchHit.main(catalog.byId(2)!, const [])]);
+    expect((await playlists.tracks(id)).last.added, isTrue);
+
+    Future<List<Object?>> order() async => [
+      for (final t in await playlists.tracks(id))
+        t.added ? t.mainDbId : t.youtubeVideoId,
+    ];
+
+    await playlists.importYouTube(
+      data([
+        v('a', 'A - 1', 'x'),
+        v('b', 'B - 2', 'x'),
+        v('c', 'C - 3', 'x'),
+        v('d', 'D - 4', 'x'),
+      ]),
+    );
+    expect(await order(), ['a', 'b', 'c', 2, 'd']);
+
+    // Its track gone from the source, it moves up to the one before.
+    await playlists.importYouTube(
+      data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x'), v('d', 'D - 4', 'x')]),
+    );
+    expect(await order(), ['a', 'b', 2, 'd']);
+    expect(playlists.byId(id)!.trackCount, 4);
+
+    // Taken out again, it's simply gone: nothing at the source to leave out.
+    await playlists.removeTrack(id, 2);
+    await playlists.importYouTube(
+      data([v('a', 'A - 1', 'x'), v('b', 'B - 2', 'x'), v('d', 'D - 4', 'x')]),
+    );
+    expect(await order(), ['a', 'b', 'd']);
+  });
+
+  test(
+    'a song added to a playlist made on the phone is not marked as added',
+    () async {
+      await catalog.ensureLoaded();
+      final saved = await playlists.create('Pusta', const []);
+      await playlists.addSongs(saved.id, [
+        SearchHit.main(catalog.byId(2)!, const []),
+      ]);
+      expect((await playlists.tracks(saved.id)).single.added, isFalse);
+    },
+  );
 }

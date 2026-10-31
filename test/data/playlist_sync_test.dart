@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/custom_covers.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
@@ -26,6 +27,9 @@ class FakePlaylistServer {
   int counter = 0;
   String token = 'tok';
   String user = 'tester';
+
+  /// false: a server from before added tracks, which drops their mark.
+  bool keepsAddedMark = true;
 
   Uri get address => Uri.parse('http://127.0.0.1:${_server.port}/');
 
@@ -127,6 +131,11 @@ class FakePlaylistServer {
         'excluded_source_tracks':
             stored?['excluded_source_tracks'] ?? const <String>[],
         ...sent..remove('base_revision'),
+        if (!keepsAddedMark)
+          'tracks': [
+            for (final t in sent['tracks']! as List)
+              {...t as Map<String, Object?>}..remove('added'),
+          ],
         'uid': keptUid,
         'revision': ++counter,
         'deleted': false,
@@ -306,6 +315,41 @@ void main() {
       );
     },
   );
+
+  for (final keepsMark in [true, false]) {
+    test(
+      'a song added to an imported playlist stays through sync and the next '
+      'import${keepsMark ? '' : ' (a server that drops the mark)'}',
+      () async {
+        server.keepsAddedMark = keepsMark;
+        await catalog.ensureLoaded();
+        final id = (await playlists.importYouTube(data(['a', 'b'])))
+            .playlist
+            .id;
+        clock = clock.add(const Duration(minutes: 1));
+        await playlists.addSongs(id, [
+          SearchHit.main(catalog.byId(2)!, const []),
+        ]);
+        await syncNow();
+        expect(playlists.lastSync!.problem, isNull);
+        final sent = server.playlists.values.single['tracks']! as List;
+        expect([
+          for (final t in sent) (t as Map)['added'],
+        ], keepsMark ? [false, false, true] : [null, null, null]);
+        expect((await playlists.tracks(id)).last.added, isTrue);
+
+        clock = clock.add(const Duration(minutes: 1));
+        await playlists.importYouTube(data(['a', 'b', 'c']));
+        expect(
+          [
+            for (final t in await playlists.tracks(id))
+              t.youtubeVideoId ?? t.mainDbId,
+          ],
+          ['a', 'b', 2, 'c'],
+        );
+      },
+    );
+  }
 
   test('a picked cover goes with its playlist; the picture only when the server lacks it', () async {
     final picture = [1, 2, 3, 4];

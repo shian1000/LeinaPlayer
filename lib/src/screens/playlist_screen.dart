@@ -162,7 +162,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   static String _sortKey(PlaylistSummary playlist) =>
       'playlist.sort.${playlist.uid ?? playlist.id}';
 
-  /// A playlist made on the phone: songs can be added to it and it can be edited.
+  /// A playlist made on the phone, which can be edited (Edytuj): an imported one's order and
+  /// tracks come from its source.
   bool get _editable => _saved != null && _saved!.source == null;
 
   List<PlaylistTrack> _sorted(List<PlaylistTrack> tracks) {
@@ -665,18 +666,17 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 'Zmień nazwę',
                 onTap: _rename,
               ),
-              if (_editable) ...[
-                MenuSheetEntry(
-                  Icons.add,
-                  'Dodaj do tej playlisty',
-                  onTap: () => _openAdd(hits),
-                ),
+              MenuSheetEntry(
+                Icons.add,
+                'Dodaj do tej playlisty',
+                onTap: () => _openAdd(hits),
+              ),
+              if (_editable)
                 MenuSheetEntry(
                   Icons.edit_outlined,
                   'Edytuj playlistę',
                   onTap: _openEdit,
                 ),
-              ],
               ...customCoverEntries(
                 context,
                 current: PlaylistLibraryScope.of(context)
@@ -1052,18 +1052,17 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             ),
                           ]
                         : [
-                            if (_editable) ...[
-                              _ActionChip(
-                                icon: Icons.add,
-                                label: 'Dodaj',
-                                onTap: () => _openAdd(hits),
-                              ),
+                            _ActionChip(
+                              icon: Icons.add,
+                              label: 'Dodaj',
+                              onTap: () => _openAdd(hits),
+                            ),
+                            if (_editable)
                               _ActionChip(
                                 icon: Icons.menu,
                                 label: 'Edytuj',
                                 onTap: tracks == null ? null : _openEdit,
                               ),
-                            ],
                             _ActionChip(
                               icon: Icons.swap_vert,
                               label: _sort == _TrackSort.own

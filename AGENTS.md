@@ -62,7 +62,8 @@ MusicDatabase links to a video, matching songs without a link on the phone, and 
 audio on Android through NewPipeExtractor, with a cache of played songs — see
 [`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube or Spotify links or saved from the queue
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
-a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do playlisty"); songs removed from
+a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do playlisty"); songs added to
+any saved playlist, imported ones too (kept by their next import); songs removed from
 any saved playlist ("Usuń z tej playlisty"; an imported one's next import leaves them out, synced);
 folders for playlists and moods (synced with the account like playlists —
 [ADR 0011](docs/decisions/0011-folder-sync.md)) and a working
@@ -104,7 +105,7 @@ czasowy (song menu), a song's radio (phone-side alikeness by artist, genre — m
 `songs.genre`, [hand-off](docs/handoffs/musicdatabase-genres.md) — moods, language, country,
 decade; `song_radio.dart`), "Pobierz" for a song or playlist (kept offline for good; a queue in
 `local.db` that resumes, under a foreground service — `playback/downloads.dart`), "Ukryj utwór"
-(phone only). Playlists made on the phone: Dodaj / Edytuj; every saved playlist: Sortuj.
+(phone only). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
 Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
 while logged out), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
