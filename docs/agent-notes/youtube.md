@@ -168,7 +168,12 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   app can't use, e.g. a channel), the service's app (only if installed), the default browser —
   plus "Zapamiętaj wybór". Native so it shows at once over the app the link was tapped in,
   without starting Flutter. Leina Radio forwards the link to `MainActivity` (NEW_TASK |
-  CLEAR_TOP | SINGLE_TOP → `onNewIntent` on a running app).
+  CLEAR_TOP | SINGLE_TOP → `onNewIntent` on a running app). For a video or Spotify track it
+  first asks "Jak odtworzyć?" — Odtwórz teraz / Odtwórz jako następny / Dodaj do kolejki (user's
+  request); the answer rides as the `EXTRA_PLAY` extra (`next` / `end`, none = now), and
+  `LinksBridge` hands Dart each link as `{url, play}` (`IncomingLink`, `LinkPlay`). Queued songs
+  go through `queueSongs` (the "Dodano do kolejki" toast) and leave the app's screen as it was.
+  A remembered Leina Radio choice skips the question and plays now, as before.
 - Remembered choices (ask / leina / app / browser, per service) live in native
   SharedPreferences `link_chooser`, read and set from Dart over the links channel
   (`readLinkChoices` / `saveLinkChoice`; Ustawienia › Otwieranie linków). The sheet takes the

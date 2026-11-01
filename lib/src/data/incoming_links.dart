@@ -62,6 +62,37 @@ YouTubeLinkTarget? parseYouTubeLink(String text) {
   return listId == null ? null : YouTubePlaylistLink(listId);
 }
 
+/// How a video or track link opened in the app plays — asked by the native chooser after
+/// "Leina Radio" (`LinkChooserActivity.kt`); playlists and albums are imported whatever it says.
+enum LinkPlay {
+  now,
+
+  /// "Odtwórz jako następny".
+  next,
+
+  /// "Dodaj do kolejki".
+  end,
+}
+
+/// A link given to the app: [text] as shared or opened, [play] as chosen in the chooser.
+class IncomingLink {
+  const IncomingLink(this.text, {this.play = LinkPlay.now});
+
+  final String text;
+  final LinkPlay play;
+
+  static IncomingLink? _of(Object? raw) {
+    if (raw is String) return IncomingLink(raw);
+    if (raw is! Map) return null;
+    final url = raw['url'];
+    if (url is! String) return null;
+    return IncomingLink(
+      url,
+      play: LinkPlay.values.asNameMap()[raw['play']] ?? LinkPlay.now,
+    );
+  }
+}
+
 /// Native side: `MainActivity.kt` (`LinksBridge`).
 const _channel = MethodChannel('music_database_app/links');
 
@@ -69,17 +100,21 @@ const _channel = MethodChannel('music_database_app/links');
 /// native chooser, `LinkChooserActivity.kt`). The one that started the app comes first, once
 /// [start] is called.
 class IncomingLinks {
-  final _links = StreamController<String>.broadcast();
+  final _links = StreamController<IncomingLink>.broadcast();
 
-  Stream<String> get links => _links.stream;
+  Stream<IncomingLink> get links => _links.stream;
 
   Future<void> start() async {
     if (kIsWeb || !Platform.isAndroid) return;
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'link') _links.add(call.arguments as String);
+      if (call.method != 'link') return;
+      final link = IncomingLink._of(call.arguments);
+      if (link != null) _links.add(link);
     });
     try {
-      final initial = await _channel.invokeMethod<String>('initialLink');
+      final initial = IncomingLink._of(
+        await _channel.invokeMethod<Object?>('initialLink'),
+      );
       if (initial != null) _links.add(initial);
     } on PlatformException catch (e) {
       debugPrint('Reading the link the app was opened with failed: $e');

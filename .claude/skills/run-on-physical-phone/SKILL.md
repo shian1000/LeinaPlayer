@@ -147,15 +147,19 @@ as above. A blank window is also what you get while the phone is asleep:
 `adb -s <device-id> shell dumpsys power | grep mWakefulness`; wake it with
 `adb -s <device-id> shell input keyevent KEYCODE_WAKEUP` (unlocking stays with the user).
 
-**Known device quirk:** older/budget phones (observed on a Huawei SNE-LX1, Android 10) can fail
-with `[server] ERROR: Capture/encoding error: android.media.MediaCodec$CodecException` at full
-resolution/bitrate. If that happens, retry with reduced settings:
+**Known device quirk — the USB Huawei (SNE-LX1, Android 10):** at default resolution/bitrate it
+always fails with `[server] ERROR: Capture/encoding error: android.media.MediaCodec$CodecException`
+(seen again 2026-11-01), and the failed scrcpy may linger with an empty window. So for this phone
+skip the default run and launch with reduced settings straight away (same `setsid nohup … &
+disown` wrapper as above):
 
 ```bash
 scrcpy -s <device-id> --max-size=1024 --video-bit-rate=4M
 ```
 
-Try default settings first; only fall back to reduced settings if the default run errors.
+Other phones (the Pixel): try the defaults first and fall back to these settings only if the log
+shows that error. If a lingering scrcpy can't be killed (`kill` says "Permission denied" — the
+sandbox), leave it and tell the user to close the extra window.
 
 ## Step 6 — Report back
 

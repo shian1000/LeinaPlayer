@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/app_updates.dart';
+import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/incoming_links.dart';
 import '../data/local_library.dart';
@@ -58,7 +59,7 @@ class AppShell extends StatefulWidget {
   const AppShell({super.key, this.links});
 
   /// YouTube and Spotify links shared to the app or opened with it ([IncomingLinks]).
-  final Stream<String>? links;
+  final Stream<IncomingLink>? links;
 
   static AppShellState of(BuildContext context) =>
       context.findAncestorStateOfType<AppShellState>()!;
@@ -73,7 +74,7 @@ class AppShellState extends State<AppShell> {
     (_) => GlobalKey<NavigatorState>(),
   );
   int _currentTab = 0;
-  StreamSubscription<String>? _linksSub;
+  StreamSubscription<IncomingLink>? _linksSub;
   final _toast = QueueToast();
   AppUpdates? _updates;
   bool _updateOffered = false;
@@ -137,16 +138,21 @@ class AppShellState extends State<AppShell> {
   }
 
   /// Opens [url] like a link given to the app ("Na później" uses it).
-  Future<void> openLink(String url) => _onLink(url);
+  Future<void> openLink(String url) => _onLink(IncomingLink(url));
 
   /// A playlist link (YouTube or Spotify, or a Spotify album) is imported and opened in
   /// Biblioteka; a YouTube video or Spotify track link is played (recognised as a MusicDatabase
-  /// song where possible) in the full player.
-  Future<void> _onLink(String text) async {
-    // Whatever was open (a sheet, a dialog, the full player) gives way to the link.
-    Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+  /// song where possible) in the full player — or queued, as [IncomingLink.play] says.
+  Future<void> _onLink(IncomingLink incoming) async {
+    final text = incoming.text;
+    final play = incoming.play;
+    // Whatever was open (a sheet, a dialog, the full player) gives way to the link; a song
+    // only queued leaves the screen as it was.
+    if (play == LinkPlay.now) {
+      Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    }
     if (text.contains('spotify.') || text.contains('spotify:')) {
-      return _onSpotifyLink(text);
+      return _onSpotifyLink(text, play);
     }
     final link = parseYouTubeLink(text);
     switch (link) {
@@ -158,11 +164,11 @@ class AppShellState extends State<AppShell> {
       case YouTubePlaylistLink(:final listId):
         await _importAndOpen(listId);
       case YouTubeVideoLink():
-        await _playVideo(link);
+        await _playVideo(link, play);
     }
   }
 
-  Future<void> _onSpotifyLink(String text) async {
+  Future<void> _onSpotifyLink(String text, LinkPlay play) async {
     final direct = parseSpotifyLink(text);
     if (direct != null && direct.kind != SpotifyLinkKind.track) {
       return _importAndOpen(text);
@@ -177,6 +183,7 @@ class AppShellState extends State<AppShell> {
     final youTube = YouTubeLibraryScope.of(context);
     final queue = PlaybackQueueScope.of(context);
     String? playlist;
+    SearchHit? queued;
     await runQueueAction(context, (onStatus) async {
       onStatus('Sprawdzam link ze Spotify…');
       final SpotifyTrack track;
@@ -205,6 +212,10 @@ class AppShellState extends State<AppShell> {
         library: library,
         youTube: youTube,
       );
+      if (play != LinkPlay.now) {
+        queued = hit;
+        return null;
+      }
       final outcome = await queue.start([hit], 0, onStatus: onStatus);
       if (outcome.played && !outcome.external && mounted) {
         unawaited(NowPlayingScreen.open(context));
@@ -212,6 +223,13 @@ class AppShellState extends State<AppShell> {
       return outcome;
     });
     if (playlist != null && mounted) await _importAndOpen(playlist!);
+    await _queue(queued, play);
+  }
+
+  /// A song from a link played "Odtwórz jako następny" / "Dodaj do kolejki".
+  Future<void> _queue(SearchHit? hit, LinkPlay play) async {
+    if (hit == null || play == LinkPlay.now || !mounted) return;
+    await queueSongs(context, [hit], next: play == LinkPlay.next);
   }
 
   void _tell(String message) =>
@@ -231,13 +249,14 @@ class AppShellState extends State<AppShell> {
     );
   }
 
-  Future<void> _playVideo(YouTubeVideoLink link) async {
+  Future<void> _playVideo(YouTubeVideoLink link, LinkPlay play) async {
     final catalog = SongCatalogScope.of(context);
     final library = LocalLibraryScope.of(context);
     final youTube = YouTubeLibraryScope.of(context);
     final search = YouTubeScope.searchOf(context);
     final settings = SourceSettingsScope.of(context);
     final queue = PlaybackQueueScope.of(context);
+    SearchHit? queued;
     await runQueueAction(context, (onStatus) async {
       onStatus('Sprawdzam link z YouTube…');
       final hit = await hitForVideoLink(
@@ -248,6 +267,10 @@ class AppShellState extends State<AppShell> {
         search: search,
         settings: settings,
       );
+      if (play != LinkPlay.now) {
+        queued = hit;
+        return null;
+      }
       final outcome = await queue.start(
         [hit],
         0,
@@ -260,6 +283,7 @@ class AppShellState extends State<AppShell> {
       }
       return outcome;
     });
+    await _queue(queued, play);
   }
 
   static const _tabRoots = <Widget>[

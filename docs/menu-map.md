@@ -469,7 +469,8 @@ import, Wyświetlanie, Dane, Aplikacja.
 - Otwieranie linków **→ Otwieranie linków** (`link_settings_screen.dart`) — **implemented**:
   "Linki z YouTube" / "Linki ze Spotify" (dialog: Pytaj za każdym razem — default, Leina Radio,
   Aplikacja YouTube/Spotify, Przeglądarka; the same choice "Zapamiętaj wybór" in the link sheet
-  sets; the sheet also has "Zapisz na później" → "Od kogo?", see Ja › Na później), what a link does in the app, how to give the links to the app in the phone settings,
+  sets; Leina Radio for a video or track then asks "Jak odtworzyć?" — Odtwórz teraz, Odtwórz
+  jako następny, Dodaj do kolejki — unless remembered (plays now); the sheet also has "Zapisz na później" → "Od kogo?", see Ja › Na później), what a link does in the app, how to give the links to the app in the phone settings,
   "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
   app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
   [`agent-notes/youtube.md`](agent-notes/youtube.md)).

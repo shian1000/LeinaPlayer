@@ -39,7 +39,8 @@ import org.json.JSONObject
  * A tapped YouTube or Spotify link: a sheet over half the screen asks whether to open it in
  * Leina Radio, the service's own app or a browser — unless a choice was remembered
  * (Ustawienia › Otwieranie linków) — or to save it for later with the person who sent it
- * ([LaterLinks], shown in Menu profilu › Wiadomości › Na później). Native and translucent, so it shows at once over the app
+ * ([LaterLinks], shown in Menu profilu › Wiadomości › Na później). A video or track opened in Leina
+ * Radio asks once more: play it now, next, or at the end of the queue ([EXTRA_PLAY]). Native and translucent, so it shows at once over the app
  * the link was tapped in, without starting Flutter. Links shared to the app ("Udostępnij") go
  * straight to [MainActivity]: sharing to it is the choice already.
  */
@@ -49,11 +50,13 @@ class LinkChooserActivity : Activity() {
     private lateinit var root: FrameLayout
     private lateinit var sheet: LinearLayout
 
-    /** What the sheet shows under its handle: the choices, or "Od kogo?". */
+    /** What the sheet shows under its handle: the choices, "Od kogo?" or "Jak odtworzyć?". */
     private lateinit var content: LinearLayout
     private lateinit var look: Look
     private lateinit var face: Typeface
-    private var choosingPerson = false
+
+    /** On "Od kogo?" or "Jak odtworzyć?": Back returns to the choices. */
+    private var onSubPage = false
     private var closing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,10 +80,15 @@ class LinkChooserActivity : Activity() {
     }
 
     @Deprecated("Still called with the old back handling this app uses.")
-    override fun onBackPressed() = if (choosingPerson) showChoices() else close()
+    override fun onBackPressed() = if (onSubPage) showChoices() else close()
 
     /** What the link points at, as far as the address tells. */
-    private data class Kind(val label: String, val leinaAction: String, val supported: Boolean)
+    private data class Kind(
+        val label: String,
+        val leinaAction: String,
+        val supported: Boolean,
+        val playable: Boolean = false,
+    )
 
     private fun kind(): Kind {
         val segments = uri.pathSegments.filter { it.isNotEmpty() }
@@ -92,7 +100,7 @@ class LinkChooserActivity : Activity() {
                 uri.host == "youtu.be" && first != null ||
                     first == "watch" && uri.getQueryParameter("v") != null ||
                     first in setOf("shorts", "live", "embed") && segments.size > 1 ->
-                    Kind("Film z YouTube", "Odtwórz", true)
+                    Kind("Film z YouTube", "Odtwórz", true, playable = true)
                 else -> Kind("Link z YouTube", "Otwiera tylko filmy i playlisty", false)
             }
             LinkService.SPOTIFY -> {
@@ -101,7 +109,7 @@ class LinkChooserActivity : Activity() {
                 when {
                     uri.host != "open.spotify.com" ->
                         Kind("Link ze Spotify", "Odtwórz albo zaimportuj", true)
-                    type == "track" -> Kind("Utwór ze Spotify", "Odtwórz", true)
+                    type == "track" -> Kind("Utwór ze Spotify", "Odtwórz", true, playable = true)
                     type == "album" -> Kind("Album ze Spotify", "Zaimportuj do Biblioteki", true)
                     type == "playlist" ->
                         Kind("Playlista ze Spotify", "Zaimportuj do Biblioteki", true)
@@ -115,13 +123,14 @@ class LinkChooserActivity : Activity() {
         }
     }
 
-    private fun open(choice: LinkChoice): Boolean = when (choice) {
+    /** [play]: [PLAY_NEXT] or [PLAY_END] for Leina Radio; else it plays now. */
+    private fun open(choice: LinkChoice, play: String? = null): Boolean = when (choice) {
         LinkChoice.ASK, LinkChoice.LEINA -> try {
             startActivity(
                 Intent(Intent.ACTION_VIEW, uri, this, MainActivity::class.java).addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP,
-                ),
+                ).apply { if (play != null) putExtra(EXTRA_PLAY, play) },
             )
             true
         } catch (e: Exception) {
@@ -342,7 +351,7 @@ class LinkChooserActivity : Activity() {
 
     /** Where to open the link, or "Zapisz na później". */
     private fun showChoices() {
-        choosingPerson = false
+        onSubPage = false
         hideKeyboard()
         content.removeAllViews()
         val kind = kind()
@@ -362,8 +371,12 @@ class LinkChooserActivity : Activity() {
             content.addView(
                 row(appIcon(icon), title, subtitle) {
                     if (remember.isChecked) LinkTargets.setChoice(this, service, choice)
-                    open(choice)
-                    finishNow()
+                    if (choice == LinkChoice.LEINA && kind.playable) {
+                        showPlayModes(kind)
+                    } else {
+                        open(choice)
+                        finishNow()
+                    }
                 },
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT),
             )
@@ -412,9 +425,40 @@ class LinkChooserActivity : Activity() {
         )
     }
 
+    /**
+     * "Jak odtworzyć?" after Leina Radio was picked for a video or track. A remembered Leina
+     * Radio choice never gets here: it plays now, as before this question existed.
+     */
+    private fun showPlayModes(kind: Kind) {
+        onSubPage = true
+        content.removeAllViews()
+        content.addView(header("Jak odtworzyć?", kind))
+        fun modeRow(iconRes: Int, title: String, subtitle: String, play: String?) {
+            content.addView(
+                row(roundIcon(iconRes = iconRes), title, subtitle) {
+                    open(LinkChoice.LEINA, play)
+                    finishNow()
+                },
+                LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT),
+            )
+        }
+        modeRow(R.drawable.ic_play_now, "Odtwórz teraz", "Zamiast tego, co gra", null)
+        modeRow(R.drawable.ic_play_next, "Odtwórz jako następny", "Zaraz po obecnym utworze",
+            PLAY_NEXT)
+        modeRow(R.drawable.ic_add_to_queue, "Dodaj do kolejki", "Na sam koniec kolejki", PLAY_END)
+        content.addView(divider(), dividerParams())
+        content.addView(backRow(), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    private fun backRow() = text("← Wróć", 15f, look.textSecondary, bold = true).apply {
+        setPadding(dp(24), dp(14), dp(24), dp(16))
+        pressable(this)
+        setOnClickListener { showChoices() }
+    }
+
     /** "Od kogo?": the people links were saved from before, or a new one. */
     private fun showPeople() {
-        choosingPerson = true
+        onSubPage = true
         content.removeAllViews()
         val kind = kind()
         content.addView(header("Od kogo?", kind))
@@ -454,14 +498,7 @@ class LinkChooserActivity : Activity() {
         }
 
         content.addView(divider(), dividerParams())
-        content.addView(
-            text("← Wróć", 15f, look.textSecondary, bold = true).apply {
-                setPadding(dp(24), dp(14), dp(24), dp(16))
-                pressable(this)
-                setOnClickListener { showChoices() }
-            },
-            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT),
-        )
+        content.addView(backRow(), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
     }
 
     /** Typing a new person's name in place of the "Nowa osoba" row. */
@@ -547,5 +584,12 @@ class LinkChooserActivity : Activity() {
         finish()
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
+    }
+
+    companion object {
+        /** How [MainActivity] plays the link: [PLAY_NEXT], [PLAY_END], or now when missing. */
+        const val EXTRA_PLAY = "com.shian1000.music_database_app.PLAY"
+        const val PLAY_NEXT = "next"
+        const val PLAY_END = "end"
     }
 }

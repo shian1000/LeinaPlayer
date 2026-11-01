@@ -117,8 +117,8 @@ YouTube and Spotify links shared to the app or opened with it import the playlis
 the video / track; a playlist with no link (made on the phone, a MusicDatabase folder) can be
 made on YouTube from its share sheet — the phone signs in to Google and uses the YouTube Data API
 itself, without MusicDatabase (unlisted, a one-off copy; [`youtube.md`](docs/agent-notes/youtube.md));
-a tapped link first shows a native sheet asking where to open it (Leina Radio,
-the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
+a tapped link first shows a native sheet asking where to open it (Leina Radio — a video or
+track then plays now, next or at the end of the queue —, the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
 saves it for later with the person who sent it (Ja › Na później,
 `later_links.dart`; kept natively in `LaterLinks.kt`, synced with the account from Dart — ADR 0013).
 

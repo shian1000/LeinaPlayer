@@ -88,7 +88,8 @@ Links from outside (Android): a tapped YouTube/Spotify link opens the native
 `LinkChooserActivity.kt` sheet (Leina Radio / the service's app / a browser, or a remembered
 choice); links shared to the app and links the sheet hands on reach `MainActivity.kt`'s
 `LinksBridge`, which passes them to `IncomingLinks` (`incoming_links.dart`); `AppShell` imports a
-playlist or album, or plays a video or Spotify track (`video_link.dart`). Opening outside the app
+playlist or album, or plays a video or Spotify track (`video_link.dart`) — now, next or at the
+end of the queue, as the sheet asked (`IncomingLink.play`). Opening outside the app
 always names the package (`LinkTargets.kt`) — the system's choice for these links may be this app
 itself.
 

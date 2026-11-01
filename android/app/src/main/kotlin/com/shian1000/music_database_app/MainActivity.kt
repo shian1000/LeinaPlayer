@@ -77,19 +77,26 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
     MethodChannel.MethodCallHandler {
     private val channel = MethodChannel(messenger, "music_database_app/links")
 
-    /** Received before Dart was listening; handed over by `initialLink`. */
-    private var pending: String? = null
+    /**
+     * Received before Dart was listening; handed over by `initialLink`. Each link goes as
+     * `{url, play}` — `play` as [LinkChooserActivity.EXTRA_PLAY] says, `null` to play now.
+     */
+    private var pending: Map<String, String?>? = null
 
     init {
         channel.setMethodCallHandler(this)
     }
 
     fun receive(intent: Intent?) {
-        val link = linkOf(intent) ?: return
+        val url = linkOf(intent) ?: return
+        val link = mapOf(
+            "url" to url,
+            "play" to intent?.getStringExtra(LinkChooserActivity.EXTRA_PLAY),
+        )
         pending = link
         channel.invokeMethod("link", link, object : MethodChannel.Result {
             override fun success(result: Any?) {
-                if (pending == link) pending = null
+                if (pending === link) pending = null
             }
 
             // Dart isn't listening yet: it takes the link from `pending` when it starts.
