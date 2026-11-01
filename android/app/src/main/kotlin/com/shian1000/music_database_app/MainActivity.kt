@@ -32,6 +32,16 @@ class MainActivity : AudioServiceActivity() {
         if (downloads?.messenger !== messenger) {
             downloads = DownloadBridge(messenger, applicationContext)
         }
+        // Dart tells the activity it handles Back only when its routes change, so a new activity
+        // on an engine that already runs Dart (the old one removed while music played) would be
+        // left without the callback, and Back would close the app from any screen.
+        if (backHandledBy === messenger) setFrameworkHandlesBack(true)
+    }
+
+    override fun setFrameworkHandlesBack(frameworkHandlesBack: Boolean) {
+        super.setFrameworkHandlesBack(frameworkHandlesBack)
+        val messenger = flutterEngine?.dartExecutor?.binaryMessenger ?: return
+        backHandledBy = if (frameworkHandlesBack) messenger else null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +61,9 @@ class MainActivity : AudioServiceActivity() {
         private var newPipe: NewPipeBridge? = null
         private var links: LinksBridge? = null
         private var downloads: DownloadBridge? = null
+
+        /** The engine whose Dart last said it handles Back. */
+        private var backHandledBy: BinaryMessenger? = null
     }
 }
 

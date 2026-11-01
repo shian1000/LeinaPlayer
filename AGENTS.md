@@ -388,7 +388,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   after a while (e.g. during a ~9 min build) — the user switches it back on, no new pairing.
   Notification / lock-screen controls are tested from adb: `cmd media_session dispatch
   pause|play|next` (Android 10 lacks it — `input keyevent KEYCODE_MEDIA_PAUSE`), then
-  `dumpsys media_session` for the state. The
+  `dumpsys media_session` for the state. A new activity on the engine music kept alive (the
+  user swiped the app away, or Android dropped it) is reproduced by `am stack remove <taskId>`
+  (`am stack list`) while a song plays, then opening the app again — the Dart routes survive,
+  native per-activity state doesn't (Back's callback was lost that way — `MainActivity`). The
   Huawei has only a swipe lock: wake it (`input keyevent KEYCODE_WAKEUP`) and unlock it with
   `input swipe 540 1800 540 600 300` rather than waiting for the user. It also shows no app logs
   (`logcat -s flutter` stays empty) — diagnose there from the screen. The release build allows no
