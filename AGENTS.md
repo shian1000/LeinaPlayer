@@ -116,7 +116,7 @@ mood or the queue can be put into a mood at once (after "Czy na pewno?"). A mood
 the queue hide and pass over songs outside the ticked moods (or with a mood, for "Utwory bez
 nastroju"); while it's on the full player shows a "Nastrój" button for the current song.
 YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
-the video / track; a playlist with no link (made on the phone, a MusicDatabase folder) can be
+the video / track (a shared one asks first: now, next or at the end of the queue); a playlist with no link (made on the phone, a MusicDatabase folder) can be
 made on YouTube from its share sheet — the phone signs in to Google and uses the YouTube Data API
 itself, without MusicDatabase (unlisted, a one-off copy; [`youtube.md`](docs/agent-notes/youtube.md));
 a tapped link first shows a native sheet asking where to open it (Leina Radio — a video or
@@ -259,7 +259,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `android/app/src/main/kotlin/.../NewPipeBridge.kt` (NewPipeExtractor behind a method channel),
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
   incoming YouTube/Spotify links and opening the YouTube app by package),
-  `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links), `LinkTargets.kt`,
+  `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links, "Jak odtworzyć?" for shared ones), `LinkTargets.kt`,
   `LaterLinks.kt` (links saved for later), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.

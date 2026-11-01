@@ -41,8 +41,9 @@ import org.json.JSONObject
  * (Ustawienia › Otwieranie linków) — or to save it for later with the person who sent it
  * ([LaterLinks], shown in Menu profilu › Wiadomości › Na później). A video or track opened in Leina
  * Radio asks once more: play it now, next, or at the end of the queue ([EXTRA_PLAY]). Native and translucent, so it shows at once over the app
- * the link was tapped in, without starting Flutter. Links shared to the app ("Udostępnij") go
- * straight to [MainActivity]: sharing to it is the choice already.
+ * the link was tapped in, without starting Flutter. A link shared to the app ("Udostępnij") is
+ * the choice already: a video or track only gets "Jak odtworzyć?", anything else goes straight
+ * to [MainActivity].
  */
 class LinkChooserActivity : Activity() {
     private lateinit var uri: Uri
@@ -57,10 +58,17 @@ class LinkChooserActivity : Activity() {
 
     /** On "Od kogo?" or "Jak odtworzyć?": Back returns to the choices. */
     private var onSubPage = false
+
+    /** Shared to the app: only "Jak odtworzyć?", with nothing to go back to. */
+    private var shared = false
     private var closing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent?.action == Intent.ACTION_SEND) {
+            onShared(intent.getStringExtra(Intent.EXTRA_TEXT))
+            return
+        }
         val data = intent?.data
         val linkService = data?.let { LinkService.of(it) }
         if (data == null || linkService == null) {
@@ -77,6 +85,34 @@ class LinkChooserActivity : Activity() {
             return
         }
         buildSheet()
+    }
+
+    /**
+     * "Udostępnij" to Leina Radio: the first link in the text (YouTube and Spotify share it with
+     * a title before it), as Dart's `incoming_links.dart` finds it.
+     */
+    private fun onShared(text: String?) {
+        val link = text?.let { Regex("https?://\\S+").find(it)?.value }?.let(Uri::parse)
+        val linkService = link?.let { LinkService.of(it) }
+        if (link != null && linkService != null) {
+            uri = link
+            service = linkService
+            if (kind().playable) {
+                shared = true
+                buildSheet()
+                return
+            }
+        }
+        try {
+            startActivity(
+                Intent(Intent.ACTION_SEND).setClass(this, MainActivity::class.java)
+                    .setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                    .addFlags(MAIN_FLAGS),
+            )
+        } catch (e: Exception) {
+            Toast.makeText(this, "Nie udało się otworzyć Leina Radio", Toast.LENGTH_SHORT).show()
+        }
+        finishNow()
     }
 
     @Deprecated("Still called with the old back handling this app uses.")
@@ -127,10 +163,9 @@ class LinkChooserActivity : Activity() {
     private fun open(choice: LinkChoice, play: String? = null): Boolean = when (choice) {
         LinkChoice.ASK, LinkChoice.LEINA -> try {
             startActivity(
-                Intent(Intent.ACTION_VIEW, uri, this, MainActivity::class.java).addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP,
-                ).apply { if (play != null) putExtra(EXTRA_PLAY, play) },
+                Intent(Intent.ACTION_VIEW, uri, this, MainActivity::class.java)
+                    .addFlags(MAIN_FLAGS)
+                    .apply { if (play != null) putExtra(EXTRA_PLAY, play) },
             )
             true
         } catch (e: Exception) {
@@ -313,7 +348,7 @@ class LinkChooserActivity : Activity() {
         )
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         sheet.addView(content, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        showChoices()
+        if (shared) showPlayModes(kind()) else showChoices()
 
         // Edge to edge (Android 15+ always): the sheet runs under the navigation bar, its
         // content stays above it — and above the keyboard while a new person's name is typed.
@@ -430,7 +465,7 @@ class LinkChooserActivity : Activity() {
      * Radio choice never gets here: it plays now, as before this question existed.
      */
     private fun showPlayModes(kind: Kind) {
-        onSubPage = true
+        onSubPage = !shared
         content.removeAllViews()
         content.addView(header("Jak odtworzyć?", kind))
         fun modeRow(iconRes: Int, title: String, subtitle: String, play: String?) {
@@ -447,7 +482,18 @@ class LinkChooserActivity : Activity() {
             PLAY_NEXT)
         modeRow(R.drawable.ic_add_to_queue, "Dodaj do kolejki", "Na sam koniec kolejki", PLAY_END)
         content.addView(divider(), dividerParams())
-        content.addView(backRow(), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        if (shared) {
+            content.addView(
+                text("Anuluj", 15f, look.textSecondary, bold = true).apply {
+                    setPadding(dp(24), dp(14), dp(24), dp(16))
+                    pressable(this)
+                    setOnClickListener { close() }
+                },
+                LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT),
+            )
+        } else {
+            content.addView(backRow(), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
     }
 
     private fun backRow() = text("← Wróć", 15f, look.textSecondary, bold = true).apply {
@@ -591,5 +637,8 @@ class LinkChooserActivity : Activity() {
         const val EXTRA_PLAY = "com.shian1000.music_database_app.PLAY"
         const val PLAY_NEXT = "next"
         const val PLAY_END = "end"
+
+        private const val MAIN_FLAGS = Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
     }
 }

@@ -23,8 +23,9 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
   handled in `AppShell._onLink`): a playlist link (`playlist?list=`) is imported like Playlista ›
   Importuj playlistę (or updated, if imported before) and opened in Biblioteka; a video link
   (`watch?v=`, `youtu.be/`, `shorts/`, also with `&list=`) is recognised as a MusicDatabase song
-  where possible (`video_link.dart`: music.db's link, a phone match, then the video's title) and
-  played from the first source in "Kolejność odtwarzania", in the full player. A Spotify playlist
+  where possible (`video_link.dart`: music.db's link, a phone match, then the video's title) and,
+  after the native "Jak odtworzyć?" sheet (`LinkChooserActivity`: teraz / jako następny / na koniec
+  kolejki — shared and tapped links alike), played from the first source in "Kolejność odtwarzania", in the full player. A Spotify playlist
   link (`open.spotify.com/playlist/…`, `spotify.link/…`) is imported and opened the same way; other
   Spotify links (tracks, albums) and anything else → a message. Only YouTube links can be *opened*
   with the app; Spotify ones arrive through "Udostępnij". On Android 12+ YouTube links reach the app only after the user allows it (see

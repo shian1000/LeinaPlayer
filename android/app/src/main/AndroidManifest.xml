@@ -63,15 +63,7 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- "Udostępnij" from YouTube or Spotify (or anything sharing a link as text): a
-                 playlist or album link is imported to Biblioteka, a video or track link played
-                 (MainActivity → Dart's incoming_links.dart). Tapped links come through
-                 LinkChooserActivity below. -->
-            <intent-filter>
-                <action android:name="android.intent.action.SEND"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <data android:mimeType="text/plain"/>
-            </intent-filter>
+            <!-- Links reach it through LinkChooserActivity below, tapped and shared alike. -->
         </activity>
         <!-- Opening YouTube and Spotify links with this app: a sheet asks whether to open them
              here, in the service's app or in a browser, or saves them for later (adjustResize:
@@ -100,6 +92,14 @@
                 <data android:host="open.spotify.com"/>
                 <data android:host="spotify.link"/>
                 <data android:host="spotify.app.link"/>
+            </intent-filter>
+            <!-- "Udostępnij" from YouTube or Spotify (or anything sharing a link as text): a
+                 video or track link asks only "Jak odtworzyć?"; anything else goes on to
+                 MainActivity (Dart's incoming_links.dart), a playlist or album to be imported. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

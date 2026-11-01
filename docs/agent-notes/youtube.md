@@ -164,8 +164,10 @@ plain video search.
 
 YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md)).
 
-- `SEND text/plain` ("Udostępnij") goes straight to `MainActivity` — sharing to the app is the
-  choice already. `VIEW` (a tapped link: youtube.com / m. / music. / youtu.be, open.spotify.com,
+- `SEND text/plain` ("Udostępnij") also goes to `LinkChooserActivity` — sharing to the app is
+  the choice already, so a video or Spotify track gets only "Jak odtworzyć?" (with "Anuluj", not
+  "Wróć"; user's request, 2026-11-01) and anything else (playlists, albums, `spotify.link`, other
+  text) is passed on to `MainActivity` as the same `SEND`. `VIEW` (a tapped link: youtube.com / m. / music. / youtu.be, open.spotify.com,
   spotify.link, spotify.app.link) goes to `LinkChooserActivity` (user's decision): a native,
   translucent activity with a half-screen sheet "Otwórz w…" — Leina Radio (hidden for paths the
   app can't use, e.g. a channel), the service's app (only if installed), the default browser —
@@ -210,7 +212,7 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   `findExact`); a song found by title gets the video saved as a phone match unless MusicDatabase
   says something about its video (incl. N/A). Reading the title costs one request (NewPipe
   `video`, else youtube_explode `videos.get`); a song known by its video needs none.
-- Testing with adb: target the activity (`am start -n com.shian1000.music_database_app/.MainActivity
+- Testing with adb: target the activity (`am start -n com.shian1000.music_database_app/.LinkChooserActivity
   -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT <link>`; a tapped
   link: `-n …/.LinkChooserActivity -a android.intent.action.VIEW -d <link>`). Don't
   `am start -a android.intent.action.CHOOSER` with a made-up `EXTRA_INTENT`: on the Huawei it
