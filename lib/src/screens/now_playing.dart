@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/album_covers.dart';
@@ -680,25 +681,35 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    track.shownTitle(context),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: AppFontSize.largeTitle,
-                                      fontWeight: FontWeight.bold,
+                                  GestureDetector(
+                                    onLongPress: () => _copyName(
+                                      context,
+                                      '${track.artist} - ${track.title}',
+                                    ),
+                                    child: Text(
+                                      track.shownTitle(context),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: AppFontSize.largeTitle,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                  Text(
-                                    withFullAlbumLabel(
-                                      queue.current,
-                                      track.shownArtist(context),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.listTitle,
-                                      color: palette.textSecondary,
+                                  GestureDetector(
+                                    onLongPress: () =>
+                                        _copyName(context, track.artist),
+                                    child: Text(
+                                      withFullAlbumLabel(
+                                        queue.current,
+                                        track.shownArtist(context),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.listTitle,
+                                        color: palette.textSecondary,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -1199,4 +1210,12 @@ class _SeekBarState extends State<_SeekBar> {
       },
     );
   }
+}
+
+/// The raw names, not the Latin form shown with them: what's copied goes into searches and
+/// messages, like a song's sharing text.
+void _copyName(BuildContext context, String text) {
+  final messenger = ScaffoldMessenger.of(context);
+  Clipboard.setData(ClipboardData(text: text));
+  messenger.showSnackBar(SnackBar(content: Text('Skopiowano: $text')));
 }
