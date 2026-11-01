@@ -20,9 +20,13 @@ be triggered on demand.
 
 ## The patch
 
-Two places, both marked "Leina Radio patch":
+Three places, both marked "Leina Radio patch":
 
 - `AudioService.onDestroy()` clears `listener` before calling it, not after.
 - `AudioHandlerInterface.onDestroy()` registers itself again with `AudioService.init(this)`
   when it is still the plugin's handler, i.e. the engine survived. A disposed engine detaches
   the plugin, which clears `audioHandlerInterface`, so nothing is registered then.
+- `AudioService.enterPlayingState()` activates the session and takes the wake lock before the
+  foreground start, which Android 12+ refuses from the background
+  (`ForegroundServiceStartNotAllowedException`): the exception used to skip them. It is logged
+  and still thrown, so Dart gets it in `AudioService.asyncError`.

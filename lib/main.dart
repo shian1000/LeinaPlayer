@@ -73,7 +73,10 @@ Future<void> main() async {
         androidNotificationChannelId:
             'com.shian1000.music_database_app.playback',
         androidNotificationChannelName: 'Odtwarzanie',
-        androidNotificationOngoing: true,
+        // A paused service leaving the foreground can't come back to it from the background
+        // (Android 12+): music resumed there played unprotected and the phone froze the app
+        // (local-library.md). So the notification can't be swiped away while paused.
+        androidStopForegroundOnPause: false,
         // White-on-transparent, as Android draws small notification icons as a mask.
         androidNotificationIcon: 'drawable/ic_stat_leina',
         // Covers are decoded whole otherwise (an iTunes one is 1000+ px): slower to hand over
@@ -85,6 +88,10 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Starting the media session failed: $e');
   }
+  // Failures sending the state to Android (e.g. a refused foreground start) end up only here.
+  AudioService.asyncError.listen(
+    (e) => debugPrint('Media session update failed: $e'),
+  );
   // Before anything opens the files and settings it replaces.
   final userBackup = UserBackup();
   try {

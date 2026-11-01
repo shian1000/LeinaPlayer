@@ -145,6 +145,14 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   `AndroidManifest.xml`. If `AudioService.init` fails, music still plays without a
   notification. While music plays, the
   foreground service keeps Android from killing the app (checked: still playing after 2+ minutes
-  locked on the Huawei); when paused the service leaves the foreground, as Android expects.
+  locked on the Huawei). It stays in the foreground while paused too
+  (`androidStopForegroundOnPause: false`, so the notification can't be swiped away then): a
+  service that left it can't come back from the background on Android 12+ (`BFGS denied` in
+  `dumpsys activity services`), so music resumed or moved on there played outside it and the
+  Pixel froze the app within seconds (`am_freeze … active while frozen`) — and the paused,
+  non-foreground service was also stopped as idle (`am_stop_idle_service`). For the same reason
+  `MediaSession._state` reports just_audio's `idle` (a song that failed to load) as `loading`:
+  audio_service stops its service on idle; only `MediaSession.stop` lets idle through. Failures
+  sending the state to Android come out in `AudioService.asyncError`, logged by `main`.
   `android/app/src/main/res/raw/keep.xml` must stay: release resource shrinking otherwise
   removes audio_service's button icons and the notification shows no play/pause/stop.

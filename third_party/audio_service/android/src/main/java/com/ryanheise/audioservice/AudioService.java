@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
+import android.util.Log;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -706,13 +707,21 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void enterPlayingState() {
-        ContextCompat.startForegroundService(this, new Intent(AudioService.this, AudioService.class));
+        // Leina Radio patch: the session and wake lock first, as Android refuses the foreground
+        // start from the background (Android 12+), and the exception used to skip them too. It
+        // still reaches Dart (AudioService.asyncError), to be logged there.
         if (!mediaSession.isActive())
             mediaSession.setActive(true);
 
         acquireWakeLock();
         mediaSession.setSessionActivity(contentIntent);
-        internalStartForeground();
+        try {
+            ContextCompat.startForegroundService(this, new Intent(AudioService.this, AudioService.class));
+            internalStartForeground();
+        } catch (RuntimeException e) {
+            Log.w("AudioService", "Starting the foreground service failed", e);
+            throw e;
+        }
     }
 
     private void exitPlayingState() {

@@ -152,6 +152,9 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
 
   static const _settleAfter = Duration(milliseconds: 800);
 
+  /// [stop] was called; until music plays again the session may say it's idle.
+  bool _stopped = false;
+
   @override
   Future<void> play() => _active.play();
 
@@ -167,6 +170,7 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> stop() async {
     _settle?.cancel();
+    _stopped = true;
     beforePause?.call();
     await _active.stop();
     await super.stop();
@@ -180,6 +184,7 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
 
   PlaybackState _state() {
     final player = _active;
+    if (player.playing) _stopped = false;
     return PlaybackState(
       controls: [
         MediaControl.skipToPrevious,
@@ -188,8 +193,13 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
       ],
       systemActions: const {MediaAction.seek},
       androidCompactActionIndices: const [0, 1, 2],
-      processingState: const {
-        ProcessingState.idle: AudioProcessingState.idle,
+      processingState: {
+        // audio_service stops its service on idle, and from the background it can't start
+        // again: a song that failed to load (just_audio goes idle) would leave the queue's
+        // next songs playing outside the foreground, frozen by Android.
+        ProcessingState.idle: _stopped
+            ? AudioProcessingState.idle
+            : AudioProcessingState.loading,
         ProcessingState.loading: AudioProcessingState.loading,
         ProcessingState.buffering: AudioProcessingState.buffering,
         ProcessingState.ready: AudioProcessingState.ready,
