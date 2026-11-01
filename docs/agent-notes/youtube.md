@@ -135,7 +135,10 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   the same table with `pinned` = 1 (local.db v18): outside the limit, left by "Wyczyść", and
   `YouTubePlayback` plays it from the phone whatever the playback methods are (cache method off
   included). `download(pin: true)` pins also a video already cached or being downloaded by
-  caching ahead — a second `download` of a video waits for the first one's future.
+  caching ahead — a second `download` of a video waits for the first one's future. With a
+  download folder set (`SourceSettings.downloadFolder`) a pinned file moves there as
+  `Artist - Title.<ext>` (`file_name` then a full path) and back to `youtube_cache/` when
+  unpinned — see `download_files.dart` and [`local-library.md`](local-library.md).
 
 Playback (`lib/src/playback/youtube_playback.dart`, `YouTubePlayback`): the switched-on
 `YouTubePlaybackMethod`s in the user's order (Ustawienia › Odtwarzanie › Sposoby odtwarzania YouTube;

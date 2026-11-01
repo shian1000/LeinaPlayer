@@ -25,6 +25,36 @@ void main() {
     expect(again.lyrics, isFalse);
   });
 
+  testWidgets(
+    'Miejsce na pobrane utwory goes back to the app and keeps the screen',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        SourceSettings.downloadFolderKey: '/storage/emulated/0/Music/Leina',
+      });
+      final settings = SourceSettings();
+      await tester.runAsync(settings.load);
+      await tester.pumpWidget(app(settings, const DataSaverScreen()));
+      expect(find.text('Pamięć telefonu/Music/Leina'), findsOneWidget);
+
+      await tester.tap(find.text('Miejsce na pobrane utwory'));
+      await tester.pumpAndSettle();
+      expect(find.text('Wybierz inny folder…'), findsOneWidget);
+      await tester.tap(find.text('W aplikacji'));
+      await tester.pumpAndSettle();
+
+      expect(settings.downloadFolder, isNull);
+      expect(find.byType(DataSaverScreen), findsOneWidget);
+      expect(
+        find.text('W aplikacji — niewidoczne dla innych aplikacji'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Pobierane utwory będą trafiać do aplikacji.'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('Oszczędzanie danych switches lyrics off', (tester) async {
     final settings = SourceSettings();
     await tester.runAsync(settings.load);

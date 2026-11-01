@@ -90,6 +90,22 @@ void main() {
       expect(pending.single.mainDbId, isNull);
     });
 
+    test('the scan leaves out the folder "Pobierz" puts songs in', () async {
+      final scanning = LocalLibrary(
+        catalog,
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+        downloadFolder: () => '${music.path}/Leina Radio',
+      );
+      await scanning.load();
+      await touch('Afina - Pay Your Respect.mp3');
+      await touch('Leina Radio/Kino - Kukushka.webm');
+      await touch('Leina Radio 2/Kino - Kukushka.mp3');
+      await scanning.addFolder(music.path);
+      expect((await scanning.scan()).added, 2);
+      scanning.dispose();
+    });
+
     test('a rescan adds only new files and drops deleted ones', () async {
       final known = await touch('Dawid Podsiadło - Małomiasteczkowy.mp3');
       await library.addFolder(music.path);

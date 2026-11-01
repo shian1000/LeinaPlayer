@@ -422,6 +422,12 @@ import, Wyświetlanie, Dane, Aplikacja.
   przez Wi-Fi" (off by default; on cellular only cached covers and covers inside phone files show),
   "Pobieraj teksty piosenek" (on by default; off hides the full player's lyrics card and never
   asks LRCLIB — `SourceSettings.lyrics`),
+  "Miejsce na pobrane utwory" (`download_folder.dart`, `SourceSettings.downloadFolder`; subtitle:
+  "W aplikacji — niewidoczne dla innych aplikacji" or the folder, with "Pamięć telefonu" / "Karta
+  SD" for the storage) — a sheet: "W aplikacji" (default) or "Wybierz folder…" (the system folder
+  picker; when the app can't write there, a dialog about "all files access", then Android's
+  permission screen). Changing it moves the songs downloaded so far (progress dialog; one that
+  can't be moved keeps playing from where it is),
   Pamięć podręczna **→ Pamięć podręczna** (`cache_settings_screen.dart`; subtitle: MB used in
   total) — every cache setting, nowhere else ("Pamięć podręczna" is the one name used in the UI):
   - "Zajęte razem: X MB" (with the downloaded songs).

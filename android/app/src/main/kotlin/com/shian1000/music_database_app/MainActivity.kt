@@ -3,6 +3,7 @@ package com.shian1000.music_database_app
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -156,6 +157,14 @@ private class LinksBridge(val messenger: BinaryMessenger, private val context: C
                     "sdk" to android.os.Build.VERSION.SDK_INT,
                 ),
             )
+            // Songs downloaded into the user's folder (or taken out of it): other music apps
+            // see the change without waiting for Android's own scan.
+            "scanMedia" -> {
+                @Suppress("UNCHECKED_CAST")
+                val paths = (call.arguments as List<String>).toTypedArray()
+                MediaScannerConnection.scanFile(context, paths, null, null)
+                result.success(null)
+            }
             "laterLinks" -> result.success(LaterLinks.all(context))
             "replaceLaterLinks" -> {
                 LaterLinks.replaceAll(context, call.arguments as String)

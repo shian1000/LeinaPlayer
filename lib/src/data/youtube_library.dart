@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'download_files.dart';
 import 'song_catalog.dart';
 import 'text_normalizer.dart';
 import 'youtube_video.dart';
@@ -41,7 +42,9 @@ class YouTubeCacheEntry {
 ///   or the phone's own video that's among them isn't used ([isVideoRemoved]).
 /// - `youtube_cache`: audio of played videos, in `<support dir>/youtube_cache/`, at most the
 ///   user's limit; the least recently played goes first. Videos downloaded with "Pobierz"
-///   ([setPinned]) stay there outside the limit until taken off again.
+///   ([setPinned]) stay there outside the limit until taken off again — or go to the user's
+///   download folder as `Artist - Title.<ext>` (`file_name` a full path then), coming back
+///   when taken off.
 ///
 /// A file gets into the cache by [download], started next to playback: YouTube throttles one
 /// long request to about playback speed, but answers 1 MB `Range` requests at full speed, so the
@@ -50,12 +53,17 @@ class YouTubeLibrary extends ChangeNotifier {
   YouTubeLibrary(
     this._database, {
     Future<Directory> Function()? storageRoot,
+    String? Function()? downloadFolder,
     DateTime Function()? now,
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
+       _downloadFolder = downloadFolder ?? (() => null),
        _now = now ?? DateTime.now;
 
   final Future<Database> Function() _database;
   final Future<Directory> Function() _storageRoot;
+
+  /// Where "Pobierz" keeps audio: the user's folder, `null` for the cache folder.
+  final String? Function() _downloadFolder;
   final DateTime Function() _now;
 
   Map<int, String> _matches = const {};
@@ -141,8 +149,9 @@ class YouTubeLibrary extends ChangeNotifier {
   /// Downloads under way; a second [download] of the same video waits for the first.
   final _downloads = <String, Future<bool>>{};
 
-  /// Videos to keep with "Pobierz" once their download under way finishes.
-  final _pinWhenDone = <String>{};
+  /// Videos to keep with "Pobierz" once their download under way finishes, with the name for
+  /// the user's folder.
+  final _pinWhenDone = <String, String?>{};
 
   static const _chunkSize = 1024 * 1024;
 
@@ -220,8 +229,13 @@ class YouTubeLibrary extends ChangeNotifier {
   ];
 
   /// "Pobierz" on (the audio must be cached already) or off — off puts it back in the cache,
-  /// trimmed to [limit] like any other.
-  Future<void> setPinned(String videoId, bool pinned, {int? limit}) async {
+  /// trimmed to [limit] like any other. [name] ("Artist - Title") names it in the user's folder.
+  Future<void> setPinned(
+    String videoId,
+    bool pinned, {
+    int? limit,
+    String? name,
+  }) async {
     if (!_cache.containsKey(videoId)) return;
     final db = await _database();
     await db.update(
@@ -231,7 +245,66 @@ class YouTubeLibrary extends ChangeNotifier {
       whereArgs: [videoId],
     );
     await _reloadCache(db);
+    await _place(videoId, name);
     if (!pinned && limit != null) await trim(limit);
+  }
+
+  /// Moves [videoId]'s file where it belongs now: a downloaded one into the user's folder when
+  /// there is one, anything else into the cache folder. A failure leaves it usable where it is.
+  Future<void> _place(String videoId, String? name) async {
+    final entry = _cache[videoId];
+    if (entry == null) return;
+    final cacheDir = await _cacheDir();
+    final folder = entry.pinned ? _downloadFolder() : null;
+    if (entry.file.parent.path == (folder ?? cacheDir.path)) return;
+    final extension = fileExtension(entry.file.path);
+    try {
+      final target = await moveFile(
+        entry.file,
+        folder == null
+            ? File('${cacheDir.path}/$videoId$extension')
+            : await freeFileIn(Directory(folder), name ?? videoId, extension),
+      );
+      final db = await _database();
+      await db.update(
+        'youtube_cache',
+        {
+          'file_name': target.parent.path == cacheDir.path
+              ? target.uri.pathSegments.last
+              : target.path,
+        },
+        where: 'video_id = ?',
+        whereArgs: [videoId],
+      );
+      await _reloadCache(db);
+      await announceMediaFiles([
+        for (final path in [entry.file.path, target.path])
+          if (!isInFolder(path, cacheDir.path)) path,
+      ]);
+    } catch (e) {
+      debugPrint('Moving YouTube audio $videoId failed: $e');
+    }
+  }
+
+  /// Moves every downloaded video to where "Pobierz" puts them now, [nameOf] naming them in the
+  /// user's folder; returns how many couldn't be moved (they stay usable where they are).
+  /// [onMoved] after each.
+  Future<int> relocate(
+    String? Function(String videoId) nameOf, {
+    void Function()? onMoved,
+  }) async {
+    var failed = 0;
+    for (final entry in pinnedEntries) {
+      await _place(entry.videoId, nameOf(entry.videoId));
+      final now = _cache[entry.videoId];
+      if (now != null &&
+          now.file.parent.path !=
+              (_downloadFolder() ?? (await _cacheDir()).path)) {
+        failed++;
+      }
+      onMoved?.call();
+    }
+    return failed;
   }
 
   Future<Directory> _cacheDir() async =>
@@ -278,7 +351,11 @@ class YouTubeLibrary extends ChangeNotifier {
     for (final row in await db.query('youtube_cache')) {
       final entry = YouTubeCacheEntry(
         videoId: row['video_id']! as String,
-        file: File('${dir.path}/${row['file_name']}'),
+        file: File(
+          (row['file_name']! as String).startsWith('/')
+              ? row['file_name']! as String
+              : '${dir.path}/${row['file_name']}',
+        ),
         sizeBytes: row['size_bytes']! as int,
         lastPlayed: DateTime.fromMillisecondsSinceEpoch(
           row['last_played_at']! as int,
@@ -287,6 +364,9 @@ class YouTubeLibrary extends ChangeNotifier {
       );
       if (await entry.file.exists()) {
         entries[entry.videoId] = entry;
+      } else if (!await entry.file.parent.exists()) {
+        // The user's download folder out of reach (an SD card taken out): kept for when it's
+        // back.
       } else {
         await db.delete(
           'youtube_cache',
@@ -523,19 +603,21 @@ class YouTubeLibrary extends ChangeNotifier {
   /// Saves [url]'s audio as [videoId]'s cache file and records it, dropping the least recently
   /// played beyond [limit]. Failures only leave nothing cached; playback doesn't depend on it.
   /// Returns whether the audio is cached now. With [pin] ("Pobierz") the audio is kept outside
-  /// the limit, also when it's cached already or another download of it is under way.
+  /// the limit, also when it's cached already or another download of it is under way; [name]
+  /// names it in the user's download folder.
   Future<bool> download(
     String videoId,
     String url,
     String extension,
     int limit, {
     bool pin = false,
+    String? name,
   }) async {
     if (_cache.containsKey(videoId)) {
-      if (pin) await setPinned(videoId, true);
+      if (pin) await setPinned(videoId, true, name: name);
       return true;
     }
-    if (pin) _pinWhenDone.add(videoId);
+    if (pin) _pinWhenDone[videoId] = name;
     return _downloads[videoId] ??= _download(videoId, url, extension, limit)
         .whenComplete(() {
           // A block: `=> remove(…)` would return this very future, which then waits for itself.
@@ -616,15 +698,19 @@ class YouTubeLibrary extends ChangeNotifier {
     if (!await file.exists()) return;
     final db = await _database();
     final now = _now().millisecondsSinceEpoch;
+    final toPin = _pinWhenDone.containsKey(videoId);
+    final name = _pinWhenDone.remove(videoId);
+    final pinned = isPinned(videoId) || toPin;
     await db.insert('youtube_cache', {
       'video_id': videoId,
       'file_name': file.uri.pathSegments.last,
       'size_bytes': await file.length(),
       'downloaded_at': now,
       'last_played_at': now,
-      'pinned': isPinned(videoId) || _pinWhenDone.remove(videoId) ? 1 : 0,
+      'pinned': pinned ? 1 : 0,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     await _reloadCache(db);
+    if (pinned) await _place(videoId, name);
     await trim(limit);
   }
 
@@ -698,6 +784,9 @@ class YouTubeLibrary extends ChangeNotifier {
     for (final path in [entry.file.path, '${entry.file.path}.mime']) {
       final file = File(path);
       if (await file.exists()) await file.delete();
+    }
+    if (!isInFolder(entry.file.path, (await _cacheDir()).path)) {
+      await announceMediaFiles([entry.file.path]);
     }
     await (await _database()).delete(
       'youtube_cache',

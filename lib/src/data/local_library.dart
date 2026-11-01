@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'download_files.dart';
 import 'playlist_sync.dart';
 import 'song_catalog.dart';
 import 'text_normalizer.dart';
@@ -168,8 +169,14 @@ class LocalLibrary extends ChangeNotifier {
     Future<Directory> Function()? storageRoot,
     this.factoryOverride,
     DateTime Function()? now,
+    String? Function()? downloadFolder,
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _downloadFolder = downloadFolder ?? (() => null);
+
+  /// "Pobierz"'s folder, left out of the scan: its songs are downloads, not phone files (they'd
+  /// be there twice, and the YouTube ones without tags).
+  final String? Function() _downloadFolder;
 
   /// `local.db`'s version; a backup from a newer one isn't restored (`user_backup.dart`).
   static const schemaVersion = 20;
@@ -749,7 +756,7 @@ class LocalLibrary extends ChangeNotifier {
     try {
       await _catalog.ensureLoaded();
       final matching = _catalog.status == CatalogStatus.ready;
-      final files = await _audioFiles(_folders);
+      final files = await _audioFiles(_folders, skip: _downloadFolder());
       final db = await database();
       final known = {
         for (final row in await db.query('local_songs', columns: ['file_path']))
@@ -837,7 +844,10 @@ class LocalLibrary extends ChangeNotifier {
     await batch.commit(noResult: true);
   }
 
-  static Future<Set<String>> _audioFiles(List<String> folders) async {
+  static Future<Set<String>> _audioFiles(
+    List<String> folders, {
+    String? skip,
+  }) async {
     final result = <String>{};
     for (final folder in folders) {
       final dir = Directory(folder);
@@ -848,7 +858,9 @@ class LocalLibrary extends ChangeNotifier {
           followLinks: false,
         )) {
           final lower = entity.path.toLowerCase();
-          if (entity is File && audioExtensions.any(lower.endsWith)) {
+          if (entity is File &&
+              audioExtensions.any(lower.endsWith) &&
+              (skip == null || !isInFolder(entity.path, skip))) {
             result.add(entity.path);
           }
         }

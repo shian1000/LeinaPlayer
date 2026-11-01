@@ -345,6 +345,57 @@ void main() {
     expect(again.isCached('kept'), isFalse);
   });
 
+  test('"Pobierz" into the user\'s folder: named by song, back in the cache when unpinned', () async {
+    String? folder = '${root.path}/Music';
+    final library = YouTubeLibrary(
+      local.database,
+      storageRoot: () async => root,
+      downloadFolder: () => folder,
+      now: () => now,
+    );
+    await library.load();
+    await library.cacheComplete('v1', await downloaded(library, 'v1'), 5);
+    await library.setPinned('v1', true, name: 'Kino - Gruppa krovi');
+    expect(
+      library.cachedFileOf('v1')!.path,
+      '${root.path}/Music/Kino - Gruppa krovi.webm',
+    );
+
+    // Another with the same name doesn't overwrite it.
+    await library.cacheComplete('v2', await downloaded(library, 'v2'), 5);
+    await library.setPinned('v2', true, name: 'Kino - Gruppa krovi');
+    expect(
+      library.cachedFileOf('v2')!.path,
+      '${root.path}/Music/Kino - Gruppa krovi (2).webm',
+    );
+
+    final again = YouTubeLibrary(
+      local.database,
+      storageRoot: () async => root,
+      downloadFolder: () => folder,
+      now: () => now,
+    );
+    await again.load();
+    expect(again.isPinned('v1'), isTrue);
+    expect(
+      again.cachedFileOf('v1')!.path,
+      endsWith('/Music/Kino - Gruppa krovi.webm'),
+    );
+
+    await again.setPinned('v1', false, limit: 5);
+    expect(again.cachedFileOf('v1')!.path, endsWith('/youtube_cache/v1.webm'));
+    expect(
+      await File('${root.path}/Music/Kino - Gruppa krovi.webm').exists(),
+      isFalse,
+    );
+
+    // Back to the app's own folder.
+    folder = null;
+    expect(await again.relocate((_) => null), 0);
+    expect(again.cachedFileOf('v2')!.path, endsWith('/youtube_cache/v2.webm'));
+    expect(again.isPinned('v2'), isTrue);
+  });
+
   test('a local.db from before the YouTube tables is upgraded', () async {
     final dir = await Directory('${root.path}/local').create(recursive: true);
     final old = await databaseFactoryFfi.openDatabase(

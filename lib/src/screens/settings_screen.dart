@@ -184,7 +184,7 @@ const _sections = <(String, List<_SettingsEntry>)>[
       _SettingsEntry(
         Icons.download_for_offline_outlined,
         'Oszczędzanie danych i tryb offline',
-        'Tylko przez Wi-Fi • Teksty piosenek • Pamięć podręczna',
+        'Tylko przez Wi-Fi • Teksty piosenek • Miejsce na pobrane • Pamięć podręczna',
         _openDataSaver,
         deeper: [
           _SettingsEntry(
@@ -209,6 +209,9 @@ const _sections = <(String, List<_SettingsEntry>)>[
         keywords: [
           'Pobieraj okładki tylko przez Wi-Fi',
           'Pobieraj teksty piosenek',
+          'Miejsce na pobrane utwory',
+          'Folder na pobraną muzykę',
+          'Karta SD',
         ],
       ),
       _SettingsEntry(

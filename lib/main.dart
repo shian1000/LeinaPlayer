@@ -150,8 +150,14 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       widget.themeController ?? (ThemeController()..load());
   final _databaseSync = DatabaseSync();
   late final _songCatalog = SongCatalog(_databaseSync);
-  late final _localLibrary = LocalLibrary(_songCatalog);
-  late final _youTubeLibrary = YouTubeLibrary(_localLibrary.database);
+  late final _localLibrary = LocalLibrary(
+    _songCatalog,
+    downloadFolder: () => _sourceSettings.downloadFolder,
+  );
+  late final _youTubeLibrary = YouTubeLibrary(
+    _localLibrary.database,
+    downloadFolder: () => _sourceSettings.downloadFolder,
+  );
   late final _player = PlayerController(
     backend: () => JustAudioBackend(
       widget.mediaSession,
@@ -223,7 +229,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   late final _youTubeSearch = widget.youTubeSearch ?? YouTubeSearch();
   late final _youTubeAudio = widget.youTubeAudio ?? YouTubeAudio();
   late final _youTubePlaylists = widget.youTubePlaylists ?? YouTubePlaylists();
-  late final _serverDownloads = ServerDownloads(_localLibrary.database);
+  late final _serverDownloads = ServerDownloads(
+    _localLibrary.database,
+    folder: () => _sourceSettings.downloadFolder,
+  );
   late final _trackPlayer = TrackPlayer(
     player: _player,
     settings: _sourceSettings,

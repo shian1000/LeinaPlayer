@@ -20,6 +20,13 @@
          lokalna: storage up to Android 12, READ_MEDIA_AUDIO from Android 13. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <!-- "Pobierz" into a folder the user picked (Oszczędzanie danych i tryb offline › Miejsce na
+         pobrane utwory): writing by path takes "all files access" from Android 11 and the
+         storage permission on Android 10; asked for only when such a folder is picked. The app
+         isn't in any store, so the store's limits on this permission don't apply. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage"/>
     <!-- requestLegacyExternalStorage: on Android 10 only, lets the scan read music files by path
          (scoped storage would hide them); ignored from Android 11, where READ_MEDIA_AUDIO /
          storage permission give path access to media files. -->

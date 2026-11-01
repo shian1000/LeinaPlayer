@@ -6,7 +6,9 @@ import 'package:flutter/widgets.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../data/combined_search.dart';
+import '../data/download_files.dart';
 import '../data/server_downloads.dart';
+import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import 'download_notification.dart';
@@ -188,6 +190,37 @@ class Downloads extends ChangeNotifier {
   int get bytes =>
       _server.totalBytes +
       _youTube.pinnedEntries.fold(0, (sum, e) => sum + e.sizeBytes);
+
+  /// Moves the songs downloaded so far to where downloads go now ([SourceSettings
+  /// .downloadFolder]), named "Artist - Title" in the user's folder; [onProgress] with how many
+  /// are done of how many. Returns how many couldn't be moved — they still play from where they
+  /// are.
+  Future<int> relocate({void Function(int done, int total)? onProgress}) async {
+    final catalog = _tracks.catalog;
+    final byFile = <int, String>{
+      for (final song in catalog?.songs ?? const <CatalogSong>[])
+        if (song.serverFile case final file?)
+          file.id: downloadBaseName(song.artistLabel, song.title),
+    };
+    final videoIds = [for (final e in _youTube.pinnedEntries) e.videoId];
+    final known = await _youTube.knownTitles(videoIds);
+    String? videoName(String videoId) {
+      if (catalog?.findByYouTubeId(videoId) case final song?) {
+        return downloadBaseName(song.artistLabel, song.title);
+      }
+      final seen = known[videoId];
+      return seen == null
+          ? null
+          : downloadBaseName(seen.artist ?? '', seen.title);
+    }
+
+    final total = _server.entries.length + videoIds.length;
+    var done = 0;
+    void moved() => onProgress?.call(++done, total);
+    onProgress?.call(0, total);
+    return await _server.relocate((id) => byFile[id], onMoved: moved) +
+        await _youTube.relocate(videoName, onMoved: moved);
+  }
 
   /// "Usuń wszystkie pobrane": server copies deleted, YouTube audio back in the cache.
   Future<void> removeAll() async {

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
+import '../data/download_files.dart';
 import '../data/outbox.dart';
 import '../data/server_downloads.dart';
 import '../data/song_catalog.dart';
@@ -505,7 +506,7 @@ class TrackPlayer {
       final addresses = await _serverAddresses();
       if (await downloads.download(server, [
         for (final base in addresses) serverFileUri(base, server),
-      ])) {
+      ], name: downloadBaseName(hit.artistLabel, hit.title))) {
         return DownloadOutcome.downloaded;
       }
     }
@@ -557,8 +558,9 @@ class TrackPlayer {
       }
     }
     if (videoId == null) return false;
+    final name = downloadBaseName(hit.artistLabel, hit.title);
     if (youTubeLibrary.isCached(videoId)) {
-      if (pin) await youTubeLibrary.setPinned(videoId, true);
+      if (pin) await youTubeLibrary.setPinned(videoId, true, name: name);
       return true;
     }
     for (final method in settings.activePlaybackMethods.where(
@@ -572,6 +574,7 @@ class TrackPlayer {
           stream.extension,
           settings.cacheKeep,
           pin: pin,
+          name: name,
         )) {
           return true;
         }

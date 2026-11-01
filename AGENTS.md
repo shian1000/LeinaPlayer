@@ -104,7 +104,9 @@ Playback extras: Powtarzaj (off / wszystkie / utwór, `PlaybackQueue.setRepeat`)
 czasowy (song menu), a song's radio (phone-side alikeness by artist, genre — music.db's
 `songs.genre`, [hand-off](docs/handoffs/musicdatabase-genres.md) — moods, language, country,
 decade; `song_radio.dart`), "Pobierz" for a song or playlist (kept offline for good; a queue in
-`local.db` that resumes, under a foreground service — `playback/downloads.dart`), "Ukryj utwór"
+`local.db` that resumes, under a foreground service — `playback/downloads.dart`; in the app's
+storage or a folder the user picked, as "Artist - Title" — Oszczędzanie danych › Miejsce na
+pobrane utwory, `download_files.dart`, [`local-library.md`](docs/agent-notes/local-library.md)), "Ukryj utwór"
 (phone only). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
 Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
@@ -323,7 +325,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   along; scroll the inner controller to `RenderAbstractViewport.getOffsetToReveal` instead.
 - Context menus are `showMenuSheet`: rare options go in `quickEntries` (a small block on top),
   and options with choices of their own unfold in place via `MenuSheetEntry.submenu` rather than
-  opening a second sheet (Juxtopposed's redesign, user's choice).
+  opening a second sheet (Juxtopposed's redesign, user's choice). The sheet closes itself before
+  an entry's `onTap` runs — an `onTap` that pops again takes the screen underneath with it (a
+  black screen, then Back closes the app).
 - Every connection the app makes is listed on Ustawienia › Prywatność i połączenia
   (`privacy_screen.dart`) with why, when and what it sends, and with a way to the switch that
   stops it (or "Tylko gdy sam tego użyjesz") — a new service or a new kind of data sent goes

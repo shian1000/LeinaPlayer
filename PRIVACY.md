@@ -49,6 +49,10 @@ as they appear in it.)
 - On the phone, in the app's data: Android Settings › Apps › Leina Radio › Storage › "Clear
   data" deletes everything (as does uninstalling). The cache alone (songs, covers) is cleared in
   the app: Oszczędzanie danych › Pamięć podręczna.
+- Songs downloaded with "Pobierz" into a folder you picked (Oszczędzanie danych › Miejsce na
+  pobrane utwory) are ordinary files there: other apps on the phone can see them, and they stay
+  after the app is uninstalled. Writing there needs Android's "all files access", asked for only
+  when you pick such a folder.
 - The error log ("Dziennik błędów") — what went wrong in the app over the last 14 days, for
   problem reports — is kept only on the phone, with tokens, passwords, server addresses (IP
   addresses, Tailscale and home-network names), your account name and YouTube's stream

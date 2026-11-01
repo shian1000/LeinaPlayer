@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../data/source_settings.dart';
 import '../theme.dart';
 import 'cache_settings_screen.dart';
+import 'download_folder.dart';
 
-/// "Ustawienia › Oszczędzanie danych i tryb offline": what may use mobile data, and the cache
-/// ([CacheSettingsScreen]).
+/// "Ustawienia › Oszczędzanie danych i tryb offline": what may use mobile data, where downloaded
+/// songs go ([DownloadFolderTile]), and the cache ([CacheSettingsScreen]).
 class DataSaverScreen extends StatelessWidget {
   const DataSaverScreen({super.key});
 
@@ -52,6 +53,7 @@ class DataSaverScreen extends StatelessWidget {
             onChanged: settings.setLyrics,
           ),
           const Divider(height: 24),
+          const DownloadFolderTile(),
           ListTile(
             leading: const Icon(Icons.sd_storage_outlined),
             title: const Text('Pamięć podręczna'),

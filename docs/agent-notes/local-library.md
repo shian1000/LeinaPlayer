@@ -37,6 +37,15 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 - Reading files by path needs READ_EXTERNAL_STORAGE (≤ Android 12; plus
   `requestLegacyExternalStorage` for Android 10) or READ_MEDIA_AUDIO (13+). The screen requests
   both and accepts either.
+- "Pobierz" into a folder the user picked (Oszczędzanie danych › Miejsce na pobrane utwory,
+  user's choice: any folder, files named "Artist - Title", earlier downloads moved along) writes
+  by path, which takes MANAGE_EXTERNAL_STORAGE ("all files access") on Android 11+ and
+  WRITE_EXTERNAL_STORAGE on 10 — asked only when a write probe in the picked folder fails. The
+  partial file is written in the app's own folder and then moved (copy + delete across storage),
+  so the user's folder never shows a half-done song; `MediaScannerConnection` (`scanMedia` on
+  the links channel) tells other music apps. The scan skips that folder (the songs would be
+  there twice, the YouTube ones untagged). A download whose folder is gone (SD card out) keeps
+  its row and comes back when the folder does — only a missing file in a present folder drops it.
 - On the Huawei test phone the user picked the SD card's Music folder
   (`/storage/2023-3514/Music`), not internal `/storage/emulated/0/Music`.
 

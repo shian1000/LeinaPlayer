@@ -54,6 +54,8 @@ class UserBackup extends ChangeNotifier {
     'database_sync.last_source',
     'database_sync.server_empty',
     'local_music.last_scan_ms',
+    // A folder of this phone, which another may not have or not let the app write to.
+    'downloads.folder',
     'updates.last_check_ms',
     'updates.latest',
     'updates.dismissed_build',
