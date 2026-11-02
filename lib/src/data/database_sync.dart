@@ -52,6 +52,7 @@ class DatabaseSync extends ChangeNotifier {
   static const _gitHubRepoKey = 'database_sync.github_repo';
   static const _gitHubOnKey = 'database_sync.github_on';
   static const _serverEmptyKey = 'database_sync.server_empty';
+  static const _catalogAsOfKey = 'database_sync.catalog_as_of_ms';
 
   /// The owner's public catalog, filled in on every phone until changed or switched off — public,
   /// shared data, not anyone's private setting (ADR 0014).
@@ -80,6 +81,7 @@ class DatabaseSync extends ChangeNotifier {
   bool _gitHubChosen = true;
   DateTime? _lastSync;
   DatabaseSource? _lastSource;
+  DateTime? _catalogAsOf;
   bool _downloading = false;
   bool _serverEmpty = false;
   String? _lastError;
@@ -139,6 +141,13 @@ class DatabaseSync extends ChangeNotifier {
     _lastSource = DatabaseSource.values
         .where((s) => s.name == prefs.getString(_lastSourceKey))
         .firstOrNull;
+    final asOf = prefs.getInt(_catalogAsOfKey);
+    // Copies downloaded before the key existed: a server's is as fresh as its download.
+    _catalogAsOf = asOf != null
+        ? DateTime.fromMillisecondsSinceEpoch(asOf, isUtc: true)
+        : _lastSource == DatabaseSource.github
+        ? null
+        : _lastSync?.toUtc();
     notifyListeners();
   }
 
@@ -341,7 +350,8 @@ class DatabaseSync extends ChangeNotifier {
   /// Downloads all files; returns whether it succeeded. The previous copy stays in place
   /// until all new files have arrived and look like SQLite databases, so a half-finished
   /// download never leaves the files out of step with each other. A server comes first (always
-  /// the freshest); GitHub only when no server is set or none answers.
+  /// the freshest); GitHub only when no server is set or none answers, and only a publish not
+  /// older than the copy here.
   ///
   /// A server whose `music.db` has no songs (MusicDatabase started "with an empty database")
   /// doesn't replace a copy that has some unless [acceptEmptyServer]: it is passed over like a
@@ -363,8 +373,9 @@ class DatabaseSync extends ChangeNotifier {
       Object? serverFailure;
       for (final (source, url) in attempts) {
         try {
+          final asOf = _now().toUtc();
           await _downloadAll(url, acceptEmpty: acceptEmptyServer);
-          await _succeeded(source);
+          await _succeeded(source, asOf);
           return true;
         } on _EmptyServer {
           _serverEmpty = true;
@@ -378,8 +389,8 @@ class DatabaseSync extends ChangeNotifier {
         throw serverFailure!;
       }
       try {
-        await _downloadFromGitHub(_gitHubRepo);
-        await _succeeded(DatabaseSource.github);
+        final (:older, :publishedAt) = await _downloadFromGitHub(_gitHubRepo);
+        if (!older) await _succeeded(DatabaseSource.github, publishedAt);
         return true;
       } catch (e) {
         _lastError = [
@@ -427,12 +438,20 @@ class DatabaseSync extends ChangeNotifier {
     }
   }
 
-  Future<void> _succeeded(DatabaseSource source) async {
+  /// [asOf]: the moment the new copy shows MusicDatabase as of, so an older GitHub publish
+  /// never replaces it.
+  Future<void> _succeeded(DatabaseSource source, DateTime? asOf) async {
     _lastSync = _now();
     _lastSource = source;
+    _catalogAsOf = asOf;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_lastSyncKey, _lastSync!.millisecondsSinceEpoch);
     await prefs.setString(_lastSourceKey, source.name);
+    if (asOf == null) {
+      await prefs.remove(_catalogAsOfKey);
+    } else {
+      await prefs.setInt(_catalogAsOfKey, asOf.millisecondsSinceEpoch);
+    }
   }
 
   /// The addresses to try now, best first: the local one on the home Wi-Fi, then the remote one.
@@ -501,15 +520,26 @@ class DatabaseSync extends ChangeNotifier {
   /// any file is swapped, so the pair stays consistent even when a publish is under way (a file
   /// briefly missing, or already newer than `version.json`). `files.db` is left as it is: it only
   /// comes from a server, and is still right for that server's files.
-  Future<void> _downloadFromGitHub(String repo) async {
+  ///
+  /// Returns `version.json`'s `published_at`, and whether that publish is [older] than the
+  /// phone's copy — one a server gave after it (the server was switched off since). Then
+  /// nothing is downloaded: the phone keeps its copy, and the attempt doesn't count as today's
+  /// download, so a server back later still gets asked.
+  Future<({bool older, DateTime? publishedAt})> _downloadFromGitHub(
+    String repo,
+  ) async {
     final base = _gitHubRelease(repo);
     final parts = <String, File>{};
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15);
     try {
-      final version = _parseVersion(
+      final (version, publishedAt) = _parseVersion(
         await _fetchBytes(client, base.resolve('version.json'), 'version.json'),
       );
+      final asOf = _catalogAsOf;
+      if (publishedAt != null && asOf != null && publishedAt.isBefore(asOf)) {
+        return (older: true, publishedAt: publishedAt);
+      }
       final dir = await databaseDirectory();
       for (final name in gitHubFileNames) {
         final (size, hash) = version[name]!;
@@ -534,6 +564,7 @@ class DatabaseSync extends ChangeNotifier {
       for (final MapEntry(key: name, value: part) in parts.entries) {
         await part.rename('${dir.path}/$name');
       }
+      return (older: false, publishedAt: publishedAt);
     } catch (_) {
       for (final part in parts.values) {
         if (await part.exists()) await part.delete();
@@ -544,9 +575,12 @@ class DatabaseSync extends ChangeNotifier {
     }
   }
 
-  /// Each published file's size and SHA-256 from `version.json`. Keys it doesn't know (e.g.
-  /// `content_sha256`) are ignored; another `format` is a layout this app doesn't know.
-  static Map<String, (int, String)> _parseVersion(List<int> bytes) {
+  /// Each published file's size and SHA-256 from `version.json`, and when it was published.
+  /// Keys it doesn't know (e.g. `content_sha256`) are ignored; another `format` is a layout this
+  /// app doesn't know.
+  static (Map<String, (int, String)>, DateTime?) _parseVersion(
+    List<int> bytes,
+  ) {
     final Object? json;
     try {
       json = jsonDecode(utf8.decode(bytes));
@@ -558,16 +592,21 @@ class DatabaseSync extends ChangeNotifier {
         'nieznany format bazy — zostaje obecna kopia (zaktualizuj aplikację)',
       );
     }
-    final files = json['files'];
-    return {
+    final listed = json['files'];
+    final published = json['published_at'];
+    final files = {
       for (final name in gitHubFileNames)
-        name: switch (files is Map ? files[name] : null) {
+        name: switch (listed is Map ? listed[name] : null) {
           {'size': final int size, 'sha256': final String hash}
               when RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hash) =>
             (size, hash.toLowerCase()),
           _ => throw _SyncFailure('version.json nie opisuje $name'),
         },
     };
+    return (
+      files,
+      published is String ? DateTime.tryParse(published)?.toUtc() : null,
+    );
   }
 
   static Future<String> _sha256Of(File file) async =>

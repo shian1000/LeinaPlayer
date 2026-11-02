@@ -69,6 +69,11 @@ Two **additional** ways of talking to MusicDatabase. They replace nothing: the H
   phone's copy has some: the phone keeps it (or takes GitHub's), and Ustawienia › Serwer says
   "Serwer udostępnia pustą bazę" with "Użyj pustej" to take it after all (sharing checklist
   4.2b, 2026-10-23).
+- **Never an older copy (2026-11-02, owner's request):** the phone remembers what moment its
+  copy shows MusicDatabase as of — a server's download time, GitHub's `published_at` — and
+  doesn't take a GitHub publish older than it (a server downloaded from before midnight, then
+  switched off). That check isn't counted as the day's download, so a server back later that
+  day is still asked.
 
 ### 2. Request packages
 

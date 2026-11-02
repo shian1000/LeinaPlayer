@@ -167,7 +167,7 @@ phone (`library_folders.dart`), not synced. Liked songs and songs saved "Na pó�
 time ([ADR 0013](docs/decisions/0013-saved-songs-sync.md); server side in a
 [hand-off](docs/handoffs/musicdatabase-saved-songs.md)). Without a server: the catalog also comes from a GitHub
 Release (`https://github.com/<owner>/<repo>/releases/download/database/` — `version.json` +
-`music.db` / `tag.db`; a server first, GitHub second; default repo `shian1000/LeinaMusicDatabase`)
+`music.db` / `tag.db`; a server first, GitHub second, never a publish older than the phone's copy; default repo `shian1000/LeinaMusicDatabase`)
 and the outbox's files go as a `.zip` package through the share sheet, counting as sent
 ([ADR 0014](docs/decisions/0014-github-database-and-request-packages.md); the contract is
 MusicDatabase's `docs/handoffs/public-database-for-musicdatabaseapp.md`).

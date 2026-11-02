@@ -561,6 +561,61 @@ void main() {
       );
     });
 
+    test(
+      'an older publish does not replace a newer copy from the server',
+      () async {
+        final sync = newSync();
+        await sync.load();
+        await sync.setRemoteUrl('127.0.0.1:${server.port}');
+        now = DateTime(2026, 10, 21, 23, 50);
+        expect(await sync.syncNow(), isTrue);
+
+        // The server is switched off; after midnight GitHub still has the morning's publish.
+        await server.close(force: true);
+        now = DateTime(2026, 10, 22, 0, 5);
+        final restarted = newSync();
+        await restarted.load();
+        await restarted.syncIfDue();
+        expect(restarted.lastError, isNull);
+        expect(gitHubRequests, ['version.json']);
+        expect(await localBytes(restarted, 'tag.db'), _sqlite);
+        expect(restarted.lastSource, DatabaseSource.remote);
+        expect(
+          restarted.lastSync!.isAtSameMomentAs(DateTime(2026, 10, 21, 23, 50)),
+          isTrue,
+          reason: 'not counted as today\'s download',
+        );
+
+        version = {
+          ...describe(released),
+          'published_at': '2026-10-22T08:00:00Z',
+        };
+        now = DateTime(2026, 10, 22, 9);
+        await restarted.syncIfDue();
+        expect(restarted.lastSource, DatabaseSource.github);
+        expect(await localBytes(restarted, 'tag.db'), released['tag.db']);
+      },
+    );
+
+    test(
+      'a copy from before the date was kept counts from its download',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'database_sync.last_sync_ms': DateTime.utc(
+            2026,
+            10,
+            22,
+          ).millisecondsSinceEpoch,
+          'database_sync.last_source': 'remote',
+        });
+        final sync = newSync();
+        await sync.load();
+        expect(await sync.syncNow(), isTrue);
+        expect(gitHubRequests, ['version.json']);
+        expect(sync.lastSource, DatabaseSource.remote);
+      },
+    );
+
     test('both failing report both', () async {
       final sync = newSync();
       await sync.load();
