@@ -112,6 +112,10 @@ class SourceSettings extends ChangeNotifier {
   static const _lyricsKey = 'data_saver.lyrics';
   static const _crossfadeKey = 'playback.crossfade_seconds';
   static const _swipePlaysNextKey = 'playback.swipe_right_plays_next';
+  static const _levelingKey = 'playback.volume_leveling';
+  static const _levelingPercentKey = 'playback.volume_leveling_percent';
+  static const _levelingMeasureKey = 'playback.volume_leveling_measure';
+  static const defaultLevelingPercent = 50;
   static const downloadFolderKey = 'downloads.folder';
 
   /// The longest "Przenikanie utworów", as in the reference app.
@@ -142,6 +146,9 @@ class SourceSettings extends ChangeNotifier {
   bool _lyrics = true;
   int _crossfadeSeconds = 0;
   bool _swipePlaysNext = true;
+  bool _leveling = false;
+  int _levelingPercent = defaultLevelingPercent;
+  bool _levelingMeasure = true;
   String? _downloadFolder;
 
   /// "Włącz szukanie w serwisie YouTube".
@@ -223,6 +230,22 @@ class SourceSettings extends ChangeNotifier {
   /// następny" (true, the default) or "Dodaj do kolejki".
   bool get swipePlaysNext => _swipePlaysNext;
 
+  /// "Wyrównywanie głośności" (Ustawienia › Odtwarzanie).
+  bool get leveling => _leveling;
+
+  /// How strongly songs are pulled to the same loudness, 10–100 %.
+  int get levelingPercent => _levelingPercent;
+
+  /// "Mierz głośność na telefonie": the phone measures the loudness of songs it has whole when
+  /// nothing else knows it (`LoudnessMeasurer`); off, those go through the compressor.
+  bool get levelingMeasure => _levelingMeasure;
+
+  /// Whether the phone measures loudness right now.
+  bool get activeLevelingMeasure => _leveling && _levelingMeasure;
+
+  /// The leveling's strength now, 0–1; `null` while it's off.
+  double? get activeLeveling => _leveling ? _levelingPercent / 100 : null;
+
   /// Where "Pobierz" puts songs (Oszczędzanie danych i tryb offline): a folder the user picked,
   /// `null` for the app's own storage (the default — nobody else sees it).
   String? get downloadFolder => _downloadFolder;
@@ -299,6 +322,10 @@ class SourceSettings extends ChangeNotifier {
     _crossfadeSeconds = (prefs.getInt(_crossfadeKey) ?? _crossfadeSeconds)
         .clamp(0, maxCrossfadeSeconds);
     _swipePlaysNext = prefs.getBool(_swipePlaysNextKey) ?? _swipePlaysNext;
+    _leveling = prefs.getBool(_levelingKey) ?? _leveling;
+    _levelingPercent = (prefs.getInt(_levelingPercentKey) ?? _levelingPercent)
+        .clamp(10, 100);
+    _levelingMeasure = prefs.getBool(_levelingMeasureKey) ?? _levelingMeasure;
     _downloadFolder = prefs.getString(downloadFolderKey);
     _playbackMethodOrder = _withAll(
       YouTubePlaybackMethod.values,
@@ -474,6 +501,30 @@ class SourceSettings extends ChangeNotifier {
     await (await SharedPreferences.getInstance()).setBool(
       _swipePlaysNextKey,
       value,
+    );
+  }
+
+  Future<void> setLeveling(bool value) async {
+    _leveling = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(_levelingKey, value);
+  }
+
+  Future<void> setLevelingMeasure(bool value) async {
+    _levelingMeasure = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _levelingMeasureKey,
+      value,
+    );
+  }
+
+  Future<void> setLevelingPercent(int percent) async {
+    _levelingPercent = percent.clamp(10, 100);
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setInt(
+      _levelingPercentKey,
+      _levelingPercent,
     );
   }
 

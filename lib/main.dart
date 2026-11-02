@@ -19,6 +19,7 @@ import 'src/data/later_links.dart';
 import 'src/data/library_folders.dart';
 import 'src/data/listening_log.dart';
 import 'src/data/local_library.dart';
+import 'src/data/recordings.dart';
 import 'src/data/account.dart';
 import 'src/data/mood_filter.dart';
 import 'src/data/moods.dart';
@@ -44,6 +45,8 @@ import 'src/playback/playback_queue.dart';
 import 'src/playback/player_controller.dart';
 import 'src/playback/queue_session.dart';
 import 'src/playback/track_player.dart';
+import 'src/playback/loudness_measurer.dart';
+import 'src/playback/volume_leveling.dart';
 import 'src/screens/app_shell.dart';
 import 'src/screens/home_screen.dart';
 import 'src/theme.dart';
@@ -169,9 +172,68 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         background: _themeController.monochromeBackground,
       ),
       _coverLook,
+      (player, track) async => _leveling?.trackLoading(player, track),
     ),
   );
   final _sourceSettings = SourceSettings();
+  late final _recordings = Recordings(_localLibrary.database);
+  late final _measurer = LoudnessMeasurer(_recordings, _measurableFiles);
+  late final _leveling = switch (widget.mediaSession?.players) {
+    final players? => VolumeLeveling(
+      [
+        players.$1.androidAudioSessionIdStream,
+        players.$2.androidAudioSessionIdStream,
+      ],
+      (track) async => switch (_recordingOf(track)) {
+        final key? => _recordings.loudness(key),
+        null => null,
+      },
+    ),
+    null => null,
+  };
+
+  static RecordingKey? _recordingOf(NowPlaying track) => Recordings.keyOf(
+    serverFileId: track.serverFileId,
+    youtubeVideoId: track.youtubeVideoId,
+    path: track.isStream ? null : track.source,
+  );
+
+  /// What the loudness measurer may measure: the YouTube cache newest first (the queue's next
+  /// songs), downloads, then the scanned phone files.
+  Future<List<MeasurableFile>> _measurableFiles() async => [
+    for (final e in [
+      ..._youTubeLibrary.cacheEntries,
+      ..._youTubeLibrary.pinnedEntries,
+    ])
+      (key: (RecordingSource.youtube, e.videoId), path: e.file.path),
+    for (final e in _serverDownloads.entries)
+      (key: (RecordingSource.server, '${e.fileId}'), path: e.file.path),
+    for (final path in await _localLibrary.filePaths())
+      (key: (RecordingSource.file, path), path: path),
+  ];
+
+  List<Listenable> get _measuredSources => [
+    _youTubeLibrary,
+    _serverDownloads,
+    _localLibrary,
+  ];
+
+  RecordingKey? _durationSaved;
+
+  /// A played recording's length, as the player found it.
+  void _rememberDuration() {
+    final track = _player.current;
+    final duration = _player.duration;
+    if (track == null || duration == null || duration <= Duration.zero) return;
+    final key = _recordingOf(track);
+    if (key == null || key == _durationSaved) return;
+    _durationSaved = key;
+    _recordings
+        .saveDuration(key, duration)
+        .catchError(
+          (Object e) => debugPrint('Saving a recording\'s length failed: $e'),
+        );
+  }
 
   /// The cover filter and its colour: the notification's cover is made again when they change.
   final _coverLook = ValueNotifier('');
@@ -208,6 +270,12 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
 
   void _updateCrossfade() =>
       _player.crossfade = Duration(seconds: _sourceSettings.crossfadeSeconds);
+
+  void _updateLeveling() {
+    _leveling?.strength = _sourceSettings.activeLeveling;
+    _measurer.enabled =
+        _leveling != null && _sourceSettings.activeLevelingMeasure;
+  }
 
   /// Takes effect from the next song the notification shows.
   void _updateNotificationNames() =>
@@ -367,6 +435,11 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       (Object e) => debugPrint('Loading music source settings failed: $e'),
     );
     _sourceSettings.addListener(_updateCrossfade);
+    _sourceSettings.addListener(_updateLeveling);
+    for (final source in _measuredSources) {
+      source.addListener(_measurer.schedule);
+    }
+    _player.addListener(_rememberDuration);
     final localLoaded = _localLibrary.load().catchError(
       (Object e) => debugPrint('Loading local library failed: $e'),
     );
@@ -807,9 +880,16 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _homeLayout.dispose();
     _playbackQueue.dispose();
     _downloads.dispose();
+    for (final source in _measuredSources) {
+      source.removeListener(_measurer.schedule);
+    }
+    _measurer.dispose();
+    _player.removeListener(_rememberDuration);
     _serverDownloads.dispose();
     _moodFilter.dispose();
     _sourceSettings.removeListener(_updateCrossfade);
+    _sourceSettings.removeListener(_updateLeveling);
+    _leveling?.dispose();
     _player.dispose();
     _sourceSettings.dispose();
     _albumCovers.dispose();

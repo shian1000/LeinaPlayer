@@ -102,13 +102,17 @@ const _sections = <(String, List<_SettingsEntry>)>[
       _SettingsEntry(
         Icons.volume_up_outlined,
         'Odtwarzanie',
-        'Kolejność źródeł • Sposoby odtwarzania YouTube • Przenikanie',
+        'Kolejność źródeł • Sposoby odtwarzania YouTube • Przenikanie • '
+            'Wyrównywanie głośności',
         _openPlayback,
         keywords: [
           'Kolejność odtwarzania',
           'Źródła',
           'Przejścia między utworami',
           'Przenikanie utworów',
+          'Wyrównywanie głośności',
+          'Normalizacja głośności',
+          'Mierz głośność na telefonie',
         ],
       ),
       _SettingsEntry(

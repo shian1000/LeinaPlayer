@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'download_files.dart';
+import 'recordings.dart';
 import 'playlist_sync.dart';
 import 'song_catalog.dart';
 import 'text_normalizer.dart';
@@ -179,7 +180,7 @@ class LocalLibrary extends ChangeNotifier {
   final String? Function() _downloadFolder;
 
   /// `local.db`'s version; a backup from a newer one isn't restored (`user_backup.dart`).
-  static const schemaVersion = 20;
+  static const schemaVersion = 22;
 
   static const _foldersKey = 'local_music.folders';
   static const _lastScanKey = 'local_music.last_scan_ms';
@@ -288,6 +289,7 @@ class LocalLibrary extends ChangeNotifier {
           await _addDownloadTables(db);
           await _createDownloadQueueTable(db);
           await _addAddedTrackColumn(db);
+          await _createRecordingsTable(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -309,9 +311,30 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 18) await _addDownloadTables(db);
           if (from < 19) await _createDownloadQueueTable(db);
           if (from < 20) await _addAddedTrackColumn(db);
+          if (from < 22) await _createRecordingsTable(db);
         },
       ),
     );
+  }
+
+  /// Version 22: what the phone found out about each recording (`recordings.dart`) — its
+  /// loudness for "Wyrównywanie głośności" and length — keyed by the recording: `source` is a
+  /// [RecordingSource] name, `key` a phone file's path, a `files.id` or a YouTube video id.
+  /// `loudness_method` null = not looked for yet; `lufs` null = not known. Version 21, a test
+  /// build only, had the loudness alone as `loudness`.
+  static Future<void> _createRecordingsTable(Database db) async {
+    await db.execute('DROP TABLE IF EXISTS loudness');
+    await db.execute('''
+      CREATE TABLE recordings (
+        source VARCHAR NOT NULL,
+        key VARCHAR NOT NULL,
+        lufs REAL,
+        peak_db REAL,
+        loudness_method VARCHAR,
+        measured_at INTEGER,
+        duration_ms INTEGER,
+        PRIMARY KEY (source, key)
+      )''');
   }
 
   /// Version 20: a track the user added to an imported playlist by hand, kept when the
@@ -718,6 +741,15 @@ class LocalLibrary extends ChangeNotifier {
     ];
   }
 
+  /// Every scanned file's path.
+  Future<List<String>> filePaths() async => [
+    for (final row in await (await database()).query(
+      'local_songs',
+      columns: ['file_path'],
+    ))
+      row['file_path']! as String,
+  ];
+
   Future<List<LocalSong>> pendingSongs() async {
     final rows = await (await database()).query(
       'local_songs',
@@ -763,6 +795,7 @@ class LocalLibrary extends ChangeNotifier {
           row['file_path']! as String,
       };
 
+      final recordings = Recordings(database, now: _now);
       final gone = known.difference(files);
       for (final path in gone) {
         await db.delete(
@@ -770,13 +803,22 @@ class LocalLibrary extends ChangeNotifier {
           where: 'file_path = ?',
           whereArgs: [path],
         );
+        await recordings.forget((RecordingSource.file, path));
       }
 
       final newPaths = (files.difference(known).toList()..sort());
+      final unlooked = files.difference(await recordings.tagsRead()).toList()
+        ..sort();
       // Tag parsing is synchronous; keep it off the UI thread on the old phone.
-      final infos = await Isolate.run(
-        () => [for (final path in newPaths) readFileSongInfo(path)],
+      final (infos, loudness) = await Isolate.run(
+        () => (
+          [for (final path in newPaths) readFileSongInfo(path)],
+          [for (final path in unlooked) readFileLoudness(path)],
+        ),
       );
+      await recordings.saveTags({
+        for (final (i, path) in unlooked.indexed) path: loudness[i],
+      });
       final now = _now().millisecondsSinceEpoch;
       var newPending = 0;
       final batch = db.batch();

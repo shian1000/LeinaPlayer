@@ -338,6 +338,15 @@ import, Wyświetlanie, Dane, Aplikacja.
   next queue song starts that long before the current one ends, one fading out as the other
   fades in; only when the queue moves on by itself ("Następny" and tapped songs switch at
   once). See [`agent-notes/local-library.md`](agent-notes/local-library.md). Section
+  *Głośność*: "Wyrównywanie głośności" (switch, default off; "Ten telefon tego nie obsługuje"
+  and disabled without Android's DynamicsProcessing) and "Intensywność" — slider 10–100 %
+  (10 % steps, default 50 %, "Łagodnie"–"Mocno", enabled only with the switch on): how strongly
+  loud and quiet songs are pulled to one loudness, every source and crossfades included; a
+  recording of known loudness (measured by the phone, or ReplayGain tags) gets a steady gain,
+  others the compressor (`volume_leveling.dart`, `recordings.dart`, `loudness_measurer.dart`,
+  `VolumeLeveling.kt`, `LoudnessMeter.kt`). Then "Mierz głośność na telefonie" (switch, default
+  on, enabled only with leveling on; "Gdy nie ma jej w bazie ani w tagach pliku") with a note on
+  what it measures, when, and what it costs (`SourceSettings.levelingMeasure`). Section
   *Przeciągnięcie utworu w prawo*: Odtwórz jako następny (default) / Dodaj do kolejki (na sam
   koniec) — what dragging a song row right does (also in Kolejka: play next / move to the end).
 - Muzyka na telefonie **→ Muzyka na telefonie** (`local_music_screen.dart`) — **implemented**:

@@ -37,7 +37,10 @@ saved "Na później", each entry remembering the playlist it was queued from, sh
 screen with reordering and swipe-to-remove, caching the next songs ahead; remembered across
 restarts, and so is the queue of several songs that playing something else replaced, brought
 back by Kolejka's "Przywróć poprzednią kolejkę"), crossfading into the next song (Ustawienia ›
-Odtwarzanie, 0–12 s), dragging a song row right to play it next or add it to the queue (as
+Odtwarzanie, 0–12 s), volume leveling there too (Android's DynamicsProcessing on both
+players, on/off and a strength: a steady gain for a recording of known loudness — ReplayGain
+tags or the phone's own EBU R128 measurement of files it has whole, kept per recording, never
+per song — a compressor for the rest; [`local-library.md`](docs/agent-notes/local-library.md)), dragging a song row right to play it next or add it to the queue (as
 set in Odtwarzanie) and left to take it out of a playlist / mood / Na później, and a
 media notification with previous/next (keeps playing in the background); scrolled down, the full
 player shows everything music.db / tag.db / the phone know about the song (all of it for now,
@@ -241,13 +244,13 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   listened time, synced (`listening_log.dart`), and what's computed from them
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
-  (`network_errors.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
+  (`network_errors.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
   port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
   (the queue and position saved across restarts), `Downloads` ("Pobierz": songs and playlists kept on the phone for good), `YouTubePlayback` (the user's ordered ways
-  of playing a YouTube video) and `ListeningTracker` (the listened time of each play, from
+  of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) and `ListeningTracker` (the listened time of each play, from
   `PlayerController.positionChanges`, for the stats). Never pause between songs — see
   [`local-library.md`](docs/agent-notes/local-library.md) (Android 12+ freezes the app).
 - `lib/src/theme.dart`, `lib/src/theme_controller.dart` — themes and the appearance settings.
@@ -260,7 +263,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
   incoming YouTube/Spotify links and opening the YouTube app by package),
   `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links, "Jak odtworzyć?" for shared ones), `LinkTargets.kt`,
-  `LaterLinks.kt` (links saved for later), `DownloadService.kt` (the "Pobieranie utworów"
+  `LaterLinks.kt` (links saved for later), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `assets/fonts/rajdhani/` — the Cyberpunk theme's font (OFL, licence in `OFL.txt`).
@@ -356,6 +359,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - No dummy elements: a feature is built or its button is left out (user's decision; the old
   `showDummy` / `Atrapa:` snackbar is gone). A `MenuSheetEntry` needs an `onTap` unless it has a
   `submenu`.
+- `local.db` code can't use UPSERT (`INSERT … ON CONFLICT … DO UPDATE`): Android 10's SQLite
+  is 3.22, older than it. Update, then insert with `ConflictAlgorithm.ignore`
+  (`Recordings._putIn`); `ConflictAlgorithm.replace` would wipe the row's other columns.
 - An in-flight map of futures (`_downloads[id] ??= work().whenComplete(...)`) must remove the
   entry in a block, `() { map.remove(id); }`: `() => map.remove(id)` returns that very future,
   which `whenComplete` then waits for — the download hangs forever.

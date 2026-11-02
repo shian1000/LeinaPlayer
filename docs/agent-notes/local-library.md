@@ -103,6 +103,51 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   fade: every user pick (`_play` with `allowExternal`) calls `cancelFade` and switches at once;
   a pause ends a fade (old song stops). Checked on the Huawei: `dumpsys audio` shows two
   started AudioTracks of the app for the fade, then one.
+- "Wyrównywanie głośności" (Ustawienia › Odtwarzanie, `SourceSettings.leveling` /
+  `levelingPercent`, 10–100 %): `VolumeLeveling` follows both players'
+  `androidAudioSessionIdStream` and puts Android's `DynamicsProcessing` on each session
+  (`VolumeLeveling.kt`, Android 9+): a one-band compressor (threshold −10 → −30 dB, ratio 1 → 4
+  with the strength, slow 30 / 600 ms so it follows a song's loudness rather than each beat),
+  make-up gain, and a limiter at −1 dB. Done in the audio framework, not in Dart, so it costs
+  next to nothing and covers every source and both crossfading players without touching
+  `setVolume`. The values were picked on paper, then sounded right to the user at 50 %.
+  A recording whose loudness is known gets a steady gain instead, with the compressor off
+  (input gain of the same effect, so cuts and boosts both work; the limiter stays):
+  `Loudness.gainDb` = strength × (−14 LUFS − its loudness), held back so the peak goes at most
+  6 dB over full scale, within −15…+10 dB. Loudness is kept per recording, never per song —
+  each is mastered differently: `local.db`'s `recordings` table (`recordings.dart`) keyed by
+  (`source`, `key`) — a server `files.id`, else a YouTube video id (also when it plays from the
+  cache or a download), else a phone file's path (`Recordings.keyOf`). It also keeps the
+  recording's length (`duration_ms`: from the measurement, or from the player when a song
+  loads — `_rememberDuration` in `main.dart`); rows are filled column by column with
+  update-then-insert-ignore, as Android 10's SQLite (3.22) has no UPSERT. `loudness_method`:
+  null = not looked at, `none` = tags read, nothing there (still to be measured), `replayGain`,
+  `analysis`, `failed` (not retried). Sources, in order:
+  - the music scan reads ReplayGain tags (ID3 TXXX, Vorbis comments, APE, Opus
+    `R128_TRACK_GAIN`; ReplayGain 2.0's −18 LUFS reference; not M4A — audio_metadata_reader
+    skips MP4 freeform atoms), each phone file once;
+  - `LoudnessMeasurer` measures everything else the phone has whole — the YouTube cache newest
+    first (so the queue's songs cached ahead are measured before they play), downloads, scanned
+    files — one at a time, only while leveling and "Mierz głośność na telefonie"
+    (`SourceSettings.activeLevelingMeasure`, default on) are on, woken by YouTubeLibrary /
+    ServerDownloads / LocalLibrary changes. `LoudnessMeter.kt` decodes with MediaCodec on a
+    background-priority thread and computes EBU R128 integrated loudness (BS.1770 K-weighting
+    re-derived per sample rate as libebur128 does, 400 ms blocks, −70 LUFS and −10 LU gates),
+    the sample peak and the length; checked against ffmpeg's `ebur128` within 0.02 LU at 44.1
+    and 48 kHz (60 s of pink noise in ~130 ms on the computer). The meter's inner loop keeps
+    the filter state in locals and reads samples in bulk — per-sample calls and array/field
+    access were 4× slower interpreted (ART runs it interpreted until JIT kicks in). On the
+    Huawei (Android 10) a 3–4 min YouTube song (webm/Opus) takes ~25–33 s while music plays,
+    the meter only 1–2.5 s of it: the rest is MediaCodec (an IPC round per small Opus packet),
+    not helped by feeding / draining the codec without waits. Fine in practice — songs cached
+    ahead are measured long before they play — but a first pass over a big cache takes a while.
+  A stream played the first time (not cached ahead) has no value yet and gets the compressor;
+  it's measured once it's cached. The gain is set by `JustAudioBackend`'s `onLoading` before a
+  song loads on its player, so each of two crossfading songs has its own; a value found while a
+  song plays waits for its next play (no jump mid-song). Not in the backup (paths are the
+  phone's — `_cacheTables`). Planned: YouTube's own `loudnessDb` for first plays (if NewPipe
+  exposes it), later MusicDatabase's values per `files.id` / `video_id` (they'd win, ADR 0003);
+  the lengths aren't shown anywhere yet (`playlistTrackLength` could fall back to them).
 - No connection while moving on by itself (`PlayOutcome.offline`, from `isNetworkError` in
   `network_errors.dart`): the queue tries the same song again after 5, 15 and 30 s
   (`PlaybackQueue.offlineRetries`) instead of skipping it — it used to race through dozens of

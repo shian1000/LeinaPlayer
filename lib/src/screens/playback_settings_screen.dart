@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/hidden_songs.dart';
 import '../data/source_settings.dart';
+import '../playback/volume_leveling.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'hidden_songs_screen.dart';
@@ -9,7 +10,8 @@ import 'playback_order_screen.dart';
 import 'youtube_playback_screen.dart';
 
 /// "Ustawienia › Odtwarzanie": which source plays a song, the ways of playing YouTube,
-/// "Przenikanie utworów", and what dragging a song row to the right does.
+/// "Przenikanie utworów", "Wyrównywanie głośności", and what dragging a song row to the right
+/// does.
 class PlaybackSettingsScreen extends StatefulWidget {
   const PlaybackSettingsScreen({super.key});
 
@@ -20,6 +22,9 @@ class PlaybackSettingsScreen extends StatefulWidget {
 class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
   /// The slider while it's dragged; saved on release.
   int? _dragged;
+  int? _draggedLeveling;
+
+  final _levelingSupported = VolumeLeveling.isSupported();
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +142,12 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
               ),
             ),
           ),
+          const SectionTitle('Głośność'),
+          FutureBuilder(
+            future: _levelingSupported,
+            builder: (context, snapshot) =>
+                _leveling(settings, supported: snapshot.data ?? true),
+          ),
           const SectionTitle('Przeciągnięcie utworu w prawo'),
           RadioGroup<bool>(
             groupValue: settings.swipePlaysNext,
@@ -173,6 +184,94 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _leveling(SourceSettings settings, {required bool supported}) {
+    final palette = context.palette;
+    final percent = _draggedLeveling ?? settings.levelingPercent;
+    final on = supported && settings.leveling;
+    return Column(
+      children: [
+        SwitchListTile(
+          secondary: const Icon(Icons.equalizer),
+          title: const Text('Wyrównywanie głośności'),
+          subtitle: Text(
+            supported
+                ? 'Głośne i ciche utwory grają podobnie głośno'
+                : 'Ten telefon tego nie obsługuje',
+          ),
+          value: on,
+          onChanged: supported ? settings.setLeveling : null,
+        ),
+        ListTile(
+          enabled: on,
+          leading: const Icon(Icons.tune),
+          title: const Text('Intensywność'),
+          subtitle: Text('$percent%'),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              _Edge('Łagodnie'),
+              Expanded(
+                child: Slider(
+                  value: percent.toDouble(),
+                  min: 10,
+                  max: 100,
+                  divisions: 9,
+                  label: '$percent%',
+                  onChanged: on
+                      ? (v) => setState(() => _draggedLeveling = v.round())
+                      : null,
+                  onChangeEnd: (v) async {
+                    await settings.setLevelingPercent(v.round());
+                    if (mounted) setState(() => _draggedLeveling = null);
+                  },
+                ),
+              ),
+              _Edge('Mocno'),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Text(
+            'Jak mocno przybliżać utwory do jednej głośności: głośniejsze są ściszane, '
+            'cichsze podgłaśniane, a ogranicznik nie pozwala im przesterować. Utwór o znanej '
+            'głośności dostaje stałe wzmocnienie i brzmi jak w oryginale, tylko ciszej lub '
+            'głośniej; pozostałe wyrównuje na bieżąco kompresor. Działa dla każdego źródła, '
+            'także przy przenikaniu.',
+            style: TextStyle(
+              color: palette.textSecondary,
+              fontSize: AppFontSize.small,
+            ),
+          ),
+        ),
+        SwitchListTile(
+          secondary: const Icon(Icons.graphic_eq),
+          title: const Text('Mierz głośność na telefonie'),
+          subtitle: const Text('Gdy nie ma jej w bazie ani w tagach pliku'),
+          value: on && settings.levelingMeasure,
+          onChanged: on ? settings.setLevelingMeasure : null,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Text(
+            'Telefon raz przesłuchuje w tle każdy utwór, który ma w całości (pliki na '
+            'telefonie, pobrane, zapisane w pamięci podręcznej — także następne z kolejki), '
+            'i zapamiętuje jego głośność, żeby grał ze stałym wzmocnieniem zamiast przez '
+            'kompresor. Utwór słuchany pierwszy raz bez zapisu mierzony jest, gdy trafi do '
+            'pamięci podręcznej. Zajmuje to od kilku do ok. 30 sekund pracy telefonu na '
+            'utwór; wyłączone — niezmierzone utwory wyrównuje kompresor.',
+            style: TextStyle(
+              color: palette.textSecondary,
+              fontSize: AppFontSize.small,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

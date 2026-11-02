@@ -65,12 +65,14 @@ class UserBackup extends ChangeNotifier {
   static bool _kept(String key) =>
       keptKeys.contains(key) || key.startsWith('backup.');
 
-  /// Rows that point at files left out of the backup (they'd be missing after a restore).
+  /// Rows that point at files left out of the backup (they'd be missing after a restore), and
+  /// `recordings`, found out again from the files (its paths are this phone's).
   static const _cacheTables = [
     'cover_cache',
     'youtube_cache',
     'server_downloads',
     'download_queue',
+    'recordings',
   ];
 
   final Future<Directory> Function() _storageRoot;

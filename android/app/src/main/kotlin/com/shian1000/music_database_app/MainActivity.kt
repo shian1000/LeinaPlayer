@@ -33,6 +33,9 @@ class MainActivity : AudioServiceActivity() {
         if (downloads?.messenger !== messenger) {
             downloads = DownloadBridge(messenger, applicationContext)
         }
+        if (leveling?.messenger !== messenger) {
+            leveling = VolumeLevelingBridge(messenger)
+        }
         // Dart tells the activity it handles Back only when its routes change, so a new activity
         // on an engine that already runs Dart (the old one removed while music played) would be
         // left without the callback, and Back would close the app from any screen.
@@ -62,6 +65,7 @@ class MainActivity : AudioServiceActivity() {
         private var newPipe: NewPipeBridge? = null
         private var links: LinksBridge? = null
         private var downloads: DownloadBridge? = null
+        private var leveling: VolumeLevelingBridge? = null
 
         /** The engine whose Dart last said it handles Back. */
         private var backHandledBy: BinaryMessenger? = null

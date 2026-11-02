@@ -217,7 +217,14 @@ class JustAudioBackend implements AudioBackend {
   /// Without a [session] (it failed to start) music still plays, just with no notification.
   /// [artFor] finds the cover file the notification shows; it's found again when [artChanged]
   /// notifies (e.g. another cover filter).
-  JustAudioBackend([this._session, this._artFor, this._artChanged]) {
+  /// [onLoading] runs before a song loads on one of the two players (by its index) — the
+  /// volume leveling sets that song's gain there.
+  JustAudioBackend([
+    this._session,
+    this._artFor,
+    this._artChanged,
+    this._onLoading,
+  ]) {
     _artChanged?.addListener(_refreshArt);
     _session?.beforePause = _endFade;
     for (final p in [_players.$1, _players.$2]) {
@@ -238,6 +245,10 @@ class JustAudioBackend implements AudioBackend {
   final MediaSession? _session;
   final Future<Uri?> Function(NowPlaying track)? _artFor;
   final Listenable? _artChanged;
+  final Future<void> Function(int player, NowPlaying track)? _onLoading;
+
+  Future<void> _loading(AudioPlayer player, NowPlaying track) async =>
+      _onLoading?.call(identical(player, _players.$1) ? 0 : 1, track);
 
   void _refreshArt() {
     final track = _track;
@@ -314,6 +325,7 @@ class JustAudioBackend implements AudioBackend {
     _endFade();
     _showTrack(track);
     await _player.setVolume(1);
+    await _loading(_player, track);
     await _player.setAudioSource(_sourceOf(track));
   }
 
@@ -323,6 +335,7 @@ class JustAudioBackend implements AudioBackend {
     final outgoing = _player;
     final incoming = _other;
     await incoming.setVolume(0);
+    await _loading(incoming, track);
     try {
       await incoming.setAudioSource(_sourceOf(track));
     } catch (_) {
