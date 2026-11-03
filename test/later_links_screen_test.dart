@@ -100,6 +100,15 @@ void main() {
     expect(later.links, hasLength(1));
   });
 
+  testWidgets('dragging a row left removes the link', (tester) async {
+    await pump(tester);
+    await tester.drag(find.text('Wideo Oli'), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Wideo Oli'), findsNothing);
+    expect(later.links, hasLength(1));
+    expect(find.textContaining('Usunięto z „Na później”'), findsOneWidget);
+  });
+
   testWidgets('nothing saved: explains how to save', (tester) async {
     for (final person in [...later.people]) {
       await later.removePerson(person);

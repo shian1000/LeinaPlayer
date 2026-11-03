@@ -20,6 +20,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/swipe_actions.dart';
 import 'app_shell.dart';
 
 const _id = 'Na później';
@@ -168,15 +169,51 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
               ),
             ),
           for (final link in links)
-            _LaterRow(
-              link: link,
-              person: later.personOf(link)?.name,
-              onTap: () => _open(link),
-              onMenu: () => _linkMenu(link),
+            SwipeActions(
+              key: ValueKey(link.id),
+              right: _queueSwipe(link),
+              left: removeSwipe(
+                context,
+                'Usuń z „$_id”',
+                () => _swipeRemove(link),
+              ),
+              child: _LaterRow(
+                link: link,
+                person: later.personOf(link)?.name,
+                onTap: () => _open(link),
+                onMenu: () => _linkMenu(link),
+              ),
             ),
         ],
       ),
     );
+  }
+
+  /// Dragged right: queued like a song row is (`queueSwipe`), as Odtwarzanie says.
+  SwipeAction _queueSwipe(LaterLink link) {
+    final next = SourceSettingsScope.maybeOf(context)?.swipePlaysNext ?? true;
+    return SwipeAction(
+      icon: next ? Icons.playlist_play : Icons.queue_music,
+      label: next
+          ? (_isPlaylist(link)
+                ? 'Odtwórz jako następną'
+                : 'Odtwórz jako następny')
+          : 'Dodaj do kolejki',
+      onTriggered: () => _queue(link, next: next),
+    );
+  }
+
+  /// Dragged left: like "Usuń z „Na później”", saying so.
+  Future<void> _swipeRemove(LaterLink link) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await LaterLinksScope.of(context).remove(link);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Usunięto z „$_id”: ${link.title ?? link.kind}'),
+        ),
+      );
   }
 
   Future<void> _linkMenu(LaterLink link) {

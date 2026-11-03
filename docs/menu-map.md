@@ -241,6 +241,8 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   for a playlist — the song of a video / track, or every track of a playlist / album read like a
   preview, nothing saved; `songsForLaterLink`), Oznacz jako (nie)odsłuchany, Zmień, od kogo jest (incl.
   Nowa osoba), Otwórz w aplikacji YouTube/Spotify, Kopiuj link, Usuń z „Na później”.
+  Rows swipe like song rows: right queues the link (as "Przeciągnięcie utworu w prawo" says),
+  left removes it ("Usunięto z „Na później”", no Cofnij).
   The links sync with the account (the sender by name; [ADR 0013](decisions/0013-saved-songs-sync.md)).
 
 ## Ustawienia (`settings_screen.dart`)
@@ -692,6 +694,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     way. Dragging left (red strip, `removeSwipe`) takes the song out where the list can lose it:
     a saved playlist ("Usunięto z playlisty", like "Usuń z tej playlisty" — no Cofnij), a mood
     the user may edit ("Usunięto z nastroju" with Cofnij), Na później and Polubione utwory;
+    Ja › Na później's link rows swipe the same way (`later_links_screen.dart`);
     elsewhere it does nothing (`SongTile.onSwipeRemove`).
   - Adding to the queue (gesture, ⋮ of a song or playlist) says so in a note right above the
     mini player, like the reference app's (`QueueToast` in `queue_toast.dart`, not a

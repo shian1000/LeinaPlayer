@@ -338,6 +338,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   opening a second sheet (Juxtopposed's redesign, user's choice). The sheet closes itself before
   an entry's `onTap` runs — an `onTap` that pops again takes the screen underneath with it (a
   black screen, then Back closes the app).
+- Gestures work the same wherever they can (user's rule): any list row that can be queued or
+  taken out swipes like a song row — `SwipeActions`, right as `swipePlaysNext` says, left
+  `removeSwipe` (Na później's link rows too, `later_links_screen.dart`). A new list gets them.
 - Every connection the app makes is listed on Ustawienia › Prywatność i połączenia
   (`privacy_screen.dart`) with why, when and what it sends, and with a way to the switch that
   stops it (or "Tylko gdy sam tego użyjesz") — a new service or a new kind of data sent goes
