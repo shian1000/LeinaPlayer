@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/mp3_conversion.dart';
 import 'package:music_database_app/src/data/server_downloads.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -142,6 +143,40 @@ void main() {
       '$folder/Kino - Kukushka.flac',
     ]);
   });
+
+  test(
+    '"Pobieraj jako MP3": a FLAC becomes an MP3 of the same name, an MP3 stays',
+    () async {
+      final folder = '${root.path}/Music';
+      final downloads = ServerDownloads(
+        local.database,
+        storageRoot: () async => root,
+        folder: () => folder,
+      );
+      await downloads.load();
+      var conversions = 0;
+      Future<void> convert(File from, File to, Mp3Tags tags) async {
+        conversions++;
+        expect(await from.readAsBytes(), audio);
+        await to.writeAsBytes(List.filled(100, 3));
+      }
+
+      await downloads.download(
+        const ServerFile(id: 7, path: 'x/01 Song.flac'),
+        [at('/library/7')],
+        name: 'Kino - Kukushka',
+      );
+      await downloads.convertToMp3(7, const Mp3Tags(), convert);
+      expect((await downloads.fileFor(7))!.path, '$folder/Kino - Kukushka.mp3');
+      expect(downloads.totalBytes, 100);
+      expect(await Directory(folder).list().map((e) => e.path).toList(), [
+        '$folder/Kino - Kukushka.mp3',
+      ]);
+      // Converted already.
+      await downloads.convertToMp3(7, const Mp3Tags(), convert);
+      expect(conversions, 1);
+    },
+  );
 
   test('a song in an SD card taken out is kept for when it\'s back', () async {
     final folder = '${root.path}/card/Music';

@@ -88,6 +88,8 @@ androidComponents {
 dependencies {
     // YouTube audio for playback (GPLv3 — see docs/decisions/0004-license-and-distribution.md).
     implementation("com.github.teamnewpipe:NewPipeExtractor:v0.26.5")
+    // MP3 encoding of downloads ("Pobieraj jako MP3"): LAME ported to Java, LGPL 2.1+.
+    implementation("de.sciss:jump3r:1.0.5")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }
 

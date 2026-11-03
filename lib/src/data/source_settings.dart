@@ -117,6 +117,7 @@ class SourceSettings extends ChangeNotifier {
   static const _levelingMeasureKey = 'playback.volume_leveling_measure';
   static const defaultLevelingPercent = 50;
   static const downloadFolderKey = 'downloads.folder';
+  static const _downloadsAsMp3Key = 'downloads.as_mp3';
 
   /// The longest "Przenikanie utworów", as in the reference app.
   static const maxCrossfadeSeconds = 12;
@@ -150,6 +151,7 @@ class SourceSettings extends ChangeNotifier {
   int _levelingPercent = defaultLevelingPercent;
   bool _levelingMeasure = true;
   String? _downloadFolder;
+  bool _downloadsAsMp3 = true;
 
   /// "Włącz szukanie w serwisie YouTube".
   bool get youTubeSearchEnabled => _youTubeSearchEnabled;
@@ -250,6 +252,10 @@ class SourceSettings extends ChangeNotifier {
   /// `null` for the app's own storage (the default — nobody else sees it).
   String? get downloadFolder => _downloadFolder;
 
+  /// "Pobierz" re-encodes every song that isn't MP3 already as MP3 (Oszczędzanie danych i tryb
+  /// offline; on by default — user's decision): songs downloaded before stay as they are.
+  bool get downloadsAsMp3 => _downloadsAsMp3;
+
   /// Cache ahead only on Wi-Fi (Oszczędzanie danych i tryb offline).
   bool get queuePrefetchWifiOnly => _queuePrefetchWifiOnly;
 
@@ -327,6 +333,7 @@ class SourceSettings extends ChangeNotifier {
         .clamp(10, 100);
     _levelingMeasure = prefs.getBool(_levelingMeasureKey) ?? _levelingMeasure;
     _downloadFolder = prefs.getString(downloadFolderKey);
+    _downloadsAsMp3 = prefs.getBool(_downloadsAsMp3Key) ?? _downloadsAsMp3;
     _playbackMethodOrder = _withAll(
       YouTubePlaybackMethod.values,
       prefs.getStringList(_playbackMethodOrderKey),
@@ -582,6 +589,15 @@ class SourceSettings extends ChangeNotifier {
     } else {
       await prefs.setString(downloadFolderKey, folder);
     }
+  }
+
+  Future<void> setDownloadsAsMp3(bool value) async {
+    _downloadsAsMp3 = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _downloadsAsMp3Key,
+      value,
+    );
   }
 
   Future<void> setCoverWifiOnly(bool value) async {

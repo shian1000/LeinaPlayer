@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/download_files.dart';
+import '../data/mp3_conversion.dart';
 import '../data/outbox.dart';
 import '../data/server_downloads.dart';
 import '../data/song_catalog.dart';
@@ -96,6 +97,8 @@ class TrackPlayer {
     this.outbox,
     this.catalog,
     this.serverDownloads,
+    this.mp3Converter,
+    this.coverBytes,
     Future<List<Uri>> Function()? serverAddresses,
     Future<bool> Function()? onWifi,
   }) : _serverAddresses = serverAddresses ?? _noServer,
@@ -121,6 +124,13 @@ class TrackPlayer {
   /// Server files kept on the phone with "Pobierz", played instead of streaming them; `null`:
   /// none (tests).
   final ServerDownloads? serverDownloads;
+
+  /// Re-encodes "Pobierz"'s songs as MP3 when [SourceSettings.downloadsAsMp3] says so; `null`
+  /// where the phone has no encoder.
+  final Mp3Converter? mp3Converter;
+
+  /// [hit]'s album cover for the MP3's tag (`AlbumCovers.coverBytes`); `null` when there's none.
+  final Future<Uint8List?> Function(SearchHit hit)? coverBytes;
 
   /// MusicDatabase's server as the phone reaches it now, best address first
   /// ([DatabaseSync.serverAddresses]), for [PlaybackSource.server].
@@ -507,15 +517,41 @@ class TrackPlayer {
       if (await downloads.download(server, [
         for (final base in addresses) serverFileUri(base, server),
       ], name: downloadBaseName(hit.artistLabel, hit.title))) {
+        if (_mp3Converter case final convert?) {
+          await downloads.convertToMp3(server.id, await _tagsOf(hit), convert);
+        }
         return DownloadOutcome.downloaded;
       }
     }
     if (!settings.enabledSources.contains(PlaybackSource.youtube)) {
       return DownloadOutcome.failed;
     }
-    return await _cacheYouTube(hit, pin: true)
-        ? DownloadOutcome.downloaded
-        : DownloadOutcome.failed;
+    if (!await _cacheYouTube(hit, pin: true)) return DownloadOutcome.failed;
+    final videoId = _withRememberedVideo(hit).youtubeVideoId;
+    if (_mp3Converter case final convert? when videoId != null) {
+      await youTubeLibrary.convertToMp3(videoId, await _tagsOf(hit), convert);
+    }
+    return DownloadOutcome.downloaded;
+  }
+
+  Mp3Converter? get _mp3Converter =>
+      settings.downloadsAsMp3 ? mp3Converter : null;
+
+  Future<Mp3Tags> _tagsOf(SearchHit hit) async {
+    Uint8List? cover;
+    try {
+      cover = await coverBytes?.call(hit);
+    } catch (e) {
+      debugPrint('Cover for the MP3 of "${hit.title}" failed: $e');
+    }
+    return Mp3Tags(
+      title: hit.title,
+      artist: hit.artistLabel,
+      album: hit.album,
+      year: hit.year,
+      genre: hit.mainSong?.genres.firstOrNull,
+      cover: cover,
+    );
   }
 
   /// [hit] kept with "Pobierz": a downloaded server file or pinned YouTube audio.

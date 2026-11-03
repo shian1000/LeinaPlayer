@@ -6,7 +6,7 @@ import 'cache_settings_screen.dart';
 import 'download_folder.dart';
 
 /// "Ustawienia › Oszczędzanie danych i tryb offline": what may use mobile data, where downloaded
-/// songs go ([DownloadFolderTile]), and the cache ([CacheSettingsScreen]).
+/// songs go ([DownloadFolderTile]) and in what format, and the cache ([CacheSettingsScreen]).
 class DataSaverScreen extends StatelessWidget {
   const DataSaverScreen({super.key});
 
@@ -54,6 +54,17 @@ class DataSaverScreen extends StatelessWidget {
           ),
           const Divider(height: 24),
           const DownloadFolderTile(),
+          SwitchListTile(
+            secondary: const Icon(Icons.audio_file_outlined),
+            title: const Text('Pobieraj jako MP3'),
+            subtitle: const Text(
+              'Utwory pobrane przyciskiem „Pobierz” są zapisywane jako MP3 256 kbps, z tytułem, '
+              'wykonawcą, albumem, rokiem, gatunkiem i okładką — inne aplikacje i sprzęty je '
+              'odtworzą. Już pobrane zostają bez zmian',
+            ),
+            value: settings.downloadsAsMp3,
+            onChanged: settings.setDownloadsAsMp3,
+          ),
           ListTile(
             leading: const Icon(Icons.sd_storage_outlined),
             title: const Text('Pamięć podręczna'),

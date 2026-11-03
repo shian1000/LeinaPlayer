@@ -452,6 +452,9 @@ import, Wyświetlanie, Dane, Aplikacja.
   picker; when the app can't write there, a dialog about "all files access", then Android's
   permission screen). Changing it moves the songs downloaded so far (progress dialog; one that
   can't be moved keeps playing from where it is),
+  "Pobieraj jako MP3" (on by default; `SourceSettings.downloadsAsMp3` — each new "Pobierz" that
+  isn't MP3 is re-encoded as MP3 256 kbps with an ID3 tag, songs downloaded before stay as
+  they are; see `local-library.md`),
   Pamięć podręczna **→ Pamięć podręczna** (`cache_settings_screen.dart`; subtitle: MB used in
   total) — every cache setting, nowhere else ("Pamięć podręczna" is the one name used in the UI):
   - "Zajęte razem: X MB" (with the downloaded songs).

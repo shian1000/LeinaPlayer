@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/mp3_conversion.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_video.dart';
@@ -394,6 +395,73 @@ void main() {
     expect(await again.relocate((_) => null), 0);
     expect(again.cachedFileOf('v2')!.path, endsWith('/youtube_cache/v2.webm'));
     expect(again.isPinned('v2'), isTrue);
+  });
+
+  test('"Pobieraj jako MP3": downloaded audio replaced by its MP3, the cache left alone', () async {
+    final folder = '${root.path}/Music';
+    final library = YouTubeLibrary(
+      local.database,
+      storageRoot: () async => root,
+      downloadFolder: () => folder,
+      now: () => now,
+    );
+    await library.load();
+    Mp3Tags? tagged;
+    Future<void> convert(File from, File to, Mp3Tags tags) async {
+      tagged = tags;
+      await to.writeAsBytes(List.filled(300, 2));
+    }
+
+    await library.cacheComplete('v1', await downloaded(library, 'v1'), 5);
+    await library.setPinned('v1', true, name: 'Kino - Gruppa krovi');
+    await library.convertToMp3(
+      'v1',
+      const Mp3Tags(title: 'Gruppa krovi', artist: 'Kino'),
+      convert,
+    );
+    expect(tagged!.artist, 'Kino');
+    expect(library.cachedFileOf('v1')!.path, '$folder/Kino - Gruppa krovi.mp3');
+    expect(library.pinnedEntries.single.sizeBytes, 300);
+    expect(await Directory(folder).list().map((e) => e.path).toList(), [
+      '$folder/Kino - Gruppa krovi.mp3',
+    ]);
+    final again = newLibrary();
+    await again.load();
+    expect(
+      again.cachedFileOf('v1')!.path,
+      endsWith('/Kino - Gruppa krovi.mp3'),
+    );
+
+    // Only played, not downloaded: stays as it came.
+    await library.cacheComplete('v2', await downloaded(library, 'v2'), 5);
+    await library.convertToMp3('v2', const Mp3Tags(), convert);
+    expect(
+      library.cachedFileOf('v2')!.path,
+      endsWith('/youtube_cache/v2.webm'),
+    );
+  });
+
+  test('a failed MP3 conversion keeps the downloaded audio', () async {
+    final library = newLibrary();
+    await library.load();
+    await library.cacheComplete('v1', await downloaded(library, 'v1'), 5);
+    await library.setPinned('v1', true);
+    await library.convertToMp3('v1', const Mp3Tags(), (from, to, tags) async {
+      await to.writeAsBytes([1]);
+      throw Exception('no decoder');
+    });
+    expect(
+      library.cachedFileOf('v1')!.path,
+      endsWith('/youtube_cache/v1.webm'),
+    );
+    expect(await library.cachedFileOf('v1')!.exists(), isTrue);
+    expect(
+      await Directory('${root.path}/youtube_cache')
+          .list()
+          .where((e) => e.path.endsWith('.part'))
+          .toList(),
+      isEmpty,
+    );
   });
 
   test('a local.db from before the YouTube tables is upgraded', () async {

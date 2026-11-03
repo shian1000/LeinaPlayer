@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'download_files.dart';
+import 'mp3_conversion.dart';
 import 'song_catalog.dart';
 
 /// One file of MusicDatabase's music library downloaded with "Pobierz".
@@ -170,6 +171,37 @@ class ServerDownloads extends ChangeNotifier {
       }
     }
     return false;
+  }
+
+  /// [fileId]'s downloaded copy re-encoded as MP3 in place ("Pobieraj jako MP3"); one that is
+  /// MP3 already stays. A failure keeps the original.
+  Future<void> convertToMp3(
+    int fileId,
+    Mp3Tags tags,
+    Mp3Converter convert,
+  ) async {
+    final download = _downloads[fileId];
+    if (download == null || isMp3(download.file.path)) return;
+    final dir = await _dir();
+    try {
+      final target = await convertBeside(download.file, dir, tags, convert);
+      await (await _database()).update(
+        'server_downloads',
+        {
+          'file_name': _nameFor(dir, target),
+          'size_bytes': await target.length(),
+        },
+        where: 'file_id = ?',
+        whereArgs: [fileId],
+      );
+      await load();
+      await announceMediaFiles([
+        for (final path in [download.file.path, target.path])
+          if (!isInFolder(path, dir.path)) path,
+      ]);
+    } catch (e) {
+      debugPrint('Converting server file $fileId to MP3 failed: $e');
+    }
   }
 
   /// Where a download of [fileId] goes now.

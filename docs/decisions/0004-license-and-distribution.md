@@ -22,5 +22,5 @@ reason NewPipe itself is not on Google Play.
 
 ## Consequences
 
-- Any library added must be GPLv3-compatible.
+- Any library added must be GPLv3-compatible. (so far also jump3r, LGPL 2.1+, for "Pobieraj jako MP3").
 - YouTube support can break whenever YouTube changes; fixing it means a new APK. Accepted.

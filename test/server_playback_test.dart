@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/mp3_conversion.dart';
 import 'package:music_database_app/src/data/server_downloads.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
@@ -17,13 +19,19 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'playback_test.dart' show FakeBackend;
 
-SearchHit _song({String? youtubeVideoId = 'N/A'}) => SearchHit.main(
+SearchHit _song({
+  String? youtubeVideoId = 'N/A',
+  String path = 'Artist/Song.mp3',
+}) => SearchHit.main(
   CatalogSong(
     id: 1,
     title: 'Song',
     artistLabel: 'Artist',
+    album: 'Album',
+    year: 1987,
+    genre: 'rock, post-punk',
     youtubeVideoId: youtubeVideoId,
-    serverFile: const ServerFile(id: 42, path: 'Artist/Song.mp3'),
+    serverFile: ServerFile(id: 42, path: path),
   ),
   const [],
 );
@@ -71,6 +79,7 @@ void main() {
   TrackPlayer tracks(
     List<Uri> Function() addresses, {
     ServerDownloads? downloads,
+    Mp3Converter? mp3Converter,
   }) => TrackPlayer(
     player: player,
     settings: settings,
@@ -84,8 +93,59 @@ void main() {
     youTubeSearch: YouTubeSearch(),
     openExternal: (_) async => true,
     serverDownloads: downloads,
+    mp3Converter: mp3Converter,
+    coverBytes: (_) async => Uint8List.fromList([0xff, 0xd8, 0xff]),
     serverAddresses: () async => addresses(),
   );
+
+  test('"Pobieraj jako MP3": the tag gets music.db\'s values and the cover; off, nothing is converted', () async {
+    sqfliteFfiInit();
+    final root = await Directory.systemTemp.createTemp('server_download_mp3');
+    final sync = DatabaseSync(storageRoot: () async => root);
+    final catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    final local = LocalLibrary(
+      catalog,
+      storageRoot: () async => root,
+      factoryOverride: databaseFactoryFfi,
+    );
+    addTearDown(() async {
+      local.dispose();
+      catalog.dispose();
+      sync.dispose();
+      await root.delete(recursive: true);
+    });
+    final downloads = ServerDownloads(
+      local.database,
+      storageRoot: () async => root,
+    );
+    await downloads.load();
+    final tagged = <Mp3Tags>[];
+    final online = tracks(
+      () => [base()],
+      downloads: downloads,
+      mp3Converter: (from, to, tags) async {
+        tagged.add(tags);
+        await to.writeAsBytes([1, 2, 3]);
+      },
+    );
+    final flac = _song(path: 'Artist/Song.flac');
+
+    await settings.setDownloadsAsMp3(false);
+    await online.download(flac);
+    expect(tagged, isEmpty);
+    expect((await downloads.fileFor(42))!.path, endsWith('/42.flac'));
+
+    await online.removeDownload(flac);
+    await settings.setDownloadsAsMp3(true);
+    await online.download(flac);
+    expect((await downloads.fileFor(42))!.path, endsWith('/42.mp3'));
+    final tags = tagged.single;
+    expect(
+      [tags.title, tags.artist, tags.album, tags.year, tags.genre],
+      ['Song', 'Artist', 'Album', 1987, 'rock'],
+    );
+    expect(tags.cover, [0xff, 0xd8, 0xff]);
+  });
 
   test(
     '"Pobierz": the file is copied to the phone and plays from there without '

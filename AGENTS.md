@@ -111,7 +111,8 @@ czasowy (song menu), a song's radio (phone-side alikeness by artist, genre — m
 decade; `song_radio.dart`), "Pobierz" for a song or playlist (kept offline for good; a queue in
 `local.db` that resumes, under a foreground service — `playback/downloads.dart`; in the app's
 storage or a folder the user picked, as "Artist - Title" — Oszczędzanie danych › Miejsce na
-pobrane utwory, `download_files.dart`, [`local-library.md`](docs/agent-notes/local-library.md)), "Ukryj utwór"
+pobrane utwory, `download_files.dart`; re-encoded as MP3 256 kbps unless "Pobieraj jako MP3" is off —
+`mp3_conversion.dart`, [`local-library.md`](docs/agent-notes/local-library.md)), "Ukryj utwór"
 (phone only). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
 Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
@@ -265,7 +266,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
   incoming YouTube/Spotify links and opening the YouTube app by package),
   `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links, "Jak odtworzyć?" for shared ones), `LinkTargets.kt`,
-  `LaterLinks.kt` (links saved for later), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `DownloadService.kt` (the "Pobieranie utworów"
+  `LaterLinks.kt` (links saved for later), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `Mp3Encoder.kt` ("Pobieraj jako MP3": MediaCodec + jump3r), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `assets/fonts/rajdhani/` — the Cyberpunk theme's font (OFL, licence in `OFL.txt`).

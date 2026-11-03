@@ -19,6 +19,7 @@ import 'src/data/later_links.dart';
 import 'src/data/library_folders.dart';
 import 'src/data/listening_log.dart';
 import 'src/data/local_library.dart';
+import 'src/data/mp3_conversion.dart';
 import 'src/data/recordings.dart';
 import 'src/data/account.dart';
 import 'src/data/mood_filter.dart';
@@ -310,6 +311,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     outbox: _outbox,
     catalog: _songCatalog,
     serverDownloads: _serverDownloads,
+    mp3Converter: platformMp3Converter(),
+    coverBytes: (hit) => _albumCovers.coverBytes(CoverRequest.of(hit)),
     serverAddresses: _databaseSync.serverAddresses,
   );
   late final _playbackQueue = PlaybackQueue(

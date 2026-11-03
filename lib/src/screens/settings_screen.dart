@@ -221,6 +221,7 @@ const _sections = <(String, List<_SettingsEntry>)>[
           'Pobieraj teksty piosenek',
           'Miejsce na pobrane utwory',
           'Folder na pobraną muzykę',
+          'Pobieraj jako MP3',
           'Karta SD',
         ],
       ),

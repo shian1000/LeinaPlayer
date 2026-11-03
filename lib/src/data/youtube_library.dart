@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'download_files.dart';
+import 'mp3_conversion.dart';
 import 'song_catalog.dart';
 import 'text_normalizer.dart';
 import 'youtube_video.dart';
@@ -283,6 +284,41 @@ class YouTubeLibrary extends ChangeNotifier {
       ]);
     } catch (e) {
       debugPrint('Moving YouTube audio $videoId failed: $e');
+    }
+  }
+
+  /// [videoId]'s downloaded audio re-encoded as MP3 in place ("Pobieraj jako MP3"); only
+  /// audio kept with "Pobierz" — the cache plays its own copies as they came. A failure keeps
+  /// the original.
+  Future<void> convertToMp3(
+    String videoId,
+    Mp3Tags tags,
+    Mp3Converter convert,
+  ) async {
+    final entry = _cache[videoId];
+    if (entry == null || !entry.pinned || isMp3(entry.file.path)) return;
+    final cacheDir = await _cacheDir();
+    try {
+      final target = await convertBeside(entry.file, cacheDir, tags, convert);
+      final db = await _database();
+      await db.update(
+        'youtube_cache',
+        {
+          'file_name': target.parent.path == cacheDir.path
+              ? target.uri.pathSegments.last
+              : target.path,
+          'size_bytes': await target.length(),
+        },
+        where: 'video_id = ?',
+        whereArgs: [videoId],
+      );
+      await _reloadCache(db);
+      await announceMediaFiles([
+        for (final path in [entry.file.path, target.path])
+          if (!isInFolder(path, cacheDir.path)) path,
+      ]);
+    } catch (e) {
+      debugPrint('Converting YouTube audio $videoId to MP3 failed: $e');
     }
   }
 

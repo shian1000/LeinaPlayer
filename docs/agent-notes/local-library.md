@@ -46,6 +46,22 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   the links channel) tells other music apps. The scan skips that folder (the songs would be
   there twice, the YouTube ones untagged). A download whose folder is gone (SD card out) keeps
   its row and comes back when the folder does — only a missing file in a present folder drops it.
+- "Pobieraj jako MP3" (Oszczędzanie danych, on by default — user's decision, 2026-11-03):
+  after "Pobierz" finishes, a song that isn't MP3 (YouTube's webm/opus or m4a, a server FLAC —
+  lossless lost too, user's choice) is re-encoded as CBR 256 kbps MP3 with an ID3v2.3 tag
+  of music.db's values (title, artist, album, year, the main genre) and the album cover as the
+  app shows it, unfiltered (`AlbumCovers.coverBytes`), and replaces the original under the same name
+  (`TrackPlayer.download` → `ServerDownloads` / `YouTubeLibrary.convertToMp3`,
+  `mp3_conversion.dart`). Only "Pobierz": the YouTube cache keeps what it played, and songs
+  downloaded before the switch stay as they are (user's choice). Natively `Mp3Encoder.kt`
+  (`toMp3` on the downloads channel, one song at a time on a background thread): MediaCodec
+  decodes, jump3r (`de.sciss:jump3r`, LAME in Java, LGPL — Android has no MP3 encoder, and
+  ffmpeg-kit was retired) encodes; jump3r's `lowlevel.LameEncoder` needs javax.sound, so the
+  encoder is wired from its `mp3` package the way that class does it. A failed conversion only
+  logs and keeps the original; the recording keys (server file id, video id) don't change, so
+  the measured loudness still applies. Speed: on the Huawei (Android 10) a song encodes at about
+  twice its playing speed (6.5 min ≈ 3 min with the download) — fine under the download's
+  foreground service; native LAME through the NDK would be several times faster if it ever matters.
 - On the Huawei test phone the user picked the SD card's Music folder
   (`/storage/2023-3514/Music`), not internal `/storage/emulated/0/Music`.
 

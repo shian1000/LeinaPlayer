@@ -9,11 +9,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.Process
 import android.util.Log
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.Executors
 
 /**
  * "Pobieranie utworów": a foreground service (type dataSync) that only shows a notification while
@@ -130,6 +134,15 @@ class DownloadBridge(val messenger: BinaryMessenger, private val context: Contex
         MethodChannel(messenger, "music_database_app/downloads").setMethodCallHandler(this)
     }
 
+    /** One song at a time, at background priority, so music and the screen go first. */
+    private val converting = Executors.newSingleThreadExecutor { task ->
+        Thread({
+            Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+            task.run()
+        }, "Mp3Encoder")
+    }
+    private val main = Handler(Looper.getMainLooper())
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "show" -> {
@@ -144,6 +157,27 @@ class DownloadBridge(val messenger: BinaryMessenger, private val context: Contex
             "hide" -> {
                 DownloadService.hide(context)
                 result.success(null)
+            }
+            "toMp3" -> {
+                val from = call.argument<String>("from")!!
+                val to = call.argument<String>("to")!!
+                val kbps = call.argument<Int>("kbps")!!
+                val tags = Mp3Encoder.Tags(
+                    call.argument<String>("title"),
+                    call.argument<String>("artist"),
+                    call.argument<String>("album"),
+                    call.argument<String>("year"),
+                    call.argument<String>("genre"),
+                    call.argument<ByteArray>("cover"),
+                )
+                converting.execute {
+                    try {
+                        Mp3Encoder.convert(from, to, kbps, tags)
+                        main.post { result.success(null) }
+                    } catch (e: Exception) {
+                        main.post { result.error("failed", e.toString(), null) }
+                    }
+                }
             }
             else -> result.notImplemented()
         }

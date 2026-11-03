@@ -494,6 +494,15 @@ class AlbumCovers extends ChangeNotifier {
 
   final _colors = <String, ({Color? color})>{};
 
+  /// The large cover's image file as it came (no cover filter), for a downloaded song's MP3
+  /// tag; `null` when there's no cover.
+  Future<Uint8List?> coverBytes(CoverRequest request) async =>
+      switch (await resolve(request, large: true)) {
+        final FileImage image => image.file.readAsBytes(),
+        final MemoryImage image => image.bytes,
+        _ => null,
+      };
+
   /// The large cover as a file, for the media notification and the lock screen (they take an
   /// address, not image bytes), with the user's [filter]; `null` when there's no cover.
   Future<Uri?> artFile(
