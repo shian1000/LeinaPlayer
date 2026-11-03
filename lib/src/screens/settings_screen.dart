@@ -61,10 +61,15 @@ const _sections = <(String, List<_SettingsEntry>)>[
       _SettingsEntry(
         Icons.account_circle_outlined,
         'Konto',
-        'Logowanie • Synchronizacja playlist i nastrojów • Konto Google',
+        'Logowanie • Synchronizuj wszystko • Konto Google',
         _openAccount,
         keywords: [
           'Konto MusicDatabase',
+          'Synchronizuj wszystko',
+          'Synchronizuj konto',
+          'Katalog muzyki',
+          'Zgłoszenia poprawek',
+          'Aktualizacje',
           'Zaloguj się',
           'Wyloguj',
           'Konto Google (playlisty na YouTube)',

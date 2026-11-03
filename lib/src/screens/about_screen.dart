@@ -174,9 +174,22 @@ class AboutScreen extends StatelessWidget {
   }
 }
 
-/// "Aktualizacje" (the newest release on GitHub, tapped to download or to check now) and the
-/// daily check's switch; only in builds that know their releases ([AppUpdates.configured]).
-List<Widget> _updateTiles(BuildContext context, AppUpdates updates) {
+/// "Aktualizacje" and the daily check's switch; only in builds that know their releases
+/// ([AppUpdates.configured]).
+List<Widget> _updateTiles(BuildContext context, AppUpdates updates) => [
+  updateCheckTile(context, updates),
+  SwitchListTile(
+    secondary: const Icon(Icons.schedule),
+    title: const Text('Sprawdzaj aktualizacje automatycznie'),
+    subtitle: const Text('Raz dziennie, w wydaniach aplikacji na GitHubie'),
+    value: updates.autoCheck,
+    onChanged: updates.setAutoCheck,
+  ),
+];
+
+/// "Aktualizacje": the newest release on GitHub, tapped to download or to check now — in
+/// Informacje i pomoc and Konto.
+Widget updateCheckTile(BuildContext context, AppUpdates updates) {
   final palette = context.palette;
   final release = updates.available;
   final last = updates.lastCheck;
@@ -190,36 +203,27 @@ List<Widget> _updateTiles(BuildContext context, AppUpdates updates) {
                 ? 'Jeszcze nie sprawdzano'
                 : 'Masz najnowszą wersję (sprawdzono '
                       '${dayMonthLabel(last)}, ${two(last.hour)}:${two(last.minute)})');
-  return [
-    ListTile(
-      leading: Icon(
-        Icons.system_update_outlined,
-        color: release != null ? palette.accent : null,
-      ),
-      title: const Text('Aktualizacje'),
-      subtitle: Text(
-        subtitle,
-        style: release != null ? TextStyle(color: palette.accent) : null,
-      ),
-      trailing: IconButton(
-        tooltip: 'Sprawdź teraz',
-        icon: const Icon(Icons.refresh),
-        onPressed: updates.checking ? null : updates.check,
-      ),
-      onTap: updates.checking
-          ? null
-          : release != null
-          ? () => showUpdateDialog(context, updates, release)
-          : updates.check,
+  return ListTile(
+    leading: Icon(
+      Icons.system_update_outlined,
+      color: release != null ? palette.accent : null,
     ),
-    SwitchListTile(
-      secondary: const Icon(Icons.schedule),
-      title: const Text('Sprawdzaj aktualizacje automatycznie'),
-      subtitle: const Text('Raz dziennie, w wydaniach aplikacji na GitHubie'),
-      value: updates.autoCheck,
-      onChanged: updates.setAutoCheck,
+    title: const Text('Aktualizacje'),
+    subtitle: Text(
+      subtitle,
+      style: release != null ? TextStyle(color: palette.accent) : null,
     ),
-  ];
+    trailing: IconButton(
+      tooltip: 'Sprawdź teraz',
+      icon: const Icon(Icons.refresh),
+      onPressed: updates.checking ? null : updates.check,
+    ),
+    onTap: updates.checking
+        ? null
+        : release != null
+        ? () => showUpdateDialog(context, updates, release)
+        : updates.check,
+  );
 }
 
 /// The commit a build was made from (`tool/build_release_apk.sh`), with "+zmiany" when its

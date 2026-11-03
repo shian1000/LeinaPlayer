@@ -87,12 +87,8 @@ class OutboxSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final outbox = OutboxScope.of(context);
-    final sync = DatabaseSyncScope.of(context);
     final account = AccountScope.maybeOf(context)?.userName;
-    final canExport = !outbox.sending && outbox.waiting > 0;
     final palette = context.palette;
-    final result = outbox.lastSend;
-    final canSend = !outbox.sending && outbox.waiting > 0 && sync.hasServer;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
@@ -112,94 +108,7 @@ class OutboxSettingsScreen extends StatelessWidget {
             value: outbox.autoSend,
             onChanged: outbox.setAutoSend,
           ),
-          ListTile(
-            leading: const Icon(Icons.outbox_outlined),
-            title: const Text('Czeka na wysłanie'),
-            subtitle: Text(
-              outbox.sending
-                  ? 'Wysyłanie…'
-                  : outbox.waiting == 0
-                  ? 'Nic'
-                  : requestsLabel(outbox.waiting),
-            ),
-            trailing: outbox.sending
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : outbox.waiting > 0
-                ? const Icon(Icons.chevron_right)
-                : null,
-            onTap: outbox.waiting > 0
-                ? () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const OutboxContentsScreen(),
-                    ),
-                  )
-                : null,
-          ),
-          if (result != null && !outbox.sending)
-            ListTile(
-              leading: Icon(
-                result.problem == null ? Icons.check : Icons.error_outline,
-                color: result.problem == null
-                    ? palette.accent
-                    : Theme.of(context).colorScheme.error,
-              ),
-              title: const Text('Ostatnie wysyłanie'),
-              subtitle: Text(
-                [
-                  'Wysłano: ${result.sent}',
-                  if (result.refused > 0)
-                    'odrzucone przez serwer: ${result.refused}',
-                  ?result.problem,
-                  if (outbox.heldForToday && outbox.autoSend)
-                    'kolejna próba jutro albo przez „Wyślij teraz”',
-                ].join(' · '),
-              ),
-            ),
-          ListTile(
-            enabled: canSend,
-            leading: Icon(
-              Icons.send,
-              color: canSend ? palette.accent : palette.textSecondary,
-            ),
-            title: Text(
-              'Wyślij teraz',
-              style: TextStyle(
-                color: canSend ? palette.accent : palette.textSecondary,
-              ),
-            ),
-            onTap: () async =>
-                outbox.send(await sync.serverAddresses(), manual: true),
-          ),
-          ListTile(
-            enabled: canExport,
-            leading: Icon(
-              Icons.archive_outlined,
-              color: canExport ? palette.accent : palette.textSecondary,
-            ),
-            title: Text(
-              'Wyślij paczkę…',
-              style: TextStyle(
-                color: canExport ? palette.accent : palette.textSecondary,
-              ),
-            ),
-            subtitle: Text(
-              outbox.waiting == 0
-                  ? 'Plik .zip przez komunikator, e-mail…'
-                  : '${requestsLabel(outbox.waiting)} jako plik .zip przez '
-                        'komunikator, e-mail…',
-            ),
-            onTap: () => _sendPackage(context, outbox),
-          ),
-          if (outbox.lastPackage.isNotEmpty)
-            ListTile(
-              leading: const Icon(Icons.replay),
-              title: const Text('Wyeksportuj ponownie ostatnią paczkę'),
-              subtitle: Text(requestsLabel(outbox.lastPackage.length)),
-              onTap: () => _sendAgain(context, outbox),
-            ),
+          const OutboxSendTiles(),
           ListTile(
             leading: const Icon(Icons.badge_outlined),
             title: const Text('Podpis paczek'),
@@ -229,6 +138,116 @@ class OutboxSettingsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// "Czeka na wysłanie", "Ostatnie wysyłanie", "Wyślij teraz", "Wyślij paczkę…" and "Wyeksportuj
+/// ponownie ostatnią paczkę" — on Zgłoszenia poprawek and in Konto's "Zgłoszenia poprawek".
+class OutboxSendTiles extends StatelessWidget {
+  const OutboxSendTiles({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final outbox = OutboxScope.of(context);
+    final sync = DatabaseSyncScope.of(context);
+    final palette = context.palette;
+    final result = outbox.lastSend;
+    final canExport = !outbox.sending && outbox.waiting > 0;
+    final canSend = !outbox.sending && outbox.waiting > 0 && sync.hasServer;
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.outbox_outlined),
+          title: const Text('Czeka na wysłanie'),
+          subtitle: Text(
+            outbox.sending
+                ? 'Wysyłanie…'
+                : outbox.waiting == 0
+                ? 'Nic'
+                : OutboxSettingsScreen.requestsLabel(outbox.waiting),
+          ),
+          trailing: outbox.sending
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : outbox.waiting > 0
+              ? const Icon(Icons.chevron_right)
+              : null,
+          onTap: outbox.waiting > 0
+              ? () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const OutboxContentsScreen(),
+                  ),
+                )
+              : null,
+        ),
+        if (result != null && !outbox.sending)
+          ListTile(
+            leading: Icon(
+              result.problem == null ? Icons.check : Icons.error_outline,
+              color: result.problem == null
+                  ? palette.accent
+                  : Theme.of(context).colorScheme.error,
+            ),
+            title: const Text('Ostatnie wysyłanie'),
+            subtitle: Text(
+              [
+                'Wysłano: ${result.sent}',
+                if (result.refused > 0)
+                  'odrzucone przez serwer: ${result.refused}',
+                ?result.problem,
+                if (outbox.heldForToday && outbox.autoSend)
+                  'kolejna próba jutro albo przez „Wyślij teraz”',
+              ].join(' · '),
+            ),
+          ),
+        ListTile(
+          enabled: canSend,
+          leading: Icon(
+            Icons.send,
+            color: canSend ? palette.accent : palette.textSecondary,
+          ),
+          title: Text(
+            'Wyślij teraz',
+            style: TextStyle(
+              color: canSend ? palette.accent : palette.textSecondary,
+            ),
+          ),
+          onTap: () async =>
+              outbox.send(await sync.serverAddresses(), manual: true),
+        ),
+        ListTile(
+          enabled: canExport,
+          leading: Icon(
+            Icons.archive_outlined,
+            color: canExport ? palette.accent : palette.textSecondary,
+          ),
+          title: Text(
+            'Wyślij paczkę…',
+            style: TextStyle(
+              color: canExport ? palette.accent : palette.textSecondary,
+            ),
+          ),
+          subtitle: Text(
+            outbox.waiting == 0
+                ? 'Plik .zip przez komunikator, e-mail…'
+                : '${OutboxSettingsScreen.requestsLabel(outbox.waiting)} jako plik .zip przez '
+                      'komunikator, e-mail…',
+          ),
+          onTap: () => OutboxSettingsScreen._sendPackage(context, outbox),
+        ),
+        if (outbox.lastPackage.isNotEmpty)
+          ListTile(
+            leading: const Icon(Icons.replay),
+            title: const Text('Wyeksportuj ponownie ostatnią paczkę'),
+            subtitle: Text(
+              OutboxSettingsScreen.requestsLabel(outbox.lastPackage.length),
+            ),
+            onTap: () => OutboxSettingsScreen._sendAgain(context, outbox),
+          ),
+      ],
     );
   }
 }

@@ -1,22 +1,30 @@
 import 'package:flutter/material.dart';
 
 import '../data/account.dart';
+import '../data/app_updates.dart';
 import '../data/database_sync.dart';
 import '../data/later_links.dart';
 import '../data/library_folders.dart';
 import '../data/listening_log.dart';
 import '../data/moods.dart';
+import '../data/outbox.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_sync.dart';
 import '../data/saved_songs.dart';
 import '../data/youtube_account.dart';
 import '../widgets/feature_info.dart';
+import 'about_screen.dart';
+import 'database_source_screen.dart';
 import 'feature_infos.dart';
+import 'outbox_settings_screen.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
 /// "Ustawienia › Konto" (also the profile card in "Ja"): logging in with a MusicDatabase
-/// user, or who is logged in and "Wyloguj" ([ADR 0006](../../../docs/decisions/0006-musicdatabase-login.md)).
+/// user, or who is logged in and "Wyloguj" ([ADR 0006](../../../docs/decisions/0006-musicdatabase-login.md)),
+/// and below it everything else the phone syncs — the music catalog, the requests for
+/// MusicDatabase, app updates — with the same tiles as their own screens, and "Synchronizuj
+/// wszystko" on top.
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
 
@@ -141,114 +149,128 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
-        children: account.loggedIn
-            ? [
-                const SectionTitle('Konto MusicDatabase'),
-                ListTile(
-                  leading: const ProfileAvatar(radius: 20),
-                  title: Text(account.userName!),
-                  subtitle: const Text('Zalogowano'),
-                ),
-                const _SyncAllTile(),
-                const _PhoneOnlyRows(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: const LogOutButton(),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Text(
-                    'Playlisty z Biblioteki są zapisywane na tym koncie w MusicDatabase i '
-                    'widoczne na każdym telefonie, na którym się na nie zalogujesz. '
-                    'Zgłoszenia poprawek wysyłane do MusicDatabase są podpisane tym kontem.',
-                    style: hint,
-                  ),
-                ),
-                const _YouTubeAccountSection(),
-              ]
-            : [
-                const SectionTitle('Zaloguj się do MusicDatabase'),
-                if (account.needsLogin)
+        children: [
+          const _SyncEverythingTile(),
+          ...account.loggedIn
+              ? [
+                  const SectionTitle('Konto MusicDatabase'),
                   ListTile(
-                    leading: Icon(
-                      Icons.error_outline,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    title: const Text(
-                      'Serwer nie przyjął zapisanego logowania',
-                    ),
-                    subtitle: const Text('Wpisz hasło jeszcze raz.'),
+                    leading: const ProfileAvatar(radius: 20),
+                    title: Text(account.userName!),
+                    subtitle: const Text('Zalogowano'),
                   ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    key: AccountScreen.userFieldKey,
-                    controller: _user,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.username],
-                    decoration: const InputDecoration(
-                      labelText: 'Nazwa użytkownika',
-                      border: OutlineInputBorder(),
+                  const _SyncAllTile(),
+                  const _PhoneOnlyRows(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: const LogOutButton(),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: Text(
+                      'Playlisty z Biblioteki są zapisywane na tym koncie w MusicDatabase i '
+                      'widoczne na każdym telefonie, na którym się na nie zalogujesz. '
+                      'Zgłoszenia poprawek wysyłane do MusicDatabase są podpisane tym kontem.',
+                      style: hint,
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    key: AccountScreen.passwordFieldKey,
-                    controller: _password,
-                    obscureText: true,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    textInputAction: TextInputAction.done,
-                    autofillHints: const [AutofillHints.password],
-                    onSubmitted: (_) => _logIn(),
-                    decoration: InputDecoration(
-                      labelText: 'Hasło',
-                      errorText: _error,
-                      errorMaxLines: 3,
-                      border: const OutlineInputBorder(),
+                  const _YouTubeAccountSection(),
+                ]
+              : [
+                  const SectionTitle('Zaloguj się do MusicDatabase'),
+                  if (account.needsLogin)
+                    ListTile(
+                      leading: Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      title: const Text(
+                        'Serwer nie przyjął zapisanego logowania',
+                      ),
+                      subtitle: const Text('Wpisz hasło jeszcze raz.'),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      key: AccountScreen.userFieldKey,
+                      controller: _user,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.username],
+                      decoration: const InputDecoration(
+                        labelText: 'Nazwa użytkownika',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: palette.onAccent,
-                      shape: palette.pillShape,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      key: AccountScreen.passwordFieldKey,
+                      controller: _password,
+                      obscureText: true,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.password],
+                      onSubmitted: (_) => _logIn(),
+                      decoration: InputDecoration(
+                        labelText: 'Hasło',
+                        errorText: _error,
+                        errorMaxLines: 3,
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
-                    onPressed: account.busy ? null : _logIn,
-                    child: account.busy
-                        ? SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: palette.onAccent,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: palette.accent,
+                        foregroundColor: palette.onAccent,
+                        shape: palette.pillShape,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: account.busy ? null : _logIn,
+                      child: account.busy
+                          ? SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.onAccent,
+                              ),
+                            )
+                          : const Text(
+                              'Zaloguj',
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                          )
-                        : const Text(
-                            'Zaloguj',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Text(
-                    'Konta zakłada się w MusicDatabase (Main menu › Users). Logowanie '
-                    'wymaga połączenia z serwerem bazy danych; telefon zapamiętuje nazwę '
-                    'użytkownika i znak logowania, nie hasło.',
-                    style: hint,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: Text(
+                      'Konta zakłada się w MusicDatabase (Main menu › Users). Logowanie '
+                      'wymaga połączenia z serwerem bazy danych; telefon zapamiętuje nazwę '
+                      'użytkownika i znak logowania, nie hasło.',
+                      style: hint,
+                    ),
                   ),
-                ),
-                const _YouTubeAccountSection(),
-              ],
+                  const _YouTubeAccountSection(),
+                ],
+          const SectionTitle('Katalog muzyki'),
+          const DatabaseDownloadTiles(),
+          if (OutboxScope.maybeOf(context) != null) ...[
+            const SectionTitle('Zgłoszenia poprawek'),
+            const OutboxSendTiles(),
+          ],
+          if (AppUpdatesScope.maybeOf(context) case final updates?
+              when updates.configured) ...[
+            const SectionTitle('Aktualizacje'),
+            updateCheckTile(context, updates),
+          ],
+        ],
       ),
     );
   }
@@ -337,15 +359,79 @@ class _YouTubeAccountSection extends StatelessWidget {
   }
 }
 
-/// One part of the account that syncs with MusicDatabase, for [_SyncAllTile].
+/// One part of the account that syncs with MusicDatabase.
 typedef _SyncPart = ({
   String name,
   bool syncing,
-  PlaylistSyncResult? last,
+  PlaylistSyncResult? Function() last,
   Future<void> Function() sync,
 });
 
-/// "Synchronizuj": every part of the account that syncs with MusicDatabase (playlists, moods,
+/// Every part of the account that syncs with MusicDatabase, for [_SyncAllTile] and
+/// [_SyncEverythingTile].
+List<_SyncPart> _accountSyncParts(BuildContext context) {
+  // Read here, not in servers(): the parts sync one after another, and once the user has
+  // left the screen the context can no longer look scopes up (Pixel, 2026-10-30).
+  final databaseSync = DatabaseSyncScope.of(context);
+  final account = AccountScope.of(context);
+  Future<List<Uri>> servers() => databaseSync.serverAddresses();
+  final playlists = PlaylistLibraryScope.maybeOf(context);
+  final moods = MoodLibraryScope.maybeOf(context);
+  final folders = LibraryFoldersScope.maybeOf(context);
+  final listens = ListeningLogScope.maybeOf(context);
+  final songs = SavedSongsSyncScope.maybeOf(context);
+  final links = LaterLinksScope.maybeOf(context);
+  return <_SyncPart>[
+    if (playlists != null)
+      (
+        name: 'Playlisty',
+        syncing: playlists.syncing,
+        last: () => playlists.lastSync,
+        sync: () async => playlists.sync(await servers()),
+      ),
+    if (moods != null)
+      (
+        name: 'Nastroje',
+        syncing: moods.syncing,
+        last: () => moods.lastSync,
+        sync: () async {
+          final addresses = await servers();
+          await account.refreshPermissions(addresses);
+          await moods.sync(addresses);
+        },
+      ),
+    if (folders != null)
+      (
+        name: 'Foldery',
+        syncing: folders.syncing,
+        last: () => folders.lastSync,
+        sync: () async => folders.sync(await servers()),
+      ),
+    if (listens != null)
+      (
+        name: 'Statystyki słuchania',
+        syncing: listens.syncing,
+        last: () => listens.lastSync,
+        sync: () async => listens.sync(await servers()),
+      ),
+    if (songs != null)
+      (
+        name: 'Polubione i zapisane utwory',
+        syncing: songs.syncing,
+        last: () => songs.lastSync,
+        sync: () async => songs.sync(await servers()),
+      ),
+    if (links != null)
+      (
+        name: 'Linki na później',
+        syncing: links.syncing,
+        last: () => links.lastSync,
+        sync: () async => links.sync(await servers()),
+      ),
+  ];
+}
+
+/// "Synchronizuj konto": every part of the account that syncs with MusicDatabase (playlists, moods,
 /// folders, plays, liked and saved songs, links saved for later) in one row — how it last went
 /// and ⟳ to sync it all now; a long press explains what syncs where.
 class _SyncAllTile extends StatelessWidget {
@@ -353,65 +439,7 @@ class _SyncAllTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Read here, not in servers(): the parts sync one after another, and once the user has
-    // left the screen the context can no longer look scopes up (Pixel, 2026-10-30).
-    final databaseSync = DatabaseSyncScope.of(context);
-    final account = AccountScope.of(context);
-    Future<List<Uri>> servers() => databaseSync.serverAddresses();
-    final playlists = PlaylistLibraryScope.maybeOf(context);
-    final moods = MoodLibraryScope.maybeOf(context);
-    final folders = LibraryFoldersScope.maybeOf(context);
-    final listens = ListeningLogScope.maybeOf(context);
-    final songs = SavedSongsSyncScope.maybeOf(context);
-    final links = LaterLinksScope.maybeOf(context);
-    final parts = <_SyncPart>[
-      if (playlists != null)
-        (
-          name: 'Playlisty',
-          syncing: playlists.syncing,
-          last: playlists.lastSync,
-          sync: () async => playlists.sync(await servers()),
-        ),
-      if (moods != null)
-        (
-          name: 'Nastroje',
-          syncing: moods.syncing,
-          last: moods.lastSync,
-          sync: () async {
-            final addresses = await servers();
-            await account.refreshPermissions(addresses);
-            await moods.sync(addresses);
-          },
-        ),
-      if (folders != null)
-        (
-          name: 'Foldery',
-          syncing: folders.syncing,
-          last: folders.lastSync,
-          sync: () async => folders.sync(await servers()),
-        ),
-      if (listens != null)
-        (
-          name: 'Statystyki słuchania',
-          syncing: listens.syncing,
-          last: listens.lastSync,
-          sync: () async => listens.sync(await servers()),
-        ),
-      if (songs != null)
-        (
-          name: 'Polubione i zapisane utwory',
-          syncing: songs.syncing,
-          last: songs.lastSync,
-          sync: () async => songs.sync(await servers()),
-        ),
-      if (links != null)
-        (
-          name: 'Linki na później',
-          syncing: links.syncing,
-          last: links.lastSync,
-          sync: () async => links.sync(await servers()),
-        ),
-    ];
+    final parts = _accountSyncParts(context);
     if (parts.isEmpty) return const SizedBox.shrink();
 
     final error = Theme.of(context).colorScheme.error;
@@ -419,15 +447,16 @@ class _SyncAllTile extends StatelessWidget {
     final syncing = parts.any((p) => p.syncing);
     final failed = [
       for (final p in parts)
-        if (p.last?.problem != null) p,
+        if (p.last()?.problem != null) p,
     ];
-    final done = [for (final p in parts) p.last?.at].nonNulls.toList()..sort();
+    final done = [for (final p in parts) p.last()?.at].nonNulls.toList()
+      ..sort();
     final String subtitle;
     if (syncing) {
       subtitle = 'Synchronizowanie…';
     } else if (failed.isNotEmpty) {
       subtitle =
-          '${failed.map((p) => p.name).join(', ')}: ${failed.first.last!.problem}';
+          '${failed.map((p) => p.name).join(', ')}: ${failed.first.last()!.problem}';
     } else if (done.isEmpty) {
       subtitle = 'Jeszcze nie synchronizowano';
     } else {
@@ -442,7 +471,7 @@ class _SyncAllTile extends StatelessWidget {
         failed.isEmpty ? Icons.sync : Icons.sync_problem,
         color: failed.isEmpty ? null : error,
       ),
-      title: const Text('Synchronizuj'),
+      title: const Text('Synchronizuj konto'),
       subtitle: Text(subtitle),
       onLongPress: () => showFeatureInfo(context, FeatureInfos.accountSync),
       trailing: IconButton(
@@ -456,6 +485,116 @@ class _SyncAllTile extends StatelessWidget {
                 }
               },
       ),
+    );
+  }
+}
+
+/// "Synchronizuj wszystko": the account, the music catalog, sending the waiting requests and
+/// the update check, one after another — each as its own tile below does it.
+class _SyncEverythingTile extends StatefulWidget {
+  const _SyncEverythingTile();
+
+  @override
+  State<_SyncEverythingTile> createState() => _SyncEverythingTileState();
+}
+
+class _SyncEverythingTileState extends State<_SyncEverythingTile> {
+  bool _running = false;
+  List<String>? _failed;
+  DateTime? _finishedAt;
+
+  Future<void> _syncEverything() async {
+    // Everything is looked up before the first await (see [_accountSyncParts]).
+    final account = AccountScope.of(context);
+    final parts = account.loggedIn ? _accountSyncParts(context) : <_SyncPart>[];
+    final catalog = DatabaseSyncScope.of(context);
+    final outbox = OutboxScope.maybeOf(context);
+    final updates = AppUpdatesScope.maybeOf(context);
+    setState(() {
+      _running = true;
+      _failed = null;
+    });
+    final failed = <String>[];
+    try {
+      for (final part in parts) {
+        await part.sync();
+      }
+      if (parts.any((p) => p.last()?.problem != null)) {
+        failed.add('Konto');
+      }
+      if (catalog.hasSource && !await catalog.syncNow()) {
+        failed.add('Katalog muzyki');
+      }
+      if (outbox != null && outbox.waiting > 0 && catalog.hasServer) {
+        final sent = await outbox.send(
+          await catalog.serverAddresses(),
+          manual: true,
+        );
+        if (sent.problem != null) failed.add('Zgłoszenia poprawek');
+      }
+      if (updates != null && updates.configured) {
+        await updates.check();
+        if (updates.problem != null) failed.add('Aktualizacje');
+      }
+    } catch (e) {
+      debugPrint('Syncing everything failed: $e');
+      failed.add('błąd: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _running = false;
+          _failed = failed;
+          _finishedAt = DateTime.now();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final error = Theme.of(context).colorScheme.error;
+    final failed = _failed;
+    final at = _finishedAt;
+    String two(int n) => n.toString().padLeft(2, '0');
+    final parts = [
+      if (AccountScope.of(context).loggedIn) 'konto',
+      'katalog muzyki',
+      if (OutboxScope.maybeOf(context) != null) 'zgłoszenia poprawek',
+      if (AppUpdatesScope.maybeOf(context)?.configured ?? false) 'aktualizacje',
+    ];
+    final covers = parts.length == 1
+        ? parts.single
+        : '${parts.sublist(0, parts.length - 1).join(', ')} i ${parts.last}';
+    final String subtitle;
+    if (_running) {
+      subtitle = 'Synchronizowanie…';
+    } else if (failed != null && failed.isNotEmpty) {
+      subtitle = 'Nie udało się: ${failed.join(', ')} — szczegóły niżej';
+    } else if (failed != null && at != null) {
+      subtitle = 'Zsynchronizowano o ${two(at.hour)}:${two(at.minute)}';
+    } else {
+      subtitle = '${covers[0].toUpperCase()}${covers.substring(1)}';
+    }
+    final problem = failed != null && failed.isNotEmpty && !_running;
+    return ListTile(
+      enabled: !_running,
+      leading: Icon(
+        problem ? Icons.sync_problem : Icons.cloud_sync_outlined,
+        color: problem ? error : palette.accent,
+      ),
+      title: Text(
+        'Synchronizuj wszystko',
+        style: TextStyle(color: palette.accent, fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(subtitle, style: problem ? TextStyle(color: error) : null),
+      trailing: _running
+          ? const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : null,
+      onTap: _running ? null : _syncEverything,
     );
   }
 }

@@ -259,7 +259,15 @@ import, Wyświetlanie, Dane, Aplikacja.
 - Konto **→ Konto** (`account_screen.dart`) — **implemented**: logging in with a MusicDatabase
   user ("Nazwa użytkownika", "Hasło", "Zaloguj"; checked by the server, which hands back a
   token), or the logged-in user and "Wyloguj" (asks first)
-  ([ADR 0006](decisions/0006-musicdatabase-login.md)). Logged in, one row **"Synchronizuj"**
+  ([ADR 0006](decisions/0006-musicdatabase-login.md)). On top, **"Synchronizuj wszystko"**
+  (logged in or not): the account's sync, then "Pobierz teraz" of the catalog, "Wyślij teraz"
+  of the waiting requests (with a server) and the update check (in builds that know their
+  releases), one after another — "Synchronizowanie…", then the time or which of them failed.
+  Below the account, sections with the very same tiles as their own screens (shared widgets):
+  *Katalog muzyki* (`DatabaseDownloadTiles` — Serwer's "Pobieranie"), *Zgłoszenia poprawek*
+  (`OutboxSendTiles` — from "Czeka na wysłanie" to "Wyeksportuj ponownie ostatnią paczkę") and
+  *Aktualizacje* (`updateCheckTile` — Informacje i pomoc's tile); the switches and addresses
+  stay on those screens. Logged in, one row **"Synchronizuj konto"**
   covers everything that syncs with the account — playlists, moods (and global-mood changes),
   folders, listening stats, liked and saved songs, links saved for later — showing "Wszystko
   zsynchronizowane (najpóźniej o HH:MM)", "Synchronizowanie…" or which part failed and why, with
@@ -524,7 +532,7 @@ import, Wyświetlanie, Dane, Aplikacja.
 A long press on these opens a sheet — what it is, what it's for, how it works, libraries, what it
 connects to, buttons (Prywatność i połączenia; Wyloguj z Google; Konto): the bottom bar's Home
 and Odkrywaj; a song menu's "Przejdź do radia utworu" (`MenuSheetEntry.onLongPress`);
-Ustawienia › Konto › the Google account's e-mail and "Synchronizuj"; Ja › Statystyki słuchania;
+Ustawienia › Konto › the Google account's e-mail and "Synchronizuj konto"; Ja › Statystyki słuchania;
 Ustawienia › Serwer and › Zgłoszenia poprawek; Sposoby odtwarzania YouTube › NewPipeExtractor and
 youtube_explode; YouTube › NewPipeExtractor, youtube_explode and "Korzystaj z API"; Spotify ›
 Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce").

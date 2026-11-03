@@ -322,6 +322,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Anything new the phone stores to work offline (a cache) gets its settings in the
   `cache_settings_screen.dart` ("Pamięć podręczna" — the only name for it in the UI, not
   "cache"), not on the screen of the feature that fills it (user's decision).
+- Ustawienia › Konto gathers everything the phone syncs (the account, the catalog, the outbox,
+  app updates), each with the very widget its own screen uses (`DatabaseDownloadTiles`,
+  `OutboxSendTiles`, `updateCheckTile`), plus "Synchronizuj wszystko" running them in turn
+  (user's decision): something new that syncs gets a shared tile there and a step in
+  `_SyncEverythingTile`; its switches stay on its own screen.
 - A `SnackBar` with an `action` stays until closed by hand in this Flutter version (`persist`
   defaults to true) and floats over whatever is pushed on top — pass `persist: false`. Notes about
   the queue use `QueueToast` above the mini player instead (Spotify-like, user's choice).
