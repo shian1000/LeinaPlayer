@@ -16,16 +16,18 @@ class Loudness {
   /// What the songs are brought to, as Spotify and YouTube do.
   static const targetLufs = -14.0;
 
-  /// The peak may go this far over full scale before the gain is held back; the limiter
-  /// (`VolumeLeveling.kt`) takes the rest.
-  static const _limiterHeadroomDb = 6.0;
+  /// A boost never lifts the song's peak above this, so the limiter (`VolumeLeveling.kt`)
+  /// never has to squash it (user's choice: one steady gain for the whole song, its dynamics
+  /// untouched, as Spotify's "Normal" does).
+  static const peakCeilingDb = -1.0;
 
-  /// The gain bringing this recording [strength] (0–1) of the way to [targetLufs].
+  /// The gain bringing this recording [strength] (0–1) of the way to [targetLufs]: a cut in
+  /// full, a boost only as far as its peak allows — none when the peak isn't known.
   double gainDb(double strength) {
-    var gain = strength * (targetLufs - lufs);
+    final gain = strength * (targetLufs - lufs);
+    if (gain <= 0) return max(gain, -15.0);
     final peak = peakDb;
-    if (peak != null) gain = min(gain, _limiterHeadroomDb - peak);
-    return gain.clamp(-15.0, 10.0);
+    return peak == null ? 0 : min(gain, max(0.0, peakCeilingDb - peak));
   }
 }
 

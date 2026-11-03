@@ -237,7 +237,7 @@ class SourceSettings extends ChangeNotifier {
   int get levelingPercent => _levelingPercent;
 
   /// "Mierz głośność na telefonie": the phone measures the loudness of songs it has whole when
-  /// nothing else knows it (`LoudnessMeasurer`); off, those go through the compressor.
+  /// nothing else knows it (`LoudnessMeasurer`); off, those play unchanged.
   bool get levelingMeasure => _levelingMeasure;
 
   /// Whether the phone measures loudness right now.

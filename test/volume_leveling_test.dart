@@ -63,8 +63,8 @@ void main() {
       second.add(22);
       await pumpEventQueue();
       expect(calls.map((c) => '${c.method} ${c.arguments}'), [
-        'apply {session: 11, strength: 0.5}',
-        'apply {session: 22, strength: 0.5}',
+        'apply {session: 11, gainDb: 0.0}',
+        'apply {session: 22, gainDb: 0.0}',
       ]);
 
       calls.clear();
@@ -72,7 +72,7 @@ void main() {
       await pumpEventQueue();
       expect(calls.map((c) => '${c.method} ${c.arguments}'), [
         'release {session: 11}',
-        'apply {session: 33, strength: 0.5}',
+        'apply {session: 33, gainDb: 0.0}',
       ]);
 
       calls.clear();
@@ -91,8 +91,9 @@ void main() {
     final second = StreamController<int?>();
     final leveling = VolumeLeveling(
       [first.stream, second.stream],
-      (track) async =>
-          track.source == '/quiet.mp3' ? const Loudness(lufs: -20) : null,
+      (track) async => track.source == '/quiet.mp3'
+          ? const Loudness(lufs: -20, peakDb: -10)
+          : null,
     );
     leveling.strength = 0.5;
     first.add(11);
@@ -104,7 +105,7 @@ void main() {
         NowPlaying(title: 't', artist: 'a', source: source, coverSeed: 's');
     await leveling.trackLoading(1, song('/quiet.mp3'));
     expect(calls.map((c) => '${c.method} ${c.arguments}'), [
-      'apply {session: 22, strength: 0.5, gainDb: 3.0}',
+      'apply {session: 22, gainDb: 3.0}',
     ]);
 
     calls.clear();
@@ -112,7 +113,7 @@ void main() {
     expect(calls, isEmpty);
     await leveling.trackLoading(1, song('/unknown.mp3'));
     expect(calls.map((c) => '${c.method} ${c.arguments}'), [
-      'apply {session: 22, strength: 0.5}',
+      'apply {session: 22, gainDb: 0.0}',
     ]);
     await leveling.dispose();
   });

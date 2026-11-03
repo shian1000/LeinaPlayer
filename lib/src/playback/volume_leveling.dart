@@ -10,8 +10,8 @@ import 'player_controller.dart';
 /// players' audio sessions (`VolumeLeveling.kt`), so every source — a phone file, the server,
 /// YouTube — is leveled alike, crossfades included. Android only.
 ///
-/// A recording whose loudness is known ([loudnessOf]) gets a steady gain to
-/// [Loudness.targetLufs] instead of the compressor, so it keeps its dynamics.
+/// One steady gain for the whole song towards [Loudness.targetLufs], from its recording's
+/// loudness ([loudnessOf]); a song not measured yet plays as it is (0 dB).
 class VolumeLeveling {
   /// [sessions]: each player's `androidAudioSessionIdStream`.
   VolumeLeveling(List<Stream<int?>> sessions, [this._loudnessOf]) {
@@ -88,11 +88,9 @@ class VolumeLeveling {
     final id = _sessions[player]!;
     final strength = _strength;
     if (strength == null) return _call('release', {'session': id});
-    final gain = _loudness[player]?.gainDb(strength);
     return _call('apply', {
       'session': id,
-      'strength': strength,
-      'gainDb': ?gain,
+      'gainDb': _loudness[player]?.gainDb(strength) ?? 0.0,
     });
   }
 

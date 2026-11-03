@@ -71,13 +71,19 @@ void main() {
   });
 
   test('the gain goes the strength\'s part of the way to -14 LUFS', () {
-    const quiet = Loudness(lufs: -20);
+    const quiet = Loudness(lufs: -20, peakDb: -12);
     expect(quiet.gainDb(1), 6);
     expect(quiet.gainDb(0.5), 3);
-    expect(const Loudness(lufs: -8).gainDb(1), -6);
-    // A peak at -1 dBFS may rise only to the limiter's headroom.
-    expect(const Loudness(lufs: -24, peakDb: -1).gainDb(1), 7);
-    expect(const Loudness(lufs: -40).gainDb(1), 10);
+    expect(const Loudness(lufs: -8, peakDb: 0).gainDb(1), -6);
+    expect(const Loudness(lufs: -40, peakDb: 0).gainDb(1), 0);
+  });
+
+  test('a boost stops where the peak would pass -1 dBFS; a cut never does', () {
+    expect(const Loudness(lufs: -24, peakDb: -4).gainDb(1), 3);
+    expect(const Loudness(lufs: -20, peakDb: 0.5).gainDb(1), 0);
+    expect(const Loudness(lufs: -20).gainDb(1), 0, reason: 'peak unknown');
+    expect(const Loudness(lufs: -6).gainDb(1), -8);
+    expect(const Loudness(lufs: 5, peakDb: 3).gainDb(1), -15);
   });
 
   group('the scan', () {

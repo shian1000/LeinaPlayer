@@ -354,9 +354,10 @@ import, Wyświetlanie, Dane, Aplikacja.
   *Głośność*: "Wyrównywanie głośności" (switch, default off; "Ten telefon tego nie obsługuje"
   and disabled without Android's DynamicsProcessing) and "Intensywność" — slider 10–100 %
   (10 % steps, default 50 %, "Łagodnie"–"Mocno", enabled only with the switch on): how strongly
-  loud and quiet songs are pulled to one loudness, every source and crossfades included; a
-  recording of known loudness (measured by the phone, or ReplayGain tags) gets a steady gain,
-  others the compressor (`volume_leveling.dart`, `recordings.dart`, `loudness_measurer.dart`,
+  loud and quiet songs are pulled to one loudness, every source and crossfades included — one
+  steady gain for the whole song, a boost only as far as its peak allows, from its loudness
+  measured by the phone or ReplayGain tags; a song not measured yet plays unchanged
+  (`volume_leveling.dart`, `recordings.dart`, `loudness_measurer.dart`,
   `VolumeLeveling.kt`, `LoudnessMeter.kt`). Then "Mierz głośność na telefonie" (switch, default
   on, enabled only with leveling on; "Gdy nie ma jej w bazie ani w tagach pliku") with a note on
   what it measures, when, and what it costs (`SourceSettings.levelingMeasure`). Section

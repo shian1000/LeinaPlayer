@@ -106,15 +106,18 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 - "Wyrównywanie głośności" (Ustawienia › Odtwarzanie, `SourceSettings.leveling` /
   `levelingPercent`, 10–100 %): `VolumeLeveling` follows both players'
   `androidAudioSessionIdStream` and puts Android's `DynamicsProcessing` on each session
-  (`VolumeLeveling.kt`, Android 9+): a one-band compressor (threshold −10 → −30 dB, ratio 1 → 4
-  with the strength, slow 30 / 600 ms so it follows a song's loudness rather than each beat),
-  make-up gain, and a limiter at −1 dB. Done in the audio framework, not in Dart, so it costs
-  next to nothing and covers every source and both crossfading players without touching
-  `setVolume`. The values were picked on paper, then sounded right to the user at 50 %.
-  A recording whose loudness is known gets a steady gain instead, with the compressor off
-  (input gain of the same effect, so cuts and boosts both work; the limiter stays):
-  `Loudness.gainDb` = strength × (−14 LUFS − its loudness), held back so the peak goes at most
-  6 dB over full scale, within −15…+10 dB. Loudness is kept per recording, never per song —
+  (`VolumeLeveling.kt`, Android 9+) as one steady input gain for the whole song (cuts and boosts
+  both work, unlike `setVolume`), with a limiter at −1 dB only as a safety net. Done in the
+  audio framework, so it costs next to nothing and covers every source and both crossfading
+  players. `Loudness.gainDb` = strength × (−14 LUFS − the recording's loudness): a cut in full
+  (down to −15 dB), a boost only until the measured peak reaches −1 dBFS (`peakCeilingDb`), none
+  when the peak isn't known — so the limiter never squashes anything. A song not measured yet
+  plays unchanged (0 dB). No compressor (user's decision, 2026-11-03): the first version
+  compressed unmeasured songs and let boosts push peaks 6 dB into the limiter, and both were
+  heard as the music ducking in songs with a wide dynamic range; the user wants Spotify
+  "Normal"-like leveling — the whole song moved by so many dB, its dynamics untouched. The price:
+  a first play with no known loudness isn't leveled, and a quiet, very dynamic recording isn't
+  lifted all the way. Loudness is kept per recording, never per song —
   each is mastered differently: `local.db`'s `recordings` table (`recordings.dart`) keyed by
   (`source`, `key`) — a server `files.id`, else a YouTube video id (also when it plays from the
   cache or a download), else a phone file's path (`Recordings.keyOf`). It also keeps the
@@ -141,7 +144,7 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
     the meter only 1–2.5 s of it: the rest is MediaCodec (an IPC round per small Opus packet),
     not helped by feeding / draining the codec without waits. Fine in practice — songs cached
     ahead are measured long before they play — but a first pass over a big cache takes a while.
-  A stream played the first time (not cached ahead) has no value yet and gets the compressor;
+  A stream played the first time (not cached ahead) has no value yet and plays unchanged;
   it's measured once it's cached. The gain is set by `JustAudioBackend`'s `onLoading` before a
   song loads on its player, so each of two crossfading songs has its own; a value found while a
   song plays waits for its next play (no jump mid-song). Not in the backup (paths are the

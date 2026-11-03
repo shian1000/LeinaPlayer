@@ -238,10 +238,10 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Text(
-            'Jak mocno przybliżać utwory do jednej głośności: głośniejsze są ściszane, '
-            'cichsze podgłaśniane, a ogranicznik nie pozwala im przesterować. Utwór o znanej '
-            'głośności dostaje stałe wzmocnienie i brzmi jak w oryginale, tylko ciszej lub '
-            'głośniej; pozostałe wyrównuje na bieżąco kompresor. Działa dla każdego źródła, '
+            'Jak mocno przybliżać utwory do jednej głośności. Cały utwór jest ściszany lub '
+            'podgłaśniany o tę samą wartość, więc brzmi jak w oryginale — ciche i głośne '
+            'fragmenty zostają takie, jakie były. Cichy utwór jest podgłaśniany tylko tyle, '
+            'żeby jego najgłośniejsze miejsca nie przesterowały. Działa dla każdego źródła, '
             'także przy przenikaniu.',
             style: TextStyle(
               color: palette.textSecondary,
@@ -259,12 +259,12 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Text(
-            'Telefon raz przesłuchuje w tle każdy utwór, który ma w całości (pliki na '
-            'telefonie, pobrane, zapisane w pamięci podręcznej — także następne z kolejki), '
-            'i zapamiętuje jego głośność, żeby grał ze stałym wzmocnieniem zamiast przez '
-            'kompresor. Utwór słuchany pierwszy raz bez zapisu mierzony jest, gdy trafi do '
-            'pamięci podręcznej. Zajmuje to od kilku do ok. 30 sekund pracy telefonu na '
-            'utwór; wyłączone — niezmierzone utwory wyrównuje kompresor.',
+            'Żeby wyrównać utwór, trzeba znać jego głośność. Telefon raz przesłuchuje w tle '
+            'każdy utwór, który ma w całości (pliki na telefonie, pobrane, zapisane w pamięci '
+            'podręcznej — także następne z kolejki), i ją zapamiętuje. Utwór słuchany pierwszy '
+            'raz bez zapisu gra bez zmian i jest mierzony, gdy trafi do pamięci podręcznej. '
+            'Zajmuje to od kilku do ok. 30 sekund pracy telefonu na utwór. Wyłączone — '
+            'wyrównywane są tylko pliki z zapisaną głośnością (tagi ReplayGain).',
             style: TextStyle(
               color: palette.textSecondary,
               fontSize: AppFontSize.small,

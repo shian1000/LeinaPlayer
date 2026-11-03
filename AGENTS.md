@@ -40,9 +40,9 @@ screen with reordering and swipe-to-remove, caching the next songs ahead; rememb
 restarts, and so is the queue of several songs that playing something else replaced, brought
 back by Kolejka's "Przywróć poprzednią kolejkę"), crossfading into the next song (Ustawienia ›
 Odtwarzanie, 0–12 s), volume leveling there too (Android's DynamicsProcessing on both
-players, on/off and a strength: a steady gain for a recording of known loudness — ReplayGain
-tags or the phone's own EBU R128 measurement of files it has whole, kept per recording, never
-per song — a compressor for the rest; [`local-library.md`](docs/agent-notes/local-library.md)), dragging a song row right to play it next or add it to the queue (as
+players, on/off and a strength: one steady gain for the whole song, no compressor — from
+ReplayGain tags or the phone's own EBU R128 measurement of files it has whole, kept per
+recording, never per song; [`local-library.md`](docs/agent-notes/local-library.md)), dragging a song row right to play it next or add it to the queue (as
 set in Odtwarzanie) and left to take it out of a playlist / mood / Na później, and a
 media notification with previous/next (keeps playing in the background); scrolled down, the full
 player shows everything music.db / tag.db / the phone know about the song (all of it for now,
