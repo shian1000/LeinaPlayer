@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../app_name.dart';
 import '../data/local_library.dart';
 import '../data/user_backup.dart';
 import '../theme.dart';
@@ -33,7 +34,7 @@ class BackupScreen extends StatelessWidget {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'application/zip')],
-          subject: 'Kopia zapasowa Leina Radio',
+          subject: 'Kopia zapasowa $appName',
         ),
       );
     } catch (e) {

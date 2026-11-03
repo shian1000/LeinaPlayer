@@ -219,7 +219,7 @@ master), `youTubePlaylistSearch` (also needs YouTube search on), `spotifyPlaylis
 ## Sharing
 
 A song's "Udostępnij" (search/Ostatnie ⋮, playlist track ⋮, full player) opens
-`showSongShareSheet`: Leina Radio and MP3 are dummies (user's decision, for now); YouTube and
+`showSongShareSheet`: Leina Player and MP3 are dummies (user's decision, for now); YouTube and
 Spotify share the song's link through the phone's share sheet. `SearchHit.spotifyUri` prefers
 MusicDatabase's `spotify_url` (`CatalogSong.spotifyTrackId`, only when it's a track page — it may
 be an album page) over the Spotify playlist's track. `SearchHit` copies go through

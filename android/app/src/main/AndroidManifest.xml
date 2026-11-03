@@ -33,7 +33,7 @@
     <!-- Cleartext allowed because that server is reached over Tailscale (already encrypted) and
          is typically a plain `python3 -m http.server`; see docs/decisions/0002-database-download.md. -->
     <application
-        android:label="Leina Radio"
+        android:label="Leina Player"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app_name.dart';
 import '../data/incoming_links.dart';
 import '../data/later_links.dart';
 import '../data/local_library.dart';
@@ -159,7 +160,7 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
                     ? 'Nic tu jeszcze nie ma.\n\nGdy ktoś przyśle Ci link z YouTube albo '
                           'Spotify, stuknij go i w okienku „Otwórz w…” wybierz „Zapisz na '
                           'później” — potem wskaż, od kogo jest.\n\nOkienko pokazuje się, gdy '
-                          'linki otwiera Leina Radio i nie zapamiętano wyboru (Ustawienia › '
+                          'linki otwiera $appName i nie zapamiętano wyboru (Ustawienia › '
                           'Otwieranie linków).'
                     : 'Nic od tej osoby.',
                 textAlign: TextAlign.center,
@@ -194,7 +195,7 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       entries: [
         MenuSheetEntry(
           Icons.play_arrow,
-          'Otwórz w Leina Radio',
+          'Otwórz w $appName',
           onTap: () => _open(link),
         ),
         MenuSheetEntry(

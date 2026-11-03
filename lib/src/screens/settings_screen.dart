@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_name.dart';
 import '../data/text_normalizer.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -244,7 +245,7 @@ const _sections = <(String, List<_SettingsEntry>)>[
         keywords: [
           'Linki YouTube',
           'Linki Spotify',
-          'Otwieraj linki w Leina Radio',
+          'Otwieraj linki w $appName',
         ],
       ),
       _SettingsEntry(

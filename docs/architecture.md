@@ -85,7 +85,7 @@ week), `ListeningSummary` (years and seasons), by `listening_stats_screen.dart` 
 `listening_summary_screen.dart`.
 
 Links from outside (Android): a tapped YouTube/Spotify link opens the native
-`LinkChooserActivity.kt` sheet (Leina Radio / the service's app / a browser, or a remembered
+`LinkChooserActivity.kt` sheet (Leina Player / the service's app / a browser, or a remembered
 choice); links shared to the app and links the sheet hands on reach `MainActivity.kt`'s
 `LinksBridge`, which passes them to `IncomingLinks` (`incoming_links.dart`); `AppShell` imports a
 playlist or album, or plays a video or Spotify track (`video_link.dart`) — now, next or at the

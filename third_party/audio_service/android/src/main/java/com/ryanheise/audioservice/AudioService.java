@@ -362,7 +362,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     public void onDestroy() {
         super.onDestroy();
         if (listener != null) {
-            // Leina Radio patch: cleared before calling it, so a listener whose engine outlives
+            // Leina Player patch: cleared before calling it, so a listener whose engine outlives
             // the service can register itself again (see AudioHandlerInterface.onDestroy).
             ServiceListener destroyed = listener;
             listener = null;
@@ -707,7 +707,7 @@ public class AudioService extends MediaBrowserServiceCompat {
     }
 
     private void enterPlayingState() {
-        // Leina Radio patch: the session and wake lock first, as Android refuses the foreground
+        // Leina Player patch: the session and wake lock first, as Android refuses the foreground
         // start from the background (Android 12+), and the exception used to skip them too. It
         // still reaches Dart (AudioService.asyncError), to be logged there.
         if (!mediaSession.isActive())

@@ -30,8 +30,8 @@ void main() {
           'body': 'Nowy ekran prywatności',
           'assets': [
             {
-              'name': 'LeinaRadio-1.0.0+58.apk',
-              'browser_download_url': 'https://example.com/LeinaRadio.apk',
+              'name': 'LeinaPlayer-1.0.0+58.apk',
+              'browser_download_url': 'https://example.com/LeinaPlayer.apk',
             },
           ],
         }),
@@ -56,7 +56,7 @@ void main() {
   );
 
   Future<PackageInfo> packageInfo() async => PackageInfo(
-    appName: 'Leina Radio',
+    appName: 'Leina Player',
     packageName: 'x',
     version: '1.0.0',
     buildNumber: '57',

@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../app_name.dart';
 import 'song_catalog.dart';
 import 'song_requests.dart';
 import 'text_normalizer.dart';
@@ -898,7 +899,7 @@ class Outbox extends ChangeNotifier {
     await packages.create(recursive: true);
     final now = _now();
     final zip = File(
-      '${packages.path}/zgloszenia-${sender ?? 'leina-radio'}-'
+      '${packages.path}/zgloszenia-${sender ?? 'leina-player'}-'
       '${_datePart(now)}_${_timePart(now)}.zip',
     );
     await zip.writeAsBytes(ZipEncoder().encodeBytes(archive));
@@ -976,7 +977,7 @@ class Outbox extends ChangeNotifier {
             'format': format,
             'created_at': _timestamp(created),
             'user_name': user,
-            'app': 'Leina Radio',
+            'app': appName,
           });
           await db.execute(_schemas[table]!);
         },

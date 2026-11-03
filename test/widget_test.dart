@@ -234,17 +234,17 @@ void main() {
     expect(find.text('Przeglądarka'), findsOneWidget);
     expect(find.text('Pytaj za każdym razem'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('Otwieraj linki w Leina Radio'),
+      find.text('Otwieraj linki w Leina Player'),
       200,
     );
-    expect(find.text('Otwieraj linki w Leina Radio'), findsOneWidget);
+    expect(find.text('Otwieraj linki w Leina Player'), findsOneWidget);
   });
 
   testWidgets(
     'Informacje i pomoc: version, private use, licence and source link',
     (tester) async {
       PackageInfo.setMockInitialValues(
-        appName: 'Leina Radio',
+        appName: 'Leina Player',
         packageName: 'music_database_app',
         version: '1.2.3',
         buildNumber: '45',

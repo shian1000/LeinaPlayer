@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../app_name.dart';
 import 'local_library.dart';
 
 /// "Kopia zapasowa" (sharing checklist 4.1): everything the user made on the phone in one `.zip`
@@ -147,7 +148,7 @@ class UserBackup extends ChangeNotifier {
         final out = Directory('${root.path}/backup');
         if (await out.exists()) await out.delete(recursive: true);
         await out.create(recursive: true);
-        final zip = File('${out.path}/leina-radio-kopia-${_stamp(now)}.zip');
+        final zip = File('${out.path}/leina-player-kopia-${_stamp(now)}.zip');
         await zip.writeAsBytes(ZipEncoder().encodeBytes(archive));
         await prefs.setInt(_lastExportKey, now.millisecondsSinceEpoch);
         _lastExport = now;
@@ -224,7 +225,7 @@ class UserBackup extends ChangeNotifier {
     List<int> bytes,
   ) {
     const notBackup = BackupException(
-      'To nie jest plik kopii zapasowej Leina Radio.',
+      'To nie jest plik kopii zapasowej $appName.',
     );
     final Archive archive;
     try {
@@ -248,7 +249,7 @@ class UserBackup extends ChangeNotifier {
     if ((json['version'] as int? ?? 0) > formatVersion ||
         (json['local_db_version'] as int? ?? 0) > LocalLibrary.schemaVersion) {
       throw const BackupException(
-        'Kopia pochodzi z nowszej wersji aplikacji. Zaktualizuj Leina Radio '
+        'Kopia pochodzi z nowszej wersji aplikacji. Zaktualizuj $appName '
         'i spróbuj ponownie.',
       );
     }

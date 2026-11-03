@@ -18,7 +18,7 @@ void main() {
     'html_url': 'https://github.com/owner/repo/releases/tag/$tag',
     'body': '- Nowość\r\n- Poprawka\r\n',
     'assets': [
-      for (final name in assets ?? ['LeinaRadio-$tag.apk'])
+      for (final name in assets ?? ['LeinaPlayer-$tag.apk'])
         {
           'name': name,
           'browser_download_url':
@@ -68,7 +68,7 @@ void main() {
     expect(found.label, '1.0.0 (58)');
     expect(
       found.apkUrl.toString(),
-      'https://github.com/owner/repo/releases/download/1.0.0+58/LeinaRadio-1.0.0+58.apk',
+      'https://github.com/owner/repo/releases/download/1.0.0+58/LeinaPlayer-1.0.0+58.apk',
     );
     expect(found.notes, '- Nowość\n- Poprawka');
     expect(updates.shouldOffer, isTrue);
@@ -176,19 +176,19 @@ void main() {
   test('the APK for this phone\'s CPU, else the universal one', () async {
     latest = release(
       '1.0.0+70',
-      assets: ['LeinaRadio-1.0.0+70.apk', 'LeinaRadio-1.0.0+70-arm64-v8a.apk'],
+      assets: ['LeinaPlayer-1.0.0+70.apk', 'LeinaPlayer-1.0.0+70-arm64-v8a.apk'],
     );
     String? apkFor(String? abi) {
       final found = AppRelease.fromGitHub(latest, abi: abi);
       return found?.apkUrl.pathSegments.last;
     }
 
-    expect(apkFor('arm64-v8a'), 'LeinaRadio-1.0.0+70-arm64-v8a.apk');
-    expect(apkFor('armeabi-v7a'), 'LeinaRadio-1.0.0+70.apk');
-    expect(apkFor(null), 'LeinaRadio-1.0.0+70.apk');
+    expect(apkFor('arm64-v8a'), 'LeinaPlayer-1.0.0+70-arm64-v8a.apk');
+    expect(apkFor('armeabi-v7a'), 'LeinaPlayer-1.0.0+70.apk');
+    expect(apkFor(null), 'LeinaPlayer-1.0.0+70.apk');
 
     // A release with only a split APK offers nothing to a phone it doesn't fit.
-    latest = release('1.0.0+70', assets: ['LeinaRadio-1.0.0+70-arm64-v8a.apk']);
+    latest = release('1.0.0+70', assets: ['LeinaPlayer-1.0.0+70-arm64-v8a.apk']);
     expect(apkFor('armeabi-v7a'), isNull);
 
     final updates = newUpdates(abi: 'arm64-v8a');
@@ -196,7 +196,7 @@ void main() {
     await updates.check();
     expect(
       updates.available?.apkUrl.pathSegments.last,
-      'LeinaRadio-1.0.0+70-arm64-v8a.apk',
+      'LeinaPlayer-1.0.0+70-arm64-v8a.apk',
     );
   });
 }

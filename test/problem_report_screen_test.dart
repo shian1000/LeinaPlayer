@@ -37,7 +37,7 @@ void main() {
         ProblemReportScreen(
           log: log,
           packageInfo: () async => PackageInfo(
-            appName: 'Leina Radio',
+            appName: 'Leina Player',
             packageName: 'x',
             version: '1.0.0',
             buildNumber: '72',

@@ -63,7 +63,7 @@ YouTubeLinkTarget? parseYouTubeLink(String text) {
 }
 
 /// How a video or track link opened in the app plays — asked by the native chooser after
-/// "Leina Radio" (`LinkChooserActivity.kt`); playlists and albums are imported whatever it says.
+/// "Leina Player" (`LinkChooserActivity.kt`); playlists and albums are imported whatever it says.
 enum LinkPlay {
   now,
 

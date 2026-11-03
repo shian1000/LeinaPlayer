@@ -58,7 +58,7 @@ CREATE TABLE request (
   format INTEGER NOT NULL,      -- 1; goes up on incompatible changes
   created_at TEXT NOT NULL,     -- ISO 8601 with offset, e.g. 2026-10-12T23:44:05+02:00
   user_name TEXT,               -- NULL until user names exist
-  app TEXT NOT NULL             -- 'Leina Radio'
+  app TEXT NOT NULL             -- 'Leina Player' ('Leina Radio' before the rename)
 );
 
 -- music.db's songs.youtube_video_id that YouTube no longer plays.

@@ -146,7 +146,7 @@ default cache → NewPipe → youtube_explode → yt-dlp server → YouTube app)
 The YouTube app method opens `https://www.youtube.com/watch?v=<id>` — on Android by naming the
 YouTube app's package (`openInYouTubeApp` → `MainActivity.kt`, then a browser that isn't this
 app), never through url_launcher's "whatever handles the link": the app handles YouTube links
-itself now, so that would open Leina Radio again. Elsewhere url_launcher (`openInYouTube`) — for a song played from an imported YouTube
+itself now, so that would open Leina Player again. Elsewhere url_launcher (`openInYouTube`) — for a song played from an imported YouTube
 playlist, `watch?v=<that playlist's video>&list=<playlist id>` instead (`TrackPlayer.youTubeUri`;
 the playlist's video may differ from music.db's, and only it opens at the song's place in the
 playlist). It pauses our player and ends — it can't report whether the video
@@ -169,16 +169,16 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   "Wróć"; user's request, 2026-11-01) and anything else (playlists, albums, `spotify.link`, other
   text) is passed on to `MainActivity` as the same `SEND`. `VIEW` (a tapped link: youtube.com / m. / music. / youtu.be, open.spotify.com,
   spotify.link, spotify.app.link) goes to `LinkChooserActivity` (user's decision): a native,
-  translucent activity with a half-screen sheet "Otwórz w…" — Leina Radio (hidden for paths the
+  translucent activity with a half-screen sheet "Otwórz w…" — Leina Player (hidden for paths the
   app can't use, e.g. a channel), the service's app (only if installed), the default browser —
   plus "Zapamiętaj wybór". Native so it shows at once over the app the link was tapped in,
-  without starting Flutter. Leina Radio forwards the link to `MainActivity` (NEW_TASK |
+  without starting Flutter. Leina Player forwards the link to `MainActivity` (NEW_TASK |
   CLEAR_TOP | SINGLE_TOP → `onNewIntent` on a running app). For a video or Spotify track it
   first asks "Jak odtworzyć?" — Odtwórz teraz / Odtwórz jako następny / Dodaj do kolejki (user's
   request); the answer rides as the `EXTRA_PLAY` extra (`next` / `end`, none = now), and
   `LinksBridge` hands Dart each link as `{url, play}` (`IncomingLink`, `LinkPlay`). Queued songs
   go through `queueSongs` (the "Dodano do kolejki" toast) and leave the app's screen as it was.
-  A remembered Leina Radio choice skips the question and plays now, as before.
+  A remembered Leina Player choice skips the question and plays now, as before.
 - Remembered choices (ask / leina / app / browser, per service) live in native
   SharedPreferences `link_chooser`, read and set from Dart over the links channel
   (`readLinkChoices` / `saveLinkChoice`; Ustawienia › Otwieranie linków). The sheet takes the
@@ -198,7 +198,7 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   Both app packages are in `<queries>`.
 - Not `autoVerify` — only YouTube/Spotify can verify their domains, so on Android 12+ their apps
   keep the links until the user turns off "Otwieraj obsługiwane linki" for them and allows the
-  links for Leina Radio (Otwieranie linków explains it and opens the settings screen). Older
+  links for Leina Player (Otwieranie linków explains it and opens the settings screen). Older
   Android (the Huawei) shows the system chooser first, unless an app was set as "always".
 - Delivery: `AudioServiceActivity` keeps one cached engine, so a link can arrive (a) on a cold
   start — `LinksBridge` keeps it and Dart asks with `initialLink` after the first frame, when

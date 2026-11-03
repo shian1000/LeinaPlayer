@@ -75,7 +75,7 @@ Future<File> saveProblemReport(String report, DateTime at) async {
   String two(int n) => n.toString().padLeft(2, '0');
   final dir = await getTemporaryDirectory();
   final file = File(
-    '${dir.path}/leina-radio-raport-${at.year}-${two(at.month)}-${two(at.day)}_'
+    '${dir.path}/leina-player-raport-${at.year}-${two(at.month)}-${two(at.day)}_'
     '${two(at.hour)}-${two(at.minute)}.txt',
   );
   await file.writeAsString(report, flush: true);

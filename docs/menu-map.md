@@ -17,9 +17,9 @@ Legend: **→** opens another screen/sheet; **implemented** marks what does some
 
 ## From outside the app (Android)
 
-The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package id unchanged).
+The app is called **Leina Player** on the phone (`lib/src/app_name.dart`; package id unchanged).
 
-- "Udostępnij" → Leina Radio, or a YouTube link opened with the app (`incoming_links.dart`,
+- "Udostępnij" → Leina Player, or a YouTube link opened with the app (`incoming_links.dart`,
   handled in `AppShell._onLink`): a playlist link (`playlist?list=`) is imported like Playlista ›
   Importuj playlistę (or updated, if imported before) and opened in Biblioteka; a video link
   (`watch?v=`, `youtu.be/`, `shorts/`, also with `&list=`) is recognised as a MusicDatabase song
@@ -34,7 +34,7 @@ The app is called **Leina Radio** on the phone (`lib/src/app_name.dart`; package
 ## First start (`first_run_screen.dart`)
 
 A fresh install (no catalog downloaded, "Pobieraj z GitHuba" never set) opens over `AppShell` a
-full screen "Witaj w Leina Radio" — "Pobierać bazę danych muzyki z GitHuba?", without a way back:
+full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?", without a way back:
 - **Tak, pobieraj z GitHuba** — the switch stays on, the catalog downloads at once.
 - **Nie, bez GitHuba** — Ustawienia › Serwer › "Pobieraj z GitHuba" is switched off.
 
@@ -237,7 +237,7 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   Zmień nazwę / Usuń osobę — with their links, asks first), rows newest first (service icon,
   title and artist looked up by the app, else the kind; "od: <osoba>", date; a dot until
   opened). Tap opens it like a link given to the app (plays / imports) and marks it listened;
-  ⋮ / long press: Otwórz w Leina Radio, Dodaj do kolejki / Odtwórz jako następny (następną
+  ⋮ / long press: Otwórz w Leina Player, Dodaj do kolejki / Odtwórz jako następny (następną
   for a playlist — the song of a video / track, or every track of a playlist / album read like a
   preview, nothing saved; `songsForLaterLink`), Oznacz jako (nie)odsłuchany, Zmień, od kogo jest (incl.
   Nowa osoba), Otwórz w aplikacji YouTube/Spotify, Kopiuj link, Usuń z „Na później”.
@@ -483,11 +483,11 @@ import, Wyświetlanie, Dane, Aplikacja.
 ### Aplikacja
 
 - Otwieranie linków **→ Otwieranie linków** (`link_settings_screen.dart`) — **implemented**:
-  "Linki z YouTube" / "Linki ze Spotify" (dialog: Pytaj za każdym razem — default, Leina Radio,
+  "Linki z YouTube" / "Linki ze Spotify" (dialog: Pytaj za każdym razem — default, Leina Player,
   Aplikacja YouTube/Spotify, Przeglądarka; the same choice "Zapamiętaj wybór" in the link sheet
-  sets; Leina Radio for a video or track then asks "Jak odtworzyć?" — Odtwórz teraz, Odtwórz
+  sets; Leina Player for a video or track then asks "Jak odtworzyć?" — Odtwórz teraz, Odtwórz
   jako następny, Dodaj do kolejki — unless remembered (plays now); the sheet also has "Zapisz na później" → "Od kogo?", see Ja › Na później), what a link does in the app, how to give the links to the app in the phone settings,
-  "Otwieraj linki w Leina Radio" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
+  "Otwieraj linki w Leina Player" (the phone's "Otwieraj domyślnie" for the app — Android 12+;
   app info on older ones). The sheet itself is native (`LinkChooserActivity.kt`, see
   [`agent-notes/youtube.md`](agent-notes/youtube.md)).
 - Prywatność i połączenia **→ Prywatność i połączenia** (`privacy_screen.dart`) — **implemented**:
@@ -500,7 +500,7 @@ import, Wyświetlanie, Dane, Aplikacja.
   odtwarzania, YouTube, Pamięć podręczna, Spotify, Źródła okładek, Oszczędzanie danych,
   Informacje i pomoc) or "Tylko gdy sam tego użyjesz"; last "Synchronizacja danych".
 - Informacje i pomoc **→ Informacje i pomoc** (`about_screen.dart`) — **implemented**: the
-  version at the top ("Leina Radio — wersja": `version` from `pubspec.yaml`, the build number
+  version at the top ("Leina Player — wersja": `version` from `pubspec.yaml`, the build number
   and commit, e.g. "1.0.0 (kompilacja 26, c11e6c4+zmiany)" — see `tool/build_release_apk.sh`); then,
   only in builds with `tool/release.env`, "Aktualizacje" (the newest GitHub release: "Dostępna
   wersja … — stuknij, żeby pobrać" in the accent colour opens the update dialog, otherwise the
@@ -704,7 +704,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     it's a track page, else the Spotify playlist's track), Plik (**implemented**: the audio file the
     phone has — its own, a server file downloaded with "Pobierz", or YouTube audio in the cache —
     to the phone's share sheet; not "MP3", since YouTube audio is webm/m4a). Each without a link
-    or file is dimmed; tapping it says why. ("Leina Radio" was removed — user's decision.)
+    or file is dimmed; tapping it says why. ("Leina Player" was removed — user's decision.)
 - Odkryj coś nowego (**implemented**, `discoverGenres`): up to six of music.db's genres
   (`songs.genre`), another draw each day, as `#genre` cards **→ the genre's songs**; left out
   while music.db has no genres.
@@ -953,7 +953,7 @@ Opened from Biblioteka's "+" (prefix `Biblioteka › Utwórz (+)`), also on a ca
 - Spotify-branded entries ("Spotify Singles", "Netflix" category, "Pokaż kod Spotify").
 - Removed (user's decision, 2026-10-16): Utwórz › Współtworzone playlisty and Blend (they need
   friends' accounts on MusicDatabase — back to it with those), Pokaż kod playlisty (the link is
-  in Udostępnij), Udostępnij › Leina Radio, Home's Podcasty filter and sample rows, Wyszukaj's
+  in Udostępnij), Udostępnij › Leina Player, Home's Podcasty filter and sample rows, Wyszukaj's
   Spotify categories.
 - Removed at the user's request: settings entries "Reklama", "Kontrola rodzicielska",
   "Prywatność i funkcje społecznościowe", "Wyświetlane treści", "Aplikacje i urządzenia", the

@@ -13,7 +13,7 @@ build, verify, English release notes, the prefilled link, and the check after pu
 2. `tool/prepare_release.sh` (or the desktop shortcut "Przygotuj wydanie Leina Radio"): builds
    the universal APK unless the current one is fresh, then the split ones (Flutter makes no
    universal APK in a split build — two builds), all signed with the release key
-   ([`signing.md`](signing.md)); copies `build/release/LeinaRadio-<version>+<build>.apk`
+   ([`signing.md`](signing.md)); copies `build/release/LeinaPlayer-<version>+<build>.apk`
    (universal, ~69 MB) and `…-arm64-v8a.apk` (~25 MB) and prints `TAG=<version>+<build>`.
 3. On GitHub: new release with **exactly that tag** (`1.0.0+58`), **both APKs** attached, and
    the notes ("Co nowego") in the description — the app shows them in its dialog. Not a draft

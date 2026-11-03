@@ -20,7 +20,7 @@ be triggered on demand.
 
 ## The patch
 
-Three places, both marked "Leina Radio patch":
+Three places, both marked "Leina Player patch":
 
 - `AudioService.onDestroy()` clears `listener` before calling it, not after.
 - `AudioHandlerInterface.onDestroy()` registers itself again with `AudioService.init(this)`

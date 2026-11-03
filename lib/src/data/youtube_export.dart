@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../app_name.dart';
 import 'combined_search.dart';
 import 'playlist_library.dart';
 import 'song_catalog.dart';
@@ -55,7 +56,7 @@ Future<YouTubeExportResult> exportToYouTube({
       (t) => api.createPlaylist(
         t,
         title: playlist.name,
-        description: 'Z aplikacji Leina Radio',
+        description: 'Z aplikacji $appName',
       ),
     );
     await library.setYouTubeCopy(playlist.id, id, done: 0, reload: false);

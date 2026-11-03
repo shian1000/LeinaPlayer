@@ -827,7 +827,7 @@ public class AudioServicePlugin implements FlutterPlugin, ActivityAware {
         @Override
         public void onDestroy() {
             disposeFlutterEngine();
-            // Leina Radio patch: the engine is kept while an activity is attached, and nothing
+            // Leina Player patch: the engine is kept while an activity is attached, and nothing
             // else would register this handler again — the next service's notification and
             // media buttons would reach no one. A disposed engine has already cleared it.
             if (audioHandlerInterface == this) {

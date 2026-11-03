@@ -157,7 +157,7 @@ void main() {
   test('the report: version, phone, description, log', () {
     final report = problemReport(
       package: PackageInfo(
-        appName: 'Leina Radio',
+        appName: 'Leina Player',
         packageName: 'x',
         version: '1.0.0',
         buildNumber: '72',
@@ -180,7 +180,7 @@ void main() {
 
     final empty = problemReport(
       package: PackageInfo(
-        appName: 'Leina Radio',
+        appName: 'Leina Player',
         packageName: 'x',
         version: '1.0.0',
         buildNumber: '72',

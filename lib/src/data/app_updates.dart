@@ -281,7 +281,7 @@ class AppUpdates extends ChangeNotifier {
           .timeout(const Duration(seconds: 15));
       request.headers
         ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
-        ..set(HttpHeaders.userAgentHeader, 'LeinaRadio');
+        ..set(HttpHeaders.userAgentHeader, 'LeinaPlayer');
       final response = await request.close().timeout(
         const Duration(seconds: 15),
       );

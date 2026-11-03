@@ -37,7 +37,7 @@ import org.json.JSONObject
 
 /**
  * A tapped YouTube or Spotify link: a sheet over half the screen asks whether to open it in
- * Leina Radio, the service's own app or a browser — unless a choice was remembered
+ * Leina Player, the service's own app or a browser — unless a choice was remembered
  * (Ustawienia › Otwieranie linków) — or to save it for later with the person who sent it
  * ([LaterLinks], shown in Menu profilu › Wiadomości › Na później). A video or track opened in Leina
  * Radio asks once more: play it now, next, or at the end of the queue ([EXTRA_PLAY]). Native and translucent, so it shows at once over the app
@@ -79,7 +79,7 @@ class LinkChooserActivity : Activity() {
         service = linkService
         val remembered = LinkTargets.choice(this, service)
         if (remembered != LinkChoice.ASK) {
-            // Leina Radio can't do anything with a channel page and the like.
+            // Leina Player can't do anything with a channel page and the like.
             open(if (remembered == LinkChoice.LEINA && !kind().supported) LinkChoice.APP else remembered)
             finish()
             return
@@ -88,7 +88,7 @@ class LinkChooserActivity : Activity() {
     }
 
     /**
-     * "Udostępnij" to Leina Radio: the first link in the text (YouTube and Spotify share it with
+     * "Udostępnij" to Leina Player: the first link in the text (YouTube and Spotify share it with
      * a title before it), as Dart's `incoming_links.dart` finds it.
      */
     private fun onShared(text: String?) {
@@ -110,7 +110,7 @@ class LinkChooserActivity : Activity() {
                     .addFlags(MAIN_FLAGS),
             )
         } catch (e: Exception) {
-            Toast.makeText(this, "Nie udało się otworzyć Leina Radio", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Nie udało się otworzyć Leina Player", Toast.LENGTH_SHORT).show()
         }
         finishNow()
     }
@@ -159,7 +159,7 @@ class LinkChooserActivity : Activity() {
         }
     }
 
-    /** [play]: [PLAY_NEXT] or [PLAY_END] for Leina Radio; else it plays now. */
+    /** [play]: [PLAY_NEXT] or [PLAY_END] for Leina Player; else it plays now. */
     private fun open(choice: LinkChoice, play: String? = null): Boolean = when (choice) {
         LinkChoice.ASK, LinkChoice.LEINA -> try {
             startActivity(
@@ -461,7 +461,7 @@ class LinkChooserActivity : Activity() {
     }
 
     /**
-     * "Jak odtworzyć?" after Leina Radio was picked for a video or track. A remembered Leina
+     * "Jak odtworzyć?" after Leina Player was picked for a video or track. A remembered Leina
      * Radio choice never gets here: it plays now, as before this question existed.
      */
     private fun showPlayModes(kind: Kind) {

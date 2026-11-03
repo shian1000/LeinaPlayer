@@ -95,12 +95,12 @@ void main() {
         catalog,
         storageRoot: () async => root,
         factoryOverride: databaseFactoryFfi,
-        downloadFolder: () => '${music.path}/Leina Radio',
+        downloadFolder: () => '${music.path}/Leina Player',
       );
       await scanning.load();
       await touch('Afina - Pay Your Respect.mp3');
-      await touch('Leina Radio/Kino - Kukushka.webm');
-      await touch('Leina Radio 2/Kino - Kukushka.mp3');
+      await touch('Leina Player/Kino - Kukushka.webm');
+      await touch('Leina Player 2/Kino - Kukushka.mp3');
       await scanning.addFolder(music.path);
       expect((await scanning.scan()).added, 2);
       scanning.dispose();

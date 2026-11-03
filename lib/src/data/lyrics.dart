@@ -101,7 +101,7 @@ class LyricsFinder {
 Future<Object?> _httpGetJson(Uri uri) async {
   final client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 10)
-    ..userAgent = 'LeinaRadio (private music app)';
+    ..userAgent = 'LeinaPlayer (private music app)';
   try {
     final response = await (await client.getUrl(uri))
         .close()

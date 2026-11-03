@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../app_name.dart';
 import '../data/source_settings.dart';
 import '../playback/downloads.dart';
 import '../theme.dart';
@@ -49,7 +50,8 @@ class DownloadFolderTile extends StatelessWidget {
         MenuSheetEntry(
           folder == null ? Icons.check : Icons.phone_android,
           'W aplikacji',
-          subtitle: 'Widać je tylko w Leina Radio; znikają po odinstalowaniu aplikacji',
+          subtitle:
+              'Widać je tylko w $appName; znikają po odinstalowaniu aplikacji',
           onTap: folder == null ? () {} : () => _apply(context, null),
         ),
         MenuSheetEntry(
@@ -91,7 +93,7 @@ class DownloadFolderTile extends StatelessWidget {
           SnackBar(
             persist: false,
             content: Text(
-              'Leina Radio nie może zapisywać w folderze ${shownDownloadFolder(folder)}. '
+              '$appName nie może zapisywać w folderze ${shownDownloadFolder(folder)}. '
               'Zezwól na dostęp do wszystkich plików albo wybierz inny folder.',
             ),
             action: const SnackBarAction(
@@ -108,7 +110,7 @@ class DownloadFolderTile extends StatelessWidget {
 
   static Future<bool> _canWrite(String folder) async {
     final probe = File(
-      '$folder/.leina-radio-${DateTime.now().microsecondsSinceEpoch}',
+      '$folder/.leina-player-${DateTime.now().microsecondsSinceEpoch}',
     );
     try {
       await Directory(folder).create(recursive: true);
@@ -126,7 +128,7 @@ class DownloadFolderTile extends StatelessWidget {
         builder: (dialogContext) => AlertDialog(
           title: const Text('Dostęp do plików'),
           content: const Text(
-            'Żeby zapisywać utwory w wybranym folderze, Leina Radio potrzebuje dostępu do '
+            'Żeby zapisywać utwory w wybranym folderze, $appName potrzebuje dostępu do '
             'wszystkich plików. Android otworzy ustawienia — włącz tam „Zezwalaj na dostęp do '
             'wszystkich plików” i wróć do aplikacji.',
           ),

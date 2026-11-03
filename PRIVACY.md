@@ -1,4 +1,4 @@
-# Privacy — Leina Radio
+# Privacy — Leina Player
 
 As of 21 October 2026. The same, shorter, is in the app: **Ustawienia › Prywatność i
 połączenia** — there each entry shows whether the app connects to it right now, with a way to
@@ -46,7 +46,7 @@ as they appear in it.)
 
 ## Where the data is and how to delete it
 
-- On the phone, in the app's data: Android Settings › Apps › Leina Radio › Storage › "Clear
+- On the phone, in the app's data: Android Settings › Apps › Leina Player › Storage › "Clear
   data" deletes everything (as does uninstalling). The cache alone (songs, covers) is cleared in
   the app: Oszczędzanie danych › Pamięć podręczna.
 - Songs downloaded with "Pobierz" into a folder you picked (Oszczędzanie danych › Miejsce na

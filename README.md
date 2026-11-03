@@ -1,4 +1,4 @@
-# Leina Radio
+# Leina Player
 
 A music player and library app for Android, built with Flutter. It plays the music on your
 phone and works with [MusicDatabase](https://github.com/shian1000/LeinaMusicDatabase) — a personal
@@ -11,9 +11,9 @@ will not be published in any app store.
 
 1. Open the [latest release](https://github.com/shian1000/LeinaPlayer/releases/latest) on your
    phone and download one of the APKs:
-   - **`LeinaRadio-<version>-arm64-v8a.apk`** (~25 MB) — for almost every phone made in the last
+   - **`LeinaPlayer-<version>-arm64-v8a.apk`** (~25 MB) — for almost every phone made in the last
      years (64-bit). Take this one.
-   - **`LeinaRadio-<version>.apk`** (~69 MB) — works on any Android phone (it carries builds for
+   - **`LeinaPlayer-<version>.apk`** (~69 MB) — works on any Android phone (it carries builds for
      three kinds of processor). Use it if the small one doesn't install.
 2. Open the downloaded file. The first time, Android asks to allow installing apps from your
    browser.

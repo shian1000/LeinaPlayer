@@ -1,6 +1,6 @@
 ---
 name: prepare-github-release
-description: 'Get a new GitHub release of Leina Radio ready: check the repo is committed and pushed, build the universal and arm64 APKs with tool/prepare_release.sh, verify them (versionCode, signature, CPU), draft the "What''s new" notes in English from the commits since the previous release, give the owner the prefilled release link and the files to attach, then — once the owner says it is published — check it the way the app''s update check reads it. Trigger on "/prepare-github-release", "przygotuj wydanie", "przygotuj buildy na githuba", "nowe wydanie", "wydaj nową wersję", "prepare a release", "release builds for GitHub". The owner publishes on GitHub himself; this skill never creates releases, tags or pushes. Not for sharing a test build over Tailscale — that is share-build-tailscale.'
+description: 'Get a new GitHub release of Leina Player ready: check the repo is committed and pushed, build the universal and arm64 APKs with tool/prepare_release.sh, verify them (versionCode, signature, CPU), draft the "What''s new" notes in English from the commits since the previous release, give the owner the prefilled release link and the files to attach, then — once the owner says it is published — check it the way the app''s update check reads it. Trigger on "/prepare-github-release", "przygotuj wydanie", "przygotuj buildy na githuba", "nowe wydanie", "wydaj nową wersję", "prepare a release", "release builds for GitHub". The owner publishes on GitHub himself; this skill never creates releases, tags or pushes. Not for sharing a test build over Tailscale — that is share-build-tailscale.'
 ---
 
 # Prepare a GitHub release
@@ -53,7 +53,7 @@ in memory).
 
 ```bash
 A=~/Android/Sdk/build-tools/36.0.0
-for f in build/release/LeinaRadio-<tag>*.apk; do
+for f in build/release/LeinaPlayer-<tag>*.apk; do
   $A/aapt dump badging "$f" | head -1 | grep -o "versionCode='[0-9]*'"
   unzip -l "$f" | grep -o 'lib/[a-z0-9_-]*/libapp.so' | cut -d/ -f2 | tr '\n' ' '
   JAVA_HOME=/snap/android-studio/current/jbr PATH=/snap/android-studio/current/jbr/bin:$PATH \
@@ -91,8 +91,8 @@ Give, in Polish:
 1. the prefilled link — `+` must be `%2B`:
    `https://github.com/shian1000/LeinaPlayer/releases/new?tag=<version>%2B<build>&title=Leina%20Radio%20<version>%2B<build>`
 2. the two files to attach, with full paths:
-   `build/release/LeinaRadio-<tag>.apk` (large, any phone) and
-   `build/release/LeinaRadio-<tag>-arm64-v8a.apk` (small, 64-bit phones);
+   `build/release/LeinaPlayer-<tag>.apk` (large, any phone) and
+   `build/release/LeinaPlayer-<tag>-arm64-v8a.apk` (small, 64-bit phones);
 3. the "What's new" text in a code block, ready to paste;
 4. the checklist: tag exactly `<tag>`, target `main`, **both** APKs, not a pre-release, "Set as the
    latest release" on, Publish.
@@ -100,7 +100,7 @@ Give, in Polish:
 ## Step 6 — After the owner publishes: check it
 
 ```bash
-curl -s -H "Accept: application/vnd.github+json" -H "User-Agent: LeinaRadio" \
+curl -s -H "Accept: application/vnd.github+json" -H "User-Agent: LeinaPlayer" \
   https://api.github.com/repos/shian1000/LeinaPlayer/releases/latest
 ```
 

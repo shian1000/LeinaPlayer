@@ -1,79 +1,69 @@
 #!/usr/bin/env python3
-"""Draws the Leina Radio icon and writes every size Android and iOS need.
+"""Draws the Leina Player icon and writes every size Android and iOS need.
 
-Run from the repo root: `python3 tool/generate_icons.py` (needs Pillow). The design: the Lain
-theme's cyan "((•))" broadcast sign on its near-black navy, glowing like a CRT.
+Run from the repo root: `python3 tool/generate_icons.py` (needs Pillow). The design: a flat azure
+play triangle on a near-black blue, with the old Leina Radio icon's "((•))" broadcast sign cut
+out of it.
 """
+import colorsys
 import json
+import math
 import os
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw
 
-NAVY_TOP = (16, 28, 52)
-NAVY_BOTTOM = (5, 8, 15)
-CYAN = (92, 214, 235)
 RES = "android/app/src/main/res"
 IOS = "ios/Runner/Assets.xcassets/AppIcon.appiconset"
 
 
-def background(size):
-    """Radial navy gradient, lighter towards the top."""
-    img = Image.new("RGB", (size, size), NAVY_BOTTOM)
-    px = img.load()
-    cx, cy, r = size * 0.5, size * 0.3, size * 0.9
-    for y in range(size):
-        for x in range(size):
-            d = min(((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 / r, 1.0)
-            px[x, y] = tuple(
-                round(t + (b - t) * d) for t, b in zip(NAVY_TOP, NAVY_BOTTOM)
-            )
-    return img
+def hsv(h, s, v):
+    return tuple(round(c * 255) for c in colorsys.hsv_to_rgb(h / 360, s, v))
 
 
-def sign(size, scale=1.0, color=CYAN, glow=True):
-    """The broadcast sign on transparency; [scale] = share of the canvas it spans."""
+BACKGROUND = hsv(200, 0.67, 0.13)
+AZURE = hsv(200, 0.59, 0.92)
+WHITE = (255, 255, 255)
+
+
+def glyph_mask(size, height):
+    """The triangle with the sign cut out, as a mask; [height] = the triangle's share of [size]."""
     big = size * 4
     layer = Image.new("L", (big, big), 0)
     d = ImageDraw.Draw(layer)
-    c = big / 2
-    unit = big * scale / 2  # half the sign's width
+    h = big * height
+    w = h * math.sqrt(3) / 2
+    cx, cy = big / 2 + w * 0.08, big / 2  # a triangle's weight is on its left: nudge it right
+    pts = [(cx - w / 2, cy - h / 2), (cx - w / 2, cy + h / 2), (cx + w / 2, cy)]
+    corner = h * 0.067
+    d.polygon(pts, fill=255)
+    d.line(pts + [pts[0]], fill=255, width=round(corner * 2), joint="curve")
+    for x, y in pts:
+        d.ellipse([x - corner, y - corner, x + corner, y + corner], fill=255)
+
+    # The sign sits on the triangle's incircle, a third of the way from its flat side.
+    cut = Image.new("L", (big, big), 0)
+    d = ImageDraw.Draw(cut)
+    sx, sy = cx - w / 2 + w / 3, cy
+    unit = h * 0.31  # half the sign's width
     dot = unit * 0.17
-    d.ellipse([c - dot, c - dot, c + dot, c + dot], fill=255)
-    width = round(unit * 0.11)
-    for radius in (0.42, 0.68, 0.94):
+    d.ellipse([sx - dot, sy - dot, sx + dot, sy + dot], fill=255)
+    for radius in (0.45, 0.80):
         r = unit * radius
-        box = [c - r, c - r, c + r, c + r]
         for start in (-50, 130):  # right and left arcs
-            d.arc(box, start, start + 100, fill=255, width=width)
-    mask = layer.resize((size, size), Image.LANCZOS)
+            d.arc([sx - r, sy - r, sx + r, sy + r], start, start + 100, fill=255,
+                  width=round(unit * 0.16))
+    return ImageChops.subtract(layer, cut).resize((size, size), Image.LANCZOS)
+
+
+def glyph(size, height, color):
     out = Image.new("RGBA", (size, size), color + (0,))
-    out.putalpha(mask)
-    if glow:
-        halo = mask.filter(ImageFilter.GaussianBlur(size * 0.03))
-        halo = halo.point(lambda v: int(v * 0.7))
-        glow_layer = Image.new("RGBA", (size, size), color + (0,))
-        glow_layer.putalpha(halo)
-        out = Image.alpha_composite(glow_layer, out)
+    out.putalpha(glyph_mask(size, height))
     return out
 
 
-def scanlines(img):
-    """Faint CRT lines over the whole icon."""
-    size = img.size[0]
-    lines = Image.new("L", img.size, 0)
-    d = ImageDraw.Draw(lines)
-    step = max(size // 64, 2)
-    for y in range(0, size, step):
-        d.line([(0, y), (size, y)], fill=18)
-    dark = Image.new("RGBA", img.size, (0, 0, 0, 255))
-    dark.putalpha(lines)
-    return Image.alpha_composite(img.convert("RGBA"), dark)
-
-
 def full_icon(size):
-    icon = background(size).convert("RGBA")
-    icon = Image.alpha_composite(icon, sign(size, scale=0.66))
-    return scanlines(icon)
+    icon = Image.new("RGBA", (size, size), BACKGROUND + (255,))
+    return Image.alpha_composite(icon, glyph(size, 0.52, AZURE))
 
 
 def save(img, path):
@@ -96,23 +86,21 @@ def main():
         icon.putalpha(ImageChops.multiply(icon.getchannel("A"), rounded))
         save(icon, f"{RES}/mipmap-{name}/ic_launcher.png")
 
-        # Adaptive icon layers (Android 8+): 108dp, the sign inside the 66dp safe zone.
+        # Adaptive icon layers (Android 8+): 108dp, of which a ~72dp circle shows; the
+        # triangle keeps the full icon's proportion of it and stays inside the 66dp safe zone.
         fg = round(108 * k)
-        save(sign(fg, scale=0.44), f"{RES}/mipmap-{name}/ic_launcher_foreground.png")
-        bg = background(fg)
-        save(scanlines(bg), f"{RES}/mipmap-{name}/ic_launcher_background.png")
-        # Themed icon (Android 13+): the launcher tints this shape itself.
+        height = 0.52 * 72 / 108
+        save(glyph(fg, height, AZURE), f"{RES}/mipmap-{name}/ic_launcher_foreground.png")
         save(
-            sign(fg, scale=0.44, color=(255, 255, 255), glow=False),
-            f"{RES}/mipmap-{name}/ic_launcher_monochrome.png",
+            Image.new("RGB", (fg, fg), BACKGROUND),
+            f"{RES}/mipmap-{name}/ic_launcher_background.png",
         )
+        # Themed icon (Android 13+): the launcher tints this shape itself.
+        save(glyph(fg, height, WHITE), f"{RES}/mipmap-{name}/ic_launcher_monochrome.png")
 
         # Notification small icon: white on transparent, 24dp.
         stat = round(24 * k)
-        save(
-            sign(stat, scale=0.92, color=(255, 255, 255), glow=False),
-            f"{RES}/drawable-{name}/ic_stat_leina.png",
-        )
+        save(glyph(stat, 0.80, WHITE), f"{RES}/drawable-{name}/ic_stat_leina.png")
 
     adaptive = (
         '<?xml version="1.0" encoding="utf-8"?>\n'

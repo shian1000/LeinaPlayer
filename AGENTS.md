@@ -2,8 +2,10 @@
 
 ## Project
 
-MusicDatabaseApp — named **Leina Radio** on the phone (`lib/src/app_name.dart`; the package id
-stays `music_database_app`) — is the mobile frontend for [MusicDatabase](../MusicDatabase) — a personal music
+MusicDatabaseApp — named **Leina Player** on the phone (`lib/src/app_name.dart`; the package id
+stays `music_database_app`; called Leina Radio until 2026-11, a name the backup format id
+`leina-radio-backup` and the signing key's file and alias keep — changing them would break old
+backups and updates) — is the mobile frontend for [MusicDatabase](../MusicDatabase) — a personal music
 library / metadata enrichment tool. MusicDatabase today is a Python terminal app with a local
 SQLite database and enrichment from MusicBrainz, Wikipedia, iTunes, and Genius.
 
@@ -122,7 +124,7 @@ YouTube and Spotify links shared to the app or opened with it import the playlis
 the video / track (a shared one asks first: now, next or at the end of the queue); a playlist with no link (made on the phone, a MusicDatabase folder) can be
 made on YouTube from its share sheet — the phone signs in to Google and uses the YouTube Data API
 itself, without MusicDatabase (unlisted, a one-off copy; [`youtube.md`](docs/agent-notes/youtube.md));
-a tapped link first shows a native sheet asking where to open it (Leina Radio — a video or
+a tapped link first shows a native sheet asking where to open it (Leina Player — a video or
 track then plays now, next or at the end of the queue —, the service's app, a browser; a choice can be remembered — Ustawienia › Otwieranie linków), or
 saves it for later with the person who sent it (Ja › Na później,
 `later_links.dart`; kept natively in `LaterLinks.kt`, synced with the account from Dart — ADR 0013).

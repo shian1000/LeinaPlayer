@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../app_name.dart';
 import '../data/error_log.dart';
 import '../data/problem_report.dart';
 import '../theme.dart';
@@ -76,7 +77,7 @@ class _ProblemReportScreenState extends State<ProblemReportScreen> {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'text/plain')],
-        subject: 'Leina Radio — raport problemu',
+        subject: '$appName — raport problemu',
       ),
     );
   }
