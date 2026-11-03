@@ -110,7 +110,10 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     links (music.db's and the phone's or the playlist's when different; music.db's other uploads of the
     song, `additional_youtube_videos`, and videos it turned down, `bad_youtube_videos`), moods (global and own,
     from `MoodLibrary`) and the other tag.db tags, the files on the phone and what it plays
-    from. Tapping a link opens it (the song's YouTube videos from where the player is, pausing it,
+    from, with its "Jakość" (`audio_quality.dart`: a YouTube stream's format, bitrate and itag —
+    `NowPlaying.streamQuality` —, a file's format with its average bitrate from size over the
+    player's length, a server file only by its format; each phone file's format, and the cached
+    YouTube copy's from a song's menu). Tapping a link opens it (the song's YouTube videos from where the player is, pausing it,
     like Otwórz w YouTube; Spotify can't be told where to start — its app opens a track link as
     the album's page on a free account), a long press copies a value. Songs not in MusicDatabase show
     only what the phone knows. A pencil next to the song's, its artists' and its album's own

@@ -56,7 +56,7 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 
 - NewPipeExtractor (JitPack, `com.github.teamnewpipe:NewPipeExtractor`) behind the
   `music_database_app/newpipe` method channel; returns the audio streams, Dart prefers itag 251
-  (Opus 160k), then 140 (AAC 128k). `just_audio` streams the URL directly — URLs are tied to the
+  (Opus 160k), then 140 (AAC 128k), unconverted, for playing and for the cache / "Pobierz" alike (no quality setting; the ~256k streams are Premium-only). `just_audio` streams the URL directly — URLs are tied to the
   phone's IP, so they can't be resolved on a server for the phone.
 - `youtube_explode` can still search but its stream downloads get 403 (no PO tokens/challenge
   solving) — don't use it for playback.

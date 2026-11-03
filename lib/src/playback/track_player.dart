@@ -618,7 +618,7 @@ class TrackPlayer {
     try {
       final via = await playback.play(
         videoId,
-        (source) => NowPlaying(
+        (source, {streamQuality}) => NowPlaying(
           title: title,
           artist: artist,
           titleLatin: titleLatin,
@@ -629,6 +629,7 @@ class TrackPlayer {
           searchQuery: searchQuery,
           playlistName: playlistName,
           youtubeVideoId: videoId,
+          streamQuality: streamQuality,
         ),
         onConnecting: () => onStatus?.call('Łączę z YouTube…'),
         allowExternal: allowExternal,

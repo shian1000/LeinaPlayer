@@ -120,7 +120,7 @@ void main() {
     },
   );
 
-  NowPlaying track(String source) =>
+  NowPlaying track(String source, {String? streamQuality}) =>
       NowPlaying(title: 'T', artist: 'A', source: source, coverSeed: 's');
 
   Future<File> cache(String id) async {

@@ -20,6 +20,7 @@ class NowPlaying {
     this.playlistName,
     this.youtubeVideoId,
     this.serverFileId,
+    this.streamQuality,
     this.titleLatin,
     this.artistLatin,
   }) : _givenCover = cover;
@@ -39,6 +40,10 @@ class NowPlaying {
 
   /// Set when [source] is this file on MusicDatabase's server (`files.id`, [ServerFile.id]).
   final int? serverFileId;
+
+  /// The YouTube stream's format and bitrate ([youTubeStreamQuality]), for "Jakość" in
+  /// Informacje o utworze; `null` for a file, whose own size and length tell.
+  final String? streamQuality;
 
   bool get isStream => source.startsWith('http');
 
@@ -733,4 +738,7 @@ class PlayerScope extends InheritedNotifier<PlayerController> {
 
   static PlayerController of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<PlayerScope>()!.notifier!;
+
+  static PlayerController? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PlayerScope>()?.notifier;
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/audio_quality.dart';
 import '../data/incoming_links.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
@@ -97,7 +98,7 @@ class YouTubePlayback {
   /// opens (e.g. the song inside its playlist); the video's own page by default.
   Future<YouTubePlayedVia> play(
     String videoId,
-    NowPlaying Function(String source) track, {
+    NowPlaying Function(String source, {String? streamQuality}) track, {
     void Function()? onConnecting,
     bool allowExternal = true,
     Uri? externalUri,
@@ -143,7 +144,9 @@ class YouTubePlayback {
           for (var attempt = 1; attempt <= 2; attempt++) {
             try {
               final stream = await audio.streamFrom(method, videoId);
-              if (await player.play(track(stream.url))) {
+              if (await player.play(
+                track(stream.url, streamQuality: youTubeStreamQuality(stream)),
+              )) {
                 if (settings.playbackMethods.contains(
                   YouTubePlaybackMethod.cache,
                 )) {

@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../data/audio_quality.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/incoming_links.dart';
@@ -865,11 +868,22 @@ class _SongInfoCardState extends State<SongInfoCard> {
                 fromPlayer: true,
               )
             : _Field('Odtwarzane z', 'pliku: ${track.source}'),
+      if (track != null && track.source.isNotEmpty)
+        _Field('Jakość', _playingQuality(track, hit)),
+      if (track == null && hit.youtubeVideoId != null)
+        if (YouTubeLibraryScope.maybeOf(context)
+                ?.cachedFileOf(hit.youtubeVideoId!)
+            case final copy?)
+          _Field(
+            'Kopia z YouTube na telefonie',
+            fileQuality(copy.path, fromYouTube: true),
+          ),
       if (hit.inMainDatabase)
         _Field('Plik na serwerze (files.db)', hit.serverFile?.path ?? 'brak'),
       if (hit.phoneFiles.isEmpty) const _Field('Pliki', 'brak'),
       for (final file in hit.phoneFiles) ...[
         _Field('Plik', file.filePath),
+        _Field('Format', fileQuality(file.filePath)),
         _Field(
           'Tagi pliku',
           [
@@ -883,6 +897,28 @@ class _SongInfoCardState extends State<SongInfoCard> {
           const _Field('MusicDatabase', 'jeszcze go nie ma (do dodania)'),
       ],
     ]);
+  }
+
+  /// "Jakość" of what the player plays: the YouTube stream's own format and bitrate, or a file's
+  /// format with its average bitrate (its size over the player's length); a server stream only
+  /// by its file's format.
+  String _playingQuality(NowPlaying track, SearchHit hit) {
+    if (track.streamQuality case final quality?) return quality;
+    if (track.isStream) {
+      return fileQuality(hit.serverFile?.path ?? Uri.parse(track.source).path);
+    }
+    int? size;
+    try {
+      size = File(track.source).lengthSync();
+    } on FileSystemException catch (e) {
+      debugPrint('Reading the size of the playing file failed: $e');
+    }
+    return fileQuality(
+      track.source,
+      sizeBytes: size,
+      duration: PlayerScope.maybeOf(context)?.duration,
+      fromYouTube: track.youtubeVideoId != null,
+    );
   }
 }
 
