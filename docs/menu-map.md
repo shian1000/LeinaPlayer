@@ -351,7 +351,7 @@ import, Wyświetlanie, Dane, Aplikacja.
   next queue song starts that long before the current one ends, one fading out as the other
   fades in; only when the queue moves on by itself ("Następny" and tapped songs switch at
   once). See [`agent-notes/local-library.md`](agent-notes/local-library.md). Section
-  *Głośność*: "Wyrównywanie głośności" (switch, default off; "Ten telefon tego nie obsługuje"
+  *Głośność*: "Wyrównywanie głośności" (switch, default on; "Ten telefon tego nie obsługuje"
   and disabled without Android's DynamicsProcessing) and "Intensywność" — slider 10–100 %
   (10 % steps, default 50 %, "Łagodnie"–"Mocno", enabled only with the switch on): how strongly
   loud and quiet songs are pulled to one loudness, every source and crossfades included — one

@@ -119,7 +119,7 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   fade: every user pick (`_play` with `allowExternal`) calls `cancelFade` and switches at once;
   a pause ends a fade (old song stops). Checked on the Huawei: `dumpsys audio` shows two
   started AudioTracks of the app for the fade, then one.
-- "Wyrównywanie głośności" (Ustawienia › Odtwarzanie, `SourceSettings.leveling` /
+- "Wyrównywanie głośności" (Ustawienia › Odtwarzanie, `SourceSettings.leveling` (on by default) /
   `levelingPercent`, 10–100 %): `VolumeLeveling` follows both players'
   `androidAudioSessionIdStream` and puts Android's `DynamicsProcessing` on each session
   (`VolumeLeveling.kt`, Android 9+) as one steady input gain for the whole song (cuts and boosts

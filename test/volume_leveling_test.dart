@@ -36,14 +36,16 @@ void main() {
   test('the switch and its strength are remembered', () async {
     final settings = SourceSettings();
     await settings.load();
-    expect(settings.activeLeveling, isNull);
-    await settings.setLeveling(true);
+    expect(settings.activeLeveling, 0.5, reason: 'on by default');
+    await settings.setLeveling(false);
     await settings.setLevelingPercent(300);
 
     final again = SourceSettings();
     await again.load();
-    expect(again.leveling, isTrue);
+    expect(again.leveling, isFalse);
     expect(again.levelingPercent, 100);
+    expect(again.activeLeveling, isNull);
+    await again.setLeveling(true);
     expect(again.activeLeveling, 1.0);
     expect(
       again.activeLevelingMeasure,
@@ -138,13 +140,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Wyrównywanie głośności'), 200);
     await tester.pump();
-    expect(levelingSlider(tester).onChanged, isNull);
+    expect(levelingSlider(tester).onChanged, isNotNull);
+    expect(find.text('50%'), findsOneWidget);
 
     await tester.tap(find.text('Wyrównywanie głośności'));
     await tester.pumpAndSettle();
-    expect(settings.leveling, isTrue);
-    expect(levelingSlider(tester).onChanged, isNotNull);
-    expect(find.text('50%'), findsOneWidget);
+    expect(settings.leveling, isFalse);
+    expect(levelingSlider(tester).onChanged, isNull);
   });
 
   testWidgets('Mierz głośność na telefonie goes with the leveling', (
@@ -161,6 +163,11 @@ void main() {
     await tester.scrollUntilVisible(measure, 200);
     await tester.pump();
     SwitchListTile tile() => tester.widget<SwitchListTile>(measure);
+    expect(settings.leveling, isTrue, reason: 'on by default');
+    expect(tile().value, isTrue);
+
+    await settings.setLeveling(false);
+    await tester.pumpAndSettle();
     expect(tile().onChanged, isNull);
     expect(tile().value, isFalse);
 

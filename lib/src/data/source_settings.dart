@@ -147,7 +147,7 @@ class SourceSettings extends ChangeNotifier {
   bool _lyrics = true;
   int _crossfadeSeconds = 0;
   bool _swipePlaysNext = true;
-  bool _leveling = false;
+  bool _leveling = true;
   int _levelingPercent = defaultLevelingPercent;
   bool _levelingMeasure = true;
   String? _downloadFolder;
