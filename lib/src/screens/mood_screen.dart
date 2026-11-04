@@ -17,6 +17,7 @@ import '../widgets/mood_sheet.dart';
 import '../widgets/playlist_picker.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
+import 'song_search_screen.dart';
 
 const _id = 'Nastrój';
 
@@ -92,6 +93,8 @@ class _MoodScreenState extends State<MoodScreen> {
                 onChanged: (text) => setState(() => _query = text),
               ),
         actions: [
+          if (_query?.trim().isNotEmpty ?? false)
+            SearchEverywhereButton(query: _query!),
           IconButton(
             tooltip: _query == null
                 ? 'Szukaj w nastroju'

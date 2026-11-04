@@ -802,7 +802,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
 ## Nastrój (`mood_screen.dart`) — **implemented**
 
 - 🔍 in the app bar: a field in place of the name; the songs whose title or artist hold every
-  word typed (× closes it).
+  word typed (× closes it). With a query typed, **Szukaj w całej bazie** (left of ×) opens song
+  search with the same query, as in a playlist.
 - App bar with the name and ⋮ **→ sheet**, IDs `Nastrój › Menu (⋮) › <pozycja>`: Dodaj do
   kolejki / Odtwórz jako następny (the whole mood), **Nastrój dla wszystkich utworów**, Dodaj do
   playlisty (every song), Przenieś do folderu (see Biblioteka), and for
@@ -866,6 +867,8 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   listed (normalised like song search; "Brak wyników dla „…”" otherwise). Tapping one plays on
   through the whole playlist from it. Back (arrow or system) closes the search first — it's a
   local history entry of the route — and returns to the playlist where it was.
+  With a query typed, **Szukaj w całej bazie** (globe-search icon, left of ×) opens song search
+  (`SongSearchScreen(initialQuery:)`) with the same query; Back returns to the playlist's search.
 - Header: the cover picked with "Dodaj okładkę", else a 2×2 collage of the covers of the first
   four different albums (the first track's cover with fewer; a Spotify album always just one) —
   `CollectionCover`, also in Biblioteka, search and the menus; name, owner

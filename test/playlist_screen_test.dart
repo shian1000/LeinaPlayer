@@ -21,6 +21,7 @@ import 'package:music_database_app/src/playback/playback_queue.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
 import 'package:music_database_app/src/playback/track_player.dart';
 import 'package:music_database_app/src/screens/library_screen.dart';
+import 'package:music_database_app/src/screens/song_search_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/widgets/playing_bars.dart';
 import 'package:music_database_app/src/widgets/song_tile.dart';
@@ -258,6 +259,25 @@ void main() {
     expect(find.text('Utwór'), findsOneWidget);
     expect(find.text('Małomiasteczkowy'), findsNothing);
     await tester.enterText(find.byType(TextField), 'xyz');
+    await tester.pumpAndSettle();
+    expect(find.text('Brak wyników dla „xyz”'), findsOneWidget);
+    // The query carries over to song search over the whole database.
+    await tester.tap(find.byTooltip('Szukaj w całej bazie'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongSearchScreen), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SongSearchScreen),
+        matching: find.widgetWithText(TextField, 'xyz'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SongSearchScreen),
+        matching: find.byTooltip('Wstecz'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Brak wyników dla „xyz”'), findsOneWidget);
     await tester.tap(find.byTooltip('Zamknij wyszukiwanie'));

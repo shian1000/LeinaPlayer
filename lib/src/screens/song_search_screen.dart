@@ -34,14 +34,17 @@ import '../widgets/song_names.dart';
 /// playlists and albums — update on every keystroke; YouTube (videos, playlists) and Spotify (playlists)
 /// are searched only with the button.
 class SongSearchScreen extends StatefulWidget {
-  const SongSearchScreen({super.key});
+  const SongSearchScreen({super.key, this.initialQuery = ''});
+
+  /// What the field starts with — a query carried over from a playlist's or mood's own search.
+  final String initialQuery;
 
   @override
   State<SongSearchScreen> createState() => _SongSearchScreenState();
 }
 
 class _SongSearchScreenState extends State<SongSearchScreen> {
-  final _query = TextEditingController();
+  late final _query = TextEditingController(text: widget.initialQuery);
 
   /// The last online search (the button); dropped as soon as the query changes.
   _OnlineResults? _online;
@@ -169,6 +172,28 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
       ),
     );
   }
+}
+
+/// Opens song search over the whole database with [query] — next to the "Wyczyść" button of a
+/// search inside one list (a playlist, a mood).
+class SearchEverywhereButton extends StatelessWidget {
+  const SearchEverywhereButton({super.key, required this.query});
+
+  final String query;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: 'Szukaj w całej bazie',
+    icon: const Icon(Icons.travel_explore),
+    onPressed: () {
+      FocusScope.of(context).unfocus();
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SongSearchScreen(initialQuery: query.trim()),
+        ),
+      );
+    },
+  );
 }
 
 /// Replaces the queue with every song found for [query], in the list's order, starting with

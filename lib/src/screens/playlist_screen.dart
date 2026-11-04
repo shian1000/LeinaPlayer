@@ -35,6 +35,7 @@ import '../widgets/youtube_export_dialog.dart';
 import 'missing_tracks_screen.dart';
 import 'playlist_add_screen.dart';
 import 'playlist_edit_screen.dart';
+import 'song_search_screen.dart';
 import '../widgets/song_names.dart';
 
 const _id = 'Playlista';
@@ -749,6 +750,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       ),
     ),
     actions: [
+      if (_query.text.trim().isNotEmpty)
+        SearchEverywhereButton(query: _query.text),
       if (_query.text.isNotEmpty)
         IconButton(
           tooltip: 'Wyczyść',
