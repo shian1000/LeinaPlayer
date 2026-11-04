@@ -26,6 +26,14 @@ asked for a login with just a username and a password.
   them against `account.json` and answers with a token. The phone keeps **the username and the
   token, never the password** (`shared_preferences`; `lib/src/data/account.dart`). Logging in
   needs the server; after that the phone works offline as before.
+- **The login names the phone** (added 2026-11): tokens never expire, and the owner revokes them
+  per device (in the home server's management panel), so `POST /login` also sends an optional
+  `"device"` — the phone's model, `Build.MODEL` with `Build.MANUFACTURER` in front unless the
+  model already starts with it ("Google Pixel 7a", "HUAWEI ELE-L29"), at most 64 characters
+  (`loginDeviceName`), read through the existing `deviceInfo` method of the
+  `music_database_app/links` channel (no new package). Left out when the model can't be read or
+  off Android; servers that don't know the field ignore it. Automatic, no setting (owner's
+  decision). MusicDatabase keeps it with the token in `tokens.json`.
 - The token goes with every request sent to the inbox (`Authorization: Bearer …`), so
   MusicDatabase knows who sent it; the username goes into the request file names
   (`<user>_<date>_<time>_<number>.db`) and `request.user_name`.

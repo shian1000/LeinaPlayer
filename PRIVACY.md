@@ -21,7 +21,7 @@ as they appear in it.)
 
 | Who | What for | When | What it gets | How to turn it off |
 |---|---|---|---|---|
-| **MusicDatabase server** (if you set one) | the song catalog, music files from the server's library, correction reports, account sync | once a day and on changes | correction reports; **only when logged in**: playlists, moods, folders, covers, liked songs, songs and links saved for later (with the name of whoever sent the link) and every play (what, when, for how long, from where) | don't set a server, or don't log in (Ustawienia › Serwer, › Konto) |
+| **MusicDatabase server** (if you set one) | the song catalog, music files from the server's library, correction reports, account sync | once a day and on changes | correction reports; at login, the phone's model; **only when logged in**: playlists, moods, folders, covers, liked songs, songs and links saved for later (with the name of whoever sent the link) and every play (what, when, for how long, from where) | don't set a server, or don't log in (Ustawienia › Serwer, › Konto) |
 | **GitHub** | the public copy of the song catalog (when no server answers); checking for a new version of the app | once a day when the app opens | nothing beyond the request itself | Ustawienia › Serwer › "Pobieraj z GitHuba"; Informacje i pomoc › "Sprawdzaj aktualizacje automatycznie" |
 | **YouTube (Google)** | searching videos, matching songs to videos, importing playlists and playback | when you search, import or play a song from YouTube | video and playlist ids, the text you search for (title, artist) — no account, no login | playback sources (Ustawienia › Odtwarzanie), search (Ustawienia › YouTube) |
 | **YouTube Data API (Google)** | official search | only if you enter your own API key | the text you search for and your key | don't enter a key |
@@ -65,7 +65,8 @@ as they appear in it.)
 ## Keys and passwords
 
 - The MusicDatabase account password is not stored on the phone — the server returns a token
-  instead. With a server serving HTTPS (MusicDatabase's own certificate, confirmed once by its
+  instead. Logging in also sends the phone's model (e.g. "Google Pixel 7a"), which the server
+  keeps with the token so its owner can tell devices apart when revoking one. With a server serving HTTPS (MusicDatabase's own certificate, confirmed once by its
   code), the password, the token and the account's data travel encrypted on any network.
 - YouTube and Spotify API keys, if you enter them, stay on the phone only.
 - Google sign-in is handled by Google Play services; the app never sees the password or token.

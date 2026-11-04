@@ -161,7 +161,8 @@ saves it for later with the person who sent it (Ja › Na później,
   asked for again); each kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
   sharing server — the request format is a contract, see the
   [hand-off](docs/handoffs/musicdatabase-outbox.md)). The phone logs in with a MusicDatabase user
-  (Ustawienia › Konto, `account.dart`; `POST /login` gives a token sent with the requests —
+  (Ustawienia › Konto, `account.dart`; `POST /login` — with the phone's model as `device`, kept by the
+  server with the token so the owner can revoke it per phone — gives a token sent with the requests —
   [ADR 0006](docs/decisions/0006-musicdatabase-login.md); the server side is in a
   [hand-off](docs/handoffs/musicdatabase-login.md)). The account's playlists are exchanged as JSON
 (`/users/<name>/playlists` — [ADR 0007](docs/decisions/0007-playlist-sync.md)), and so are its

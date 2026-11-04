@@ -100,6 +100,35 @@ void main() {
     },
   );
 
+  test('the login names the phone when its model is known', () async {
+    final account = Account(deviceName: () async => 'Google Pixel 7a');
+    expect(await account.logIn([base()], 'Owner', 'tajne1'), isNull);
+    expect(logins.single, {
+      'username': 'Owner',
+      'password': 'tajne1',
+      'device': 'Google Pixel 7a',
+    });
+
+    final unnamed = Account(deviceName: () async => null);
+    expect(await unnamed.logIn([base()], 'Owner', 'tajne1'), isNull);
+    expect(logins.last, {'username': 'Owner', 'password': 'tajne1'});
+  });
+
+  test(
+    'the phone\'s name is its model, with the maker unless it is already there',
+    () {
+      expect(loginDeviceName('Google', 'Pixel 7a'), 'Google Pixel 7a');
+      expect(loginDeviceName('samsung', 'SM-G991B'), 'Samsung SM-G991B');
+      expect(loginDeviceName('HUAWEI', 'ELE-L29'), 'HUAWEI ELE-L29');
+      expect(loginDeviceName('OnePlus', 'OnePlus 9'), 'OnePlus 9');
+      expect(loginDeviceName('Xiaomi', ' xiaomi 13 '), 'xiaomi 13');
+      expect(loginDeviceName(null, 'Pixel 7a'), 'Pixel 7a');
+      expect(loginDeviceName('Google', ''), isNull);
+      expect(loginDeviceName('Google', null), isNull);
+      expect(loginDeviceName('Maker', 'x' * 100), 'Maker ${'x' * 58}');
+    },
+  );
+
   test('a wrong password, an old server and no server say so', () async {
     final account = Account();
     expect(

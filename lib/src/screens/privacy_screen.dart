@@ -115,7 +115,9 @@ class PrivacyScreen extends StatelessWidget {
             'Baza utworów, Twoje pliki muzyczne (źródło „Serwer”) i zgłoszenia poprawek. Po '
             'zalogowaniu także synchronizacja konta: playlisty, nastroje, foldery, okładki, '
             'polubione, „Na później”, linki na później (z imieniem nadawcy) i każde '
-            'odtworzenie — co, kiedy, jak długo i skąd.',
+            'odtworzenie — co, kiedy, jak długo i skąd. Przy logowaniu wysyła też model '
+            'telefonu (np. „Google Pixel 7a”), żeby właściciel serwera wiedział, który '
+            'telefon trzyma które logowanie.',
           ),
           if (sync != null)
             sync.hasServer

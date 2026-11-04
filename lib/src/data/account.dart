@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'playlist_sync.dart';
+import 'problem_report.dart';
 import 'server_trust.dart';
 
 /// The MusicDatabase user logged in on this phone ([ADR 0006](../../../docs/decisions/0006-musicdatabase-login.md)).
@@ -18,7 +19,21 @@ import 'server_trust.dart';
 ///
 /// The owner grants users permissions in MusicDatabase (main menu › Users › Permissions); the
 /// phone shows what they allow only while the user has them ([hasPermission]).
+///
+/// The login also names the phone ([loginDeviceName]), so the owner can tell which token is
+/// which phone when revoking one.
 class Account extends ChangeNotifier {
+  /// [deviceName] stands in for reading the phone's model (tests).
+  Account({Future<String?> Function()? deviceName})
+    : _deviceName = deviceName ?? _phoneName;
+
+  final Future<String?> Function() _deviceName;
+
+  static Future<String?> _phoneName() async {
+    final info = await deviceInfo();
+    return loginDeviceName(info.manufacturer, info.model);
+  }
+
   static const _userKey = 'account.user_name';
   static const _tokenKey = 'account.token';
   static const _permissionsKey = 'account.permissions';
@@ -79,6 +94,7 @@ class Account extends ChangeNotifier {
     final client = ServerTrust.instance.client()..connectionTimeout = timeout;
     String? problem;
     try {
+      final device = await _deviceName();
       for (final server in servers) {
         try {
           final request = await client
@@ -86,7 +102,11 @@ class Account extends ChangeNotifier {
               .timeout(timeout);
           // MusicDatabase's server needs Content-Length (411 for a chunked body).
           final body = utf8.encode(
-            jsonEncode({'username': userName.trim(), 'password': password}),
+            jsonEncode({
+              'username': userName.trim(),
+              'password': password,
+              'device': ?device,
+            }),
           );
           request.headers.contentType = ContentType.json;
           request.contentLength = body.length;
@@ -252,4 +272,20 @@ class AccountScope extends InheritedNotifier<Account> {
   /// `null` outside the app (widget tests that pump a single screen).
   static Account? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AccountScope>()?.notifier;
+}
+
+/// The phone's name sent with `POST /login` (MusicDatabase keeps it with the token):
+/// `Build.MODEL` with `Build.MANUFACTURER` in front (first letter capitalised) unless the model
+/// already starts with it — "Google Pixel 7a", "HUAWEI ELE-L29", "Samsung SM-G991B", but
+/// "OnePlus 9" stays as it is for maker "OnePlus" — cut to 64 characters; `null` when Android
+/// doesn't give a model (or not Android), so the field is left out.
+String? loginDeviceName(String? manufacturer, String? model) {
+  final maker = manufacturer?.trim() ?? '';
+  final name = model?.trim() ?? '';
+  if (name.isEmpty) return null;
+  final full =
+      maker.isEmpty || name.toLowerCase().startsWith(maker.toLowerCase())
+      ? name
+      : '${maker[0].toUpperCase()}${maker.substring(1)} $name';
+  return full.length <= 64 ? full : full.substring(0, 64).trimRight();
 }
