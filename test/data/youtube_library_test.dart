@@ -577,5 +577,34 @@ void main() {
           .toList();
       expect(leftovers, isEmpty);
     });
+
+    // Played songs are cached without anyone awaiting it: an error thrown out of the download
+    // is an uncaught one. Seen when the folder went away just as a failed download cleaned up;
+    // a folder that refuses the delete hits the same line every time.
+    test('a failed download that can\'t clean up still just fails', () async {
+      final library = newLibrary();
+      await library.load();
+      final cacheDir = '${root.path}/youtube_cache';
+      void setWritable(String mode) =>
+          Process.runSync('chmod', [mode, cacheDir]);
+      addTearDown(() => setWritable('u+w'));
+      final failing = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => failing.close(force: true));
+      failing.listen((request) async {
+        setWritable('a-w');
+        request.response.statusCode = HttpStatus.internalServerError;
+        await request.response.close();
+      });
+      expect(
+        await library.download(
+          'v',
+          'http://127.0.0.1:${failing.port}/a',
+          'webm',
+          25,
+        ),
+        isFalse,
+      );
+      expect(library.cachedCount, 0);
+    });
   });
 }

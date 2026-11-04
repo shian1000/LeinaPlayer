@@ -715,7 +715,15 @@ class YouTubeLibrary extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('Caching YouTube audio $videoId failed: $e');
-      if (await part.exists()) await part.delete();
+      // Nobody awaits a played song's download, so what this throws would be uncaught; and the
+      // folder may go away between an exists() check and the delete.
+      try {
+        await part.delete();
+      } on PathNotFoundException {
+        // Already gone: nothing to clean up.
+      } on FileSystemException catch (e) {
+        debugPrint('Removing the unfinished YouTube audio $videoId failed: $e');
+      }
       return false;
     } finally {
       client.close(force: true);

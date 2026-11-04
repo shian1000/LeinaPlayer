@@ -57,6 +57,42 @@ class _Backend implements AudioBackend {
   Future<void> dispose() async {}
 }
 
+/// Playing a stream starts caching it without anyone awaiting that, so a test would end with
+/// the download still at work in the folder its tearDown deletes.
+class _Library extends YouTubeLibrary {
+  _Library(super.database, {super.storageRoot});
+
+  final _started = <Future<bool>>[];
+
+  @override
+  Future<bool> download(
+    String videoId,
+    String url,
+    String extension,
+    int limit, {
+    bool pin = false,
+    String? name,
+  }) {
+    final download = super.download(
+      videoId,
+      url,
+      extension,
+      limit,
+      pin: pin,
+      name: name,
+    );
+    _started.add(download);
+    return download;
+  }
+
+  Future<void> downloadsFinished() async {
+    var waited = 0;
+    while (waited < _started.length) {
+      await _started[waited++];
+    }
+  }
+}
+
 void main() {
   sqfliteFfiInit();
 
@@ -64,7 +100,7 @@ void main() {
   late DatabaseSync sync;
   late SongCatalog catalog;
   late LocalLibrary local;
-  late YouTubeLibrary library;
+  late _Library library;
   late SourceSettings settings;
   late _Backend backend;
   late PlayerController player;
@@ -82,7 +118,7 @@ void main() {
       storageRoot: () async => root,
       factoryOverride: databaseFactoryFfi,
     );
-    library = YouTubeLibrary(local.database, storageRoot: () async => root);
+    library = _Library(local.database, storageRoot: () async => root);
     await library.load();
     settings = SourceSettings();
     await settings.load();
@@ -94,6 +130,7 @@ void main() {
   });
 
   tearDown(() async {
+    await library.downloadsFinished();
     player.dispose();
     library.dispose();
     local.dispose();

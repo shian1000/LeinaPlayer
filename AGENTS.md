@@ -393,6 +393,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   shows, not for a notifier's field: `PlaylistLibrary.load` sets `playlists` before its second
   query and its `notifyListeners`, so waiting on the field let the test check the screen too
   early (and `find.text` also matches an open dialog's `TextField`).
+- A test failing only in a full run is reproduced much faster by looping its file next to CPU hogs
+  (twice as many as cores, or more), keeping each run's output. "This test failed after it had
+  already completed" blames the test that started the work: look for something nobody awaits
+  (playing a stream starts caching it, `YouTubeLibrary.download`) throwing as the test's folder
+  is deleted. Such work must not throw, and a test starting it waits for it before deleting the folder.
 - After `tester.scrollUntilVisible(…)` call `await tester.pump()` before tapping what it found:
   it ends with an `ensureVisible` jump but draws no frame, so `tap` aims where the last drag left
   the widget. Where that is can depend on the screen's content — the listening stats test
