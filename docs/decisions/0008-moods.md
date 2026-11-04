@@ -25,8 +25,9 @@ had tags (`tag.db`, global) and private tags per user (`user.db`, its ADR-0004).
 
 - **Moods are tags.** Global moods are `tag.db` tags with `kind = 'mood'` (the others, e.g.
   `spellchecked`, are markers and never shown); a user's moods are tags in their `user.db`.
-- **Only MusicDatabase songs** (`songs.id`) can be in a mood — "Dodaj do nastroju" is offered
-  only for them.
+- **Global moods hold only MusicDatabase songs** (`songs.id`). **A user's own mood may also hold
+  songs music.db doesn't have** (owner, 2026-11-04; until then no mood could): YouTube videos,
+  Spotify tracks, phone files. See "Songs outside music.db" below.
 - **A user's moods sync like playlists** ([ADR 0007](0007-playlist-sync.md)): whole moods,
   newer change wins, deleting deletes everywhere (archived first), names unique per user — the
   same name made on two phones becomes one mood (MusicDatabase merges, the phone adopts its uid).
@@ -64,9 +65,27 @@ had tags (`tag.db`, global) and private tags per user (`user.db`, its ADR-0004).
 - Before each mood sync the phone refreshes the permissions, so a granted or revoked permission
   shows without logging in again.
 
+## Songs outside music.db (owner, 2026-11-04)
+
+- `mood_tracks` (`local.db` v23): title, artist, video and Spotify ids, one row per normalized
+  artist + title (`songRequestKey`), so two videos of a song are one song. A phone file's path is
+  never kept: its file is found again by its names, like a playlist's track (`playlistHit`, which
+  also plays these rows).
+- They go in the mood's JSON as `tracks` ([hand-off](../handoffs/musicdatabase-mood-tracks.md)). A
+  server answer without the key leaves the phone's as they are and the mood goes again with each
+  sync: until MusicDatabase builds it they stay on the phone that added them (and in its backup),
+  and they reach it by themselves afterwards.
+- Once music.db has such a song (by the video, then exact title + artist) `MoodLibrary._linkTracks`
+  moves it to `mood_songs` and marks the mood dirty, without touching `updated_at`.
+- Song search (`SearchField.mood`) lists them only for a query naming their mood: they aren't
+  searchable otherwise. A global mood offers no tick for them; for a whole list, it takes only the
+  music.db songs and the sheet says how many stay out.
+- Being in a mood doesn't ask for a song to be added to MusicDatabase (`song_requests.dart` is
+  separate).
+
 ## Consequences
 
-- A mood shows only songs the phone's music.db has; others wait for a newer download (the
-  screen says how many).
+- Of a mood's `songs.id`s, it shows only those the phone's music.db has; others wait for a newer
+  download (the screen says how many).
 - A user's mood edited on the phone after the owner promoted it loses that edit (MusicDatabase
   answers 409 with the deletion); the phone doesn't redirect it to the global mood.

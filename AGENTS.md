@@ -116,7 +116,8 @@ pobrane utwory, `download_files.dart`; re-encoded as MP3 256 kbps unless "Pobier
 (phone only). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
 Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
-while logged out), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
+while logged out; own ones also hold songs music.db doesn't have, moved to its song once it has
+them — [hand-off](docs/handoffs/musicdatabase-mood-tracks.md)), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
 permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)); a whole playlist,
 mood or the queue can be put into a mood at once (after "Czy na pewno?"). A mood filter makes
 the queue hide and pass over songs outside the ticked moods (or with a mood, for "Utwory bez
@@ -313,6 +314,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   goes through `SongRequest.of(hit, artistNamed: catalog.artistNamed)`, which turns a name
   that is one of an artist's `artists.synonyms` / `name_latin` into music.db's name
   ("familyboombox" → "Бумбокс").
+- Which moods a song shown on screen is in goes by the hit (`Mood.has`, `moodKeysOfHit`,
+  `moodNameListOfHit`, changes through `setHits`), not `hit.mainSong!.id`: a user's mood also holds
+  songs music.db doesn't have (`Mood.tracks`). Only a list made of music.db songs (a radio) may use
+  the id.
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
   reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.

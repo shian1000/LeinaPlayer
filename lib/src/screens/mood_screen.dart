@@ -63,9 +63,10 @@ class _MoodScreenState extends State<MoodScreen> {
         ),
       );
     }
+    final catalog = SongCatalogScope.of(context);
     final hits = moodHits(
       mood,
-      SongCatalogScope.of(context),
+      catalog,
       LocalLibraryScope.of(context),
       YouTubeLibraryScope.of(context),
     );
@@ -79,7 +80,7 @@ class _MoodScreenState extends State<MoodScreen> {
           (i, hit),
     ];
     final editable = !mood.global || moods.canEditGlobal;
-    final missing = mood.songIds.length - hits.length;
+    final missing = mood.songIds.where((id) => catalog.byId(id) == null).length;
     return Scaffold(
       appBar: AppBar(
         title: _query == null
@@ -193,7 +194,7 @@ class _MoodScreenState extends State<MoodScreen> {
               ),
             for (final (i, hit) in shown)
               SongTile(
-                key: ValueKey(hit.mainSong!.id),
+                key: ValueKey(SongSelection.keyOf(hit)),
                 hit: hit,
                 queue: hits,
                 queueIndex: i,
@@ -284,9 +285,7 @@ class _MoodScreenState extends State<MoodScreen> {
         MenuSheetEntry(
           Icons.remove_circle_outline,
           'Usuń z tego nastroju',
-          onTap: () =>
-              MoodLibraryScope.of(context)
-                  .setSong(mood, hit.mainSong!.id, false),
+          onTap: () => MoodLibraryScope.of(context).setHits(mood, [hit], false),
         ),
     ],
   );
@@ -294,8 +293,7 @@ class _MoodScreenState extends State<MoodScreen> {
   /// Dragged left: out of the mood, with "Cofnij".
   void _swipeRemove(BuildContext context, Mood mood, SearchHit hit) {
     final moods = MoodLibraryScope.of(context);
-    final id = hit.mainSong!.id;
-    moods.setSong(mood, id, false);
+    moods.setHits(mood, [hit], false);
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
@@ -304,7 +302,7 @@ class _MoodScreenState extends State<MoodScreen> {
           persist: false,
           action: SnackBarAction(
             label: 'Cofnij',
-            onPressed: () => moods.setSong(mood, id, true),
+            onPressed: () => moods.setHits(mood, [hit], true),
           ),
         ),
       );

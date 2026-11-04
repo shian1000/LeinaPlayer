@@ -5,10 +5,10 @@ import 'combined_search.dart';
 
 /// "Filtr nastrojów": while it's on, the queue passes over (and hides) songs in none of the
 /// ticked moods. "Bez nastroju" lets through songs in no mood at all — on its own it passes
-/// over every song with a mood, except those in a mood ticked too. Songs not in music.db
-/// can't be in a mood, so they count as having none. Nothing ticked: nothing is passed over.
+/// over every song with a mood, except those in a mood ticked too. Nothing ticked: nothing is
+/// passed over.
 class MoodFilter extends ChangeNotifier {
-  /// [moodsOf]: the [Mood.key]s of a music.db song; [knownMoods]: of every mood shown now, so
+  /// [moodsOf]: the [Mood.key]s of a song; [knownMoods]: of every mood shown now, so
   /// a ticked mood that's gone (deleted, another account's) doesn't count; [moodChanges]
   /// notifies when either may have changed.
   MoodFilter({
@@ -24,7 +24,7 @@ class MoodFilter extends ChangeNotifier {
   static const _untaggedKey = 'mood_filter.untagged';
   static const _offWhenAddedKey = 'mood_filter.off_when_added';
 
-  final Set<String> Function(int songId) _moodsOf;
+  final Set<String> Function(SearchHit hit) _moodsOf;
   final Set<String> Function() _knownMoods;
   final Listenable? _moodChanges;
 
@@ -62,8 +62,7 @@ class MoodFilter extends ChangeNotifier {
   /// Whether the queue plays [hit]; always while the filter isn't [active].
   bool allows(SearchHit hit) {
     if (!active) return true;
-    final id = hit.mainSong?.id;
-    final moods = id == null ? const <String>{} : _moodsOf(id);
+    final moods = _moodsOf(hit);
     if (moods.isEmpty) return _untagged;
     return moods.any(_moods.contains);
   }

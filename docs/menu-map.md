@@ -654,8 +654,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   - Every result (YouTube ones too) has a ⋮ **→ sheet**, IDs `Wyszukaj › Utwór › Menu (⋮) ›
     <pozycja>`: Dodaj do kolejki (**implemented**), Odtwórz jako następny (**implemented**),
     Dodaj do playlisty (**implemented → sheet "Dodaj do playlisty"** below), Dodaj do nastroju
-    (**implemented**, MusicDatabase songs only, **→
-    sheet "Dodaj do nastroju"** below), Zapisz na później / Usuń z „Na później” (**implemented**),
+    (**implemented → sheet "Dodaj do nastroju"** below), Zapisz na później / Usuń z „Na później” (**implemented**),
     Przejdź do albumu (**implemented**: the album's songs in a song list, a full album of it
     first — `openAlbumSongs`; left
     out for songs with no album), Przejdź do wykonawców ›, Przejdź do radia utworu (**implemented**,
@@ -684,8 +683,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     list with Odtwórz / Losowo and a ⋮ with Dodaj do kolejki / Odtwórz jako następny for all
     its songs; `song_list_screen.dart`).
   - **The song menu** (`showSongMenu` in `song_tile.dart`): the same entries as this ⋮ — Dodaj do
-    kolejki, Odtwórz jako następny, Dodaj do nastroju (for a song not in MusicDatabase it says
-    only database songs can be in a mood), Dodaj do playlisty, the dummies, Udostępnij — open
+    kolejki, Odtwórz jako następny, Dodaj do nastroju, Dodaj do playlisty, the dummies, Udostępnij — open
     with a long press on song rows outside a selection area (YouTube results, Kolejka
     `Kolejka › Utwór › Menu (⋮)`, outbox contents), the full player's ⋮ (`Odtwarzacz › Menu
     (⋮)`) and a long press on the mini player (`Mini odtwarzacz › Menu utworu`).
@@ -835,8 +833,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
 ## Sheet "Dodaj do nastroju" (`mood_sheet.dart`)
 
 - Header with the song; "Nowy nastrój" (name dialog; the new mood gets the song); "Twoje
-  nastroje" with a checkbox each (ticking adds / removes right away); "Globalne" the same, only
-  with the `edit_global_moods` permission. Moods show a crescent moon (`moodIcon`) everywhere.
+  nastroje" with a checkbox each (ticking adds / removes right away), for any song; "Globalne" the
+  same, only for MusicDatabase songs and with the `edit_global_moods` permission. Moods show a crescent moon (`moodIcon`) everywhere.
 
 ## Sheet "Nastrój dla wszystkich utworów" (`showMoodPickerForAll` in `mood_sheet.dart`)
 
@@ -844,7 +842,7 @@ From the playlist ⋮, the mood ⋮ and Kolejka (moon icon). The same lists as "
 each mood ticked when all the songs are in it, a dash and "N z M" when some are. Tapping one asks
 "Czy na pewno? Dodać N utworów do nastroju „…”?" (the missing ones) — or, when all are in,
 "Usunąć N utworów z…" — and changes them at once. "Nowy nastrój" makes one with all of them.
-Songs not in MusicDatabase are left out (the sheet says how many).
+Global moods leave out songs not in MusicDatabase (the sheet says how many).
 
 ## Sheet "Filtr nastrojów" (`showMoodFilterSheet` in `mood_sheet.dart`)
 

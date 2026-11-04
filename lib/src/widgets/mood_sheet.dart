@@ -16,33 +16,14 @@ const moodIcon = Icons.nightlight;
 /// "Utwory bez nastroju" in the mood filter.
 const noMoodIcon = Icons.nightlight_outlined;
 
-/// "Dodaj do nastroju" for a song's menu; `null` where there are no moods (widget tests). Only
-/// MusicDatabase songs can be in a mood, so for any other it says so.
+/// "Dodaj do nastroju" for a song's menu; `null` where there are no moods (widget tests).
 MenuSheetEntry? moodMenuEntry(BuildContext context, SearchHit hit) {
   if (MoodLibraryScope.maybeOf(context) == null) return null;
   return MenuSheetEntry(
     moodIcon,
     'Dodaj do nastroju',
-    onTap: () => openMoodPicker(context, hit),
+    onTap: () => showMoodPicker(context, hit),
   );
-}
-
-/// [showMoodPicker] for [hit], or why it can't be in a mood: only MusicDatabase songs can.
-void openMoodPicker(BuildContext context, SearchHit hit) {
-  if (hit.mainSong != null) {
-    showMoodPicker(context, hit);
-    return;
-  }
-  ScaffoldMessenger.of(context)
-    ..clearSnackBars()
-    ..showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Do nastroju można dodać tylko utwory z bazy danych MusicDatabase — '
-          'tego jeszcze w niej nie ma.',
-        ),
-      ),
-    );
 }
 
 /// "Filtr nastrojów": the switch, "Bez nastroju" and every mood shown, each ticked when it's in
@@ -146,10 +127,10 @@ Future<void> showMoodFilterSheet(BuildContext context) {
 }
 
 /// Asks for a name and makes a mood of the logged-in user (logged out: only on this phone)
-/// with [songIds]; says why when it can't. Returns whether it was made.
+/// with [hits]; says why when it can't. Returns whether it was made.
 Future<bool> createMood(
   BuildContext context, {
-  Iterable<int> songIds = const [],
+  Iterable<SearchHit> hits = const [],
 }) async {
   final moods = MoodLibraryScope.of(context);
   final messenger = ScaffoldMessenger.of(context);
@@ -162,7 +143,7 @@ Future<bool> createMood(
     ),
   );
   if (name == null) return false;
-  final problem = await moods.create(name, songIds: songIds);
+  final problem = await moods.create(name, hits: hits);
   if (problem != null) {
     messenger.showSnackBar(SnackBar(content: Text(problem)));
   }
@@ -170,9 +151,8 @@ Future<bool> createMood(
 }
 
 /// The moods [hit] can go into, each ticked when it's in it: the user's own and, with the
-/// permission, the global ones. Ticking changes the mood right away.
+/// permission and a song music.db has, the global ones. Ticking changes the mood right away.
 Future<void> showMoodPicker(BuildContext context, SearchHit hit) {
-  final songId = hit.mainSong!.id;
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
@@ -191,8 +171,8 @@ Future<void> showMoodPicker(BuildContext context, SearchHit hit) {
               contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               secondary: const Icon(moodIcon),
               title: Text(mood.name),
-              value: mood.songIds.contains(songId),
-              onChanged: (inMood) => moods.setSong(mood, songId, inMood!),
+              value: mood.has(hit),
+              onChanged: (inMood) => moods.setHits(mood, [hit], inMood!),
             );
             return ListView(
               shrinkWrap: true,
@@ -209,13 +189,15 @@ Future<void> showMoodPicker(BuildContext context, SearchHit hit) {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                   leading: Icon(Icons.add, color: palette.textSecondary),
                   title: const Text('Nowy nastrój'),
-                  onTap: () => createMood(sheetContext, songIds: [songId]),
+                  onTap: () => createMood(sheetContext, hits: [hit]),
                 ),
                 if (moods.userMoods.isNotEmpty) ...[
                   const SectionTitle('Twoje nastroje'),
                   for (final mood in moods.userMoods) tile(mood),
                 ],
-                if (moods.canEditGlobal && moods.globalMoods.isNotEmpty) ...[
+                if (hit.mainSong != null &&
+                    moods.canEditGlobal &&
+                    moods.globalMoods.isNotEmpty) ...[
                   const SectionTitle('Globalne'),
                   for (final mood in moods.globalMoods) tile(mood),
                 ],
@@ -245,14 +227,17 @@ MenuSheetEntry? moodForAllEntry(
 
 /// The moods all of [hits] can go into, ticked when all of them are in it (a dash when some
 /// are). Tapping one asks first, then puts all of them in — or, when all are in already, takes
-/// them all out. Only MusicDatabase songs can be in a mood; the rest are left out.
+/// them all out. A global mood holds only MusicDatabase songs; the rest are left out of it.
 Future<void> showMoodPickerForAll(
   BuildContext context,
   List<SearchHit> hits, {
   required String title,
 }) {
-  final songIds = {for (final hit in hits) ?hit.mainSong?.id};
-  final outside = hits.where((hit) => hit.mainSong == null).length;
+  final songs = {
+    for (final hit in hits) hit.mainSong?.id ?? moodTrackKey(hit): hit,
+  }.values.toList();
+  final inDatabase = songs.where((hit) => hit.mainSong != null).toList();
+  final outside = songs.length - inDatabase.length;
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
@@ -268,8 +253,9 @@ Future<void> showMoodPickerForAll(
           builder: (sheetContext, _) {
             final palette = sheetContext.palette;
             Widget tile(Mood mood) {
-              final inMood = songIds.where(mood.songIds.contains).length;
-              final all = songIds.isNotEmpty && inMood == songIds.length;
+              final fitting = mood.global ? inDatabase : songs;
+              final inMood = fitting.where(mood.has).length;
+              final all = fitting.isNotEmpty && inMood == fitting.length;
               return CheckboxListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 secondary: const Icon(moodIcon),
@@ -277,20 +263,20 @@ Future<void> showMoodPickerForAll(
                 subtitle: inMood == 0 || all
                     ? null
                     : Text(
-                        '$inMood z ${songIds.length}',
+                        '$inMood z ${fitting.length}',
                         style: TextStyle(color: palette.textSecondary),
                       ),
                 tristate: true,
                 value: all ? true : (inMood == 0 ? false : null),
-                onChanged: songIds.isEmpty
+                onChanged: fitting.isEmpty
                     ? null
                     : (_) => _confirmForAll(
                         sheetContext,
                         moods,
                         mood,
-                        songIds,
+                        fitting,
                         add: !all,
-                        changed: all ? songIds.length : songIds.length - inMood,
+                        changed: all ? fitting.length : fitting.length - inMood,
                       ),
               );
             }
@@ -304,15 +290,14 @@ Future<void> showMoodPickerForAll(
                   title: 'Nastrój dla wszystkich utworów',
                   subtitle: title,
                 ),
-                if (songIds.isEmpty || outside > 0)
+                if (outside > 0 &&
+                    moods.canEditGlobal &&
+                    moods.globalMoods.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                     child: Text(
-                      songIds.isEmpty
-                          ? 'Żadnego z tych utworów nie ma w bazie danych '
-                                'MusicDatabase — tylko takie mogą być w nastroju.'
-                          : 'Utwory spoza bazy danych MusicDatabase ($outside) '
-                                'zostaną pominięte.',
+                      'Utwory spoza bazy danych MusicDatabase ($outside) '
+                      'nie trafią do nastrojów globalnych.',
                       style: TextStyle(color: palette.textSecondary),
                     ),
                   ),
@@ -321,8 +306,7 @@ Future<void> showMoodPickerForAll(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                   leading: Icon(Icons.add, color: palette.textSecondary),
                   title: const Text('Nowy nastrój'),
-                  enabled: songIds.isNotEmpty,
-                  onTap: () => createMood(sheetContext, songIds: songIds),
+                  onTap: () => createMood(sheetContext, hits: songs),
                 ),
                 if (moods.userMoods.isNotEmpty) ...[
                   const SectionTitle('Twoje nastroje'),
@@ -346,7 +330,7 @@ Future<void> _confirmForAll(
   BuildContext context,
   MoodLibrary moods,
   Mood mood,
-  Set<int> songIds, {
+  List<SearchHit> hits, {
   required bool add,
   required int changed,
 }) async {
@@ -370,5 +354,5 @@ Future<void> _confirmForAll(
       ],
     ),
   );
-  if (confirmed ?? false) await moods.setSongs(mood, songIds, add);
+  if (confirmed ?? false) await moods.setHits(mood, hits, add);
 }

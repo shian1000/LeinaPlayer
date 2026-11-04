@@ -1260,7 +1260,7 @@ void main() {
     setUp(() async {
       moodsOf = {};
       filter = MoodFilter(
-        moodsOf: (id) => moodsOf[id] ?? const {},
+        moodsOf: (hit) => moodsOf[hit.mainSong?.id] ?? const {},
         knownMoods: () => {'dance', 'gym', 'calm'},
       );
       await filter.load();

@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/custom_covers.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/moods.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
+import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -32,6 +34,9 @@ class FakeMoodServer {
   String user = 'tester';
   bool permitted = true;
   Set<int> globalMoodIds = {1};
+
+  /// `false`: a server from before moods held songs outside music.db.
+  bool knowsTracks = true;
 
   Uri get address => Uri.parse('http://127.0.0.1:${_server.port}/');
 
@@ -191,6 +196,7 @@ class FakeMoodServer {
         'revision': ++counter,
         'deleted': false,
       };
+      if (!knowsTracks) saved.remove('tracks');
       moods[uid] = saved;
       return reply(HttpStatus.ok, saved);
     }
@@ -223,16 +229,18 @@ void main() {
   var clock = DateTime(2026, 10, 13, 12);
   final revoked = <String>[];
 
-  MoodLibrary newLibrary({CustomCovers? covers}) => MoodLibrary(
-    local.database,
-    sync,
-    factoryOverride: databaseFactoryFfi,
-    now: () => clock,
-    userName: () => userName,
-    authToken: () => token,
-    canEditGlobal: () => permitted,
-    covers: covers,
-  )..onPermissionRevoked = revoked.add;
+  MoodLibrary newLibrary({CustomCovers? covers, SongCatalog? catalog}) =>
+      MoodLibrary(
+        local.database,
+        sync,
+        factoryOverride: databaseFactoryFfi,
+        now: () => clock,
+        userName: () => userName,
+        authToken: () => token,
+        canEditGlobal: () => permitted,
+        covers: covers,
+        catalog: catalog,
+      )..onPermissionRevoked = revoked.add;
 
   Future<void> writeTags(Map<int, (String, String, List<int>)> tags) async =>
       writeTagDb((await sync.localFile('tag.db')).path, tags: tags);
@@ -594,6 +602,8 @@ void main() {
       // Version 14 on top: covers.
       expect(await db.query('global_mood_covers'), isEmpty);
       expect((await db.query('moods')).single['cover_sha256'], isNull);
+      // Version 23 on top: songs music.db doesn't have.
+      expect(await db.query('mood_tracks'), isEmpty);
       await db.insert('moods', {
         'uid': 'v',
         'name': 'Bez konta',
@@ -604,4 +614,199 @@ void main() {
       await oldRoot.delete(recursive: true);
     },
   );
+
+  group('songs music.db doesn\'t have', () {
+    final video = SearchHit.youTubeOnly(
+      title: 'Spoza bazy',
+      artistLabel: 'Ktoś',
+      videoId: 'outsideVid1',
+      playlistVideoId: 'outsideVid1',
+    );
+    late YouTubeLibrary youTube;
+
+    setUp(() {
+      youTube = YouTubeLibrary(local.database, storageRoot: () async => root);
+    });
+
+    Mood mood(String name) => moods.userMoods.firstWhere((m) => m.name == name);
+
+    test('go into the user\'s own mood, show and come out again', () async {
+      await catalog.ensureLoaded();
+      await moods.create('Chill', songIds: [1]);
+      await moods.setHits(mood('Chill'), [video], true);
+
+      expect(mood('Chill').has(video), isTrue);
+      expect(moods.moodKeysOfHit(video), {mood('Chill').key});
+      expect(moods.moodNameListOfHit(video), ['Chill']);
+      final hits = moodHits(mood('Chill'), catalog, local, youTube);
+      expect(
+        [for (final hit in hits) hit.title],
+        ['Małomiasteczkowy', 'Spoza bazy'],
+      );
+      final shown = hits.last;
+      expect(shown.mainSong, isNull);
+      expect(shown.youtubeVideoId, 'outsideVid1');
+      // The row a mood lists takes it out too.
+      await moods.setHits(mood('Chill'), [shown], false);
+      expect(mood('Chill').tracks, isEmpty);
+      expect(mood('Chill').songIds, {1});
+    });
+
+    test('a new mood can start with them; deleting it takes them', () async {
+      await moods.create('Nowy', hits: [video]);
+      expect(mood('Nowy').tracks.keys, [moodTrackKey(video)]);
+      expect(mood('Nowy').songIds, isEmpty);
+
+      await moods.delete(mood('Nowy'));
+      final db = await local.database();
+      expect(await db.query('mood_tracks'), isEmpty);
+    });
+
+    test('the same song from another video is one song', () async {
+      await moods.create('Chill', hits: [video]);
+      final again = SearchHit.youTubeOnly(
+        title: 'SPOZA BAZY',
+        artistLabel: 'ktoś',
+        videoId: 'otherVideo2',
+      );
+      expect(mood('Chill').has(again), isTrue);
+      await moods.setHits(mood('Chill'), [again], true);
+      expect(mood('Chill').tracks, hasLength(1));
+    });
+
+    test('a global mood leaves them out', () async {
+      await moods.setHits(moods.globalMoods.single, [video], true);
+      expect(moods.globalMoods.single.has(video), isFalse);
+      expect(server.globalChanges, isEmpty);
+    });
+
+    test('a phone file goes without its path', () async {
+      await moods.create('Chill');
+      await moods.setHits(mood('Chill'), [
+        SearchHit.phoneOnly(
+          LocalSong(
+            id: 9,
+            filePath: '/music/plik.mp3',
+            title: 'Plik',
+            artist: 'Ktoś',
+            pending: true,
+          ),
+        ),
+      ], true);
+      await syncNow();
+
+      final sent = server.moods.values.single['tracks']! as List;
+      expect(sent, [
+        {
+          'title': 'Plik',
+          'artist': 'Ktoś',
+          'youtube_video_id': null,
+          'spotify_track_id': null,
+        },
+      ]);
+    });
+
+    test('sync with the account, both ways', () async {
+      await moods.create('Chill', hits: [video]);
+      await syncNow();
+      final stored = server.moods.values.single;
+      expect(stored['song_ids'], isEmpty);
+      expect((stored['tracks']! as List).single, {
+        'title': 'Spoza bazy',
+        'artist': 'Ktoś',
+        'youtube_video_id': 'outsideVid1',
+        'spotify_track_id': null,
+      });
+      expect(mood('Chill').tracks, hasLength(1));
+
+      // Taken out on another phone.
+      server.add({
+        ...stored,
+        'tracks': const [],
+        'updated_at': (stored['updated_at']! as int) + 1,
+      });
+      await syncNow();
+      expect(mood('Chill').tracks, isEmpty);
+    });
+
+    test(
+      'a server that doesn\'t know them leaves the phone\'s alone',
+      () async {
+        server.knowsTracks = false;
+        await moods.create('Chill', songIds: [1], hits: [video]);
+        await syncNow();
+
+        expect(server.moods.values.single.containsKey('tracks'), isFalse);
+        expect(mood('Chill').tracks, hasLength(1));
+        expect(mood('Chill').songIds, {1});
+
+        // Once the server knows them, they arrive without another change here.
+        server.knowsTracks = true;
+        await syncNow();
+        expect(server.moods.values.single['tracks'], hasLength(1));
+        final db = await local.database();
+        expect((await db.query('moods')).single['dirty'], 0);
+      },
+    );
+
+    test('become music.db songs once it has them', () async {
+      await catalog.ensureLoaded();
+      final library = newLibrary(catalog: catalog);
+      await library.load();
+      await library.create(
+        'Chill',
+        hits: [
+          SearchHit.youTubeOnly(
+            title: 'Pusty',
+            artistLabel: 'Artur Rojek',
+            videoId: null,
+          ),
+          video,
+        ],
+      );
+      final made = library.userMoods.single;
+      expect(made.songIds, {4});
+      expect(made.tracks.keys, [moodTrackKey(video)]);
+
+      // The link is sent, without looking like the user's change.
+      final db = await local.database();
+      await db.update('moods', {'dirty': 0});
+      final before = (await db.query('moods')).single['updated_at'];
+      await db.insert('mood_tracks', {
+        'mood_id': made.localId,
+        'track_key': 'x',
+        'title': 'Going to California',
+        'artist': 'Led Zeppelin',
+      });
+      await library.load();
+      expect(library.userMoods.single.songIds, {2, 4});
+      final row = (await db.query('moods')).single;
+      expect(row['dirty'], 1);
+      expect(row['updated_at'], before);
+      library.dispose();
+    });
+
+    test('song search finds them by their mood\'s name', () async {
+      await catalog.ensureLoaded();
+      catalog.setMoodTracks(moods.tracksForSearch);
+      await moods.create('Do biegania', hits: [video]);
+
+      List<String> found(String query) => [
+        for (final hit in searchEverywhere(
+          query,
+          catalog,
+          local,
+          youTube: youTube,
+        ))
+          hit.title,
+      ];
+      expect(found('biegania'), ['Spoza bazy']);
+      expect(found('biegania spoza'), ['Spoza bazy']);
+      expect(found('biegania rojek'), isEmpty);
+      // Only through the mood: its title alone finds nothing, like any video.
+      expect(found('spoza'), isEmpty);
+      await catalog.setSearchFields({SearchField.title});
+      expect(found('biegania'), isEmpty);
+    });
+  });
 }

@@ -822,14 +822,13 @@ class _SongInfoCardState extends State<SongInfoCard> {
   }
 
   Widget _moodsSection(BuildContext context, SongDetails? details) {
-    final id = widget.hit.mainSong?.id;
     final moods = MoodLibraryScope.maybeOf(context);
-    final inMoods = id == null || moods == null
+    final inMoods = moods == null
         ? const <Mood>[]
         : [
             ...moods.globalMoods,
             ...moods.userMoods,
-          ].where((m) => m.songIds.contains(id)).toList();
+          ].where((m) => m.has(widget.hit)).toList();
     final tags = [
       for (final tag in details?.tags ?? const <({String name, String kind})>[])
         if (tag.kind != 'mood') tag,

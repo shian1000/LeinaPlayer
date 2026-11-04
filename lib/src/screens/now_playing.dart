@@ -356,7 +356,7 @@ Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
                   action(
                     moodIcon,
                     'Nastrój',
-                    () => openMoodPicker(context, hit),
+                    () => showMoodPicker(context, hit),
                   ),
                 if (saved != null)
                   saved.contains(hit)
@@ -1080,10 +1080,7 @@ class _MoodButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final songId = hit.mainSong?.id;
-    final names = songId == null
-        ? const <String>[]
-        : MoodLibraryScope.of(context).moodNameListOf(songId);
+    final names = MoodLibraryScope.of(context).moodNameListOfHit(hit);
     return IconButton(
       tooltip: names.isEmpty ? 'Nastrój' : 'Nastrój: ${names.join(', ')}',
       icon: Icon(
@@ -1091,7 +1088,7 @@ class _MoodButton extends StatelessWidget {
         size: 28,
         color: names.isEmpty ? null : context.palette.accent,
       ),
-      onPressed: () => openMoodPicker(context, hit),
+      onPressed: () => showMoodPicker(context, hit),
     );
   }
 }

@@ -180,7 +180,7 @@ class LocalLibrary extends ChangeNotifier {
   final String? Function() _downloadFolder;
 
   /// `local.db`'s version; a backup from a newer one isn't restored (`user_backup.dart`).
-  static const schemaVersion = 22;
+  static const schemaVersion = 23;
 
   static const _foldersKey = 'local_music.folders';
   static const _lastScanKey = 'local_music.last_scan_ms';
@@ -290,6 +290,7 @@ class LocalLibrary extends ChangeNotifier {
           await _createDownloadQueueTable(db);
           await _addAddedTrackColumn(db);
           await _createRecordingsTable(db);
+          await _createMoodTracksTable(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -312,9 +313,26 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 19) await _createDownloadQueueTable(db);
           if (from < 20) await _addAddedTrackColumn(db);
           if (from < 22) await _createRecordingsTable(db);
+          if (from < 23) await _createMoodTracksTable(db);
         },
       ),
     );
+  }
+
+  /// Version 23: songs music.db doesn't have in the user's own moods (`moods.dart`, ADR 0008).
+  /// `track_key` is [songRequestKey] of the artist and title: one song is one row, whichever
+  /// video or file it came from. No file path: a phone file is found again by its names.
+  static Future<void> _createMoodTracksTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE mood_tracks (
+        mood_id INTEGER NOT NULL,
+        track_key VARCHAR NOT NULL,
+        title VARCHAR NOT NULL,
+        artist VARCHAR,
+        youtube_video_id VARCHAR,
+        spotify_track_id VARCHAR,
+        PRIMARY KEY (mood_id, track_key)
+      )''');
   }
 
   /// Version 22: what the phone found out about each recording (`recordings.dart`) — its
@@ -499,7 +517,7 @@ class LocalLibrary extends ChangeNotifier {
     await db.execute('''
       CREATE TABLE mood_songs (
         mood_id INTEGER NOT NULL,
-        -- music.db's songs.id: only MusicDatabase songs can be in a mood.
+        -- music.db's songs.id; other songs are in mood_tracks.
         song_id INTEGER NOT NULL,
         PRIMARY KEY (mood_id, song_id)
       )''');

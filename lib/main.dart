@@ -336,7 +336,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         resolveTrack(ref, _songCatalog, _localLibrary, _youTubeLibrary),
   );
   late final _moodFilter = MoodFilter(
-    moodsOf: (songId) => _moodLibrary.moodKeysOf(songId),
+    moodsOf: (hit) => _moodLibrary.moodKeysOfHit(hit),
     knownMoods: () => _moodLibrary.moodKeys,
     moodChanges: _moodLibrary,
   );
@@ -357,6 +357,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
           authToken: () => _account.token,
           canEditGlobal: () => _account.hasPermission(Account.editGlobalMoods),
           covers: _customCovers,
+          catalog: _songCatalog,
         )
         ..onUnauthorized = _account.tokenRejected
         ..onPermissionRevoked = _account.permissionRevoked;
@@ -535,6 +536,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       _playlistSyncSoon = Timer(const Duration(seconds: 3), _syncPlaylists);
     };
     _songCatalog.setMoodNames(_moodLibrary.moodNamesOf);
+    _songCatalog.setMoodTracks(_moodLibrary.tracksForSearch);
     _moodLibrary.addListener(_songCatalog.moodsChanged);
     _moodLibrary.onChanged = () {
       _moodSyncSoon?.cancel();

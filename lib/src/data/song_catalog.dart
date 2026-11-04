@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'database_sync.dart';
 import 'latin_names.dart';
+import 'playlist_library.dart';
 import 'song_requests.dart';
 import 'text_normalizer.dart';
 import 'youtube_matcher.dart';
@@ -394,6 +395,16 @@ class SongCatalog extends ChangeNotifier {
     _moodNames = moodNames;
     _searchTexts = null;
   }
+
+  List<PlaylistTrack> Function(String query)? _moodTracks;
+
+  /// Where [moodTracksFor] gets its songs.
+  void setMoodTracks(List<PlaylistTrack> Function(String query) moodTracks) =>
+      _moodTracks = moodTracks;
+
+  /// Songs not in music.db that moods hold, for [query] (`SearchField.mood`).
+  List<PlaylistTrack> moodTracksFor(String query) =>
+      _moodTracks?.call(query) ?? const [];
 
   /// A mood was made, renamed or got other songs: search sees it from the next keystroke.
   void moodsChanged() => _searchTexts = null;

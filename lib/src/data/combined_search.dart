@@ -256,7 +256,8 @@ SearchHit withPhoneYouTube(SearchHit hit, YouTubeLibrary youTube) {
 }
 
 /// Song search over both databases: MusicDatabase's songs (each marked with the phone files that
-/// are that song) plus phone songs MusicDatabase doesn't have. Ordered like
+/// are that song) plus phone songs MusicDatabase doesn't have and, with [youTube], the songs
+/// outside it that a mood named in the query holds. Ordered like
 /// [SongCatalog.search]: best title matches first, alphabetical within a group. [fields] —
 /// instead of the ones chosen in "Szukaj w" (a dynamic playlist's).
 List<SearchHit> searchEverywhere(
@@ -283,6 +284,18 @@ List<SearchHit> searchEverywhere(
     ))
       SearchHit.phoneOnly(file),
   ];
+  final searched = fields ?? catalog.searchFields;
+  if (youTube != null && searched.contains(SearchField.mood)) {
+    String name(SearchHit hit) =>
+        normalizeForSearch('${hit.artistLabel}|${hit.title}');
+    final ids = {for (final hit in hits) ?hit.mainSong?.id};
+    final names = {for (final hit in hits) name(hit)};
+    for (final track in catalog.moodTracksFor(query)) {
+      final hit = playlistHit(track, catalog, library, youTube);
+      final id = hit.mainSong?.id;
+      if ((id == null || ids.add(id)) && names.add(name(hit))) hits.add(hit);
+    }
+  }
   final keys = {
     for (final hit in hits)
       hit: (

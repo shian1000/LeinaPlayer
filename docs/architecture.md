@@ -54,7 +54,8 @@ v12 moods, v13 phone-only moods, v14 picked covers, v15 YouTube copies, v16 excl
 v17 `listens`).
 
 Moods ([ADR 0008](decisions/0008-moods.md)): `MoodLibrary` (`moods.dart`, `MoodLibraryScope`)
-reads global moods from the downloaded `tag.db` and keeps the user's own in `local.db`, synced like
+reads global moods from the downloaded `tag.db` and keeps the user's own in `local.db` (songs
+music.db doesn't have too, in `mood_tracks`, v23), synced like
 playlists; `SongCatalog` asks it for each song's mood names (`SearchField.mood`). Every song row
 offers the same menu (`showSongMenu` in `song_tile.dart`: ⋮ or a long press), which is where "Dodaj
 do nastroju" lives.

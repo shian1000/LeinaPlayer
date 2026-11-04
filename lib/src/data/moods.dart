@@ -9,12 +9,14 @@ import 'combined_search.dart';
 import 'custom_covers.dart';
 import 'database_sync.dart';
 import 'local_library.dart';
+import 'playlist_library.dart';
 import 'playlist_sync.dart';
 import 'song_catalog.dart';
+import 'song_requests.dart';
 import 'text_normalizer.dart';
 import 'youtube_library.dart';
 
-/// A "Nastrój": MusicDatabase songs with the same feel, in no order
+/// A "Nastrój": songs with the same feel, in no order
 /// ([ADR 0008](../../../docs/decisions/0008-moods.md)). Global moods come from the downloaded
 /// `tag.db` and everyone sees them, logged in or not; a user's own moods are synced with their
 /// MusicDatabase account, and ones made while logged out live only on the phone.
@@ -22,6 +24,7 @@ class Mood {
   const Mood._({
     required this.name,
     required this.songIds,
+    this.tracks = const {},
     this.globalId,
     this.localId,
     this.uid,
@@ -34,6 +37,15 @@ class Mood {
 
   /// music.db's `songs.id`s; some may be missing from an older music.db on the phone.
   final Set<int> songIds;
+
+  /// Songs music.db didn't have when they were added, by [moodTrackKey]; a global mood has none.
+  /// Each moves to [songIds] once music.db has it.
+  final Map<String, PlaylistTrack> tracks;
+
+  /// [hit] is in this mood.
+  bool has(SearchHit hit) =>
+      (hit.mainSong != null && songIds.contains(hit.mainSong!.id)) ||
+      tracks.containsKey(moodTrackKey(hit));
 
   /// tag.db's `tags.id` of a global mood.
   final int? globalId;
@@ -61,6 +73,31 @@ class Mood {
   String get key => global ? 'g$globalId' : 'u$localId';
 }
 
+/// The artist [hit] is kept under outside music.db, like a playlist's track: a phone file's own,
+/// `null` when nothing names one.
+String? _trackArtist(SearchHit hit) {
+  final artist = hit.mainSong == null && hit.onPhone
+      ? hit.phoneFiles.first.artist
+      : hit.artistLabel;
+  return artist == SongRequest.unknownArtist ? null : artist;
+}
+
+/// What tells a song apart in [Mood.tracks]: its names, not the video or file it came from.
+String moodTrackKey(SearchHit hit) =>
+    songRequestKey(_trackArtist(hit), hit.title);
+
+/// [hit], a song music.db doesn't have, as kept in [Mood.tracks]. A phone file keeps no video, so
+/// [playlistHit] looks for the file.
+PlaylistTrack _moodTrackOf(SearchHit hit) => PlaylistTrack(
+  position: 0,
+  title: hit.title,
+  artist: _trackArtist(hit),
+  youtubeVideoId: hit.onPhone
+      ? null
+      : hit.playlistVideoId ?? hit.youtubeVideoId,
+  spotifyTrackId: hit.onPhone ? null : hit.spotifyTrackId,
+);
+
 /// The moods the phone knows: global ones read from `tag.db` (`tags.kind = 'mood'`) and the
 /// user's own, kept in `local.db`. Like playlists, the logged-in account's are exchanged with
 /// MusicDatabase by [sync] (`/users/<name>/moods`: whole moods, newer change wins, deleting
@@ -70,6 +107,10 @@ class Mood {
 /// A user with the `edit_global_moods` permission may also add songs to global moods and take
 /// them out. MusicDatabase applies those changes to its tag.db later, so the phone keeps each
 /// one (shown on top of its own tag.db) until a downloaded tag.db has it.
+///
+/// The user's own moods also hold songs music.db doesn't have ([Mood.tracks], `tracks` in the
+/// sync; tag.db can only hold `songs.id`, so global moods can't). Once [catalog] has such a song
+/// it moves to [Mood.songIds] by itself.
 class MoodLibrary extends ChangeNotifier {
   MoodLibrary(
     this._database,
@@ -80,11 +121,13 @@ class MoodLibrary extends ChangeNotifier {
     String? Function()? authToken,
     bool Function()? canEditGlobal,
     this.covers,
+    this.catalog,
   }) : _now = now ?? DateTime.now,
        _userName = userName ?? (() => null),
        _authToken = authToken ?? (() => null),
        _canEditGlobal = canEditGlobal ?? (() => false) {
     _sync.addListener(_onSyncChanged);
+    catalog?.addListener(_onCatalogChanged);
   }
 
   /// A change MusicDatabase accepted but its tag.db (as downloaded) still doesn't show is
@@ -103,6 +146,9 @@ class MoodLibrary extends ChangeNotifier {
 
   /// Where cover pictures are kept, sent from and downloaded to; `null` in tests without them.
   final CustomCovers? covers;
+
+  /// Recognises songs of [Mood.tracks]; `null` in tests that don't need it.
+  final SongCatalog? catalog;
 
   /// A mood was changed here, e.g. to send it to MusicDatabase soon.
   VoidCallback? onChanged;
@@ -152,6 +198,85 @@ class MoodLibrary extends ChangeNotifier {
     }
     load().catchError((Object e) => debugPrint('Loading moods failed: $e'));
   }
+
+  void _onCatalogChanged() {
+    _linkTracks()
+        .then((linked) async {
+          if (linked) await _loadLocal();
+        })
+        .catchError((Object e) => debugPrint('Linking mood songs failed: $e'));
+  }
+
+  /// The songs of [Mood.tracks] music.db has now become its songs, recognised as [playlistHit]
+  /// recognises them. `updated_at` stays: for the user the mood didn't change. Whether any did.
+  Future<bool> _linkTracks() async {
+    final catalog = this.catalog;
+    if (catalog == null || catalog.status != CatalogStatus.ready) return false;
+    final db = await _database();
+    final scope = _scope('m.');
+    final found = <({int mood, String key, int song})>[];
+    for (final row in await db.rawQuery(
+      'SELECT t.* FROM mood_tracks t JOIN moods m ON m.id = t.mood_id '
+      'WHERE m.deleted_at IS NULL AND ${scope.where}',
+      scope.args,
+    )) {
+      final track = _trackFrom(row);
+      final videoId = track.youtubeVideoId;
+      final song =
+          (videoId == null ? null : catalog.findByYouTubeId(videoId)) ??
+          playlistSongByName(track, catalog);
+      if (song == null) continue;
+      found.add((
+        mood: row['mood_id']! as int,
+        key: row['track_key']! as String,
+        song: song.id,
+      ));
+    }
+    if (found.isEmpty) return false;
+    await db.transaction((txn) async {
+      for (final link in found) {
+        await txn.insert('mood_songs', {
+          'mood_id': link.mood,
+          'song_id': link.song,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await txn.delete(
+          'mood_tracks',
+          where: 'mood_id = ? AND track_key = ?',
+          whereArgs: [link.mood, link.key],
+        );
+        await txn.update(
+          'moods',
+          {'dirty': 1},
+          where: 'id = ?',
+          whereArgs: [link.mood],
+        );
+      }
+    });
+    onChanged?.call();
+    return true;
+  }
+
+  static PlaylistTrack _trackFrom(Map<String, Object?> row) => PlaylistTrack(
+    position: 0,
+    title: row['title']! as String,
+    artist: row['artist'] as String?,
+    youtubeVideoId: row['youtube_video_id'] as String?,
+    spotifyTrackId: row['spotify_track_id'] as String?,
+  );
+
+  static Future<void> _insertTrack(
+    Transaction txn,
+    int moodId,
+    String key,
+    PlaylistTrack track,
+  ) => txn.insert('mood_tracks', {
+    'mood_id': moodId,
+    'track_key': key,
+    'title': track.title,
+    'artist': track.artist,
+    'youtube_video_id': track.youtubeVideoId,
+    'spotify_track_id': track.spotifyTrackId,
+  }, conflictAlgorithm: ConflictAlgorithm.ignore);
 
   Future<void> _loadTagDb() async {
     final syncTime = _sync.lastSync;
@@ -231,6 +356,7 @@ class MoodLibrary extends ChangeNotifier {
   }
 
   Future<void> _loadLocal() async {
+    await _linkTracks();
     final db = await _database();
     final user = _userName();
     final userMoods = <Mood>[];
@@ -247,6 +373,15 @@ class MoodLibrary extends ChangeNotifier {
     )) {
       (songs[row['mood_id']! as int] ??= {}).add(row['song_id']! as int);
     }
+    final tracks = <int, Map<String, PlaylistTrack>>{};
+    for (final row in await db.rawQuery(
+      'SELECT t.* FROM mood_tracks t '
+      'JOIN moods m ON m.id = t.mood_id WHERE ${scope.where}',
+      scope.args,
+    )) {
+      (tracks[row['mood_id']! as int] ??= {})[row['track_key']! as String] =
+          _trackFrom(row);
+    }
     for (final row in await db.rawQuery(
       'SELECT m.id, m.uid, m.name, m.account, m.cover_sha256, m.created_at FROM moods m '
       'WHERE m.deleted_at IS NULL AND ${scope.where}',
@@ -257,6 +392,7 @@ class MoodLibrary extends ChangeNotifier {
         Mood._(
           name: row['name']! as String,
           songIds: songs[id] ?? const {},
+          tracks: tracks[id] ?? const {},
           localId: id,
           uid: row['uid'] as String?,
           phoneOnly: row['account'] == null,
@@ -311,8 +447,18 @@ class MoodLibrary extends ChangeNotifier {
         (keys[songId] ??= {}).add(mood.key);
       }
     }
+    final trackNames = <String, List<String>>{};
+    final trackKeys = <String, Set<String>>{};
+    for (final mood in _userMoods) {
+      for (final track in mood.tracks.keys) {
+        (trackNames[track] ??= []).add(mood.name);
+        (trackKeys[track] ??= {}).add(mood.key);
+      }
+    }
     _moodNames = names;
     _moodKeys = keys;
+    _trackMoodNames = trackNames;
+    _trackMoodKeys = trackKeys;
     _allKeys = {
       for (final mood in [..._userMoods, ..._globalMoods]) mood.key,
     };
@@ -321,16 +467,56 @@ class MoodLibrary extends ChangeNotifier {
 
   Map<int, List<String>> _moodNames = const {};
   Map<int, Set<String>> _moodKeys = const {};
+  Map<String, List<String>> _trackMoodNames = const {};
+  Map<String, Set<String>> _trackMoodKeys = const {};
   Set<String> _allKeys = const {};
 
   /// The [Mood.key]s of the shown moods [songId] is in.
   Set<String> moodKeysOf(int songId) => _moodKeys[songId] ?? const {};
+
+  /// The [Mood.key]s of the shown moods [hit] is in, also through [Mood.tracks].
+  Set<String> moodKeysOfHit(SearchHit hit) {
+    final id = hit.mainSong?.id;
+    return {
+      if (id != null) ...moodKeysOf(id),
+      ...?_trackMoodKeys[moodTrackKey(hit)],
+    };
+  }
 
   /// The [Mood.key]s of every shown mood.
   Set<String> get moodKeys => _allKeys;
 
   /// The names of the shown moods [songId] is in, in order.
   List<String> moodNameListOf(int songId) => _moodNames[songId] ?? const [];
+
+  /// The names of the shown moods [hit] is in, also through [Mood.tracks].
+  List<String> moodNameListOfHit(SearchHit hit) {
+    final id = hit.mainSong?.id;
+    return {
+      if (id != null) ...moodNameListOf(id),
+      ...?_trackMoodNames[moodTrackKey(hit)],
+    }.toList();
+  }
+
+  /// The songs of [Mood.tracks] song search lists for [query] (`SearchField.mood`): like a
+  /// music.db song, every word is in the mood's name, the title or the artist — but at least one
+  /// in the name, as these songs are found only through their mood.
+  List<PlaylistTrack> tracksForSearch(String query) {
+    final words = normalizeForSearch(query).split(' ')
+      ..removeWhere((w) => w.isEmpty);
+    final found = <String, PlaylistTrack>{};
+    for (final mood in _userMoods) {
+      final name = normalizeForSearch(mood.name);
+      if (!words.any(name.contains)) continue;
+      for (final MapEntry(:key, :value) in mood.tracks.entries) {
+        final text =
+            '$name ${normalizeForSearch(value.title)} '
+            '${normalizeForSearch(value.artist)}';
+        if (words.every(text.contains)) found[key] = value;
+      }
+    }
+    return found.values.toList();
+  }
 
   /// The names of the shown moods [songId] is in, for song search (`SearchField.mood`).
   String moodNamesOf(int songId) => _moodNames[songId]?.join(' ') ?? '';
@@ -402,11 +588,13 @@ class MoodLibrary extends ChangeNotifier {
     onChanged?.call();
   }
 
-  /// Makes a mood of the logged-in user (logged out: only on this phone), with [songIds] in it. Returns why it couldn't
-  /// (Polish, for display), `null` when it's made.
+  /// Makes a mood of the logged-in user (logged out: only on this phone), with [songIds] and
+  /// the songs music.db doesn't have of [hits] in it. Returns why it couldn't (Polish, for
+  /// display), `null` when it's made.
   Future<String?> create(
     String name, {
     Iterable<int> songIds = const [],
+    Iterable<SearchHit> hits = const [],
   }) async {
     final user = _userName();
     final problem = _nameProblem(name.trim());
@@ -422,11 +610,18 @@ class MoodLibrary extends ChangeNotifier {
         'updated_at': now,
         'dirty': 1,
       });
-      for (final songId in songIds) {
+      for (final songId in {
+        ...songIds,
+        for (final hit in hits) ?hit.mainSong?.id,
+      }) {
         await txn.insert('mood_songs', {
           'mood_id': id,
           'song_id': songId,
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+      for (final hit in hits) {
+        if (hit.mainSong != null) continue;
+        await _insertTrack(txn, id, moodTrackKey(hit), _moodTrackOf(hit));
       }
     });
     await _loadLocal();
@@ -472,6 +667,11 @@ class MoodLibrary extends ChangeNotifier {
     await db.transaction((txn) async {
       await txn.delete(
         'mood_songs',
+        where: 'mood_id = ?',
+        whereArgs: [mood.localId],
+      );
+      await txn.delete(
+        'mood_tracks',
         where: 'mood_id = ?',
         whereArgs: [mood.localId],
       );
@@ -547,6 +747,43 @@ class MoodLibrary extends ChangeNotifier {
         ))
           row['cover_sha256']! as String,
     };
+  }
+
+  /// Puts [hits] into [mood] or takes them out ([inMood]), whether music.db has them or not. A
+  /// global mood takes only music.db's: the rest are left out.
+  Future<void> setHits(Mood mood, Iterable<SearchHit> hits, bool inMood) async {
+    final all = hits.toList();
+    final songIds = {for (final hit in all) ?hit.mainSong?.id};
+    final outside = all.where((hit) => hit.mainSong == null);
+    // Taking out goes by the names too: a song music.db got since may not be linked yet.
+    final tracks = inMood ? outside : all;
+    if (!mood.global && tracks.isNotEmpty) {
+      await (await _database()).transaction((txn) async {
+        for (final hit in tracks) {
+          final key = moodTrackKey(hit);
+          if (inMood) {
+            await _insertTrack(txn, mood.localId!, key, _moodTrackOf(hit));
+          } else {
+            await txn.delete(
+              'mood_tracks',
+              where: 'mood_id = ? AND track_key = ?',
+              whereArgs: [mood.localId, key],
+            );
+          }
+        }
+        await txn.update(
+          'moods',
+          {'updated_at': _now().millisecondsSinceEpoch, 'dirty': 1},
+          where: 'id = ?',
+          whereArgs: [mood.localId],
+        );
+      });
+      if (songIds.isEmpty) {
+        await _loadLocal();
+        onChanged?.call();
+      }
+    }
+    await setSongs(mood, songIds, inMood);
   }
 
   /// Puts [songId] into [mood] or takes it out ([inMood]). A global mood needs
@@ -1017,6 +1254,20 @@ class MoodLibrary extends ChangeNotifier {
       ))
         s['song_id'],
     ],
+    'tracks': [
+      for (final t in await db.query(
+        'mood_tracks',
+        where: 'mood_id = ?',
+        whereArgs: [row['id']],
+        orderBy: 'track_key',
+      ))
+        {
+          'title': t['title'],
+          'artist': t['artist'],
+          'youtube_video_id': t['youtube_video_id'],
+          'spotify_track_id': t['spotify_track_id'],
+        },
+    ],
   };
 
   /// The row [id] takes MusicDatabase's revision and uid (another one when it merged the mood
@@ -1048,6 +1299,11 @@ class MoodLibrary extends ChangeNotifier {
         where: 'mood_id = ?',
         whereArgs: [row['id']],
       );
+      await txn.delete(
+        'mood_tracks',
+        where: 'mood_id = ?',
+        whereArgs: [row['id']],
+      );
       await txn.delete('moods', where: 'id = ?', whereArgs: [row['id']]);
     }
   }
@@ -1075,17 +1331,34 @@ class MoodLibrary extends ChangeNotifier {
     if (id != null) {
       await txn.delete('mood_songs', where: 'mood_id = ?', whereArgs: [id]);
     }
+    // A server from before these says nothing about them, so the phone keeps its own.
+    final remoteTracks = remote['tracks'] as List?;
+    if (id != null && (remoteTracks != null || remote['deleted'] == true)) {
+      await txn.delete('mood_tracks', where: 'mood_id = ?', whereArgs: [id]);
+    }
     if (remote['deleted'] == true) {
       if (id != null) {
         await txn.delete('moods', where: 'id = ?', whereArgs: [id]);
       }
       return;
     }
+    final keepsOwnTracks =
+        remoteTracks == null &&
+        id != null &&
+        (await txn.query(
+          'mood_tracks',
+          columns: ['track_key'],
+          where: 'mood_id = ?',
+          whereArgs: [id],
+          limit: 1,
+        )).isNotEmpty;
     final values = {
       'uid': uid,
       'account': user,
       'revision': remote['revision'],
-      'dirty': 0,
+      // Not on the server yet: they go again with each sync until it keeps them, or the next
+      // answer with `tracks` from another phone's copy would erase them here.
+      'dirty': keepsOwnTracks ? 1 : 0,
       'deleted_at': null,
       'name': remote['name'],
       'created_at': remote['created_at'],
@@ -1103,11 +1376,29 @@ class MoodLibrary extends ChangeNotifier {
         'song_id': songId,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
+    for (final item in remoteTracks ?? const []) {
+      final json = item as Map<String, Object?>;
+      final title = json['title']! as String;
+      final artist = json['artist'] as String?;
+      await _insertTrack(
+        txn,
+        moodId,
+        songRequestKey(artist, title),
+        PlaylistTrack(
+          position: 0,
+          title: title,
+          artist: artist,
+          youtubeVideoId: json['youtube_video_id'] as String?,
+          spotifyTrackId: json['spotify_track_id'] as String?,
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     _sync.removeListener(_onSyncChanged);
+    catalog?.removeListener(_onCatalogChanged);
     super.dispose();
   }
 }
@@ -1119,8 +1410,8 @@ class _SyncStopped implements Exception {
   final String problem;
 }
 
-/// [mood]'s songs that the phone's music.db has, as rows (with their phone files and what the
-/// phone found on YouTube), by title.
+/// [mood]'s songs as rows, by title: those the phone's music.db has (with their phone files and
+/// what the phone found on YouTube), and [Mood.tracks] the way a playlist shows such a track.
 List<SearchHit> moodHits(
   Mood mood,
   SongCatalog catalog,
@@ -1132,6 +1423,12 @@ List<SearchHit> moodHits(
       if (catalog.byId(id) case final song?)
         withPhoneYouTube(SearchHit.main(song, library.filesOf(id)), youTube),
   ];
+  final seen = {for (final hit in hits) hit.mainSong!.id};
+  for (final track in mood.tracks.values) {
+    final hit = playlistHit(track, catalog, library, youTube);
+    // Recognised but not linked yet ([MoodLibrary._linkTracks]) and already there.
+    if (hit.mainSong == null || seen.add(hit.mainSong!.id)) hits.add(hit);
+  }
   final titles = {for (final hit in hits) hit: normalizeForSearch(hit.title)};
   return hits..sort((a, b) => titles[a]!.compareTo(titles[b]!));
 }
