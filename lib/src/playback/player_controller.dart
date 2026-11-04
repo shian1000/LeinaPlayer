@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../data/album_covers.dart';
 import '../data/latin_names.dart';
+import 'server_audio_source.dart';
 
 /// What's loaded in the player.
 class NowPlaying {
@@ -313,9 +314,15 @@ class JustAudioBackend implements AudioBackend {
   @override
   Stream<MediaSkip> get skips => _session?.skips ?? const Stream.empty();
 
-  AudioSource _sourceOf(NowPlaying track) => track.isStream
-      ? AudioSource.uri(Uri.parse(track.source))
-      : AudioSource.file(track.source);
+  AudioSource _sourceOf(NowPlaying track) {
+    if (!track.isStream) return AudioSource.file(track.source);
+    final uri = Uri.parse(track.source);
+    // MusicDatabase's server over HTTPS has its own certificate, which Android's player
+    // would refuse: its bytes go through the app instead.
+    return track.serverFileId != null && uri.scheme == 'https'
+        ? ServerAudioSource(uri)
+        : AudioSource.uri(uri);
+  }
 
   void _showTrack(NowPlaying track) {
     _track = track;

@@ -29,6 +29,7 @@ import 'src/data/play_history.dart';
 import 'src/data/playlist_bookmarks.dart';
 import 'src/data/playlist_library.dart';
 import 'src/data/saved_songs.dart';
+import 'src/data/server_trust.dart';
 import 'src/data/smart_playlists.dart';
 import 'src/data/hidden_songs.dart';
 import 'src/data/server_downloads.dart';
@@ -102,6 +103,12 @@ Future<void> main() async {
     if (await userBackup.applyPending()) debugPrint('Restored a backup');
   } catch (e) {
     debugPrint('Restoring a backup failed: $e');
+  }
+  // Before anything talks to MusicDatabase's server, which shows its own certificate.
+  try {
+    await ServerTrust.instance.load();
+  } catch (e) {
+    debugPrint('Reading the server certificate failed: $e');
   }
   // Loaded before the first frame so the app doesn't flash the default theme on start.
   final themeController = ThemeController();

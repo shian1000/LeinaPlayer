@@ -8,6 +8,8 @@ import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../support/tls.dart';
+
 final _sqlite = [...'SQLite format 3\u0000'.codeUnits, 1, 2, 3];
 
 /// A music.db without songs, as `countSongs` in [newSync] sees it (every other file has some).
@@ -120,9 +122,13 @@ void main() {
       expect(DatabaseSync.normalizeUrl('  '), isNull);
     });
 
-    test('adds http:// and a trailing slash', () {
+    test('adds https:// and a trailing slash', () {
       expect(
         DatabaseSync.normalizeUrl('100.1.2.3:8002').toString(),
+        'https://100.1.2.3:8002/',
+      );
+      expect(
+        DatabaseSync.normalizeUrl('http://100.1.2.3:8002').toString(),
         'http://100.1.2.3:8002/',
       );
       expect(
@@ -149,7 +155,7 @@ void main() {
   test('downloads both files once a day', () async {
     final sync = newSync();
     await sync.load();
-    await sync.setRemoteUrl('127.0.0.1:${server.port}');
+    await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
 
     await sync.syncIfDue();
     expect(sync.lastError, isNull);
@@ -171,7 +177,7 @@ void main() {
   test('goes on without files.db when the server has none', () async {
     final sync = newSync();
     await sync.load();
-    await sync.setRemoteUrl('127.0.0.1:${server.port}');
+    await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
     expect(await sync.syncNow(), isTrue);
     expect(await (await sync.localFile('files.db')).exists(), isTrue);
 
@@ -189,7 +195,7 @@ void main() {
   test('remembers address and last download across restarts', () async {
     final first = newSync();
     await first.load();
-    await first.setRemoteUrl('127.0.0.1:${server.port}');
+    await first.setRemoteUrl('http://127.0.0.1:${server.port}');
     expect(await first.syncNow(), isTrue);
 
     final second = newSync();
@@ -201,7 +207,7 @@ void main() {
   test('keeps the old copy when a new file is not a database', () async {
     final sync = newSync();
     await sync.load();
-    await sync.setRemoteUrl('127.0.0.1:${server.port}');
+    await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
     expect(await sync.syncNow(), isTrue);
 
     served['tag.db'] = '<html>404</html>'.codeUnits;
@@ -220,7 +226,7 @@ void main() {
     test('does not replace a copy that has songs', () async {
       final sync = newSync();
       await sync.load();
-      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
       expect(await sync.syncNow(), isTrue);
 
       now = now.add(const Duration(days: 1));
@@ -248,7 +254,7 @@ void main() {
     test('is taken when asked for', () async {
       final sync = newSync();
       await sync.load();
-      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
       expect(await sync.syncNow(), isTrue);
 
       served['music.db'] = _empty;
@@ -264,7 +270,7 @@ void main() {
     test('is taken when the phone has no songs either', () async {
       final sync = newSync();
       await sync.load();
-      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
       served['music.db'] = _empty;
       expect(await sync.syncNow(), isTrue);
       expect(sync.serverEmpty, isFalse);
@@ -303,7 +309,7 @@ void main() {
     await sync.load();
     final port = server.port;
     await server.close(force: true);
-    await sync.setRemoteUrl('127.0.0.1:$port');
+    await sync.setRemoteUrl('http://127.0.0.1:$port');
 
     expect(await sync.syncNow(), isFalse);
     expect(sync.lastError, 'Nie można połączyć się z serwerem');
@@ -329,8 +335,8 @@ void main() {
     Future<DatabaseSync> configured() async {
       final sync = newSync();
       await sync.load();
-      await sync.setRemoteUrl('127.0.0.1:${server.port}');
-      await sync.setLocalUrl('127.0.0.1:${localServer.port}');
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
+      await sync.setLocalUrl('http://127.0.0.1:${localServer.port}');
       await sync.setLocalWifi('Dom');
       return sync;
     }
@@ -520,7 +526,7 @@ void main() {
     test('a reachable server comes first', () async {
       final sync = newSync();
       await sync.load();
-      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
       expect(await sync.syncNow(), isTrue);
       expect(sync.lastSource, DatabaseSource.remote);
       expect(gitHubRequests, isEmpty);
@@ -531,7 +537,7 @@ void main() {
       await sync.load();
       expect(await sync.syncNow(), isTrue);
 
-      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
       served['music.db'] = _empty;
       expect(await sync.syncNow(), isTrue);
       expect(sync.lastSource, DatabaseSource.github);
@@ -547,7 +553,7 @@ void main() {
     test('GitHub when the server is down, keeping files.db', () async {
       final sync = newSync();
       await sync.load();
-      await sync.setRemoteUrl('127.0.0.1:${server.port}');
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
       expect(await sync.syncNow(), isTrue);
 
       await server.close(force: true);
@@ -566,7 +572,7 @@ void main() {
       () async {
         final sync = newSync();
         await sync.load();
-        await sync.setRemoteUrl('127.0.0.1:${server.port}');
+        await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
         now = DateTime(2026, 10, 21, 23, 50);
         expect(await sync.syncNow(), isTrue);
 
@@ -621,7 +627,7 @@ void main() {
       await sync.load();
       final port = server.port;
       await server.close(force: true);
-      await sync.setRemoteUrl('127.0.0.1:$port');
+      await sync.setRemoteUrl('http://127.0.0.1:$port');
       version = {'format': 2};
       expect(await sync.syncNow(), isFalse);
       expect(
@@ -683,23 +689,34 @@ void main() {
 
   group('discoverLocalServer', () {
     test('finds the server serving music.db in the phone subnet', () async {
-      // Loopback 127.0.0.x behaves like a /24 subnet with the test server on .1.
+      // Loopback 127.0.0.x behaves like a /24 subnet with the test server on .1. With no
+      // remote address it looks for HTTPS, whatever certificate the server shows.
+      final secure = await HttpServer.bindSecure(
+        InternetAddress.loopbackIPv4,
+        0,
+        testServerContext(),
+      );
+      addTearDown(() => secure.close(force: true));
+      secure.listen((request) {
+        request.response.add(_sqlite);
+        request.response.close();
+      });
       final sync = DatabaseSync(
         storageRoot: () async => storage,
         currentWifiIp: () async => '127.0.0.42',
       );
       await sync.load();
-      final found = await sync.discoverLocalServer(port: server.port);
-      expect(found.toString(), 'http://127.0.0.1:${server.port}/');
+      final found = await sync.discoverLocalServer(port: secure.port);
+      expect(found.toString(), 'https://127.0.0.1:${secure.port}/');
     });
 
-    test('takes port and path from the remote address', () async {
+    test('takes scheme, port and path from the remote address', () async {
       final sync = DatabaseSync(
         storageRoot: () async => storage,
         currentWifiIp: () async => '127.0.0.42',
       );
       await sync.load();
-      await sync.setRemoteUrl('100.64.0.1:${server.port}');
+      await sync.setRemoteUrl('http://100.64.0.1:${server.port}');
       final found = await sync.discoverLocalServer();
       expect(found.toString(), 'http://127.0.0.1:${server.port}/');
     });

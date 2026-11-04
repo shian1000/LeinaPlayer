@@ -65,7 +65,8 @@ as they appear in it.)
 ## Keys and passwords
 
 - The MusicDatabase account password is not stored on the phone — the server returns a token
-  instead.
+  instead. With a server serving HTTPS (MusicDatabase's own certificate, confirmed once by its
+  code), the password, the token and the account's data travel encrypted on any network.
 - YouTube and Spotify API keys, if you enter them, stay on the phone only.
 - Google sign-in is handled by Google Play services; the app never sees the password or token.
 

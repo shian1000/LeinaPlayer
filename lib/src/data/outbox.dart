@@ -12,6 +12,7 @@ import 'song_catalog.dart';
 import 'song_requests.dart';
 import 'text_normalizer.dart';
 import 'youtube_video.dart';
+import 'server_trust.dart';
 
 /// Requests for MusicDatabase, waiting on the phone until it can hand them over
 /// ([ADR 0005](../../../docs/decisions/0005-outbox-for-musicdatabase.md)). Each request is a small
@@ -603,7 +604,8 @@ class Outbox extends ChangeNotifier {
       );
     }
     final dir = await directory();
-    final client = HttpClient()..connectionTimeout = sendTimeout;
+    final client = ServerTrust.instance.client()
+      ..connectionTimeout = sendTimeout;
     var sent = 0;
     var refused = 0;
     String? problem;

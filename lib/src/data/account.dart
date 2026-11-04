@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'playlist_sync.dart';
+import 'server_trust.dart';
 
 /// The MusicDatabase user logged in on this phone ([ADR 0006](../../../docs/decisions/0006-musicdatabase-login.md)).
 /// Users are created in MusicDatabase (main menu › Users); the phone logs in with a username and
@@ -75,7 +76,7 @@ class Account extends ChangeNotifier {
     }
     _busy = true;
     notifyListeners();
-    final client = HttpClient()..connectionTimeout = timeout;
+    final client = ServerTrust.instance.client()..connectionTimeout = timeout;
     String? problem;
     try {
       for (final server in servers) {
@@ -143,7 +144,7 @@ class Account extends ChangeNotifier {
     await prefs.remove(_tokenKey);
     await prefs.remove(_permissionsKey);
     if (token == null || servers.isEmpty) return;
-    final client = HttpClient()..connectionTimeout = timeout;
+    final client = ServerTrust.instance.client()..connectionTimeout = timeout;
     try {
       for (final server in servers) {
         try {

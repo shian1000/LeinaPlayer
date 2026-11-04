@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted (2026-10-10)
+Accepted (2026-10-10). Plain HTTP as the expected transport is superseded by
+[ADR 0015](0015-server-https.md) (2026-11-04): the server serves HTTPS with its own certificate,
+pinned by the phone.
 
 ## Context
 

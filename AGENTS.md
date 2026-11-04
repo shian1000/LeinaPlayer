@@ -148,7 +148,11 @@ saves it for later with the person who sent it (Ja › Na później,
   the phone's own findings only fill gaps and are dropped once music.db settles them — never
   the other way round (user agreed; see [`youtube.md`](docs/agent-notes/youtube.md)).
 - The app gets MusicDatabase's data by downloading its SQLite files over HTTP
-  ([ADR 0002](docs/decisions/0002-database-download.md)). What goes back is a request file in the
+  ([ADR 0002](docs/decisions/0002-database-download.md)) — HTTPS with the server's own
+  certificate, pinned after the user compares its code ([ADR 0015](docs/decisions/0015-server-https.md)):
+  every request to the server goes through `ServerTrust.instance.client()` (a bare `HttpClient()`
+  refuses the certificate), and a server file over HTTPS plays through `ServerAudioSource`, since
+  Android's player can't use the pin. What goes back is a request file in the
   phone's outbox ([ADR 0005](docs/decisions/0005-outbox-for-musicdatabase.md), `outbox.dart`; so
   far dead music.db YouTube links, videos the phone found for songs music.db has no link for,
   the user's corrections of song / artist / album fields — incl. YouTube links set by hand — and

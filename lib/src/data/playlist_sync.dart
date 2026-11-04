@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
 import 'custom_covers.dart';
+import 'server_trust.dart';
 
 /// A new playlist id shared with MusicDatabase (`playlists.uid` on both sides): a random UUID v4.
 String newPlaylistUid() {
@@ -35,7 +36,8 @@ class PlaylistSyncClient {
     this.userName,
     this.token, {
     this.collection = 'playlists',
-  }) : _client = HttpClient()..connectionTimeout = connectTimeout;
+  }) : _client = ServerTrust.instance.client()
+         ..connectionTimeout = connectTimeout;
 
   static const connectTimeout = Duration(seconds: 8);
 

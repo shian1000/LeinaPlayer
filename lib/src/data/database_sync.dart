@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'server_trust.dart';
+
 /// Where a download came from: one of the two server addresses, or the public copy on GitHub.
 enum DatabaseSource { remote, local, github }
 
@@ -243,9 +245,12 @@ class DatabaseSync extends ChangeNotifier {
   Future<String?> currentWifiName() => _currentWifi();
 
   /// Looks for a MusicDatabase server on the phone's current Wi-Fi network: tries every address
-  /// of its /24 subnet on the port (and path) of the remote address — the same server is
-  /// expected to listen on both — and returns the first one that serves `music.db` as an SQLite
-  /// file, or `null`. Takes a few seconds at most: 32 hosts at a time with short timeouts.
+  /// of its /24 subnet on the scheme, port and path of the remote address — the same server is
+  /// expected to listen on both; HTTPS when none is set — and returns the first one that serves
+  /// `music.db` as an SQLite file, or `null`. Takes a few seconds at most: 32 hosts at a time
+  /// with short timeouts. Any certificate is accepted while probing, since only the start of
+  /// the public music.db is read; whether to trust the server found is asked afterwards
+  /// ([ServerTrust.check]).
   Future<Uri?> discoverLocalServer({int? port}) async {
     final ownIp = await _currentWifiIp();
     final octets = ownIp?.split('.');
@@ -255,14 +260,15 @@ class DatabaseSync extends ChangeNotifier {
       for (var host = 1; host < 255; host++)
         if ('${octets.take(3).join('.')}.$host' != ownIp)
           Uri(
-            scheme: 'http',
+            scheme: template?.scheme ?? 'https',
             host: '${octets.take(3).join('.')}.$host',
             port: port ?? template?.port ?? 8002,
             path: template?.path ?? '/',
           ),
     ];
     final client = HttpClient()
-      ..connectionTimeout = const Duration(milliseconds: 700);
+      ..connectionTimeout = const Duration(milliseconds: 700)
+      ..badCertificateCallback = (_, _, _) => true;
     try {
       for (var start = 0; start < candidates.length; start += 32) {
         final batch = candidates.sublist(
@@ -310,18 +316,18 @@ class DatabaseSync extends ChangeNotifier {
 
   /// Turns user input into the base address the files are resolved against.
   ///
-  /// The scheme may be omitted (the server is expected on the tailnet or LAN, where plain HTTP
-  /// is fine), and a pasted link to one of the files is accepted as its folder.
+  /// The scheme may be omitted (HTTPS then — MusicDatabase's server serves it with its own
+  /// certificate, [ServerTrust]), and a pasted link to one of the files is accepted as its folder.
   static Uri? normalizeUrl(String raw) {
     var text = raw.trim();
     if (text.isEmpty) return null;
-    if (!text.contains('://')) text = 'http://$text';
+    if (!text.contains('://')) text = 'https://$text';
     final uri = Uri.tryParse(text);
     if (uri == null ||
         !(uri.scheme == 'http' || uri.scheme == 'https') ||
         uri.host.isEmpty) {
       throw const FormatException(
-        'Nieprawidłowy adres (np. http://serwer:8002/)',
+        'Nieprawidłowy adres (np. https://serwer:8002/)',
       );
     }
     final segments = [...uri.pathSegments.where((s) => s.isNotEmpty)];
@@ -474,7 +480,7 @@ class DatabaseSync extends ChangeNotifier {
 
   Future<void> _downloadAll(Uri base, {required bool acceptEmpty}) async {
     final parts = <File>[];
-    final client = HttpClient()
+    final client = ServerTrust.instance.client()
       ..connectionTimeout = const Duration(seconds: 15);
     try {
       final dir = await databaseDirectory();
@@ -717,6 +723,8 @@ class DatabaseSync extends ChangeNotifier {
 
   static String _describe(Object e) => switch (e) {
     _SyncFailure(:final message) => message,
+    // A certificate the phone doesn't trust (yet): ServerTrust, confirmed on Ustawienia › Serwer.
+    HandshakeException() => 'Nieznany certyfikat serwera — potwierdź go w Ustawienia › Serwer („Zapisz adresy”)',
     SocketException() => 'Nie można połączyć się z serwerem',
     TimeoutException() => 'Serwer nie odpowiada',
     HttpException() => 'Przerwane połączenie z serwerem',

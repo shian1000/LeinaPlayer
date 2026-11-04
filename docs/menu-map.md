@@ -289,12 +289,17 @@ import, Wyświetlanie, Dane, Aplikacja.
   - "Adres serwera (połączenie zdalne)" and "Adres serwera (sieć lokalna)" — two addresses of
     MusicDatabase's `music.db` / `tag.db` / `files.db` (the server's music files, ADR 0010),
     validated and saved with "Zapisz adresy i pobierz bazę" (saving downloads
-    right away).
+    right away). An address without a scheme is `https://`; an HTTPS server showing a
+    certificate the phone doesn't trust yet first gets "Czy to Twój serwer?" with the
+    certificate's code to compare with MusicDatabase's ("Tak, to mój serwer" pins it — ADR 0015).
+  - "Certyfikat serwera" (only once one is pinned) — "Zaufany certyfikat zapamiętany" with
+    "Zapomnij" (after a confirmation), for a server that made a new certificate.
   - "Wi-Fi sieci lokalnej" — the saved home Wi-Fi name (× clears it) and "Użyj bieżącego
     połączenia", which asks for location permission (Android's requirement for reading the
     SSID), saves the current Wi-Fi, then scans the phone's /24 subnet for a server answering
-    `music.db` (SQLite) on the remote address's port and path, and saves the first hit as the
-    local address (`DatabaseSync.discoverLocalServer`).
+    `music.db` (SQLite) on the remote address's scheme (HTTPS when none), port and path, asks
+    about its certificate as above, and saves the first hit as the local address
+    (`DatabaseSync.discoverLocalServer`).
   - "GitHub (publiczna kopia bazy)" — "Pobieraj z GitHuba" (switch, on by default) and the
     repository `<owner>/<repo>` (default `shian1000/LeinaMusicDatabase`; a pasted repository
     link is accepted, empty brings the default back; saved with "Zapisz adresy i pobierz bazę"). Only `music.db` /

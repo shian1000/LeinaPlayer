@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../data/database_sync.dart';
+import '../data/server_trust.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -152,6 +153,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
       );
       return;
     }
+    if (!await _confirmCertificates([sync.remoteUrl, sync.localUrl])) return;
     // Downloading right away tells the user at once whether the address works, instead of
     // only finding out on tomorrow's automatic run.
     final ok = await sync.syncNow();
@@ -201,6 +203,12 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
         );
         return;
       }
+      if (!await _confirmCertificates([server])) {
+        say(
+          'Zapisano sieć „$ssid”. Nie zapisano serwera $server — certyfikat odrzucony.',
+        );
+        return;
+      }
       await sync.setLocalUrl(server.toString());
       if (mounted) {
         setState(() {
@@ -217,6 +225,52 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
         });
       }
     }
+  }
+
+  /// Asks about every HTTPS address in [urls] whose server shows a certificate the phone
+  /// doesn't trust yet ([ServerTrust.check]); `false` once the user says one isn't theirs. An
+  /// address that doesn't answer now is left for the download to report.
+  Future<bool> _confirmCertificates(List<Uri?> urls) async {
+    final trust = ServerTrust.instance;
+    for (final url in urls) {
+      if (url == null || url.scheme != 'https') continue;
+      final result = await trust.check(
+        url.resolve(DatabaseSync.fileNames.first),
+      );
+      if (result is! CertificateUnknown) continue;
+      if (!mounted) return false;
+      final yes = await confirmServerCertificate(context, url, result.code);
+      if (!yes) return false;
+      await trust.pin(result.certificate);
+      if (mounted) setState(() {});
+    }
+    return true;
+  }
+
+  Future<void> _forgetCertificates() async {
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Zapomnieć certyfikat serwera?'),
+        content: const Text(
+          'Przy następnym zapisaniu adresów telefon znów pokaże kod certyfikatu do '
+          'porównania. Do tego czasu połączenia z serwerem przez HTTPS nie będą działać.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Anuluj'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Zapomnij'),
+          ),
+        ],
+      ),
+    );
+    if (sure != true) return;
+    await ServerTrust.instance.forgetAll();
+    if (mounted) setState(() {});
   }
 
   Widget _addressField({
@@ -268,7 +322,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
           _addressField(
             key: DatabaseSourceScreen.remoteFieldKey,
             controller: _remote,
-            hint: 'http://serwer:8002/',
+            hint: 'https://serwer:8002/',
             helper:
                 'Używany poza siecią lokalną. Pobierane są pliki '
                 'music.db, tag.db i files.db (lokalizacja plików na serwerze).',
@@ -279,7 +333,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
           _addressField(
             key: DatabaseSourceScreen.localFieldKey,
             controller: _local,
-            hint: 'http://192.168.x.x:8002/',
+            hint: 'https://192.168.x.x:8002/',
             helper: 'Używany, gdy telefon jest w sieci Wi-Fi wybranej poniżej.',
             error: _localError,
             onSubmitted: () => _save(sync),
@@ -321,6 +375,21 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
               ),
             ),
           ),
+          if (ServerTrust.instance.hasPins) ...[
+            const SectionTitle('Certyfikat serwera'),
+            ListTile(
+              leading: const Icon(Icons.verified_user_outlined),
+              title: const Text('Zaufany certyfikat zapamiętany'),
+              subtitle: const Text(
+                'Telefon łączy się przez HTTPS tylko z serwerem, którego kod potwierdzono. '
+                'Gdy serwer dostał nowy certyfikat, zapomnij stary i zapisz adresy ponownie.',
+              ),
+              trailing: TextButton(
+                onPressed: _forgetCertificates,
+                child: const Text('Zapomnij'),
+              ),
+            ),
+          ],
           const SectionTitle('Wi-Fi sieci lokalnej'),
           ListTile(
             leading: Icon(wifi == null ? Icons.wifi_off : Icons.wifi),
@@ -511,4 +580,55 @@ String _describeLastSync(DateTime d, DatabaseSource? source) {
     DatabaseSource.github => '$when (GitHub)',
     null => when,
   };
+}
+
+/// "Czy to Twój serwer?" with the certificate's code ([certificateCode]) to compare with the
+/// one MusicDatabase shows; `true` when the user says it's theirs.
+Future<bool> confirmServerCertificate(
+  BuildContext context,
+  Uri url,
+  String code,
+) async {
+  final palette = context.palette;
+  final yes = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Czy to Twój serwer?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Serwer ${url.host}:${url.port} pokazuje certyfikat o kodzie:'),
+          const SizedBox(height: 12),
+          SelectableText(
+            code,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Porównaj go z kodem, który pokazuje MusicDatabase (serwer wypisuje go przy '
+            'starcie). Potwierdź tylko, gdy oba są takie same — inny kod może oznaczać, że '
+            'ktoś podszywa się pod serwer.',
+            style: TextStyle(color: palette.textSecondary),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Nie, odrzuć'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Tak, to mój serwer'),
+        ),
+      ],
+    ),
+  );
+  return yes == true;
 }

@@ -19,6 +19,7 @@ import '../data/youtube_search.dart';
 import 'player_controller.dart';
 import 'youtube_playback.dart';
 import '../data/album_covers.dart';
+import '../data/server_trust.dart';
 
 /// How playing one song went; [message] is for the user (what was found, or why it failed),
 /// `null` when there's nothing to say.
@@ -66,7 +67,8 @@ Uri serverFileUri(Uri base, ServerFile file) =>
 /// The status MusicDatabase's server answers a `HEAD` of [uri] with, `null` when it can't be
 /// reached within a few seconds.
 Future<int?> _probeServer(Uri uri) async {
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+  final client = ServerTrust.instance.client()
+    ..connectionTimeout = const Duration(seconds: 3);
   try {
     final request = await client
         .headUrl(uri)

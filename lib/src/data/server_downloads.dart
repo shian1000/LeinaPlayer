@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'download_files.dart';
 import 'mp3_conversion.dart';
 import 'song_catalog.dart';
+import 'server_trust.dart';
 
 /// One file of MusicDatabase's music library downloaded with "Pobierz".
 class ServerDownload {
@@ -126,7 +127,7 @@ class ServerDownloads extends ChangeNotifier {
     // Written in the app's folder, so the user's never shows a half-done file.
     final part = File('${dir.path}/${file.id}$extension.part');
     for (final uri in uris) {
-      final client = HttpClient()
+      final client = ServerTrust.instance.client()
         ..connectionTimeout = const Duration(seconds: 5);
       try {
         final response = await (await client.getUrl(uri))

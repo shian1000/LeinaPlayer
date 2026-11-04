@@ -122,6 +122,10 @@ the requests; [ADR 0006](decisions/0006-musicdatabase-login.md)). That user's pl
 ways with their account in MusicDatabase: `PlaylistLibrary.sync` (`playlist_library.dart`, HTTP in
 `playlist_sync.dart`) exchanges whole playlists as JSON on `/users/<name>/playlists`
 ([ADR 0007](decisions/0007-playlist-sync.md)).
+Every one of these requests goes through `ServerTrust.instance.client()`
+(`lib/src/data/server_trust.dart`): the server serves HTTPS with its own certificate, pinned once
+the user confirms its code, and a server file plays through `ServerAudioSource`
+([ADR 0015](decisions/0015-server-https.md)).
 
 ## Intended shape (not yet implemented)
 

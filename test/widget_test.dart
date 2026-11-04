@@ -538,7 +538,7 @@ void main() {
     await tester.tap(find.text('Serwer'));
     await tester.pumpAndSettle();
 
-    expect(find.text('http://192.168.x.x:8002/'), findsOneWidget);
+    expect(find.text('https://192.168.x.x:8002/'), findsOneWidget);
     await tester.enterText(
       find.byKey(DatabaseSourceScreen.localFieldKey),
       '10.0.0.5:8002',
@@ -550,7 +550,7 @@ void main() {
     await tester.runAsync(
       () => waitUntil(() => prefs.getString('database_sync.local_url') != null),
     );
-    expect(prefs.getString('database_sync.local_url'), 'http://10.0.0.5:8002/');
+    expect(prefs.getString('database_sync.local_url'), 'https://10.0.0.5:8002/');
   });
 
   testWidgets('Serwer doesn\'t keep an invalid address when left', (
@@ -630,7 +630,7 @@ void main() {
     );
     await tester.pump();
     expect(
-      find.text('Nieprawidłowy adres (np. http://serwer:8002/)'),
+      find.text('Nieprawidłowy adres (np. https://serwer:8002/)'),
       findsOneWidget,
     );
 
