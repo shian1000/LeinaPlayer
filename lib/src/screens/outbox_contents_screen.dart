@@ -10,6 +10,7 @@ import '../data/song_requests.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_info.dart';
 import '../widgets/song_tile.dart';
 
@@ -116,15 +117,9 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
                     for (final song in songs)
                       ListTile(
                         leading: const Icon(Icons.playlist_add),
-                        title: Text(
-                          song.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
+                        title: ScrollingText(song.title),
+                        subtitle: ScrollingText(
                           song.artist ?? SongRequest.unknownArtist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                   ],
@@ -160,8 +155,8 @@ class _SongReportTile extends StatelessWidget {
     if (song == null) {
       return ListTile(
         leading: const Icon(Icons.music_note_outlined),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+        title: ScrollingText(title),
+        subtitle: ScrollingText(subtitle, maxLines: 2),
       );
     }
     final hit = withPhoneYouTube(
@@ -254,23 +249,18 @@ class _CorrectionTile extends StatelessWidget {
     final unlike = _unlikeRename;
     return ListTile(
       leading: const Icon(Icons.edit_outlined),
-      title: Text(
+      title: ScrollingText(
         // old_value is an artists.id there; the song's artist is in the subtitle.
         c.table == 'songs' && c.column == 'artist_id'
             ? 'Inny wykonawca: ${shown(c.newValue)}'
             : '${fieldLabel(c.table, c.column)}${where == null ? '' : ' ($where)'}: '
                   '${shown(c.oldValue)} → ${shown(c.newValue)}',
         maxLines: 2,
-        overflow: TextOverflow.ellipsis,
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${c.title} · ${c.artist}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          ScrollingText('${c.title} · ${c.artist}'),
           if (unlike) ...[
             Text(
               'To nie wygląda na poprawkę pisowni — zmieni nazwę we wszystkich utworach '

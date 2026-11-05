@@ -5,6 +5,7 @@ import '../data/text_normalizer.dart';
 import '../theme.dart';
 import 'common.dart';
 import 'menu_sheet.dart';
+import 'scrolling_text.dart';
 
 /// "Przenieś do folderu" for a playlist's or mood's menu; `null` where there are no folders
 /// (widget tests).
@@ -56,7 +57,7 @@ Future<void> showMoveToFolderSheet(BuildContext context, String itemKey) {
       }) => ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20),
         leading: Icon(icon, color: palette.textSecondary),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: ScrollingText(title),
         trailing: here ? Icon(Icons.check, color: palette.accent) : null,
         onTap: () {
           Navigator.of(sheetContext).pop();

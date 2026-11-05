@@ -19,6 +19,7 @@ import '../theme.dart';
 import '../widgets/collection_cover.dart';
 import '../widgets/common.dart';
 import '../widgets/cover_art.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/swipe_actions.dart';
@@ -618,22 +619,19 @@ class _PlaylistRow extends StatelessWidget {
                 children: [
                   _Thumbnail(playlist: playlist, size: _cover),
                   const SizedBox(height: 6),
-                  Text(
+                  ScrollingText(
                     playlist.name,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: AppFontSize.small,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(
+                  ScrollingText(
                     [
                       ?playlist.owner,
                       ?(count == null ? null : '$count utw.'),
                     ].join(' • '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: AppFontSize.small,
                       color: palette.textSecondary,
@@ -689,10 +687,9 @@ class _AlbumRow extends StatelessWidget {
                 children: [
                   SongCover(cover: CoverRequest.of(first), size: _cover),
                   const SizedBox(height: 6),
-                  Text(
+                  ScrollingText(
                     first.shownAlbum(context) ?? album.name,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: AppFontSize.small,
                       fontWeight: FontWeight.bold,
@@ -703,10 +700,8 @@ class _AlbumRow extends StatelessWidget {
                     artists.length == 1 ? artists.first : 'Różni wykonawcy',
                     '$count utw.',
                   ])
-                    Text(
+                    ScrollingText(
                       line,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: AppFontSize.small,
                         color: palette.textSecondary,
@@ -765,12 +760,8 @@ class _SavedPlaylistTile extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
       leading: PlaylistCover(playlist: playlist, size: SongTile.coverSize),
-      title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        ['Playlista', ?playlist.owner].join(' • '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: ScrollingText(playlist.name),
+      subtitle: ScrollingText(['Playlista', ?playlist.owner].join(' • ')),
       onTap: () {
         FocusScope.of(context).unfocus();
         Navigator.of(context).push(
@@ -819,13 +810,11 @@ class _YouTubeTile extends StatelessWidget {
         size: SongTile.coverSize,
       ),
       title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
-      subtitle: Text(
+      subtitle: ScrollingText(
         [
           hit.shownArtist(context),
           ?(duration == null ? null : formatDuration(duration)),
         ].join(' • '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
       ),
       onTap: () {
         FocusScope.of(context).unfocus();

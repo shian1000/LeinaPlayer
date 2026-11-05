@@ -329,10 +329,15 @@ class AppShellState extends State<AppShell> {
                 index: _currentTab,
                 children: [
                   for (var i = 0; i < _tabRoots.length; i++)
-                    Navigator(
-                      key: _navigatorKeys[i],
-                      onGenerateRoute: (_) =>
-                          MaterialPageRoute<void>(builder: (_) => _tabRoots[i]),
+                    // IndexedStack leaves hidden tabs' animations running.
+                    TickerMode(
+                      enabled: i == _currentTab,
+                      child: Navigator(
+                        key: _navigatorKeys[i],
+                        onGenerateRoute: (_) => MaterialPageRoute<void>(
+                          builder: (_) => _tabRoots[i],
+                        ),
+                      ),
                     ),
                 ],
               ),

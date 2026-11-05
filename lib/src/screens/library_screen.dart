@@ -18,6 +18,7 @@ import '../widgets/folder_sheet.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/mood_sheet.dart';
 import '../widgets/playlist_picker.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_tile.dart';
 import 'create_sheet.dart';
 import 'mood_screen.dart';
@@ -667,10 +668,8 @@ class LibraryEntryTile extends StatelessWidget {
             leading,
             const SizedBox(height: 6),
             CurrentTitle(text: entry.name, isCurrent: playing),
-            Text(
+            ScrollingText(
               subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: AppFontSize.small,
                 color: context.palette.textSecondary,
@@ -684,7 +683,7 @@ class LibraryEntryTile extends StatelessWidget {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: leading,
       title: CurrentTitle(text: entry.name, isCurrent: playing),
-      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: ScrollingText(subtitle),
       onTap: open,
       onLongPress: menu,
     );
@@ -829,7 +828,7 @@ class FolderScreen extends StatelessWidget {
         .contents;
     return Scaffold(
       appBar: AppBar(
-        title: Text(folder.name),
+        title: ScrollingText(folder.name),
         actions: [
           IconButton(
             tooltip: 'Menu folderu (⋮)',

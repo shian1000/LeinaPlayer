@@ -20,6 +20,7 @@ import '../theme.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/queue_toast.dart';
 import '../theme_controller.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/share_sheet.dart';
 import '../widgets/mood_sheet.dart';
@@ -210,23 +211,19 @@ class MiniPlayer extends StatelessWidget {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
+                                      ScrollingText(
                                         track.shownTitle(context),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontSize: AppFontSize.body,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                      Text(
+                                      ScrollingText(
                                         withFullAlbumLabel(
                                           PlaybackQueueScope.of(context)
                                               .current,
                                           track.shownArtist(context),
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           fontSize: AppFontSize.small,
                                           color: palette.textSecondary,
@@ -331,10 +328,8 @@ Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
                       children: [
                         Icon(icon),
                         const SizedBox(height: 4),
-                        Text(
+                        ScrollingText(
                           label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: AppFontSize.badge),
                         ),
                       ],
@@ -649,12 +644,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                   ),
                                   if (track.playlistName != null ||
                                       track.searchQuery != null)
-                                    Text(
+                                    ScrollingText(
                                       track.playlistName ??
                                           '„${track.searchQuery}” w wyszukiwarce',
                                       textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: AppFontSize.body,
                                         fontWeight: FontWeight.bold,
@@ -686,10 +679,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                       context,
                                       '${track.artist} - ${track.title}',
                                     ),
-                                    child: Text(
+                                    child: ScrollingText(
                                       track.shownTitle(context),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: AppFontSize.largeTitle,
                                         fontWeight: FontWeight.bold,
@@ -699,13 +690,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                   GestureDetector(
                                     onLongPress: () =>
                                         _copyName(context, track.artist),
-                                    child: Text(
+                                    child: ScrollingText(
                                       withFullAlbumLabel(
                                         queue.current,
                                         track.shownArtist(context),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: AppFontSize.listTitle,
                                         color: palette.textSecondary,

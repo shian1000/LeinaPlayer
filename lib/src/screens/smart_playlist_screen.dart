@@ -8,6 +8,7 @@ import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/playlist_picker.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
@@ -78,7 +79,7 @@ class SmartPlaylistTile extends StatelessWidget {
         ),
         child: Icon(Icons.auto_mode, color: palette.textSecondary),
       ),
-      title: Text(playlist.name),
+      title: ScrollingText(playlist.name),
       subtitle: Text('Dynamiczna • ${playlist.rule}'),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -223,7 +224,7 @@ class SmartPlaylistScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(playlist.name),
+        title: ScrollingText(playlist.name),
         actions: [
           IconButton(
             tooltip: 'Menu playlisty (⋮)',

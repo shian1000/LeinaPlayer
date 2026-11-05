@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'scrolling_text.dart';
 
 /// A short note right above the mini player, like the reference app's "Dodano do kolejki":
 /// gone after [duration], or as soon as the mini player or the bottom bar is touched — unlike a
@@ -94,10 +95,9 @@ class QueueToastView extends StatelessWidget {
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Text(
+                          child: ScrollingText(
                             shown.text,
                             maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: palette.snackForeground,
                               fontSize: AppFontSize.body,

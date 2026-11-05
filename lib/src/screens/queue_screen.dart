@@ -8,6 +8,7 @@ import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_tile.dart';
 import '../data/album_covers.dart';
 import '../widgets/common.dart';
@@ -380,10 +381,8 @@ class _Heading extends StatelessWidget {
     child: Row(
       children: [
         Expanded(
-          child: Text(
+          child: ScrollingText(
             text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: AppFontSize.emphasis,
               fontWeight: FontWeight.bold,
@@ -514,11 +513,7 @@ class _QueueRow extends StatelessWidget {
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
       leading: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),
       title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
-      subtitle: Text(
-        hit.shownArtist(context),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      subtitle: ScrollingText(hit.shownArtist(context)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

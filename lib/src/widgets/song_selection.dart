@@ -8,6 +8,7 @@ import '../theme.dart';
 import 'common.dart';
 import 'mood_sheet.dart';
 import 'playlist_picker.dart';
+import 'scrolling_text.dart';
 import 'song_tile.dart';
 
 /// Songs ticked in a list after a long press on one of them, for doing the same to all of them.
@@ -173,11 +174,9 @@ class _SelectionBar extends StatelessWidget {
                 children: [
                   Icon(icon, color: palette.textPrimary),
                   const SizedBox(height: 4),
-                  Text(
+                  ScrollingText(
                     label,
                     textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: AppFontSize.navLabel,
                       color: palette.textSecondary,

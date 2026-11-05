@@ -4,6 +4,7 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/playlist_library.dart';
 import '../theme.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_tile.dart';
@@ -126,16 +127,8 @@ class _PlaylistEditScreenState extends State<PlaylistEditScreen> {
                       ),
                     ],
                   ),
-                  title: Text(
-                    hit.shownTitle(context),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    hit.shownArtist(context),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  title: ScrollingText(hit.shownTitle(context)),
+                  subtitle: ScrollingText(hit.shownArtist(context)),
                   trailing: ReorderableDragStartListener(
                     index: i,
                     child: const Padding(

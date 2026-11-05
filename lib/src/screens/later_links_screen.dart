@@ -19,6 +19,7 @@ import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/swipe_actions.dart';
 import 'app_shell.dart';
@@ -485,10 +486,8 @@ class _LaterRow extends StatelessWidget {
             const SizedBox(width: 6),
           ],
           Expanded(
-            child: Text(
+            child: ScrollingText(
               link.title ?? link.kind,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: AppFontSize.listTitle,
                 color: link.opened ? palette.textSecondary : null,
@@ -497,11 +496,7 @@ class _LaterRow extends StatelessWidget {
           ),
         ],
       ),
-      subtitle: Text(
-        details.join(' • '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      subtitle: ScrollingText(details.join(' • ')),
       trailing: IconButton(
         tooltip: 'Menu linku (⋮)',
         icon: const Icon(Icons.more_vert),

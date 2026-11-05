@@ -5,6 +5,7 @@ import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../data/album_covers.dart';
 import '../widgets/menu_sheet.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
@@ -53,7 +54,7 @@ class SongListScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: ScrollingText(title),
         actions: [
           if (hits.isNotEmpty)
             IconButton(

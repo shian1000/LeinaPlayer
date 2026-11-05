@@ -15,6 +15,7 @@ import '../widgets/menu_sheet.dart';
 import '../widgets/folder_sheet.dart';
 import '../widgets/mood_sheet.dart';
 import '../widgets/playlist_picker.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'song_search_screen.dart';
@@ -50,7 +51,7 @@ class _MoodScreenState extends State<MoodScreen> {
     final mood = moods.current(widget.mood);
     if (mood == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.mood.name)),
+        appBar: AppBar(title: ScrollingText(widget.mood.name)),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -84,7 +85,7 @@ class _MoodScreenState extends State<MoodScreen> {
     return Scaffold(
       appBar: AppBar(
         title: _query == null
-            ? Text(mood.name)
+            ? ScrollingText(mood.name)
             : TextField(
                 autofocus: true,
                 decoration: const InputDecoration(
@@ -126,10 +127,9 @@ class _MoodScreenState extends State<MoodScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        ScrollingText(
                           mood.name,
                           maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: AppFontSize.largeTitle,
                             fontWeight: FontWeight.bold,

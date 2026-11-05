@@ -14,6 +14,7 @@ import '../data/listening_summary.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/listening_charts.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
 import 'listening_stats_screen.dart';
@@ -302,10 +303,9 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
               _Row(
                 rank: i + 1,
                 leading: ClipOval(child: _EntryCover(entry: a, size: 52)),
-                body: Text(
+                body: ScrollingText(
                   _name(context, a),
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: AppFontSize.listTitle,
                     fontWeight: FontWeight.bold,
@@ -329,11 +329,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
               _Row(
                 rank: i + 2,
                 leading: _EntryCover(entry: a, size: 44),
-                body: Text(
-                  _name(context, a),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                body: ScrollingText(_name(context, a), maxLines: 2),
                 trailing: '${a.plays}×',
               ),
           ],
@@ -381,11 +377,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
               _Row(
                 rank: i + 1,
                 leading: ClipOval(child: _EntryCover(entry: a, size: 52)),
-                body: Text(
-                  _name(context, a),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                body: ScrollingText(_name(context, a), maxLines: 2),
                 trailing: '${a.plays}×',
               ),
           ],
@@ -625,20 +617,17 @@ class _SongNames extends StatelessWidget {
           ? CrossAxisAlignment.center
           : CrossAxisAlignment.start,
       children: [
-        Text(
+        ScrollingText(
           hit.shownTitle(context),
           maxLines: 2,
-          overflow: TextOverflow.ellipsis,
           textAlign: big ? TextAlign.center : TextAlign.start,
           style: TextStyle(
             fontSize: big ? AppFontSize.largeTitle : AppFontSize.listTitle,
             fontWeight: FontWeight.bold,
           ),
         ),
-        Text(
+        ScrollingText(
           hit.shownArtist(context),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           textAlign: big ? TextAlign.center : TextAlign.start,
         ),
       ],
@@ -668,6 +657,7 @@ class _TopList extends StatelessWidget {
       for (final (i, name) in names.indexed)
         Padding(
           padding: const EdgeInsets.only(bottom: 4),
+          // Plain Text, not ScrollingText: this card is saved as a picture.
           child: Text(
             '${i + 1}. $name',
             maxLines: 1,

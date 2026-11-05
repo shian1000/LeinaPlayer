@@ -9,6 +9,7 @@ import '../data/listening_summary.dart';
 import '../data/song_catalog.dart';
 import '../theme.dart';
 import '../widgets/feature_info.dart';
+import '../widgets/scrolling_text.dart';
 import 'feature_infos.dart';
 import '../widgets/common.dart';
 import 'account_screen.dart';
@@ -80,10 +81,8 @@ class ProfileScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      ScrollingText(
                         loggedIn ? account!.userName! : 'Nie zalogowano',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: AppFontSize.section,
                           fontWeight: FontWeight.bold,

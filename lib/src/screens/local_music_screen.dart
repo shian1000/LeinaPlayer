@@ -6,6 +6,7 @@ import '../data/local_library.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../data/album_covers.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
 
 /// "Ustawienia › Muzyka na telefonie" — folders on the phone that hold music, the
@@ -234,18 +235,13 @@ class _PendingSongsScreenState extends State<PendingSongsScreen> {
               final song = songs[i];
               return ListTile(
                 leading: SongCover(cover: CoverRequest.ofFile(song), size: 48),
-                title: Text(
-                  song.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
+                title: ScrollingText(song.title),
+                subtitle: ScrollingText(
                   [
                     song.artist ?? 'Nieznany wykonawca',
                     song.fileName,
                   ].join(' • '),
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               );
             },

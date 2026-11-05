@@ -225,7 +225,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog`, `pluralWord` (Polish plurals) and
   `dayMonthLabel` in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
-  `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `update_dialog.dart` — "Dostępna nowa wersja"; `feature_info.dart` — the long-press explanation sheet (`showFeatureInfo`, texts in `screens/feature_infos.dart`); `song_names.dart` — `shownTitle` / `shownArtist` /
+  `ScrollingText` — a text that slides when it does not fit; `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `update_dialog.dart` — "Dostępna nowa wersja"; `feature_info.dart` — the long-press explanation sheet (`showFeatureInfo`, texts in `screens/feature_infos.dart`); `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files from a server or GitHub (`database_sync.dart`), reading
   `music.db` and `files.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
@@ -341,6 +341,13 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - A `SnackBar` with an `action` stays until closed by hand in this Flutter version (`persist`
   defaults to true) and floats over whatever is pushed on top — pass `persist: false`. Notes about
   the queue use `QueueToast` above the mini player instead (Spotify-like, user's choice).
+- A text that may not fit (anything dynamic: names, titles, details) is a `ScrollingText`
+  (`widgets/scrolling_text.dart`), not `Text` with `TextOverflow.ellipsis` (user's rule, everywhere):
+  it slides back and forth when too long; with `maxLines` above 1 it wraps while it fits and
+  scrolls on one line otherwise. The exception is what's saved as a picture (the stats' share
+  card), where a moment of the slide would be captured. It animates only while its route and
+  tab are shown, so an `IndexedStack` keeping something hidden needs `TickerMode` around that
+  child (`app_shell.dart`), or hidden texts keep asking for frames.
 - `Scrollable.ensureVisible` scrolls every scrollable above the widget too — inside a card that
   scrolls on its own within a page (the lyrics under the full player) it drags the whole page
   along; scroll the inner controller to `RenderAbstractViewport.getOffsetToReveal` instead.
@@ -406,7 +413,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - For UI changes, actually run the app and look at it — a green test suite does not confirm the
   screen looks right. Use the `run-on-physical-phone` skill (release build on the USB Huawei, with
   the Gradle memory precautions) or `share-build-tailscale` for the user's Pixel 7a; check screens
-  with `adb exec-out screencap`. To check a gesture mid-way, hold it with
+  with `adb exec-out screencap`. A green frame around the screen after `input keyevent` / `input
+  text` is Android's focus highlight, not the app; a tap clears it. To check a gesture mid-way, hold it with
   `input motionevent DOWN/MOVE … ` and screenshot before `UP` (each adb call takes ~0.2 s, so
   apps with long-press menus — Spotify — read it as a long press). `uiautomator dump` hangs on screens with running animations
   (e.g. while music plays) — use screenshots there. The Huawei runs Android 10, so background

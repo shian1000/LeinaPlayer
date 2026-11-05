@@ -27,6 +27,7 @@ import 'queue_toast.dart';
 import '../screens/queue_screen.dart';
 import '../screens/song_list_screen.dart';
 import 'playlist_picker.dart';
+import 'scrolling_text.dart';
 import 'share_sheet.dart';
 import 'sleep_timer_sheet.dart';
 import 'song_selection.dart';
@@ -56,10 +57,8 @@ class CurrentTitle extends StatelessWidget {
           const SizedBox(width: 6),
         ],
         Expanded(
-          child: Text(
+          child: ScrollingText(
             text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: isCurrent ? TextStyle(color: palette.accent) : null,
           ),
         ),
@@ -397,7 +396,7 @@ class SongTile extends StatelessWidget {
             )
           : cover,
       title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
-      subtitle: Text.rich(
+      subtitle: ScrollingText.rich(
         TextSpan(
           children: [
             if (fullAlbum) ...[
@@ -410,8 +409,6 @@ class SongTile extends StatelessWidget {
             TextSpan(text: details),
           ],
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
       ),
       trailing: trailing == null && !bookmarked
           ? SourceIcons(hit: hit)

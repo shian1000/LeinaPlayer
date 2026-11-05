@@ -6,6 +6,7 @@ import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/song_names.dart';
@@ -66,10 +67,8 @@ class MissingTracksScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Utwory spoza bazy danych'),
-            Text(
+            ScrollingText(
               playlist.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: AppFontSize.small,
                 color: palette.textSecondary,

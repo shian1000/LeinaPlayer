@@ -7,6 +7,7 @@ import '../theme.dart';
 import 'collection_cover.dart';
 import 'common.dart';
 import 'menu_sheet.dart';
+import 'scrolling_text.dart';
 
 /// "Dodaj do playlisty" for a song's menu; `null` where there are no playlists (widget tests).
 MenuSheetEntry? playlistMenuEntry(
@@ -201,11 +202,7 @@ Future<void> showAddToPlaylistSheet(
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 leading: PlaylistCover(playlist: playlist, size: 48),
-                title: Text(
-                  playlist.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                title: ScrollingText(playlist.name),
                 subtitle: Text(
                   '${playlist.trackCount} ${songsWord(playlist.trackCount)}',
                 ),

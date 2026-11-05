@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../data/account.dart';
 import '../theme.dart';
+import 'scrolling_text.dart';
 
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({super.key, this.radius = 16, this.onTap});
@@ -103,10 +104,8 @@ class SectionTitle extends StatelessWidget {
             const SizedBox(width: 6),
           ],
           Expanded(
-            child: Text(
+            child: ScrollingText(
               text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: AppFontSize.section,
                 fontWeight: FontWeight.bold,
@@ -142,10 +141,8 @@ class _PanelTitleBar extends StatelessWidget {
             const SizedBox(width: 6),
           ],
           Expanded(
-            child: Text(
+            child: ScrollingText(
               text.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: AppFontSize.small,
                 fontWeight: FontWeight.bold,
@@ -201,10 +198,8 @@ class _TabTitleBar extends StatelessWidget {
                     const SizedBox(width: 6),
                   ],
                   Flexible(
-                    child: Text(
+                    child: ScrollingText(
                       text.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: AppFontSize.listTitle,
                         fontWeight: FontWeight.bold,
@@ -256,12 +251,10 @@ class TabHeader extends StatelessWidget {
             Expanded(
               child:
                   content ??
-                  Text(
+                  ScrollingText(
                     context.palette.uppercaseTitles
                         ? title!.toUpperCase()
                         : title!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: AppFontSize.tabTitle,
                       fontWeight: FontWeight.bold,

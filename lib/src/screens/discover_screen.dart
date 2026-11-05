@@ -15,6 +15,7 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../theme.dart';
 import '../widgets/playlist_picker.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/share_sheet.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
@@ -396,24 +397,20 @@ class _DiscoverCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    ScrollingText(
                       hit.shownTitle(context),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: AppFontSize.section,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
+                    ScrollingText(
                       [
                         hit.shownArtist(context),
                         if (hit.shownAlbum(context) case final album?
                             when album.isNotEmpty)
                           album,
                       ].join(' • '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: palette.textSecondary),
                     ),
                   ],
@@ -475,10 +472,8 @@ class _SideButton extends StatelessWidget {
           children: [
             Icon(icon, size: 28, color: color),
             const SizedBox(height: 2),
-            Text(
+            ScrollingText(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: AppFontSize.badge, color: color),
             ),
           ],

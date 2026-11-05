@@ -13,6 +13,7 @@ import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/cover_art.dart';
+import '../widgets/scrolling_text.dart';
 import 'listening_stats_screen.dart';
 import 'mood_screen.dart';
 import 'search_fields_sheet.dart';
@@ -58,10 +59,8 @@ class SearchScreen extends StatelessWidget {
                         Icon(Icons.search, color: palette.background, size: 28),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
+                          child: ScrollingText(
                             'Czego chcesz posłuchać?',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: palette.background.withValues(alpha: 0.65),
                               fontSize: AppFontSize.listTitle,
@@ -464,10 +463,9 @@ class _CategoryTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  ScrollingText(
                     name,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: AppFontSize.listTitle,
                       fontWeight: FontWeight.bold,

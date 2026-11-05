@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'scrolling_text.dart';
 
 class MenuSheetEntry {
   const MenuSheetEntry(
@@ -132,11 +133,7 @@ Future<void> showMenuSheet(
                         right: 20,
                       ),
                       leading: Icon(inner.icon, color: palette.textSecondary),
-                      title: Text(
-                        inner.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      title: ScrollingText(inner.label),
                       subtitle: inner.subtitle == null
                           ? null
                           : Text(inner.subtitle!),

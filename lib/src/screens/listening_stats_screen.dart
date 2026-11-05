@@ -16,6 +16,7 @@ import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/listening_charts.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_selection.dart';
@@ -428,21 +429,18 @@ class _CoverRow extends StatelessWidget {
                 children: [
                   round ? ClipOval(child: cover) : cover,
                   const SizedBox(height: 6),
-                  Text(
+                  ScrollingText(
                     '${i + 1}. ${latin ? withLatin(entry.name, entry.latin) : entry.name}',
                     maxLines: round ? 1 : 2,
                     textAlign: round ? TextAlign.center : TextAlign.start,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: AppFontSize.small,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   for (final line in [?entry.detail, _playsOf(entry)])
-                    Text(
+                    ScrollingText(
                       line,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: AppFontSize.small,
                         color: palette.textSecondary,
@@ -489,10 +487,8 @@ class _Shares extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
+                            child: ScrollingText(
                               share.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: AppFontSize.body,
                               ),
@@ -645,10 +641,8 @@ class _HighlightRow extends StatelessWidget {
                                 Icon(icon, size: 16, color: palette.accent),
                                 const SizedBox(width: 4),
                                 Expanded(
-                                  child: Text(
+                                  child: ScrollingText(
                                     title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontSize: AppFontSize.small,
                                       fontWeight: FontWeight.bold,
@@ -658,10 +652,9 @@ class _HighlightRow extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text(
+                            ScrollingText(
                               detail,
                               maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: AppFontSize.small,
                                 color: palette.textSecondary,
@@ -731,10 +724,8 @@ class _SummaryRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      ScrollingText(
                         period.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: AppFontSize.listTitle,
                           fontWeight: FontWeight.bold,

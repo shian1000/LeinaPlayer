@@ -24,6 +24,7 @@ import '../widgets/common.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/mood_sheet.dart';
+import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_tile.dart';
@@ -719,11 +720,9 @@ class _Card extends StatelessWidget {
         children: [
           cover,
           const SizedBox(height: 8),
-          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text(
+          ScrollingText(title),
+          ScrollingText(
             subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: context.palette.textSecondary,
               fontSize: AppFontSize.small,
@@ -774,12 +773,7 @@ class _ArtistCard extends StatelessWidget {
                     ),
             ),
             const SizedBox(height: 8),
-            Text(
-              name,
-              maxLines: 1,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-            ),
+            ScrollingText(name, textAlign: TextAlign.center),
           ],
         ),
       ),

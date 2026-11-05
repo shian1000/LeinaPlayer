@@ -12,6 +12,7 @@ import '../data/youtube_library.dart';
 import '../playback/downloads.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
+import 'scrolling_text.dart';
 import 'song_cover.dart';
 import 'song_names.dart';
 
@@ -69,11 +70,10 @@ Future<void> showShareSheet(
                   children: [
                     cover,
                     const SizedBox(height: 16),
-                    Text(
+                    ScrollingText(
                       title,
                       textAlign: TextAlign.center,
                       maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: AppFontSize.section,
                         fontWeight: FontWeight.bold,
