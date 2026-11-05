@@ -678,7 +678,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`). Entries with › unfold their options under them in
     the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Polub / Usuń z polubionych,
-    Nowa playlista, then every saved playlist) and Przejdź do wykonawców › (each artist of the song — **→ its
+    Nowa playlista, then every saved playlist, ✓ on those holding the song, tapped to add or take
+    it out — see the sheet "Dodaj do playlisty") and Przejdź do wykonawców › (each artist of the song — **→ its
     songs**: `openArtistSongs`, every song in music.db and on the phone with that artist, a song
     list with Odtwórz / Losowo and a ⋮ with Dodaj do kolejki / Odtwórz jako następny for all
     its songs; `song_list_screen.dart`).
@@ -828,7 +829,11 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   liked; `LikedSongs`, synced with the account — the only place a song is liked, user's decision); "Nowa
   playlista" (name dialog; a new playlist of these songs); then every saved playlist, imported ones too — tapping one puts the songs at its
   end, synced like any change (in an imported one marked as added by hand, so its next import
-  keeps them — `playlists.md`).
+  keeps them — `playlists.md`). A playlist already holding all these songs has an accent ✓ (else ⊕;
+  several songs, some there: "już tu: 3 z 5" — `PlaylistLibrary.playlistsWith`). Tapping is a toggle
+  (`togglePlaylist`, user's decision): only the songs it lacks are added, never a second copy, and a
+  playlist with ✓ loses them ("Usunięto z playlisty", no Cofnij). The song menu's "Dodaj do playlisty ›"
+  submenu works the same way.
 
 ## Sheet "Dodaj do nastroju" (`mood_sheet.dart`)
 

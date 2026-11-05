@@ -41,6 +41,13 @@ music.db's own link stays music.db's. A phone file not in MusicDatabase has no c
 — it's kept by title + artist and `playlistHit` finds it again (`LocalLibrary.pendingFile`); on
 another phone, or once renamed, it's searched on YouTube like a Spotify track.
 
+"Dodaj do playlisty" is a toggle (`togglePlaylist`, the owner's decision): it adds only what a
+playlist lacks, and a playlist already holding all the songs (✓, `PlaylistLibrary.playlistsWith`,
+an index built by `load` — by song, video, Spotify track, or names for tracks without a song) loses
+them (`removeSongs`). This can happen from inside the open playlist, so `PlaylistScreen` reloads when
+its summary changes: its tracks' positions go to `removeTrack`, and stale ones would remove the
+wrong song.
+
 "Utwórz nową playlistę" makes an empty one the same way, and "Dodaj do playlisty"
 (`playlist_picker.dart`, also the selection bar's) appends with `PlaylistLibrary.addSongs`, kept
 like `create` keeps them — to any saved playlist, imported ones too (the owner called the old

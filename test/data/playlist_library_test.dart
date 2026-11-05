@@ -521,6 +521,69 @@ void main() {
     );
   });
 
+  test(
+    'playlistsWith tells which playlists hold a song, however it is kept',
+    () async {
+      await catalog.ensureLoaded();
+      final song = SearchHit.main(catalog.byId(1)!, const []);
+      final video = SearchHit.youTubeOnly(
+        title: 'Nieznany',
+        artistLabel: 'Kanał',
+        videoId: 'abc',
+        playlistVideoId: 'abc',
+      );
+      final spotify = SearchHit.youTubeOnly(
+        title: 'Ze Spotify',
+        artistLabel: 'Ktoś',
+        videoId: null,
+        spotifyTrackId: 'sp1',
+      );
+      final named = SearchHit.youTubeOnly(
+        title: 'Bez linku',
+        videoId: null,
+        artistLabel: 'Ktoś',
+      );
+      final first = await playlists.create('A', [song, video]);
+      final second = await playlists.create('B', [song, spotify, named]);
+
+      expect(playlists.playlistsWith(song), {first.id, second.id});
+      expect(playlists.playlistsWith(video), {first.id});
+      expect(playlists.playlistsWith(spotify), {second.id});
+      expect(
+        playlists.playlistsWith(
+          SearchHit.youTubeOnly(
+            title: 'BEZ LINKU',
+            videoId: null,
+            artistLabel: 'ktoś',
+          ),
+        ),
+        {second.id},
+      );
+      expect(
+        playlists.playlistsWith(SearchHit.main(catalog.byId(2)!, const [])),
+        isEmpty,
+      );
+
+      await playlists.removeTrack(first.id, 0);
+      expect(playlists.playlistsWith(song), {second.id});
+      await playlists.delete(second.id);
+      expect(playlists.playlistsWith(song), isEmpty);
+    },
+  );
+
+  test('removeSongs takes out every copy of a song, wherever it is', () async {
+    await catalog.ensureLoaded();
+    final one = SearchHit.main(catalog.byId(1)!, const []);
+    final two = SearchHit.main(catalog.byId(2)!, const []);
+    final saved = await playlists.create('A', [one, two, one]);
+
+    await playlists.removeSongs(saved.id, [one]);
+
+    final tracks = await playlists.tracks(saved.id);
+    expect([for (final t in tracks) (t.position, t.mainDbId)], [(0, 2)]);
+    expect(playlists.byId(saved.id)!.trackCount, 1);
+  });
+
   test('songs added to a playlist made on the phone go at its end', () async {
     await catalog.ensureLoaded();
     final saved = await playlists.create('Pusta', const []);

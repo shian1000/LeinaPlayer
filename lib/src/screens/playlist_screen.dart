@@ -135,7 +135,20 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_loading) return;
+    if (_loading) {
+      // Taken out from a song's "Dodaj do playlisty": a stale list would hand wrong positions
+      // to "Usuń z tej playlisty".
+      final saved = _saved;
+      final now = saved == null
+          ? null
+          : PlaylistLibraryScope.of(context).byId(saved.id);
+      if (now != null &&
+          (now.updatedAt != saved!.updatedAt ||
+              now.trackCount != saved.trackCount)) {
+        _load();
+      }
+      return;
+    }
     _loading = true;
     // music.db is otherwise only read once search is opened; tracks need it for their icons.
     SongCatalogScope.of(context).ensureLoaded();

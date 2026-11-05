@@ -12,6 +12,7 @@ class MenuSheetEntry {
     this.onTap,
     this.submenu,
     this.onLongPress,
+    this.checked = false,
   });
 
   final IconData icon;
@@ -29,6 +30,9 @@ class MenuSheetEntry {
   /// What a long press does — an explanation of the option ([showFeatureInfo]), opened over
   /// the menu.
   final VoidCallback? onLongPress;
+
+  /// An accent ✓ at the end of the row, for an entry of a [submenu].
+  final bool checked;
 }
 
 /// Bottom-sheet menu used for all context menus (⋮), the "Utwórz" sheet and sort options.
@@ -137,6 +141,9 @@ Future<void> showMenuSheet(
                       subtitle: inner.subtitle == null
                           ? null
                           : Text(inner.subtitle!),
+                      trailing: inner.checked
+                          ? Icon(Icons.check_circle, color: palette.accent)
+                          : null,
                       onTap: () {
                         Navigator.of(sheetContext).pop();
                         inner.onTap?.call();

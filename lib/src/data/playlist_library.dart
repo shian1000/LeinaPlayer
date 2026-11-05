@@ -10,6 +10,7 @@ import 'combined_search.dart';
 import 'custom_covers.dart';
 import 'playlist_sync.dart';
 import 'song_catalog.dart';
+import 'song_requests.dart';
 import 'spotify_playlist.dart';
 import 'youtube_library.dart';
 import 'youtube_playlist.dart';
@@ -289,6 +290,7 @@ class PlaylistLibrary extends ChangeNotifier {
       GROUP BY p.id ORDER BY p.updated_at DESC''', scope.args);
     final lead = <int, List<PlaylistTrack>>{};
     final lengths = <int, ({Duration known, int unknown})>{};
+    final holding = <String, Set<int>>{};
     for (final row in await (await _database()).rawQuery('''
       SELECT t.* FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id
       WHERE p.deleted_at IS NULL AND ${scope.where}
@@ -301,6 +303,9 @@ class PlaylistLibrary extends ChangeNotifier {
       lengths[id] = length == null
           ? (known: sum.known, unknown: sum.unknown + 1)
           : (known: sum.known + length, unknown: sum.unknown);
+      for (final key in _trackKeys(track)) {
+        (holding[key] ??= {}).add(id);
+      }
     }
     _playlists = [
       for (final row in rows)
@@ -327,9 +332,48 @@ class PlaylistLibrary extends ChangeNotifier {
         ),
     ];
     _leadTracks = lead;
+    _holding = holding;
     notifyListeners();
     if (linked) onChanged?.call();
   }
+
+  /// The playlists in [playlists] holding each song, by [_trackKeys] / [_hitKeys].
+  Map<String, Set<int>> _holding = const {};
+
+  /// The ids of the playlists in [playlists] that [hit] is on.
+  Set<int> playlistsWith(SearchHit hit) => {
+    for (final key in _hitKeys(hit)) ...?_holding[key],
+  };
+
+  /// What [track] can be recognised by, its song found like [playlistHit] finds it. Its names
+  /// count only without a song: two music.db songs may share them.
+  Iterable<String> _trackKeys(PlaylistTrack track) sync* {
+    final videoId = track.playableVideoId;
+    final song =
+        (track.mainDbId == null ? null : _catalog.current(track.mainDbId!)) ??
+        (videoId == null ? null : _catalog.findByYouTubeId(videoId)) ??
+        playlistSongByName(track, _catalog);
+    if (videoId != null) yield 'video:$videoId';
+    if (track.spotifyTrackId case final spotify?) yield 'spotify:$spotify';
+    yield song != null
+        ? 'song:${song.id}'
+        : 'name:${_nameKey(track.artist, track.title)}';
+  }
+
+  Iterable<String> _hitKeys(SearchHit hit) sync* {
+    if (hit.playlistVideoId case final video?) yield 'video:$video';
+    if (hit.youtubeVideoId case final video?) yield 'video:$video';
+    if (hit.spotifyTrackId case final spotify?) yield 'spotify:$spotify';
+    final song = hit.mainSong;
+    yield song != null
+        ? 'song:${song.id}'
+        : 'name:${_nameKey(hit.onPhone ? hit.phoneFiles.first.artist : hit.artistLabel, hit.title)}';
+  }
+
+  static String _nameKey(String? artist, String title) => songRequestKey(
+    artist == SongRequest.unknownArtist ? null : artist,
+    title,
+  );
 
   /// Writes the MusicDatabase song found by title and artist ([playlistSongByName]) into the
   /// tracks that have none and whose video music.db doesn't know, so MusicDatabase's copy of the
@@ -702,58 +746,83 @@ class PlaylistLibrary extends ChangeNotifier {
   /// so importing the playlist again leaves it out. Synced like any change.
   Future<void> removeTrack(int playlistId, int position) async {
     final db = await _database();
+    await db.transaction((txn) => _removeTrackIn(txn, playlistId, position));
+    await load();
+    onChanged?.call();
+  }
+
+  /// Takes every track of [songs] out of the playlist [playlistId], like [removeTrack].
+  Future<void> removeSongs(int playlistId, List<SearchHit> songs) async {
+    final keys = {for (final hit in songs) ..._hitKeys(hit)};
+    final positions = [
+      for (final track in await tracks(playlistId))
+        if (_trackKeys(track).any(keys.contains)) track.position,
+    ];
+    if (positions.isEmpty) return;
+    final db = await _database();
     await db.transaction((txn) async {
-      final rows = await txn.query(
-        'playlist_tracks',
-        where: 'playlist_id = ? AND position = ?',
-        whereArgs: [playlistId, position],
-      );
-      if (rows.isEmpty) return;
-      final track = _track(rows.first);
-      await txn.delete(
-        'playlist_tracks',
-        where: 'playlist_id = ? AND position = ?',
-        whereArgs: [playlistId, position],
-      );
-      // Through negative positions: shifting in place could hit (playlist_id, position)'s
-      // uniqueness, SQLite doesn't promise the order rows are updated in.
-      await txn.rawUpdate(
-        'UPDATE playlist_tracks SET position = -position - 1 '
-        'WHERE playlist_id = ? AND position > ?',
-        [playlistId, position],
-      );
-      await txn.rawUpdate(
-        'UPDATE playlist_tracks SET position = -position - 2 '
-        'WHERE playlist_id = ? AND position < 0',
-        [playlistId],
-      );
-      final playlist = (await txn.query(
-        'playlists',
-        columns: ['source', 'excluded_tracks'],
-        where: 'id = ?',
-        whereArgs: [playlistId],
-      )).first;
-      final source = PlaylistSource.values.asNameMap()[playlist['source']];
-      // A track added by hand isn't at the source: excluding its video would also drop the
-      // source's own track with it.
-      final key = track.added
-          ? null
-          : _sourceKey(source, track.youtubeVideoId, track.spotifyTrackId);
-      final excluded = _decodeExcluded(playlist['excluded_tracks']);
-      await txn.update(
-        'playlists',
-        {
-          'updated_at': _now().millisecondsSinceEpoch,
-          'dirty': 1,
-          if (key != null && excluded.add(key))
-            'excluded_tracks': jsonEncode([...excluded]),
-        },
-        where: 'id = ?',
-        whereArgs: [playlistId],
-      );
+      // From the end: taking a track out moves those after it up.
+      for (final position in positions.reversed) {
+        await _removeTrackIn(txn, playlistId, position);
+      }
     });
     await load();
     onChanged?.call();
+  }
+
+  Future<void> _removeTrackIn(
+    Transaction txn,
+    int playlistId,
+    int position,
+  ) async {
+    final rows = await txn.query(
+      'playlist_tracks',
+      where: 'playlist_id = ? AND position = ?',
+      whereArgs: [playlistId, position],
+    );
+    if (rows.isEmpty) return;
+    final track = _track(rows.first);
+    await txn.delete(
+      'playlist_tracks',
+      where: 'playlist_id = ? AND position = ?',
+      whereArgs: [playlistId, position],
+    );
+    // Through negative positions: shifting in place could hit (playlist_id, position)'s
+    // uniqueness, SQLite doesn't promise the order rows are updated in.
+    await txn.rawUpdate(
+      'UPDATE playlist_tracks SET position = -position - 1 '
+      'WHERE playlist_id = ? AND position > ?',
+      [playlistId, position],
+    );
+    await txn.rawUpdate(
+      'UPDATE playlist_tracks SET position = -position - 2 '
+      'WHERE playlist_id = ? AND position < 0',
+      [playlistId],
+    );
+    final playlist = (await txn.query(
+      'playlists',
+      columns: ['source', 'excluded_tracks'],
+      where: 'id = ?',
+      whereArgs: [playlistId],
+    )).first;
+    final source = PlaylistSource.values.asNameMap()[playlist['source']];
+    // A track added by hand isn't at the source: excluding its video would also drop the
+    // source's own track with it.
+    final key = track.added
+        ? null
+        : _sourceKey(source, track.youtubeVideoId, track.spotifyTrackId);
+    final excluded = _decodeExcluded(playlist['excluded_tracks']);
+    await txn.update(
+      'playlists',
+      {
+        'updated_at': _now().millisecondsSinceEpoch,
+        'dirty': 1,
+        if (key != null && excluded.add(key))
+          'excluded_tracks': jsonEncode([...excluded]),
+      },
+      where: 'id = ?',
+      whereArgs: [playlistId],
+    );
   }
 
   /// "Edytuj" on a playlist made on the phone: its tracks become those at [positions], in that

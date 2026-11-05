@@ -537,6 +537,85 @@ void main() {
     expect(find.text('Lubiany'), findsNothing);
   });
 
+  testWidgets('⋮ › Dodaj do playlisty marks the playlists already holding the '
+      'song', (tester) async {
+    await pumpLibrary(
+      tester,
+      before: () async {
+        final hit = SearchHit.phoneOnly(
+          LocalSong(
+            id: 1,
+            filePath: '/m/a.mp3',
+            title: 'Lubiany',
+            pending: true,
+          ),
+        );
+        await liked.setAll([hit], true);
+        await playlists.create('Ma go', [hit]);
+        await playlists.create('Nie ma', const []);
+      },
+    );
+    await tester.tap(find.text('Polubione utwory'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Menu utworu (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dodaj do playlisty'));
+    await tester.pumpAndSettle();
+
+    Finder check(String playlist) => find.descendant(
+      of: find.ancestor(
+        of: find.text(playlist),
+        matching: find.byType(ListTile),
+      ),
+      matching: find.byIcon(Icons.check_circle),
+    );
+    expect(check('Ma go'), findsOneWidget);
+    expect(check('Nie ma'), findsNothing);
+
+    final held = playlists.playlists.firstWhere((p) => p.name == 'Ma go');
+    await tester.ensureVisible(find.text('Ma go'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ma go'));
+    await pumpUntil(
+      tester,
+      () => find.text('Usunięto z playlisty „Ma go”').evaluate().isNotEmpty,
+    );
+    expect(playlists.byId(held.id)!.trackCount, 0);
+  });
+
+  testWidgets('a song taken out through its menu leaves the open playlist', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      before: () => playlists.create('Moja', [
+        SearchHit.phoneOnly(
+          LocalSong(
+            id: 1,
+            filePath: '/m/a.mp3',
+            title: 'Pierwszy',
+            pending: true,
+          ),
+        ),
+        SearchHit.phoneOnly(
+          LocalSong(id: 2, filePath: '/m/b.mp3', title: 'Drugi', pending: true),
+        ),
+      ]),
+    );
+    await tester.tap(find.text('Moja'));
+    await settle(tester, until: find.text('Pierwszy'));
+
+    await tester.tap(find.byTooltip('Menu utworu (⋮)').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dodaj do playlisty'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Moja').last);
+    await settle(tester, until: find.text('Usunięto z playlisty „Moja”'));
+
+    await pumpUntil(tester, () => find.text('Pierwszy').evaluate().isEmpty);
+    expect(find.text('Drugi'), findsOneWidget);
+  });
+
   testWidgets('an imported playlist can be sorted and added to, not edited', (
     tester,
   ) async {

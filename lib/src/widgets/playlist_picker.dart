@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/combined_search.dart';
 import '../data/playlist_library.dart';
 import '../data/saved_songs.dart';
+import '../data/track_ref.dart';
 import '../theme.dart';
 import 'collection_cover.dart';
 import 'common.dart';
@@ -42,42 +43,88 @@ MenuSheetEntry? playlistSubmenuEntry(
   return MenuSheetEntry(
     Icons.playlist_add,
     'Dodaj do playlisty',
-    submenu: () => [
-      if (liked != null)
-        liked.containsAll(hits)
-            ? MenuSheetEntry(
-                Icons.favorite,
-                'Usuń z polubionych',
-                onTap: () async => said(await toggleLiked(liked, hits)),
-              )
-            : MenuSheetEntry(
-                Icons.favorite_border,
-                'Polub',
-                subtitle: likedSongsLabel,
-                onTap: () async => said(await toggleLiked(liked, hits)),
-              ),
-      MenuSheetEntry(
-        Icons.add,
-        'Nowa playlista',
-        onTap: () async {
-          final name = await askPlaylistName(context);
-          if (name == null) return;
-          await library.create(name, hits);
-          said('Utworzono playlistę „$name”');
-        },
-      ),
-      for (final playlist in library.playlists)
+    submenu: () {
+      final held = _heldCounts(library, hits);
+      return [
+        if (liked != null)
+          liked.containsAll(hits)
+              ? MenuSheetEntry(
+                  Icons.favorite,
+                  'Usuń z polubionych',
+                  onTap: () async => said(await toggleLiked(liked, hits)),
+                )
+              : MenuSheetEntry(
+                  Icons.favorite_border,
+                  'Polub',
+                  subtitle: likedSongsLabel,
+                  onTap: () async => said(await toggleLiked(liked, hits)),
+                ),
         MenuSheetEntry(
-          Icons.queue_music,
-          playlist.name,
-          subtitle: '${playlist.trackCount} ${songsWord(playlist.trackCount)}',
+          Icons.add,
+          'Nowa playlista',
           onTap: () async {
-            await library.addSongs(playlist.id, hits);
-            said('Dodano do playlisty „${playlist.name}”');
+            final name = await askPlaylistName(context);
+            if (name == null) return;
+            await library.create(name, hits);
+            said('Utworzono playlistę „$name”');
           },
         ),
-    ],
+        for (final playlist in library.playlists)
+          MenuSheetEntry(
+            Icons.queue_music,
+            playlist.name,
+            subtitle: _playlistLine(
+              playlist,
+              held[playlist.id] ?? 0,
+              hits.length,
+            ),
+            checked: held[playlist.id] == hits.length,
+            onTap: () async {
+              said(await togglePlaylist(library, playlist, hits));
+            },
+          ),
+      ];
+    },
   );
+}
+
+/// How many of [hits] each playlist already has, by its id.
+Map<int, int> _heldCounts(PlaylistLibrary library, List<SearchHit> hits) {
+  final counts = <int, int>{};
+  for (final hit in hits) {
+    for (final id in library.playlistsWith(hit)) {
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/// A playlist's size and, while choosing for several songs, how many of them it already has.
+String _playlistLine(PlaylistSummary playlist, int held, int songs) {
+  final size = '${playlist.trackCount} ${songsWord(playlist.trackCount)}';
+  return held == 0 || held == songs ? size : '$size · już tu: $held z $songs';
+}
+
+/// Adds those of [hits] the playlist doesn't have yet, or takes them out when it has them all;
+/// returns what to tell the user.
+Future<String> togglePlaylist(
+  PlaylistLibrary library,
+  PlaylistSummary playlist,
+  List<SearchHit> hits,
+) async {
+  final seen = <String>{};
+  final missing = [
+    for (final hit in hits)
+      if (!library.playlistsWith(hit).contains(playlist.id) &&
+          seen.add(TrackRef.of(hit).key))
+        hit,
+  ];
+  if (missing.isEmpty) {
+    await library.removeSongs(playlist.id, hits);
+    return 'Usunięto z playlisty „${playlist.name}”';
+  }
+  await library.addSongs(playlist.id, missing);
+  return 'Dodano do playlisty „${playlist.name}”';
 }
 
 const likedSongsLabel = 'Polubione utwory';
@@ -126,8 +173,8 @@ Future<String?> askPlaylistName(BuildContext context) async {
   return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
 
-/// Puts [hits] at the end of a playlist made on the phone, or into a new one. Imported
-/// playlists aren't offered: importing them again would drop what was added.
+/// Puts [hits] at the end of a saved playlist or into a new one, or takes them out of a playlist
+/// holding them all ([togglePlaylist]).
 Future<void> showAddToPlaylistSheet(
   BuildContext context,
   List<SearchHit> hits,
@@ -148,6 +195,7 @@ Future<void> showAddToPlaylistSheet(
     isScrollControlled: true,
     builder: (sheetContext) {
       final palette = sheetContext.palette;
+      final held = _heldCounts(library, hits);
       return ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
@@ -204,12 +252,17 @@ Future<void> showAddToPlaylistSheet(
                 leading: PlaylistCover(playlist: playlist, size: 48),
                 title: ScrollingText(playlist.name),
                 subtitle: Text(
-                  '${playlist.trackCount} ${songsWord(playlist.trackCount)}',
+                  _playlistLine(playlist, held[playlist.id] ?? 0, hits.length),
                 ),
+                trailing: held[playlist.id] == hits.length
+                    ? Icon(Icons.check_circle, color: palette.accent)
+                    : Icon(
+                        Icons.add_circle_outline,
+                        color: palette.textSecondary,
+                      ),
                 onTap: () async {
                   Navigator.of(sheetContext).pop();
-                  await library.addSongs(playlist.id, hits);
-                  said('Dodano do playlisty „${playlist.name}”');
+                  said(await togglePlaylist(library, playlist, hits));
                 },
               ),
           ],
