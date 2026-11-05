@@ -302,22 +302,8 @@ class QueueScreen extends StatelessWidget {
                     ],
                   ),
                 );
-                final key = ValueKey('heading ${heading.at}');
-                if (!playlistGroup) return KeyedSubtree(key: key, child: tile);
-                // Dragged left, the whole group goes, like a single row.
-                return Dismissible(
-                  key: key,
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    color: Theme.of(context).colorScheme.error,
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Icon(
-                      Icons.playlist_remove,
-                      color: Theme.of(context).colorScheme.onError,
-                    ),
-                  ),
-                  onDismissed: (_) => removeGroup(),
+                return KeyedSubtree(
+                  key: ValueKey('heading ${heading.at}'),
                   child: tile,
                 );
               },

@@ -638,6 +638,29 @@ void main() {
   );
 
   testWidgets(
+    '"Kolejka": a playlist\'s heading can\'t be swiped away, only its button removes it',
+    (tester) async {
+      await tester.runAsync(() async {
+        await queue.start([_file('a')], 0);
+        await queue.add([
+          _file('p'),
+          _file('q'),
+        ], origin: QueueOrigin(playlistName: 'Inna'));
+      });
+      await showQueue(tester);
+
+      await tester.drag(find.text('Z playlisty: Inna'), const Offset(-300, 0));
+      await settle(tester);
+      expect(titles(queue.upcoming), ['p', 'q']);
+
+      await tester.tap(find.byTooltip('Usuń tę grupę z kolejki'));
+      await settle(tester);
+      expect(queue.upcoming, isEmpty);
+      expect(find.text('Usunięto z kolejki: 2 utw.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     '"Kolejka": saved as a playlist — every song listed, the previous ones too',
     (tester) async {
       late Directory root;

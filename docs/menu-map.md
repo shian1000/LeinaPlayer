@@ -160,9 +160,9 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     „query” w wyszukiwarce>" (the main songs). "Wyczyść kolejkę" on the first heading of added
     songs drops everything added by hand. A heading of songs from a playlist (**implemented**) has
     "Losowo w tej grupie" (its songs in random order where they are; shuffle leaves them after
-    that), "Powtórz tę grupę" (copies of its songs right after it) and "Usuń tę grupę z kolejki";
-    dragged left the heading takes the whole group out too ("Usunięto z kolejki: N utw." with
-    Cofnij). Each row has a drag handle (≡) to move it anywhere —
+    that), "Powtórz tę grupę" (copies of its songs right after it) and "Usuń tę grupę z kolejki"
+    ("Usunięto z kolejki: N utw." with Cofnij) — the button only: a group can't be swiped away
+    (user's decision). Each row has a drag handle (≡) to move it anywhere —
     it keeps its origin, and shuffle no longer moves it. Dragging a row left takes it out
     ("Usunięto z kolejki" with Cofnij — the reference app does the same), right makes it play
     next — or moves it to the end, with Ustawienia › Odtwarzanie › "Przeciągnięcie utworu w
