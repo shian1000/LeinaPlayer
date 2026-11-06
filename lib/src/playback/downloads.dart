@@ -185,6 +185,10 @@ class Downloads extends ChangeNotifier {
     return videoId == null ? null : _youTube.cachedFileOf(videoId);
   }
 
+  /// What "Pobierz" keeps, for "Pamięć podręczna › Pobrane utwory".
+  List<ServerDownload> get serverEntries => _server.entries;
+  List<YouTubeCacheEntry> get youTubeEntries => _youTube.pinnedEntries;
+
   /// How many songs "Pobierz" keeps, and how much room they take.
   int get count => _server.entries.length + _youTube.pinnedEntries.length;
   int get bytes =>
@@ -227,16 +231,22 @@ class Downloads extends ChangeNotifier {
     await (await _database()).delete('download_queue');
     _queued = const {};
     for (final download in _server.entries) {
-      await _server.remove(download.fileId);
+      await removeServerFile(download.fileId);
     }
     for (final entry in _youTube.pinnedEntries) {
-      await _youTube.setPinned(
-        entry.videoId,
-        false,
-        limit: _tracks.settings.cacheKeep,
-      );
+      await removeVideo(entry.videoId);
     }
   }
+
+  /// One of [serverEntries] off the phone.
+  Future<void> removeServerFile(int fileId) => _server.remove(fileId);
+
+  /// One of [youTubeEntries] back in the cache.
+  Future<void> removeVideo(String videoId) => _youTube.setPinned(
+    videoId,
+    false,
+    limit: _tracks.settings.cacheKeep,
+  );
 
   /// Takes [hits] off the phone again (a file of the phone's own stays, of course).
   Future<void> remove(List<SearchHit> hits) async {

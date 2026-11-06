@@ -358,6 +358,33 @@ List<FoundAlbum> searchAlbums(
   ];
 }
 
+/// The row for YouTube audio kept on the phone: the MusicDatabase song where the video is known,
+/// else the title the phone has seen for it ([YouTubeLibrary.knownTitles]).
+SearchHit hitForStoredVideo(
+  String videoId,
+  SongCatalog catalog,
+  LocalLibrary library,
+  YouTubeLibrary youTube,
+  ({String title, String? artist})? known,
+) {
+  final phoneMatched = youTube.songForVideo(videoId);
+  final song =
+      catalog.findByYouTubeId(videoId) ??
+      (phoneMatched == null ? null : catalog.byId(phoneMatched));
+  if (song != null) {
+    return SearchHit.main(
+      song,
+      library.filesOf(song.id),
+      phoneMatch: song.youtubeVideoId == null ? videoId : null,
+    );
+  }
+  return SearchHit.youTubeOnly(
+    title: known?.title ?? 'Film z YouTube',
+    artistLabel: known?.artist ?? videoId,
+    videoId: videoId,
+  );
+}
+
 /// The row for a playlist track: the MusicDatabase song when it was recognised (by its
 /// `main_db_id`, by the video if music.db has linked it since, or by its title and artist —
 /// [playlistSongByName]), with its phone files; otherwise

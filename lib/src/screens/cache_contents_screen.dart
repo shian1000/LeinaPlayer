@@ -48,27 +48,16 @@ class _CacheContentsScreenState extends State<CacheContentsScreen> {
     final local = LocalLibraryScope.of(context);
     final entries = library.cacheEntries;
 
-    SearchHit hitFor(String videoId) {
-      final phoneMatched = library.songForVideo(videoId);
-      final song =
-          catalog.findByYouTubeId(videoId) ??
-          (phoneMatched == null ? null : catalog.byId(phoneMatched));
-      if (song != null) {
-        return SearchHit.main(
-          song,
-          local.filesOf(song.id),
-          phoneMatch: song.youtubeVideoId == null ? videoId : null,
-        );
-      }
-      final known = _titles[videoId];
-      return SearchHit.youTubeOnly(
-        title: known?.title ?? 'Film z YouTube',
-        artistLabel: known?.artist ?? videoId,
-        videoId: videoId,
-      );
-    }
-
-    final hits = [for (final e in entries) hitFor(e.videoId)];
+    final hits = [
+      for (final e in entries)
+        hitForStoredVideo(
+          e.videoId,
+          catalog,
+          local,
+          library,
+          _titles[e.videoId],
+        ),
+    ];
     String mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 
     return Scaffold(

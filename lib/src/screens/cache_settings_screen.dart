@@ -7,6 +7,7 @@ import '../playback/downloads.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'cache_contents_screen.dart';
+import 'downloaded_songs_screen.dart';
 
 String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 
@@ -239,6 +240,12 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
               subtitle: Text(
                 '${downloads.count} ${_songs(downloads.count)}, '
                 '${_mb(downloads.bytes)} MB',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const DownloadedSongsScreen(),
+                ),
               ),
             ),
             ListTile(

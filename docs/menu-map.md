@@ -465,7 +465,10 @@ import, Wyświetlanie, Dane, Aplikacja.
   Pamięć podręczna **→ Pamięć podręczna** (`cache_settings_screen.dart`; subtitle: MB used in
   total) — every cache setting, nowhere else ("Pamięć podręczna" is the one name used in the UI):
   - "Zajęte razem: X MB" (with the downloaded songs).
-  - *Pobrane* — "Pobrane utwory" ("N utworów, X MB": songs kept with "Pobierz") and "Usuń
+  - *Pobrane* — "Pobrane utwory" ("N utworów, X MB": songs kept with "Pobierz") **→ Pobrane
+    utwory** (`downloaded_songs_screen.dart`: song rows by title with their size; tapping plays
+    from there on through the list; ⊖ or a drag left "Usuń z pobranych"; a server file music.db
+    no longer has a song for is listed by its file name, only to be removed) and "Usuń
     wszystkie pobrane" (confirm: server copies deleted, YouTube audio back in the cache). They're
     outside the YouTube limit and "Wyczyść" / "Wyczyść wszystko" leave them.
   - *Utwory z YouTube* — "Liczba utworów" (dialog, default 25; lowering it deletes the excess
@@ -691,7 +694,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     `Kolejka › Utwór › Menu (⋮)`, outbox contents), the full player's ⋮ (`Odtwarzacz › Menu
     (⋮)`) and a long press on the mini player (`Mini odtwarzacz › Menu utworu`).
   - **Ticking songs** (`SongSelectionArea` in `widgets/song_selection.dart`; song search,
-    playlists, moods, Ostatnie, Pamięć podręczna, Utwory spoza bazy danych): a **long press on a
+    playlists, moods, Ostatnie, Pamięć podręczna, Pobrane utwory, Utwory spoza bazy danych): a **long press on a
     song row** ticks it and starts ticking — taps then tick / untick instead of playing, the ⋮
     and the swipe go away, and a bar under the list shows "Zaznaczono: N", ✕, "Wszystkie" /
     "Odznacz" (playlists and moods) and Do kolejki, Jako następne, Do playlisty
