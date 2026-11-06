@@ -29,10 +29,13 @@ const _id = 'Na później';
 /// "Na później" (Ja › Na później): links people sent, saved from the "Otwórz w…"
 /// sheet with who sent them. Tapping one opens it like a link given to the app.
 class LaterLinksScreen extends StatefulWidget {
-  const LaterLinksScreen({super.key, this.onOpen});
+  const LaterLinksScreen({super.key, this.onOpen, this.onQueue});
 
   /// Opening a link; [AppShell.openLink] when not given (tests give their own).
   final void Function(String url)? onOpen;
+
+  /// Putting a link's songs in the queue, saying whether they got there; tests give their own.
+  final Future<bool> Function(LaterLink link, {required bool next})? onQueue;
 
   @override
   State<LaterLinksScreen> createState() => _LaterLinksScreenState();
@@ -123,6 +126,13 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
         backgroundColor: palette.background,
         centerTitle: true,
         title: const Text(_id),
+        actions: [
+          IconButton(
+            tooltip: 'Ustawienia „$_id”',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
@@ -189,6 +199,13 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       ),
     );
   }
+
+  Future<void> _openSettings() => showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    builder: (_) => const _LaterSettingsSheet(),
+  );
 
   /// Dragged right: queued like a song row is (`queueSwipe`), as Odtwarzanie says.
   SwipeAction _queueSwipe(LaterLink link) {
@@ -286,8 +303,18 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       ? parseYouTubeLink(link.url) is YouTubePlaylistLink
       : parseSpotifyLink(link.url)?.kind == SpotifyLinkKind.playlist;
 
-  /// The link's song — or a playlist's / album's songs — into the queue, without opening it.
   Future<void> _queue(LaterLink link, {required bool next}) async {
+    final later = LaterLinksScope.of(context);
+    final settings = SourceSettingsScope.of(context);
+    final queued = await (widget.onQueue ?? _queueSongs)(link, next: next);
+    if (queued && settings.laterQueuedListened && !link.opened) {
+      await later.setOpened(link, true);
+    }
+  }
+
+  /// The link's song — or a playlist's / album's songs — into the queue, without opening it;
+  /// says whether they got there.
+  Future<bool> _queueSongs(LaterLink link, {required bool next}) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..clearSnackBars()
@@ -310,11 +337,11 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
         spotify: YouTubeScope.spotifyOf(context),
         settings: SourceSettingsScope.of(context),
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       if (found.hits.isNotEmpty) {
         messenger.clearSnackBars();
         final name = found.name;
-        await queueSongs(
+        return await queueSongs(
           context,
           found.hits,
           next: next,
@@ -325,7 +352,6 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
                   youTubeListId: found.youTubeListId,
                 ),
         );
-        return;
       }
       problem = 'W tym linku nie ma utworów do dodania.';
     } on YouTubeSearchException catch (e) {
@@ -336,10 +362,12 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       debugPrint('Queueing ${link.url} failed: $e');
       problem = 'Nie udało się odczytać linku.';
     }
-    if (!messenger.mounted) return;
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(problem)));
+    if (messenger.mounted) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(problem)));
+    }
+    return false;
   }
 
   Future<void> _openOutside(LinkService service, Uri uri) async {
@@ -448,6 +476,40 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       ),
     );
     if (confirmed ?? false) await later.removePerson(person);
+  }
+}
+
+class _LaterSettingsSheet extends StatelessWidget {
+  const _LaterSettingsSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = SourceSettingsScope.of(context);
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Text(
+              'Ustawienia „$_id”',
+              style: TextStyle(
+                fontSize: AppFontSize.emphasis,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.check_circle_outline),
+            title: const Text('Po dodaniu do kolejki, oznacz jako odsłuchane'),
+            value: settings.laterQueuedListened,
+            onChanged: settings.setLaterQueuedListened,
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
   }
 }
 

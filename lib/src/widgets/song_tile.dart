@@ -84,7 +84,7 @@ String formatDuration(Duration d) {
 
 /// Runs a queue action started by a tap ([PlaybackQueue.start], next, previous) and tells the
 /// user how it went: progress while YouTube is contacted, then what was found or why it failed.
-Future<void> runQueueAction(
+Future<PlayOutcome?> runQueueAction(
   BuildContext context,
   Future<PlayOutcome?> Function(void Function(String status) onStatus) action,
 ) async {
@@ -109,6 +109,7 @@ Future<void> runQueueAction(
   } else if (announced && messenger.mounted) {
     messenger.clearSnackBars();
   }
+  return outcome;
 }
 
 /// "Dodaj do kolejki" from a song's ⋮ menu: plays at the very end of the queue (right away
@@ -172,14 +173,16 @@ SwipeAction removeSwipe(
 }
 
 /// Adds [hits] to the queue — right after the current song ([next]) or at its very end —
-/// saying so; [origin] is the playlist they're added from as a whole.
-Future<void> queueSongs(
+/// saying so; [origin] is the playlist they're added from as a whole. Returns whether they got
+/// there: with nothing playing, a song that can't start is all that can fail, and the songs
+/// after it still wait in the queue.
+Future<bool> queueSongs(
   BuildContext context,
   List<SearchHit> hits, {
   required bool next,
   QueueOrigin? origin,
 }) async {
-  if (hits.isEmpty) return;
+  if (hits.isEmpty) return false;
   final messenger = ScaffoldMessenger.of(context);
   final queue = PlaybackQueueScope.of(context);
   final toast = QueueToastScope.maybeOf(context);
@@ -202,8 +205,8 @@ Future<void> queueSongs(
         : 'Część utworów dodanych do kolejki jest poza filtrami nastroju: '
               '${turnOff ? 'wyłączam filtr' : 'będą pominięte'}';
   }
-  if (!context.mounted) return;
-  await runQueueAction(context, (onStatus) async {
+  if (!context.mounted) return false;
+  final result = await runQueueAction(context, (onStatus) async {
     final outcome = next
         ? await queue.playNext(hits, origin: origin, onStatus: onStatus)
         : await queue.add(hits, origin: origin, onStatus: onStatus);
@@ -239,6 +242,7 @@ Future<void> queueSongs(
     }
     return outcome;
   });
+  return result == null || result.played || hits.length > 1;
 }
 
 /// A song row — search results, playlists: cover, title (highlighted while it plays), details,

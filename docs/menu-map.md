@@ -248,6 +248,9 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   Nowa osoba), Otwórz w aplikacji YouTube/Spotify, Kopiuj link, Usuń z „Na później”.
   Rows swipe like song rows: right queues the link (as "Przeciągnięcie utworu w prawo" says),
   left removes it ("Usunięto z „Na później”", no Cofnij).
+  Ustawienia (gear in the app bar, a sheet): "Po dodaniu do kolejki, oznacz jako odsłuchane" (on
+  by default) — a link queued from the menu or by a swipe counts as listened to, unless its song
+  couldn't start.
   The links sync with the account (the sender by name; [ADR 0013](decisions/0013-saved-songs-sync.md)).
 
 ## Ustawienia (`settings_screen.dart`)

@@ -2,15 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/incoming_links.dart';
 import 'package:music_database_app/src/data/later_links.dart';
+import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/screens/later_links_screen.dart';
 import 'package:music_database_app/src/theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   late MemoryLaterStore store;
   late LaterLinks later;
   late List<String> opened;
+  late SourceSettings settings;
+  late List<(String, bool)> queued;
+  late bool queueWorks;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    settings = SourceSettings();
+    await settings.load();
+    queued = [];
+    queueWorks = true;
     store = MemoryLaterStore();
     later = LaterLinks(store);
     opened = [];
@@ -44,16 +54,83 @@ void main() {
 
   Future<void> pump(WidgetTester tester) async {
     await tester.pumpWidget(
-      LaterLinksScope(
-        notifier: later,
-        child: MaterialApp(
-          theme: buildAppTheme(dummifyTheme),
-          home: LaterLinksScreen(onOpen: opened.add),
+      SourceSettingsScope(
+        notifier: settings,
+        child: LaterLinksScope(
+          notifier: later,
+          child: MaterialApp(
+            theme: buildAppTheme(dummifyTheme),
+            home: LaterLinksScreen(
+              onOpen: opened.add,
+              onQueue: (link, {required next}) async {
+                queued.add((link.title!, next));
+                return queueWorks;
+              },
+            ),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
   }
+
+  LaterLink wideo() => later.links.firstWhere((l) => l.title == 'Wideo Oli');
+
+  Future<void> queueFromMenu(WidgetTester tester) async {
+    await tester.longPress(find.text('Wideo Oli'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dodaj do kolejki'));
+    await tester.pumpAndSettle();
+  }
+
+  group('a queued link', () {
+    testWidgets('counts as listened to by default', (tester) async {
+      await pump(tester);
+      expect(settings.laterQueuedListened, isTrue);
+      await queueFromMenu(tester);
+      expect(queued, [('Wideo Oli', false)]);
+      expect(wideo().opened, isTrue);
+    });
+
+    testWidgets('dragged right: too, as Odtwarzanie says', (tester) async {
+      await pump(tester);
+      await tester.drag(find.text('Wideo Oli'), const Offset(300, 0));
+      await tester.pumpAndSettle();
+      expect(queued, [('Wideo Oli', true)]);
+      expect(wideo().opened, isTrue);
+    });
+
+    testWidgets('stays as it was when it could not be queued', (tester) async {
+      queueWorks = false;
+      await pump(tester);
+      await queueFromMenu(tester);
+      expect(queued, hasLength(1));
+      expect(wideo().opened, isFalse);
+    });
+
+    testWidgets('stays unlistened with the setting switched off, remembered', (
+      tester,
+    ) async {
+      await pump(tester);
+      await tester.tap(find.byTooltip('Ustawienia „Na później”'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text('Po dodaniu do kolejki, oznacz jako odsłuchane'),
+      );
+      await tester.pumpAndSettle();
+      expect(settings.laterQueuedListened, isFalse);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      await queueFromMenu(tester);
+      expect(queued, hasLength(1));
+      expect(wideo().opened, isFalse);
+
+      final again = SourceSettings();
+      await tester.runAsync(again.load);
+      expect(again.laterQueuedListened, isFalse);
+    });
+  });
 
   testWidgets('shows everyone\'s links, filters by person, opens one', (
     tester,

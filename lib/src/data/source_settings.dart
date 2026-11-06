@@ -112,6 +112,7 @@ class SourceSettings extends ChangeNotifier {
   static const _lyricsKey = 'data_saver.lyrics';
   static const _crossfadeKey = 'playback.crossfade_seconds';
   static const _swipePlaysNextKey = 'playback.swipe_right_plays_next';
+  static const _laterQueuedListenedKey = 'later.queued_marks_listened';
   static const _levelingKey = 'playback.volume_leveling';
   static const _levelingPercentKey = 'playback.volume_leveling_percent';
   static const _levelingMeasureKey = 'playback.volume_leveling_measure';
@@ -147,6 +148,7 @@ class SourceSettings extends ChangeNotifier {
   bool _lyrics = true;
   int _crossfadeSeconds = 0;
   bool _swipePlaysNext = true;
+  bool _laterQueuedListened = true;
   bool _leveling = true;
   int _levelingPercent = defaultLevelingPercent;
   bool _levelingMeasure = true;
@@ -231,6 +233,9 @@ class SourceSettings extends ChangeNotifier {
   /// What dragging a song row to the right does (Ustawienia › Odtwarzanie): "Odtwórz jako
   /// następny" (true, the default) or "Dodaj do kolejki".
   bool get swipePlaysNext => _swipePlaysNext;
+
+  /// A link from "Na później" put in the queue counts as listened to (Na później › Ustawienia).
+  bool get laterQueuedListened => _laterQueuedListened;
 
   /// "Wyrównywanie głośności" (Ustawienia › Odtwarzanie).
   bool get leveling => _leveling;
@@ -328,6 +333,8 @@ class SourceSettings extends ChangeNotifier {
     _crossfadeSeconds = (prefs.getInt(_crossfadeKey) ?? _crossfadeSeconds)
         .clamp(0, maxCrossfadeSeconds);
     _swipePlaysNext = prefs.getBool(_swipePlaysNextKey) ?? _swipePlaysNext;
+    _laterQueuedListened =
+        prefs.getBool(_laterQueuedListenedKey) ?? _laterQueuedListened;
     _leveling = prefs.getBool(_levelingKey) ?? _leveling;
     _levelingPercent = (prefs.getInt(_levelingPercentKey) ?? _levelingPercent)
         .clamp(10, 100);
@@ -507,6 +514,15 @@ class SourceSettings extends ChangeNotifier {
     notifyListeners();
     await (await SharedPreferences.getInstance()).setBool(
       _swipePlaysNextKey,
+      value,
+    );
+  }
+
+  Future<void> setLaterQueuedListened(bool value) async {
+    _laterQueuedListened = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _laterQueuedListenedKey,
       value,
     );
   }

@@ -844,6 +844,54 @@ void main() {
     expect(removed, 1);
   });
 
+  group('queueSongs says whether the songs got into the queue', () {
+    Future<bool?> queueWithNothingPlaying(
+      WidgetTester tester,
+      List<SearchHit> hits,
+    ) async {
+      await tester.pumpWidget(
+        PlayerScope(
+          notifier: player,
+          child: PlaybackQueueScope(
+            notifier: queue,
+            child: MaterialApp(
+              theme: buildAppTheme(dummifyTheme),
+              home: const Scaffold(body: SizedBox.shrink()),
+            ),
+          ),
+        ),
+      );
+      final context = tester.element(find.byType(Scaffold));
+      final queued = await tester.runAsync(
+        () => queueSongs(context, hits, next: false),
+      );
+      await tester.pumpAndSettle();
+      return queued;
+    }
+
+    testWidgets('the only song can\'t start: no', (tester) async {
+      expect(
+        await queueWithNothingPlaying(tester, [_unplayable('x')]),
+        isFalse,
+      );
+    });
+
+    testWidgets('the song after one that can\'t start still waits: yes', (
+      tester,
+    ) async {
+      expect(
+        await queueWithNothingPlaying(tester, [_unplayable('x'), _file('b')]),
+        isTrue,
+      );
+      expect(titles(queue.upcoming), ['b']);
+    });
+
+    testWidgets('a song that plays: yes', (tester) async {
+      expect(await queueWithNothingPlaying(tester, [_file('a')]), isTrue);
+      expect(backend.opened, ['/music/a.mp3']);
+    });
+  });
+
   testWidgets(
     '"Kolejka": "Przywróć poprzednią kolejkę" brings the replaced one back',
     (tester) async {
