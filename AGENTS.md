@@ -72,7 +72,7 @@ any saved playlist, imported ones too (kept by their next import); songs removed
 any saved playlist ("Usuń z tej playlisty"; an imported one's next import leaves them out, synced);
 folders for playlists and moods (synced with the account like playlists —
 [ADR 0011](docs/decisions/0011-folder-sync.md)) and a working
-"Sortuj wg" (phone only); song search also finds Biblioteka playlists and albums (grouped by name, as "Przejdź do albumu" does), and its online button YouTube and
+"Sortuj wg" and filter chips, several at once (phone only); song search also finds Biblioteka playlists and albums (grouped by name, as "Przejdź do albumu" does), and its online button YouTube and
 Spotify playlists, opened as a preview before saving; songs can be shared as their YouTube or Spotify link
 ([`playlists.md`](docs/agent-notes/playlists.md)). A logged-in user's playlists sync with their
 MusicDatabase account, both ways ([ADR 0007](docs/decisions/0007-playlist-sync.md)).
@@ -173,7 +173,7 @@ moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and
 ([ADR 0009](docs/decisions/0009-cover-sync.md)). The music library's files are streamed from
 `GET /library/<files.id>` ([ADR 0010](docs/decisions/0010-server-files.md)). Biblioteka's folders go as JSON too
 (`/users/<name>/folders`, [ADR 0011](docs/decisions/0011-folder-sync.md); server side in a
-[hand-off](docs/handoffs/musicdatabase-folders.md)); its sort order and "last opened" stay on the
+[hand-off](docs/handoffs/musicdatabase-folders.md)); its sort order, filter chips and "last opened" stay on the
 phone (`library_folders.dart`), not synced. Liked songs and songs saved "Na później" go as
 `/users/<name>/saved-songs`, links saved "Na później" as `/users/<name>/later-links`, one item at a
 time ([ADR 0013](docs/decisions/0013-saved-songs-sync.md); server side in a
@@ -238,7 +238,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `youtube_export.dart`), phone-found YouTube
   links and the audio cache (`youtube_library.dart`), Spotify playlists, albums and tracks — fetching, and searching playlists
   (`spotify_playlist.dart`), playlists found by search (`playlist_search.dart`), Biblioteka's
-  folders (synced), sort order and "last opened" (`library_folders.dart`), songs saved for
+  folders (synced), sort order, filter chips and "last opened" (`library_folders.dart`), songs saved for
   later and liked songs (`saved_songs.dart`, synced item by item with `item_sync.dart`'s `ItemSync`
   like the later links), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), the song last played from each playlist, marked with a bookmark (`playlist_bookmarks.dart`, phone only), dynamic playlists (`smart_playlists.dart`), Home's row layout
   (`home_layout.dart`) — all three phone only, syncing

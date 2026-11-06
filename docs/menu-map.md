@@ -764,7 +764,11 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   Dynamiczne playlisty** (`smart_playlist_screen.dart`, below). A category shows its playlists /
   moods outside folders plus the folders holding any of them (inside, only those).
 - Below the categories: everything — folders, playlists and moods outside folders, mixed in the
-  sort order.
+  sort order — and over it the **filter chips** (**implemented**): Playlisty, Albumy, Nastroje,
+  Foldery. Any of them together, none ticked shows everything, remembered on the phone
+  (`LibraryFolders.filters`, not synced). Lists the kinds ticked, with the folders holding them
+  (inside, only those); with Foldery every folder, whole, and outside folders only the other kinds
+  ticked. The search above ignores them.
 - **Dynamiczne playlisty** (`SmartPlaylists` in `data/smart_playlists.dart`, phone only): a
   saved filter — a song-search field (Tytuł, Wykonawca, Album, Rok, Język, Pochodzenie
   wykonawcy, Nastrój) and a value; its songs are searched in music.db and on the phone each time

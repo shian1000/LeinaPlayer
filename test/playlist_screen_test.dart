@@ -23,6 +23,7 @@ import 'package:music_database_app/src/playback/track_player.dart';
 import 'package:music_database_app/src/screens/library_screen.dart';
 import 'package:music_database_app/src/screens/song_search_screen.dart';
 import 'package:music_database_app/src/theme.dart';
+import 'package:music_database_app/src/widgets/common.dart';
 import 'package:music_database_app/src/widgets/playing_bars.dart';
 import 'package:music_database_app/src/widgets/song_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -713,6 +714,60 @@ void main() {
     expect(find.byType(PlayingBars), findsOneWidget);
   });
 
+  testWidgets('Biblioteka: filter chips narrow the list together and are remembered; the '
+      'search ignores them', (tester) async {
+    await pumpLibrary(tester, before: importDoAuta);
+    Finder chip(String label) => find.widgetWithText(PillChip, label);
+    expect(find.text('Do auta'), findsOneWidget);
+
+    await tester.tap(chip('Nastroje'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsNothing);
+    expect(folders.filters, {LibraryCategory.moods});
+    final reloaded = LibraryFolders();
+    await tester.runAsync(reloaded.load);
+    expect(reloaded.filters, {LibraryCategory.moods});
+
+    await tester.tap(find.byTooltip('Wyszukaj w Bibliotece'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'auta');
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsOneWidget);
+    await tester.tap(find.byTooltip('Zamknij wyszukiwanie'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsNothing);
+
+    // Moods and playlists together.
+    await tester.tap(chip('Playlisty'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsOneWidget);
+    expect(folders.filters, {LibraryCategory.moods, LibraryCategory.playlists});
+    await tester.tap(chip('Playlisty'));
+    await tester.tap(chip('Nastroje'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsOneWidget);
+    expect(folders.filters, isEmpty);
+
+    await tester.tap(chip('Albumy'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsNothing);
+    expect(find.textContaining('Brak albumów'), findsOneWidget);
+    await tester.tap(chip('Nastroje'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('nie pasuje do tych filtrów'), findsOneWidget);
+    await tester.tap(chip('Nastroje'));
+    await tester.tap(chip('Albumy'));
+    await tester.pumpAndSettle();
+
+    // "Foldery" alone: only folders; with "Playlisty" also the playlists outside them.
+    await tester.tap(chip('Foldery'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsNothing);
+    await tester.tap(chip('Playlisty'));
+    await tester.pumpAndSettle();
+    expect(find.text('Do auta'), findsOneWidget);
+  });
+
   testWidgets('Biblioteka: a playlist moved into a new folder shows only inside it; sorting '
       'is remembered', (tester) async {
     await pumpLibrary(tester, before: importDoAuta);
@@ -733,13 +788,13 @@ void main() {
     expect(find.text('Folder • 1 playlista'), findsOneWidget);
     expect(find.text('Do auta'), findsNothing);
     // A category keeps the folder holding a playlist; "Nastroje" leaves it out.
-    await tester.tap(find.text('Playlisty'));
+    await tester.tap(find.text('Playlisty').first);
     await tester.pumpAndSettle();
     expect(find.text('Podróże'), findsOneWidget);
     expect(find.text('Do auta'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Nastroje'));
+    await tester.tap(find.text('Nastroje').first);
     await tester.pumpAndSettle();
     expect(find.text('Podróże'), findsNothing);
     await tester.pageBack();

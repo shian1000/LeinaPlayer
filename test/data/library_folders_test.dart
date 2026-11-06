@@ -118,6 +118,25 @@ void main() {
     expect(reloaded.folderOf(key)?.id, b.id);
     expect(reloaded.sort, LibrarySort.added);
 
+    expect(reloaded.filters, isEmpty);
+    await reloaded.toggleFilter(LibraryCategory.moods);
+    await reloaded.toggleFilter(LibraryCategory.albums);
+    final filtered = LibraryFolders();
+    await filtered.load();
+    expect(filtered.filters, {LibraryCategory.moods, LibraryCategory.albums});
+    await filtered.toggleFilter(LibraryCategory.moods);
+    await filtered.toggleFilter(LibraryCategory.albums);
+    final cleared = LibraryFolders();
+    await cleared.load();
+    expect(cleared.filters, isEmpty);
+
+    // A String left under the key of older builds' single filter doesn't get in the way.
+    SharedPreferences.setMockInitialValues({'library.filter': 'Nastroje'});
+    final legacy = LibraryFolders();
+    await legacy.load();
+    expect(legacy.filters, isEmpty);
+    SharedPreferences.setMockInitialValues({});
+
     await reloaded.delete(b.id);
     expect(reloaded.folderOf(key), isNull);
     expect(

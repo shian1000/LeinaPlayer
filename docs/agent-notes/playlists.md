@@ -81,7 +81,7 @@ playlists ([ADR 0011](../decisions/0011-folder-sync.md)): on the phone items are
 ids (`p<playlists.id>`, `Mood.key`), on the wire by the playlist's / mood's `uid` (a global
 mood by its tag.db id) — `updateItems` keeps the mapping, refs not on the phone yet wait in
 `pending`. Deleting a playlist or mood also takes it out of its folder, since SQLite may hand
-the id to a new one. The sort order and "last opened" times stay phone-only, and so do songs
+the id to a new one. The sort order, filter chips and "last opened" times stay phone-only, and so do songs
 saved "Na później", dynamic playlists and Home's layout — syncing those would need a new
 MusicDatabase endpoint and an ADR, not decided.
 

@@ -28,67 +28,49 @@ import 'smart_playlist_screen.dart';
 
 const _id = 'Biblioteka';
 
-/// What one of Biblioteka's categories lists.
-enum LibraryCategory {
-  playlists('Playlisty'),
-  albums('Albumy'),
-  moods('Nastroje'),
-  folders('Foldery');
-
-  const LibraryCategory(this.label);
-
-  final String label;
-}
-
-/// Biblioteka's rows for [category] (`null`: everything): its playlists and moods, with the
-/// folders holding them. A category shows only the folders with something it lets through, and
-/// inside a folder the same; "Foldery" only the folders.
+/// Biblioteka's rows for the kinds in [filter] (none: everything): its playlists and moods, with
+/// the folders holding them. Without "Foldery" only the folders with something the filter lets
+/// through show, and inside a folder the same; with it every folder, whole, and outside folders
+/// only the other kinds ticked.
 List<LibraryEntry> _libraryEntries(
   BuildContext context,
-  LibraryCategory? category,
+  Set<LibraryCategory> filter,
 ) {
-  final all = PlaylistLibraryScope.of(context).playlists;
-  bool album(PlaylistSummary p) => p.source == PlaylistSource.spotifyAlbum;
-  final playlists = switch (category) {
-    null || LibraryCategory.folders => all,
-    LibraryCategory.playlists => [
-      for (final p in all)
-        if (!album(p)) p,
-    ],
-    LibraryCategory.albums => [
-      for (final p in all)
-        if (album(p)) p,
-    ],
-    LibraryCategory.moods => const <PlaylistSummary>[],
+  bool passes(LibraryEntry entry) => switch (entry) {
+    FolderEntry() => true,
+    MoodEntry() => filter.contains(LibraryCategory.moods),
+    PlaylistEntry(:final playlist) => filter.contains(
+      playlist.source == PlaylistSource.spotifyAlbum
+          ? LibraryCategory.albums
+          : LibraryCategory.playlists,
+    ),
   };
+  final foldersTicked = filter.contains(LibraryCategory.folders);
+  final whole = filter.isEmpty || foldersTicked;
   final moodLibrary = MoodLibraryScope.maybeOf(context);
-  final showMoods =
-      category == null ||
-      category == LibraryCategory.moods ||
-      category == LibraryCategory.folders;
-  final moods = showMoods && moodLibrary != null
-      ? [...moodLibrary.userMoods, ...moodLibrary.globalMoods]
-      : const <Mood>[];
-  final keepEmpty = category == null || category == LibraryCategory.folders;
+  final playlists = [
+    for (final p in PlaylistLibraryScope.of(context).playlists)
+      if (whole || passes(PlaylistEntry(p))) p,
+  ];
+  final moods = [
+    for (final m in [...?moodLibrary?.userMoods, ...?moodLibrary?.globalMoods])
+      if (whole || passes(MoodEntry(m))) m,
+  ];
   final entries =
-      LibraryFoldersScope.maybeOf(context)?.entries(
-        playlists: playlists,
-        moods: moods,
-        keepEmptyFolders: keepEmpty,
-      ) ??
+      LibraryFoldersScope.maybeOf(
+        context,
+      )?.entries(playlists: playlists, moods: moods, keepEmptyFolders: whole) ??
       [
         for (final p in playlists) PlaylistEntry(p),
         for (final m in moods) MoodEntry(m),
       ];
-  if (category == LibraryCategory.folders) {
-    return entries.whereType<FolderEntry>().toList();
-  }
-  return entries;
+  return foldersTicked ? entries.where(passes).toList() : entries;
 }
 
 /// Biblioteka: a search over it, its categories (Playlisty, Albumy, Nastroje, Foldery,
 /// Wykonawcy, Na później, Dynamiczne playlisty — each its own list, after Juxtopposed's Spotify
-/// redesign), then everything, in folders or not, ordered by "Sortuj wg".
+/// redesign), then everything, in folders or not, ordered by "Sortuj wg", narrowed by filter
+/// chips that are remembered (in [LibraryFolders]). The search goes over everything regardless.
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
@@ -109,7 +91,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final folders = LibraryFoldersScope.maybeOf(context);
-    final entries = _libraryEntries(context, null);
+    final filter = folders?.filters ?? const <LibraryCategory>{};
+    final entries = _libraryEntries(context, _searching ? const {} : filter);
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,11 +138,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     padding: const EdgeInsets.only(bottom: 16),
                     children: [
                       const _Categories(),
-                      if (folders != null) _ViewRow(folders: folders),
-                      if (entries.isEmpty)
+                      if (folders != null) ...[
+                        _FilterChips(folders: folders),
+                        _ViewRow(folders: folders),
+                      ],
+                      if (entries.isNotEmpty)
+                        LibraryEntries(entries: entries, filter: filter)
+                      else if (filter.isEmpty)
                         const _EmptyLibrary()
+                      else if (filter.length == 1)
+                        _EmptyCategory(filter.single)
                       else
-                        LibraryEntries(entries: entries),
+                        _EmptyNote(
+                          'Nic w Bibliotece nie pasuje do tych filtrów.',
+                          palette: context.palette,
+                        ),
                     ],
                   ),
           ),
@@ -167,6 +160,31 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
     );
   }
+}
+
+/// The filter over Biblioteka's list: any of the kinds, none ticked shows everything.
+class _FilterChips extends StatelessWidget {
+  const _FilterChips({required this.folders});
+
+  final LibraryFolders folders;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+    child: Row(
+      children: [
+        for (final category in LibraryCategory.values) ...[
+          if (category.index > 0) const SizedBox(width: 8),
+          PillChip(
+            label: category.label,
+            selected: folders.filters.contains(category),
+            onTap: () => folders.toggleFilter(category),
+          ),
+        ],
+      ],
+    ),
+  );
 }
 
 /// Biblioteka's categories, each with how much is in it.
@@ -419,9 +437,8 @@ class LibraryCategoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final folders = LibraryFoldersScope.maybeOf(context);
-    final entries = _libraryEntries(context, category);
+    final entries = _libraryEntries(context, {category});
     return Scaffold(
       appBar: AppBar(
         title: Text(category.label),
@@ -439,25 +456,38 @@ class LibraryCategoryScreen extends StatelessWidget {
         children: [
           if (folders != null) _ViewRow(folders: folders),
           if (entries.isEmpty)
-            switch (category) {
-              LibraryCategory.moods => const _EmptyMoods(),
-              LibraryCategory.playlists => const _EmptyLibrary(),
-              LibraryCategory.albums => _EmptyNote(
-                'Brak albumów. Album ze Spotify dodasz, importując jego link '
-                '(+ › Importuj playlistę).',
-                palette: palette,
-              ),
-              LibraryCategory.folders => _EmptyNote(
-                'Brak folderów. Utwórz folder przyciskiem + albo przytrzymaj '
-                'playlistę lub nastrój.',
-                palette: palette,
-              ),
-            }
+            _EmptyCategory(category)
           else
-            LibraryEntries(entries: entries, category: category),
+            LibraryEntries(entries: entries, filter: {category}),
         ],
       ),
     );
+  }
+}
+
+/// What a category or filter chip with nothing in it says instead of its list.
+class _EmptyCategory extends StatelessWidget {
+  const _EmptyCategory(this.category);
+
+  final LibraryCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return switch (category) {
+      LibraryCategory.moods => const _EmptyMoods(),
+      LibraryCategory.playlists => const _EmptyLibrary(),
+      LibraryCategory.albums => _EmptyNote(
+        'Brak albumów. Album ze Spotify dodasz, importując jego link '
+        '(+ › Importuj playlistę).',
+        palette: palette,
+      ),
+      LibraryCategory.folders => _EmptyNote(
+        'Brak folderów. Utwórz folder przyciskiem + albo przytrzymaj '
+        'playlistę lub nastrój.',
+        palette: palette,
+      ),
+    };
   }
 }
 
@@ -500,10 +530,14 @@ class _ViewRow extends StatelessWidget {
 
 /// [entries] as rows, or as a grid of covers when "Widok siatki" is on.
 class LibraryEntries extends StatelessWidget {
-  const LibraryEntries({super.key, required this.entries, this.category});
+  const LibraryEntries({
+    super.key,
+    required this.entries,
+    this.filter = const {},
+  });
 
   final List<LibraryEntry> entries;
-  final LibraryCategory? category;
+  final Set<LibraryCategory> filter;
 
   static const _gap = 12.0;
 
@@ -513,7 +547,7 @@ class LibraryEntries extends StatelessWidget {
       return Column(
         children: [
           for (final entry in entries)
-            LibraryEntryTile(entry: entry, category: category),
+            LibraryEntryTile(entry: entry, filter: filter),
         ],
       );
     }
@@ -531,7 +565,7 @@ class LibraryEntries extends StatelessWidget {
                   width: width,
                   child: LibraryEntryTile(
                     entry: entry,
-                    category: category,
+                    filter: filter,
                     gridSize: width,
                   ),
                 ),
@@ -595,7 +629,7 @@ class LibraryEntryTile extends StatelessWidget {
   const LibraryEntryTile({
     super.key,
     required this.entry,
-    this.category,
+    this.filter = const {},
     this.gridSize,
   });
 
@@ -604,8 +638,8 @@ class LibraryEntryTile extends StatelessWidget {
   /// A cell of [LibraryEntries]' grid this wide: the cover with the name under it.
   final double? gridSize;
 
-  /// The category it's listed in; a folder opened from it shows only what the category does.
-  final LibraryCategory? category;
+  /// The kinds it's listed under; a folder opened from there shows only those.
+  final Set<LibraryCategory> filter;
 
   @override
   Widget build(BuildContext context) {
@@ -641,7 +675,7 @@ class LibraryEntryTile extends StatelessWidget {
       FolderEntry(:final folder) => FolderScreen.open(
         context,
         folder,
-        category: category,
+        filter: filter,
       ),
       PlaylistEntry(:final playlist) => Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -778,18 +812,22 @@ Future<void> showFolderMenu(
   );
 }
 
-/// What's in a Biblioteka folder that the category it was opened from lets through, in
+/// What's in a Biblioteka folder that the filter it was opened from lets through, in
 /// Biblioteka's order.
 class FolderScreen extends StatelessWidget {
-  const FolderScreen({super.key, required this.folderId, this.category});
+  const FolderScreen({
+    super.key,
+    required this.folderId,
+    this.filter = const {},
+  });
 
   final String folderId;
-  final LibraryCategory? category;
+  final Set<LibraryCategory> filter;
 
   static Future<void> open(
     BuildContext context,
     LibraryFolder folder, {
-    LibraryCategory? category,
+    Set<LibraryCategory> filter = const {},
   }) {
     LibraryFoldersScope.read(context)?.opened(folder.key);
     return Navigator.of(context).push(
@@ -797,7 +835,7 @@ class FolderScreen extends StatelessWidget {
         builder: (_) => FolderScreen(
           folderId: folder.id,
           // Inside a folder "Foldery" means everything in it.
-          category: category == LibraryCategory.folders ? null : category,
+          filter: filter.contains(LibraryCategory.folders) ? const {} : filter,
         ),
       ),
     );
@@ -819,7 +857,7 @@ class FolderScreen extends StatelessWidget {
         ),
       );
     }
-    final entries = _libraryEntries(context, category)
+    final entries = _libraryEntries(context, filter)
         .whereType<FolderEntry>()
         .firstWhere(
           (e) => e.folder.id == folderId,
@@ -857,7 +895,7 @@ class FolderScreen extends StatelessWidget {
                 style: TextStyle(color: palette.textSecondary),
               ),
             ),
-          LibraryEntries(entries: entries, category: category),
+          LibraryEntries(entries: entries, filter: filter),
         ],
       ),
     );

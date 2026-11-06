@@ -182,7 +182,7 @@ void main() {
       // A pushed tab route (a Biblioteka category) with a root sheet (Utwórz) over it.
       await tester.tap(find.text('Biblioteka'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Albumy'));
+      await tester.tap(find.text('Albumy').first);
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Utwórz (+)'));
       await tester.pumpAndSettle();

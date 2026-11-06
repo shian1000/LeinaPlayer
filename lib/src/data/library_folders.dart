@@ -22,6 +22,18 @@ enum LibrarySort {
   final String label;
 }
 
+/// What one of Biblioteka's categories lists; also its filter chips.
+enum LibraryCategory {
+  playlists('Playlisty'),
+  albums('Albumy'),
+  moods('Nastroje'),
+  folders('Foldery');
+
+  const LibraryCategory(this.label);
+
+  final String label;
+}
+
 /// A folder in Biblioteka holding playlists and moods.
 class LibraryFolder {
   const LibraryFolder({
@@ -238,8 +250,8 @@ class MoodEntry extends LibraryEntry {
 /// (for "Ostatnie"), in `shared_preferences`. The logged-in account's folders are exchanged with
 /// MusicDatabase by [sync] (`/users/<name>/folders`: whole folders, newer change wins, deleting
 /// deletes everywhere — like playlists, ADR 0011); ones made while logged out stay on the phone
-/// until [addPhoneOnlyToAccount], another account's are hidden. The sort order and "Ostatnie"
-/// stay on each phone (user's decision).
+/// until [addPhoneOnlyToAccount], another account's are hidden. The sort order, the filter chip
+/// and "Ostatnie" stay on each phone (user's decision).
 ///
 /// An item is in at most one folder; folders don't nest.
 class LibraryFolders extends ChangeNotifier {
@@ -254,6 +266,8 @@ class LibraryFolders extends ChangeNotifier {
   static const _foldersKey = 'library.folders';
   static const _sortKey = 'library.sort';
   static const _gridKey = 'library.grid';
+  // Not 'library.filter': older builds left a String there, and reading it as a list throws.
+  static const _filtersKey = 'library.filters';
   static const _openedKey = 'library.opened';
 
   final DateTime Function() _now;
@@ -272,6 +286,7 @@ class LibraryFolders extends ChangeNotifier {
   List<LibraryFolder> _all = const [];
   LibrarySort _sort = LibrarySort.recent;
   bool _grid = false;
+  Set<LibraryCategory> _filters = const {};
   Map<String, int> _opened = const {};
 
   /// Item keys of the playlists and moods loaded now, by their ref and the other way round
@@ -293,6 +308,9 @@ class LibraryFolders extends ChangeNotifier {
   /// Biblioteka's playlists, moods and folders as a grid of covers instead of a list.
   bool get grid => _grid;
 
+  /// The filter chips ticked over Biblioteka's list; none shows everything.
+  Set<LibraryCategory> get filters => _filters;
+
   static String playlistKey(int playlistId) => 'p$playlistId';
 
   Future<void> load() async {
@@ -310,6 +328,11 @@ class LibraryFolders extends ChangeNotifier {
     }
     _sort = LibrarySort.values.asNameMap()[prefs.getString(_sortKey)] ?? _sort;
     _grid = prefs.getBool(_gridKey) ?? _grid;
+    final categories = LibraryCategory.values.asNameMap();
+    _filters = {
+      for (final name in prefs.getStringList(_filtersKey) ?? const <String>[])
+        ?categories[name],
+    };
     notifyListeners();
   }
 
@@ -329,6 +352,16 @@ class LibraryFolders extends ChangeNotifier {
     _grid = grid;
     notifyListeners();
     await (await SharedPreferences.getInstance()).setBool(_gridKey, grid);
+  }
+
+  Future<void> toggleFilter(LibraryCategory category) async {
+    _filters = _filters.contains(category)
+        ? _filters.difference({category})
+        : {..._filters, category};
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setStringList(_filtersKey, [
+      for (final c in _filters) c.name,
+    ]);
   }
 
   /// [key] (a playlist, mood or folder) was opened now.
