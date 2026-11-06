@@ -227,7 +227,9 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   Pory dnia (listened time per hour), Dekady, Języki, Kraje wykonawców, Skąd grało (shares).
   Ustawienia **→ Ustawienia**.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
-  app: 🗑 "Wyczyść historię" in the app bar (confirm dialog), then the history by day ("Dzisiaj", "Wczoraj",
+  app: 🔍 "Szukaj w ostatnich" in the app bar (as within a playlist: title, artist or album, under
+  their days; Back closes it first; "Szukaj w całej bazie" carries the query over), 🗑 "Wyczyść
+  historię" (confirm dialog), then the history by day ("Dzisiaj", "Wczoraj",
   "5 października", with the year when not this year): the songs played that day, newest first,
   each once per playlist it came from (song rows with the playing animation; ⋮ IDs `Ostatnie ›
   Utwór › Menu (⋮) › <pozycja>`, the same entries as in search). A song played from a playlist

@@ -4,6 +4,7 @@ import '../data/local_library.dart';
 import '../data/play_history.dart';
 import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
+import '../data/text_normalizer.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
@@ -11,6 +12,7 @@ import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'history_settings_screen.dart';
 import 'playlist_screen.dart';
+import 'song_search_screen.dart';
 import '../widgets/song_names.dart';
 
 const _id = 'Ostatnie';
@@ -73,6 +75,17 @@ class RecentsScreen extends StatefulWidget {
 class _RecentsScreenState extends State<RecentsScreen> {
   bool _loading = false;
 
+  /// Searching the history, as within a playlist: the app bar becomes a search field and only
+  /// matching songs are listed; Back (the arrow or the system one) closes it first.
+  LocalHistoryEntry? _searchEntry;
+  final _query = TextEditingController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -82,6 +95,109 @@ class _RecentsScreenState extends State<RecentsScreen> {
     SongCatalogScope.of(context).ensureLoaded();
   }
 
+  bool get _searching => _searchEntry != null;
+
+  void _startSearch() {
+    final entry = LocalHistoryEntry(
+      onRemove: () {
+        if (!mounted) return;
+        setState(() {
+          _searchEntry = null;
+          _query.clear();
+        });
+      },
+    );
+    ModalRoute.of(context)!.addLocalHistoryEntry(entry);
+    setState(() => _searchEntry = entry);
+  }
+
+  PreferredSizeWidget _searchBar(AppPalette palette) => AppBar(
+    backgroundColor: palette.background,
+    leading: IconButton(
+      tooltip: 'Zamknij wyszukiwanie',
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => Navigator.of(context).pop(),
+    ),
+    titleSpacing: 0,
+    title: TextField(
+      controller: _query,
+      autofocus: true,
+      textInputAction: TextInputAction.search,
+      onChanged: (_) => setState(() {}),
+      decoration: const InputDecoration(
+        hintText: 'Szukaj w ostatnich',
+        border: InputBorder.none,
+      ),
+    ),
+    actions: [
+      if (_query.text.trim().isNotEmpty)
+        SearchEverywhereButton(query: _query.text),
+      if (_query.text.isNotEmpty)
+        IconButton(
+          tooltip: 'Wyczyść',
+          icon: const Icon(Icons.close),
+          onPressed: () => setState(_query.clear),
+        ),
+    ],
+  );
+
+  /// The days' songs whose title, artist or album contain every word of the query (both
+  /// normalised like song search), under their days; a day with none left is left out.
+  Widget _searchResults(List<RecentDay> days) {
+    final catalog = SongCatalogScope.of(context);
+    final library = LocalLibraryScope.of(context);
+    final youTube = YouTubeLibraryScope.of(context);
+    final words = normalizeForSearch(_query.text)
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .toList();
+    final matching = <RecentDay>[];
+    for (final day in days) {
+      final plays = day.plays.where((play) {
+        final hit = resolveTrack(play.track, catalog, library, youTube);
+        return words.every(
+          normalizeForSearch(
+            [hit.title, hit.artistLabel, hit.album ?? ''].join(' '),
+          ).contains,
+        );
+      }).toList();
+      if (plays.isNotEmpty) matching.add((label: day.label, plays: plays));
+    }
+    if (matching.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'Brak wyników dla „${_query.text.trim()}”',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.palette.textSecondary),
+          ),
+        ),
+      );
+    }
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.only(bottom: 24),
+      children: _dayRows(matching),
+    );
+  }
+
+  List<Widget> _dayRows(List<RecentDay> days) => [
+    for (final day in days) ...[
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Text(
+          day.label,
+          style: const TextStyle(
+            fontSize: AppFontSize.section,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      for (final play in day.plays) _PlayRow(play: play),
+    ],
+  ];
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -90,44 +206,51 @@ class _RecentsScreenState extends State<RecentsScreen> {
       DateTime.now(),
     );
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: palette.background,
-        centerTitle: true,
-        title: const Text('Ostatnie'),
-        actions: [
-          IconButton(
-            tooltip: 'Wyczyść historię',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: days.isEmpty ? null : () => confirmClearHistory(context),
-          ),
-        ],
-      ),
+      appBar: _searching
+          ? _searchBar(palette)
+          : AppBar(
+              backgroundColor: palette.background,
+              centerTitle: true,
+              title: const Text('Ostatnie'),
+              actions: [
+                IconButton(
+                  tooltip: 'Szukaj w ostatnich',
+                  icon: const Icon(Icons.search),
+                  onPressed: days.isEmpty ? null : _startSearch,
+                ),
+                IconButton(
+                  tooltip: 'Wyczyść historię',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: days.isEmpty
+                      ? null
+                      : () => confirmClearHistory(context),
+                ),
+              ],
+            ),
+      // The history stays built under the search, so closing it returns to the same place.
       body: SongSelectionArea(
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 24),
+        child: IndexedStack(
+          index: _searching ? 1 : 0,
           children: [
-            if (days.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
-                child: Text(
-                  'Nic jeszcze nie odtworzono.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: palette.textSecondary),
-                ),
+            TickerMode(
+              enabled: !_searching,
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 24),
+                children: [
+                  if (days.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+                      child: Text(
+                        'Nic jeszcze nie odtworzono.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: palette.textSecondary),
+                      ),
+                    ),
+                  ..._dayRows(days),
+                ],
               ),
-            for (final day in days) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Text(
-                  day.label,
-                  style: const TextStyle(
-                    fontSize: AppFontSize.section,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              for (final play in day.plays) _PlayRow(play: play),
-            ],
+            ),
+            if (_searching) _searchResults(days),
           ],
         ),
       ),
