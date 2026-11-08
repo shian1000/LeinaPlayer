@@ -113,7 +113,9 @@ decade; `song_radio.dart`), "Pobierz" for a song or playlist (kept offline for g
 storage or a folder the user picked, as "Artist - Title" — Oszczędzanie danych › Miejsce na
 pobrane utwory, `download_files.dart`; re-encoded as MP3 256 kbps unless "Pobieraj jako MP3" is off —
 `mp3_conversion.dart`, [`local-library.md`](docs/agent-notes/local-library.md)), "Ukryj utwór"
-(phone only). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
+(phone only), scheduled music (Ja › Zaplanowane uruchomienie muzyki: once or on chosen weekdays, at a set time and volume, starting the
+app if needed and playing a song, a playlist or the last queue; Zaplanowane wyłączenie: fades the
+music out — Android's `setAlarmClock` in `ScheduledMusic.kt`, `playback/scheduled_music.dart`). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
 Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.
 Nastroje (moods): global ones from `tag.db` and the user's own (synced the same way; phone-only
 while logged out; own ones also hold songs music.db doesn't have, moved to its song once it has
@@ -259,7 +261,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
   (the queue and position saved across restarts), `Downloads` ("Pobierz": songs and playlists kept on the phone for good), `YouTubePlayback` (the user's ordered ways
-  of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) and `ListeningTracker` (the listened time of each play, from
+  of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) `ScheduledMusic` (Ja's scheduled start and stop, `scheduled_music.dart`) and `ListeningTracker` (the listened time of each play, from
   `PlayerController.positionChanges`, for the stats). Never pause between songs — see
   [`local-library.md`](docs/agent-notes/local-library.md) (Android 12+ freezes the app).
 - `lib/src/theme.dart`, `lib/src/theme_controller.dart` — themes and the appearance settings.
@@ -272,7 +274,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
   incoming YouTube/Spotify links and opening the YouTube app by package),
   `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links, "Jak odtworzyć?" for shared ones), `LinkTargets.kt`,
-  `LaterLinks.kt` (links saved for later), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `Mp3Encoder.kt` ("Pobieraj jako MP3": MediaCodec + jump3r), `DownloadService.kt` (the "Pobieranie utworów"
+  `LaterLinks.kt` (links saved for later), `ScheduledMusic.kt` (the times of a scheduled start / stop; it also moves a repeating one to its next day itself, as a stop finds no Dart running when the app is closed), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `Mp3Encoder.kt` ("Pobieraj jako MP3": MediaCodec + jump3r), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `assets/fonts/rajdhani/` — the Cyberpunk theme's font (OFL, licence in `OFL.txt`).
@@ -296,7 +298,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `PlaylistBookmarksScope`, `AppUpdatesScope`, `SavedSongsScope`, `LikedSongsScope`, `SavedSongsSyncScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
-  `PlaybackQueueScope`, `SourceSettingsScope`; plus
+  `PlaybackQueueScope`, `ScheduledMusicScope`, `SourceSettingsScope`; plus
   `YouTubeScope`, an `InheritedWidget` so tests can swap YouTube search, audio and playlist
   fetching); no
   state-management package. Settings persist via `shared_preferences`.
@@ -387,6 +389,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - No dummy elements: a feature is built or its button is left out (user's decision; the old
   `showDummy` / `Atrapa:` snackbar is gone). A `MenuSheetEntry` needs an `onTap` unless it has a
   `submenu`.
+- `MainActivity`'s overrides mustn't touch `flutterEngine` before `configureFlutterEngine`: an
+  activity restored after its process was killed gets `setFrameworkHandlesBack` from
+  FlutterActivity's `onCreate`, with no delegate yet — a crash at start (`engineConfigured`).
 - `local.db` code can't use UPSERT (`INSERT … ON CONFLICT … DO UPDATE`): Android 10's SQLite
   is 3.22, older than it. Update, then insert with `ConflictAlgorithm.ignore`
   (`Recordings._putIn`); `ConflictAlgorithm.replace` would wipe the row's other columns.
@@ -430,7 +435,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `dumpsys media_session` for the state. A new activity on the engine music kept alive (the
   user swiped the app away, or Android dropped it) is reproduced by `am stack remove <taskId>`
   (`am stack list`) while a song plays, then opening the app again — the Dart routes survive,
-  native per-activity state doesn't (Back's callback was lost that way — `MainActivity`). The
+  native per-activity state doesn't (Back's callback was lost that way — `MainActivity`). A scheduled start is tested with the app killed by
+  `am kill <package>` after Home (`am force-stop` would cancel Android's alarms too) and the screen off;
+  the time picker's dial rounds minutes to fives, and `dumpsys alarm | grep triggerTime` shows what's set. The
   Huawei has only a swipe lock: wake it (`input keyevent KEYCODE_WAKEUP`) and unlock it with
   `input swipe 540 1800 540 600 300` rather than waiting for the user. It also shows no app logs
   (`logcat -s flutter` stays empty) — diagnose there from the screen. The release build allows no

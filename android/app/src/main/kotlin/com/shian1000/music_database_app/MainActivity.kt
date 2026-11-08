@@ -17,8 +17,11 @@ import io.flutter.plugin.common.MethodChannel
 // AudioServiceActivity (a FlutterActivity) lets the media notification/background service and
 // the app share one Flutter engine.
 class MainActivity : AudioServiceActivity() {
+    private var engineConfigured = false
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        engineConfigured = true
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         // The engine outlives this activity while music plays in the background, and the queue
         // still needs NewPipe for the next song then — so the bridge lives with the engine and
@@ -36,6 +39,9 @@ class MainActivity : AudioServiceActivity() {
         if (leveling?.messenger !== messenger) {
             leveling = VolumeLevelingBridge(messenger)
         }
+        if (ScheduledMusic.bridge?.messenger !== messenger) {
+            ScheduledMusic.bridge = ScheduledMusicBridge(messenger, applicationContext)
+        }
         // Dart tells the activity it handles Back only when its routes change, so a new activity
         // on an engine that already runs Dart (the old one removed while music played) would be
         // left without the callback, and Back would close the app from any screen.
@@ -44,12 +50,17 @@ class MainActivity : AudioServiceActivity() {
 
     override fun setFrameworkHandlesBack(frameworkHandlesBack: Boolean) {
         super.setFrameworkHandlesBack(frameworkHandlesBack)
+        // Restoring the activity after its process was killed calls this from FlutterActivity's
+        // onCreate, before there's a delegate: flutterEngine would crash the app (seen when
+        // scheduled music started it).
+        if (!engineConfigured) return
         val messenger = flutterEngine?.dartExecutor?.binaryMessenger ?: return
         backHandledBy = if (frameworkHandlesBack) messenger else null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent?.action == ScheduledMusic.Kind.START.action) ScheduledMusic.showOverLockScreen(this)
         // A new activity on an engine that already runs Dart (music kept it alive) gets the
         // link pushed; on a cold start Dart asks for it once it's ready.
         if (savedInstanceState == null) links?.receive(intent)
@@ -58,6 +69,7 @@ class MainActivity : AudioServiceActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.action == ScheduledMusic.Kind.START.action) ScheduledMusic.showOverLockScreen(this)
         links?.receive(intent)
     }
 

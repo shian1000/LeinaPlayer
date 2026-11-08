@@ -7,6 +7,7 @@ import '../data/playlist_library.dart';
 import '../data/listening_log.dart';
 import '../data/listening_summary.dart';
 import '../data/song_catalog.dart';
+import '../playback/scheduled_music.dart';
 import '../theme.dart';
 import '../widgets/feature_info.dart';
 import '../widgets/scrolling_text.dart';
@@ -17,6 +18,7 @@ import 'later_links_screen.dart';
 import 'listening_stats_screen.dart';
 import 'listening_summary_screen.dart';
 import 'recents_screen.dart';
+import 'scheduled_music_screen.dart';
 import 'settings_screen.dart';
 
 /// The "Ja" tab: the profile, the MusicDatabase account, then history, "Na później"
@@ -62,6 +64,7 @@ class ProfileScreen extends StatelessWidget {
     final later = LaterLinksScope.maybeOf(context);
     final laterCount = later?.links.length ?? 0;
     final unopened = later?.unopenedCount ?? 0;
+    final scheduled = ScheduledMusicScope.maybeOf(context);
     void push(Widget screen) =>
         Navigator.of(context)
             .push(MaterialPageRoute<void>(builder: (_) => screen));
@@ -178,6 +181,20 @@ class ProfileScreen extends StatelessWidget {
             onLongPress: () =>
                 showFeatureInfo(context, FeatureInfos.listeningStats),
           ),
+          if (scheduled != null) ...[
+            _Row(
+              icon: Icons.alarm,
+              label: 'Zaplanowane uruchomienie muzyki',
+              subtitle: scheduledLabel(scheduled.timeOf(ScheduleKind.start)),
+              onTap: () => push(const ScheduledStartScreen()),
+            ),
+            _Row(
+              icon: Icons.alarm_off,
+              label: 'Zaplanowane wyłączenie',
+              subtitle: scheduledLabel(scheduled.timeOf(ScheduleKind.stop)),
+              onTap: () => push(const ScheduledStopScreen()),
+            ),
+          ],
           _Row(
             icon: Icons.settings_outlined,
             label: 'Ustawienia',

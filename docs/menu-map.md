@@ -226,6 +226,13 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   queues them), Wykonawcy and Albumy (top 10, sideways, opening the artist's / album's songs),
   Pory dnia (listened time per hour), Dekady, Języki, Kraje wykonawców, Skąd grało (shares).
   Ustawienia **→ Ustawienia**.
+- Zaplanowane uruchomienie muzyki (when, or "Wyłączone") **→** `ScheduledStartScreen`
+  (`scheduled_music_screen.dart`) — **implemented**: the time (tap: picker, which also switches it
+  on) with a switch, days to repeat on (Pn–Nd; none ticked: once), Głośność (5–100%, sets the phone's music volume and leaves it there), Co ma
+  zagrać: Utwór (→ search, a tap picks) / Playlista (→ list) / Ostatnia kolejka;
+  the app starts if it isn't running and the music plays, nothing to confirm.
+- Zaplanowane wyłączenie (when, or "Wyłączone") **→** `ScheduledStopScreen` — **implemented**: the
+  time with a switch and the same days; the music fades out and pauses.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
   app: 🔍 "Szukaj w ostatnich" in the app bar (as within a playlist: title, artist or album, under
   their days; Back closes it first; "Szukaj w całej bazie" carries the query over), 🗑 "Wyczyść

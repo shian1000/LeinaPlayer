@@ -9,6 +9,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <!-- "Pobierz": DownloadService keeps the app running while songs download. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- "Zaplanowane uruchomienie muzyki" / "Zaplanowane wyłączenie" (Ja): on time
+         (USE_EXACT_ALARM from Android 13), surviving a restart, and bringing the app up through a
+         full-screen notification. POST_NOTIFICATIONS is asked for when a start is switched on. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Reading the Wi-Fi name (Ustawienia › Źródła muzyki › Baza danych › Wi-Fi sieci lokalnej)
          to choose between the local and the remote server. Android only reveals the SSID to apps
          holding location permission; it's requested when the user taps "Użyj bieżącego
@@ -114,6 +122,12 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+        <receiver android:name=".ScheduledMusicReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
         <service android:name=".DownloadService"
             android:foregroundServiceType="dataSync"
             android:exported="false"/>
