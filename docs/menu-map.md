@@ -51,15 +51,16 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
   After the app restarts it shows the last song paused where it
   was (like the reference app); play carries on from there, with the same queue
   (`QueueSession`). ⊕ before play/pause — Dodaj do playlisty (**implemented**, the same sheet as
-  in the song's menu; an accent ✓ when the song is liked). Holding it shows four buttons just above it (`Mini odtwarzacz › Szybkie
+  in the song's menu), then ♡ — Polub (**implemented**, likes the
+  song at once, a filled accent heart when liked, tapped again to take it back). Holding it shows four buttons just above it (`Mini odtwarzacz › Szybkie
   akcje › …`), all **implemented**: Nastrój (**→ Dodaj do nastroju**), Na później / Zapisane
   (toggles "Na później"), Playlista (**→ Dodaj do playlisty**) and Więcej (**→ the song's menu**). Tapping it **→ full player** (slides up, covers the bottom bar):
   - Header: ⌄ (collapse), "Odtwarzanie z wyników wyszukiwania / „<query>” w wyszukiwarce" (the
     menu ⋮ is in the bottom row, by the thumb).
   - Big cover, title, artist, Nastrój (**implemented**: the moon, accent when the song is in a
     mood — tapping it **→ Dodaj do nastroju**; where "Polub" was), Dodaj do playlisty (⊕,
-    **implemented**: the song menu's sheet, where the song is also liked — like Spotify's, an
-    accent ✓ instead of ⊕ when it is liked).
+    **implemented**: the song menu's sheet) and ♡ — Polub (**implemented**, as on the mini player;
+    a liked song is shown by a heart everywhere, empty or full — user's rule).
   - Otwórz w YouTube (**implemented**, first in the bottom row; opens
     the song in the YouTube app from where this player is (`t=` in the link) — inside its
     YouTube playlist when it plays from an imported one, so YouTube then has the whole playlist;
@@ -843,9 +844,9 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
 
 ## Sheet "Dodaj do playlisty" (`playlist_picker.dart`)
 
-- Header with the song (or "N utworów"); "Polubione utwory" (heart cover, song count; ⊕, or an
-  accent ✓ when all these songs are liked — tapping likes them, or unlikes them when all are
-  liked; `LikedSongs`, synced with the account — the only place a song is liked, user's decision); "Nowa
+- Header with the song (or "N utworów"); "Polubione utwory" (heart cover, song count; an empty heart, or a
+  full accent one when all these songs are liked — tapping likes them, or unlikes them when all are
+  liked; `LikedSongs`, synced with the account); "Nowa
   playlista" (name dialog; a new playlist of these songs); then every saved playlist, imported ones too — tapping one puts the songs at its
   end, synced like any change (in an imported one marked as added by hand, so its next import
   keeps them — `playlists.md`). A playlist already holding all these songs has an accent ✓ (else ⊕;

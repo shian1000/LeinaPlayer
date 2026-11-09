@@ -11,6 +11,7 @@ import 'package:music_database_app/src/data/hidden_songs.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/mood_filter.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
+import 'package:music_database_app/src/data/saved_songs.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/track_ref.dart';
@@ -1011,6 +1012,46 @@ void main() {
       expect(backend.opened, ['/music/a.mp3', '/music/b.mp3', '/music/a.mp3']);
     },
   );
+
+  testWidgets('the mini player\'s heart likes the song and takes it back', (
+    tester,
+  ) async {
+    await tester.runAsync(() => queue.start([_file('a')], 0));
+    final liked = LikedSongs();
+    addTearDown(liked.dispose);
+    await tester.pumpWidget(
+      PlayerScope(
+        notifier: player,
+        child: PlaybackQueueScope(
+          notifier: queue,
+          child: LikedSongsScope(
+            notifier: liked,
+            child: MaterialApp(
+              theme: buildAppTheme(dummifyTheme),
+              home: const Scaffold(bottomNavigationBar: MiniPlayer()),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.byTooltip('Polub'));
+      await waitUntil(() => liked.contains(queue.current!));
+    });
+    await tester.pump();
+    expect(find.byIcon(Icons.favorite), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_border), findsNothing);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.byTooltip('Usuń z polubionych'));
+      await waitUntil(() => !liked.contains(queue.current!));
+    });
+    await tester.pump();
+    expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+  });
 
   test('no pause between songs (the media session keeps the app awake), '
       'only at the end of the queue', () async {

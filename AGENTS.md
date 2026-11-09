@@ -81,7 +81,7 @@ The layout follows Juxtopposed's Spotify redesign
 Biblioteka, Ja (the profile, no avatar or drawer); Home's rows arranged by the user (pin, move,
 hide, rows from Biblioteka — `home_layout.dart`); Odkrywaj — one song at a time from all of
 MusicDatabase or a mood; Biblioteka as categories, with "Polubione utwory" (liked in the
-"Dodaj do playlisty" sheet / submenu — the full player's ⊕ turns into an accent ✓, Spotify-like),
+"Dodaj do playlisty" sheet / submenu or with the players' heart — a like is always a heart, empty or full, user's rule),
 songs saved "Na później" (both `saved_songs.dart`, synced with the account —
 [ADR 0013](docs/decisions/0013-saved-songs-sync.md)) and dynamic playlists — a saved search filter
 (`smart_playlists.dart`, phone only); the full player's queue button opens the whole queue, and lyrics (looked

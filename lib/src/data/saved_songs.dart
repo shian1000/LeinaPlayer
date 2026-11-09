@@ -222,7 +222,8 @@ class SavedSongs extends StoredSongList {
   SavedSongs({super.now, super.userName}) : super('saved_songs', 'later');
 }
 
-/// Liked songs, like Spotify's "Polubione utwory": liked from the "Dodaj do playlisty" sheet.
+/// Liked songs, like Spotify's "Polubione utwory": liked from the "Dodaj do playlisty" sheet
+/// or the players' heart.
 /// Newest first (Biblioteka › Polubione utwory).
 class LikedSongs extends StoredSongList {
   LikedSongs({super.now, super.userName}) : super('liked_songs', 'liked');

@@ -223,7 +223,7 @@ Future<void> showAddToPlaylistSheet(
                       '${liked.songs.length} ${songsWord(liked.songs.length)}',
                     ),
                     trailing: Icon(
-                      all ? Icons.check_circle : Icons.add_circle_outline,
+                      all ? Icons.favorite : Icons.favorite_border,
                       color: all ? palette.accent : palette.textSecondary,
                     ),
                     onTap: () async {

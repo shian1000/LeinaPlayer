@@ -239,6 +239,9 @@ class MiniPlayer extends StatelessWidget {
                         _AddToPlaylistButton(
                           hit: PlaybackQueueScope.of(context).current,
                         ),
+                        _LikeButton(
+                          hit: PlaybackQueueScope.of(context).current,
+                        ),
                         IconButton(
                           tooltip: player.playing ? 'Pauza' : 'Odtwórz',
                           icon: Icon(
@@ -261,8 +264,7 @@ class MiniPlayer extends StatelessWidget {
   }
 }
 
-/// "Dodaj do playlisty" by the song's title; like Spotify's, an accent tick when the song is
-/// liked (liking is in the sheet it opens).
+/// "Dodaj do playlisty" by the song's title.
 class _AddToPlaylistButton extends StatelessWidget {
   const _AddToPlaylistButton({required this.hit, this.size});
 
@@ -272,20 +274,38 @@ class _AddToPlaylistButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hit = this.hit;
-    final liked =
-        hit != null &&
-        (LikedSongsScope.maybeOf(context)?.contains(hit) ?? false);
     return IconButton(
-      tooltip: liked ? 'Polubione · Dodaj do playlisty' : 'Dodaj do playlisty',
-      icon: Icon(
-        liked ? Icons.check_circle : Icons.add_circle_outline,
-        size: size,
-        color: liked ? context.palette.accent : null,
-      ),
+      tooltip: 'Dodaj do playlisty',
+      icon: Icon(Icons.add_circle_outline, size: size),
       onPressed: () {
         final entry = hit == null ? null : playlistMenuEntry(context, [hit]);
         entry?.onTap?.call();
       },
+    );
+  }
+}
+
+/// The players' heart: one tap likes the song or takes the like back.
+class _LikeButton extends StatelessWidget {
+  const _LikeButton({required this.hit, this.size});
+
+  final SearchHit? hit;
+  final double? size;
+
+  @override
+  Widget build(BuildContext context) {
+    final hit = this.hit;
+    final likedSongs = LikedSongsScope.maybeOf(context);
+    if (hit == null || likedSongs == null) return const SizedBox.shrink();
+    final liked = likedSongs.contains(hit);
+    return IconButton(
+      tooltip: liked ? 'Usuń z polubionych' : 'Polub',
+      icon: Icon(
+        liked ? Icons.favorite : Icons.favorite_border,
+        size: size,
+        color: liked ? context.palette.accent : null,
+      ),
+      onPressed: () => likedSongs.toggle(hit),
     );
   }
 }
@@ -707,6 +727,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             if (queue.current case final hit?)
                               _MoodButton(hit: hit),
                             _AddToPlaylistButton(hit: queue.current, size: 30),
+                            _LikeButton(hit: queue.current, size: 30),
                           ],
                         ),
                         const SizedBox(height: 12),
