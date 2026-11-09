@@ -136,7 +136,9 @@ class PrivacyScreen extends StatelessWidget {
           const SectionTitle('GitHub'),
           text(
             'Publiczna kopia bazy utworów (gdy żaden serwer nie odpowiada) i sprawdzanie, czy '
-            'jest nowa wersja aplikacji. Raz dziennie przy otwarciu.',
+            'jest nowa wersja aplikacji. Raz dziennie przy otwarciu. Motywy: lista i pliki tylko '
+            'w Wygląd › Pobierz motyw, oraz jednorazowo motyw wybrany, zanim stał się '
+            'pobieranym.',
           ),
           if (sync != null)
             statusOf([

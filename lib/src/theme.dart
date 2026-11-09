@@ -214,12 +214,16 @@ class AppThemeDef {
   const AppThemeDef(
     this.name,
     this.palette, {
+    String? id,
     this.fontFamily,
     this.brightness = Brightness.dark,
-  });
+  }) : id = id ?? name;
 
-  /// Shown in "Ustawienia › Wygląd" and used as the theme's id within its list (a light and a
-  /// dark theme may share a name, e.g. both variants of Dummify).
+  /// What the choice of theme is saved as; unique within the light or the dark themes.
+  final String id;
+
+  /// Shown in "Ustawienia › Wygląd" (a light and a dark theme may share a name, e.g. both
+  /// variants of Dummify).
   final String name;
   final AppPalette palette;
 
@@ -228,6 +232,33 @@ class AppThemeDef {
 
   /// Null keeps the platform default (Roboto).
   final String? fontFamily;
+
+  ThemePreview get preview => ThemePreview(
+    background: palette.background,
+    border: palette.outline ?? palette.divider,
+    colors: [
+      palette.accent,
+      palette.textPrimary,
+      palette.coverColors[0],
+      palette.coverColors[1],
+    ],
+    rounded: palette.rounded,
+  );
+}
+
+/// What a theme's small preview shows (`ThemeSwatch`), for themes on the phone and on GitHub.
+class ThemePreview {
+  const ThemePreview({
+    required this.background,
+    required this.border,
+    required this.colors,
+    required this.rounded,
+  });
+
+  final Color background;
+  final Color border;
+  final List<Color> colors;
+  final bool rounded;
 }
 
 const dummifyTheme = AppThemeDef(
@@ -262,82 +293,6 @@ const dummifyTheme = AppThemeDef(
     ],
     likedGradient: [Color(0xFF4A1BE0), Color(0xFF8FD6C7)],
   ),
-);
-
-/// Retro desktop/terminal look after "Serial Experiments Lain" fan desktops: near-black navy,
-/// cyan phosphor accents, steel-blue window chrome, monospace text, square corners.
-const lainTheme = AppThemeDef(
-  'Lain',
-  AppPalette(
-    background: Color(0xFF05080F),
-    surface: Color(0xFF0A1424),
-    surfaceHigh: Color(0xFF0E1B30),
-    chip: Color(0xFF0C1A2C),
-    accent: Color(0xFF5CD6EB),
-    onAccent: Color(0xFF02121A),
-    textPrimary: Color(0xFFCDE6F0),
-    textSecondary: Color(0xFF6E8BA6),
-    badge: Color(0xFF8FB8FF),
-    divider: Color(0xFF1C3550),
-    navBar: Color(0xFF03060B),
-    snackBackground: Color(0xFF0E2A40),
-    snackForeground: Color(0xFF9BE8F5),
-    coverColors: [
-      Color(0xFF0E3A5A),
-      Color(0xFF145E73),
-      Color(0xFF1B6E8C),
-      Color(0xFF0B2A4A),
-      Color(0xFF2A4F7A),
-      Color(0xFF12515E),
-      Color(0xFF1F3B66),
-      Color(0xFF0D4D5C),
-    ],
-    likedGradient: [Color(0xFF1E3F73), Color(0xFF5CD6EB)],
-    outline: Color(0xFF2B5B7E),
-    rounded: false,
-    panelHeaders: true,
-  ),
-  // Android's built-in monospace face, so nothing has to be bundled.
-  fontFamily: 'monospace',
-);
-
-/// After cyberpunk HUD phone wallpapers (user's Pins folder, red/cyan "cyberdeck" ones): a
-/// near-black page with a red tint, red frames and subtitles, cyan accents, cut corners with a
-/// notch, tab-like section headings and the narrow technical Rajdhani font (bundled, OFL).
-const cyberpunkTheme = AppThemeDef(
-  'Cyberpunk',
-  AppPalette(
-    background: Color(0xFF0E0A0D),
-    surface: Color(0xFF170F13),
-    surfaceHigh: Color(0xFF16191D),
-    chip: Color(0xFF1C2226),
-    accent: Color(0xFF5FE3E8),
-    onAccent: Color(0xFF051416),
-    textPrimary: Color(0xFFD8F4F5),
-    textSecondary: Color(0xFFD65A50),
-    badge: Color(0xFFE0524A),
-    divider: Color(0xFF3A1D20),
-    navBar: Color(0xFF0A0C0F),
-    snackBackground: Color(0xFF0F2A2D),
-    snackForeground: Color(0xFF8FF3F6),
-    coverColors: [
-      Color(0xFF7A2420),
-      Color(0xFF16585C),
-      Color(0xFF9E3A33),
-      Color(0xFF0F3E42),
-      Color(0xFF5A1A26),
-      Color(0xFF1F6F73),
-      Color(0xFF3B1418),
-      Color(0xFF24474F),
-    ],
-    likedGradient: [Color(0xFF8C2A2A), Color(0xFF5FE3E8)],
-    outline: Color(0xFFB8403A),
-    rounded: false,
-    chamfered: true,
-    panelHeaders: true,
-    uppercaseTitles: true,
-  ),
-  fontFamily: 'Rajdhani',
 );
 
 /// Light counterpart of Dummify: white background, near-black text, a darker green so the
@@ -377,44 +332,11 @@ const dummifyLightTheme = AppThemeDef(
   brightness: Brightness.light,
 );
 
-/// After the light Home of Juxtopposed's Spotify redesign: a soft grey page with lighter grey
-/// cards and chips, near-black text and a deep green accent.
-const redesignLightTheme = AppThemeDef(
-  'Redesign',
-  AppPalette(
-    background: Color(0xFFF2F2F0),
-    surface: Color(0xFFE9E9E6),
-    surfaceHigh: Color(0xFFDFDFDB),
-    chip: Color(0xFFE2E2DE),
-    accent: Color(0xFF138A43),
-    onAccent: Colors.white,
-    textPrimary: Color(0xFF151515),
-    textSecondary: Color(0xFF646462),
-    badge: Color(0xFF2E5BBA),
-    divider: Colors.black12,
-    navBar: Color(0xFFE9E9E6),
-    snackBackground: Color(0xFF1C1C1C),
-    snackForeground: Colors.white,
-    coverColors: [
-      Color(0xFF5B6FD6),
-      Color(0xFF2BB39B),
-      Color(0xFFE2574C),
-      Color(0xFFE5A53A),
-      Color(0xFF8E6BC8),
-      Color(0xFF3D8FD1),
-      Color(0xFFD9578C),
-      Color(0xFF4FA35A),
-    ],
-    likedGradient: [Color(0xFF5B6FD6), Color(0xFF8FD6C7)],
-  ),
-  brightness: Brightness.light,
-);
+/// Built into the app, so it always has a look; the others are downloaded (`ThemeController`).
+const lightThemes = [dummifyLightTheme];
 
-/// Themes offered under "Motyw jasny".
-const lightThemes = [dummifyLightTheme, redesignLightTheme];
-
-/// Themes offered under "Motyw ciemny".
-const darkThemes = [dummifyTheme, lainTheme, cyberpunkTheme];
+/// Built into the app, like [lightThemes].
+const darkThemes = [dummifyTheme];
 
 ThemeData buildAppTheme(AppThemeDef def) {
   final p = def.palette;
@@ -477,6 +399,7 @@ ThemeData buildAppTheme(AppThemeDef def) {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: p.snackBackground,
+      actionTextColor: p.snackForeground,
       contentTextStyle: TextStyle(
         fontFamily: def.fontFamily,
         color: p.snackForeground,

@@ -427,9 +427,12 @@ import, Wyświetlanie, Dane, Aplikacja.
 
 - Wygląd **→ Wygląd** (`appearance_screen.dart`) — **implemented**, everything applies at once
   and is remembered after restart:
-  - Motyw jasny **→ list of light themes** (Dummify, Redesign) — used while dark mode is off.
-  - Motyw ciemny **→ list of dark themes** (Dummify, Lain — the default, Cyberpunk) — used while dark mode
+  - Motyw jasny **→ list of light themes** (Dummify and downloaded ones) — used while dark mode is off.
+  - Motyw ciemny **→ list of dark themes** (Dummify — the default — and downloaded ones) — used while dark mode
     is on.
+  - Pobierz motyw **→ theme browser** (`theme_browser_screen.dart`) — the themes on GitHub with a
+    colour preview: download, update (when GitHub has a newer version), remove; after a download
+    a note with "Użyj" switches to it.
   - "Przełącz na tryb ciemny" — switch; off = light theme, on = dark theme. Greyed out (showing
     the system's current mode) while the next switch is on.
   - "Systemowe przełączanie trybu ciemnego" — switch; when on, light/dark follows the phone's

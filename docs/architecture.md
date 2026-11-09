@@ -11,7 +11,7 @@ Context menus are modal bottom sheets built by `showMenuSheet()` (`lib/src/widge
 on the root navigator. There are no dummy leaves: an element not built is left out.
 
 Theming: every colour, corner style and font comes from the active theme (`AppPalette` in
-`lib/src/theme.dart`, read via `context.palette`); the chosen light/dark themes and the dark-mode
+`lib/src/theme.dart` or downloaded, read via `context.palette`); the chosen light/dark themes and the dark-mode
 settings live in a `ThemeController` (`lib/src/theme_controller.dart`) above `MaterialApp`,
 persisted in `shared_preferences`. See
 [`agent-notes/theming.md`](agent-notes/theming.md).

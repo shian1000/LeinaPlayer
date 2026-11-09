@@ -162,7 +162,7 @@ class UserBackup extends ChangeNotifier {
   }
 
   /// What's restored besides `local.db` and the settings, as folders of the app's storage.
-  static const _folders = ['outbox', 'custom_covers'];
+  static const _folders = ['outbox', 'custom_covers', 'theme_fonts'];
 
   static Future<void> _copyDatabase(Database db, File to) async {
     // A WAL file's changes go into the database first (no-op in the default journal mode).

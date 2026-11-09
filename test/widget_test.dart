@@ -41,11 +41,11 @@ void main() {
     expect(versionLabel('1.0.0', '', ''), '1.0.0');
   });
 
-  test('Lain is the dark theme until the user picks another', () async {
+  test('Dummify is the dark theme on a new install', () async {
     SharedPreferences.setMockInitialValues({});
     final themes = ThemeController();
     await themes.load();
-    expect(themes.dark, same(lainTheme));
+    expect(themes.dark, same(dummifyTheme));
   });
 
   for (final gitHub in [true, false]) {
@@ -399,14 +399,6 @@ void main() {
               .extension<AppPalette>()!;
       expect(activePalette(), same(dummifyTheme.palette));
 
-      await tester.tap(find.text('Motyw ciemny'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Lain'));
-      await tester.pumpAndSettle();
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-      expect(activePalette(), same(lainTheme.palette));
-
       await tester.tap(find.text('Przełącz na tryb ciemny'));
       await tester.pumpAndSettle();
       expect(activePalette(), same(dummifyLightTheme.palette));
@@ -422,10 +414,9 @@ void main() {
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       await tester.pumpAndSettle();
-      expect(activePalette(), same(lainTheme.palette));
+      expect(activePalette(), same(dummifyTheme.palette));
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('appearance.dark_theme'), 'Lain');
       expect(prefs.getBool('appearance.dark_mode'), isFalse);
       expect(prefs.getBool('appearance.follow_system'), isTrue);
     },

@@ -24,7 +24,8 @@ Current state: navigation and menus are modelled on the Spotify Android app. No 
 dummy (the old `Atrapa: <ID>` snackbar) any more — what couldn't be built was removed (user's
 decision, 2026-10-16); [`docs/menu-map.md`](docs/menu-map.md) lists every element. Home's
 recommendation rows come from the listening stats and music.db (`home_recommendations.dart`). Real so
-far: themes (Ustawienia › Wygląd), downloading MusicDatabase's `music.db` / `tag.db` from a remote
+far: themes (Ustawienia › Wygląd; only Dummify is built in, the others are downloaded from the
+`shian1000/LeinaThemes` repository with "Pobierz motyw" — [ADR 0016](docs/decisions/0016-downloadable-themes.md)), downloading MusicDatabase's `music.db` / `tag.db` from a remote
 or home-network address ([ADR 0002](docs/decisions/0002-database-download.md)) or, with no server
 answering, from a GitHub Release (`shian1000/LeinaMusicDatabase`; a fresh install's first start asks
 whether to use it — `first_run_screen.dart`, shown by `AppShell`), outbox requests
@@ -264,7 +265,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) `ScheduledMusic` (Ja's scheduled start and stop, `scheduled_music.dart`), `InterruptedPlayers` (what a phone call paused and whether to play on after it) and `ListeningTracker` (the listened time of each play, from
   `PlayerController.positionChanges`, for the stats). Never pause between songs — see
   [`local-library.md`](docs/agent-notes/local-library.md) (Android 12+ freezes the app).
-- `lib/src/theme.dart`, `lib/src/theme_controller.dart` — themes and the appearance settings.
+- `lib/src/theme.dart`, `lib/src/theme_controller.dart` — the built-in theme and the appearance
+  settings, incl. downloaded themes; `lib/src/data/theme_repository.dart` — the theme file format
+  and fetching from GitHub; `screens/theme_browser_screen.dart` — "Pobierz motyw".
 - `test/` — widget/unit tests, mirrors `lib/`; `test/support/` holds shared test helpers.
 - `tool/` — scripts run on the computer: `build_release_apk.sh` and `build_info.sh` (the numbered release build), `prepare_release.sh` (a GitHub release's APK and tag), `youtube_match_benchmark.dart`, `generate_icons.py`
   (draws the app icon and writes every Android/iOS size — rerun it instead of editing the PNGs).
@@ -277,7 +280,6 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `LaterLinks.kt` (links saved for later), `ScheduledMusic.kt` (the times of a scheduled start / stop; it also moves a repeating one to its next day itself, as a stop finds no Dart running when the app is closed), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `Mp3Encoder.kt` ("Pobieraj jako MP3": MediaCodec + jump3r), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
-- `assets/fonts/rajdhani/` — the Cyberpunk theme's font (OFL, licence in `OFL.txt`).
 - `third_party/audio_service/` — a patched copy of audio_service 0.18.19 (`dependency_overrides`
   in `pubspec.yaml`): without the patch the notification's and lock screen's buttons die for
   good once Android stops the service while the app's engine lives on (seen on the Pixel after
@@ -467,7 +469,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 
 ## Topic notes (`docs/agent-notes/`)
 
-- [`theming.md`](docs/agent-notes/theming.md) — themes (Dummify, Lain, Cyberpunk), `context.palette`, how to add
+- [`theming.md`](docs/agent-notes/theming.md) — themes (Dummify built in, the rest downloaded from `LeinaThemes`), `context.palette`, how to add
   one.
 - [`local-library.md`](docs/agent-notes/local-library.md) — phone music scan, matching files to
   MusicDatabase (tags first — user's decision), `local.db`, search availability (incl. YouTube

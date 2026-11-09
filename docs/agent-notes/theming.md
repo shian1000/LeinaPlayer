@@ -1,7 +1,13 @@
 # Theming
 
-- A theme is an `AppThemeDef` in `lib/src/theme.dart`: a name, an `AppPalette` and an optional
-  `fontFamily`. `buildAppTheme()` turns it into `ThemeData` and attaches the palette as a
+- A theme is an `AppThemeDef`: a name, an `AppPalette` and an optional `fontFamily`. Only Dummify
+  (dark and light) is built in (`lib/src/theme.dart`), so the app always has a look; the rest are
+  downloaded ([ADR 0016](../decisions/0016-downloadable-themes.md)).
+- A downloaded theme's `theme.json` is kept whole in `shared_preferences`
+  (`appearance.downloaded_themes`, so it's read before the first frame and is in the backup), its
+  fonts in `<support>/theme_fonts/<id>__<file>`, loaded with `FontLoader` when the theme is used.
+  It's only data (`ThemeFile.parse`, `data/theme_repository.dart`): a new look a theme can't get
+  from `AppPalette`'s switches needs an app change and a higher `format`. `buildAppTheme()` turns it into `ThemeData` and attaches the palette as a
   `ThemeExtension`.
 - Screens never hard-code colours, corner radii or pill/stadium/circle shapes. They use
   `context.palette` (`accent`, `textSecondary`, `colorForSeed()`, `radius()`, `pillShape`,
@@ -22,6 +28,10 @@
 
 ## Themes
 
+Dummify's two variants are here; Lain, Cyberpunk and Redesign live in the
+`shian1000/LeinaThemes` repository, with the ids that were their saved names (a phone that had
+one picked downloads it by itself on start, showing Dummify until then — `_restoreMissing`).
+
 - **Dummify** (dark) — modelled on the reference app (black/grey, green accent, rounded).
 - **Dummify** (light, `dummifyLightTheme`) — white/light grey with near-black text and a darker
   green accent (`#14A04A`, readable as text on white).
@@ -40,16 +50,16 @@
   `radius()` (covers) stays square. Section headings are a red tab with a cut corner and a line
   to the edge; `uppercaseTitles` puts tab titles in capitals (song, artist and playlist names
   keep their spelling — user's choice; AppBar titles aren't uppercased). Font: Rajdhani
-  (`assets/fonts/rajdhani/`, SIL OFL, its licence registered in `main()` for Licencje
-  bibliotek); it has Latin Extended but no Cyrillic, which falls back to the system font. The
+  (in the theme's folder of `LeinaThemes`, SIL OFL, its licence shown in Licencje bibliotek through
+  `ThemeController.licenses`); it has Latin Extended but no Cyrillic, which falls back to the system font. The
   native "Otwórz w…" sheet only knows `monospace`, so there it uses the system font.
 
 ## Adding a theme
 
-1. Add a `const AppThemeDef(...)` in `theme.dart` and append it to `darkThemes`, or — with
-   `brightness: Brightness.light` — to `lightThemes`.
+1. In `LeinaThemes`, add `themes/<id>/theme.json` (and fonts with their licence beside it) and
+   an entry in `index.json`; raise `version` on every change, so phones offer the update.
 2. Fill every palette field (`rounded`, `chamfered`, `panelHeaders`, `uppercaseTitles` are
    optional switches); `coverColors` needs at least two entries (the picker previews the
-   first two).
+   first two). Colours are `#RRGGBB` or `#AARRGGBB`.
 3. Check the Wygląd picker preview and the main screens on the phone; wide fonts may need
    `FittedBox`/ellipsis in tight spots (see the quick tiles in `settings_screen.dart`).

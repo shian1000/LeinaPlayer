@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import '../theme_controller.dart';
+import '../widgets/theme_swatch.dart';
 import 'cover_filter_screen.dart';
+import 'theme_browser_screen.dart';
 
 /// "Ustawienia › Wygląd". A light and a dark theme are chosen separately; the two switches
 /// decide which of them is shown — by hand ("Przełącz na tryb ciemny") or following the phone's
@@ -44,6 +46,16 @@ class AppearanceScreen extends StatelessWidget {
             subtitle: Text(themes.dark.name),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _open(context, dark: true),
+          ),
+          ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('Pobierz motyw'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ThemeBrowserScreen(),
+              ),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.filter_vintage_outlined),
@@ -105,7 +117,7 @@ class _ThemeListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final controller = ThemeScope.of(context);
-    final themes = dark ? darkThemes : lightThemes;
+    final themes = dark ? controller.availableDark : controller.availableLight;
     final selected = dark ? controller.dark : controller.light;
 
     return Scaffold(
@@ -118,13 +130,13 @@ class _ThemeListScreen extends StatelessWidget {
         children: [
           for (final theme in themes)
             ListTile(
-              leading: _PaletteSwatch(theme.palette),
+              leading: ThemeSwatch(theme.preview),
               title: Text(theme.name),
               trailing: Icon(
-                identical(theme, selected)
+                theme.id == selected.id
                     ? Icons.radio_button_checked
                     : Icons.radio_button_unchecked,
-                color: identical(theme, selected)
+                color: theme.id == selected.id
                     ? palette.accent
                     : palette.textSecondary,
               ),
@@ -143,47 +155,6 @@ class _ThemeListScreen extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Small preview of a theme: background with accent, text and two artwork colours.
-class _PaletteSwatch extends StatelessWidget {
-  const _PaletteSwatch(this.preview);
-
-  final AppPalette preview;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = [
-      preview.accent,
-      preview.textPrimary,
-      preview.coverColors[0],
-      preview.coverColors[1],
-    ];
-    return Container(
-      width: 56,
-      height: 40,
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: preview.background,
-        border: Border.all(color: preview.outline ?? preview.divider),
-        borderRadius: preview.radius(6),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          for (final color in colors)
-            Container(
-              width: 9,
-              height: 28,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: preview.radius(2),
-              ),
-            ),
         ],
       ),
     );
