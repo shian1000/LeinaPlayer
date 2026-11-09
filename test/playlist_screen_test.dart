@@ -617,6 +617,43 @@ void main() {
     expect(find.text('Drugi'), findsOneWidget);
   });
 
+  testWidgets('taking a song out leaves the list where it was, not at the '
+      'bookmark', (tester) async {
+    final songs = [
+      for (var i = 0; i < 60; i++)
+        SearchHit.phoneOnly(
+          LocalSong(
+            id: i + 1,
+            filePath: '/m/$i.mp3',
+            title: 'Utwór $i',
+            pending: true,
+          ),
+        ),
+    ];
+    await pumpLibrary(tester, before: () => playlists.create('Długa', songs));
+    final id = playlists.playlists.single.id;
+    await tester.runAsync(() => bookmarks.record(id, 30, songs[30]));
+    await tester.tap(find.text('Długa'));
+    await settle(tester, until: find.text('Utwór 30'));
+
+    // Back near the top, away from the bookmark the opening jumped to.
+    await tester.drag(find.text('Utwór 30'), const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(SongTile).first, const Offset(0, -200));
+    await tester.pumpAndSettle();
+    final anchor = find.text('Utwór 2');
+    final before = tester.getTopLeft(anchor).dy;
+
+    await tester.runAsync(() async {
+      final tracks = await playlists.tracks(id);
+      await playlists.removeTrack(id, tracks[4].position);
+    });
+    await settle(tester, until: find.text('59 utworów'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(anchor).dy, before);
+  });
+
   testWidgets('an imported playlist can be sorted and added to, not edited', (
     tester,
   ) async {

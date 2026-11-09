@@ -158,6 +158,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Future<void> _load() async {
     final saved = _saved;
     if (saved == null) return _fetch();
+    // Only on opening: a reload (a song taken out, an edit) leaves the list where the user is.
+    final opening = _ownOrder == null;
     final library = PlaylistLibraryScope.of(context);
     final tracks = await library.tracks(saved.id);
     final prefs = await SharedPreferences.getInstance();
@@ -171,7 +173,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       _ownOrder = tracks;
       _tracks = _sorted(tracks);
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    if (opening) WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
   }
 
   static String _sortKey(PlaylistSummary playlist) =>
