@@ -286,9 +286,10 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   void _updateNotificationNames() =>
       widget.mediaSession?.latinNames = _themeController.latinNames;
 
-  late final _albumCovers = AlbumCovers(
+  late final AlbumCovers _albumCovers = AlbumCovers(
     _localLibrary.database,
     _sourceSettings,
+    findVideoId: (hit) async => (await _trackPlayer.pickVideo(hit))?.id,
   );
   final _customCovers = CustomCovers();
   late final Future<void> _coversLoaded;

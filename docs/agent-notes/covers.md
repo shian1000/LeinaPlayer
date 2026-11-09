@@ -17,11 +17,16 @@ Once it has them, the "Serwer" source (now a dummy) should read them, keyed on `
   (`SINGLES_ALBUM`), not an album; album tags holding a YouTube URL are ignored too.
 - **Matching** iTunes/Deezer results: the title must equal the album (or start with it + a word:
   "Karma (Remastered)"; " - Single"/" - EP" dropped) and the artist must equal one of the
-  result's artists split on &, feat., x, i… ("Hey" ≠ "Hey Violet"). No match = no cover rather
-  than a wrong one.
+  result's artists split on &, feat., x, i… ("Hey" ≠ "Hey Violet"), a group's suffix aside
+  ("Adam Baldych Quartet" = "Adam Baldych"). No match = no cover rather than a wrong one.
+- **Video search, the last resort** (`_fromVideoSearch`): a music.db song no source has a cover
+  for, with no known video and no "N/A" in music.db, is searched on YouTube by the matcher
+  (`TrackPlayer.pickVideo`, one per 4 s) if the YouTube source and search are on. Its thumbnail is kept in `cover_lookups` under
+  `video:artist|title`, for the cover only: `findVideo`'s match and outbox suggestion would fill
+  up from merely scrolling a list.
 - **Rate limits**: iTunes allows ~20 searches/min, so it's asked at most every 3 s; Deezer every
-  150 ms. Queues run newest first and drop requests whose row scrolled away (`wanted`). A source
-  that errors (offline, 403, Deezer's quota error object) is skipped for a minute and nothing is
+  150 ms. Queues run newest first and drop requests whose row scrolled away (`wanted`; a shared lookup or
+  download stays while any row asking for it wants it — `_share`). A source that errors (offline, 403, Deezer's quota error object) is skipped for a minute and nothing is
   remembered.
 - **Persistence** (`local.db` v5): `cover_lookups` — a source's answer per lookup key ("none" is
   retried after 30 days); `cover_cache` + `<support dir>/cover_cache/` — downloaded images by URL,

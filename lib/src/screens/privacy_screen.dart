@@ -226,8 +226,9 @@ class PrivacyScreen extends StatelessWidget {
           const SectionTitle('Okładki: iTunes, Deezer, miniatury YouTube'),
           text(
             'Okładki albumów, których nie ma w pliku na telefonie. Serwisy dostają wykonawcę '
-            'i album (albo tytuł) lub identyfikator filmu; znaleziona okładka zostaje w pamięci '
-            'podręcznej.',
+            'i album (albo tytuł) lub identyfikator filmu; utwór z bazy bez linku i bez okładki '
+            'jest też szukany na YouTube po wykonawcy i tytule. Znaleziona okładka zostaje w '
+            'pamięci podręcznej.',
           ),
           if (settings != null)
             statusOf([

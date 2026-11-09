@@ -418,18 +418,24 @@ class TrackPlayer {
     );
   }
 
-  /// The best video for [hit], remembered so the next play uses it (or its cached audio) without
-  /// searching again, and the icon turns full; a MusicDatabase song's video also goes to the
-  /// outbox as a suggestion. Finding none is remembered too ([YouTubeLibrary.saveNotFound]).
-  Future<YouTubeVideo?> findVideo(SearchHit hit) async {
+  /// The best video YouTube search has for [hit]; nothing is remembered.
+  Future<YouTubeVideo?> pickVideo(SearchHit hit) async {
     final target = hit.youTubeTarget;
     final mainSong = hit.mainSong;
-    final video = pickYouTubeVideo(target, [
+    return pickYouTubeVideo(target, [
       for (final v in await youTubeSearch.search(target.query, settings))
         if (!youTubeLibrary.isVideoRemoved(v.id) &&
             !(mainSong != null && youTubeLibrary.isWrongFor(mainSong.id, v.id)))
           v,
     ]);
+  }
+
+  /// The best video for [hit], remembered so the next play uses it (or its cached audio) without
+  /// searching again, and the icon turns full; a MusicDatabase song's video also goes to the
+  /// outbox as a suggestion. Finding none is remembered too ([YouTubeLibrary.saveNotFound]).
+  Future<YouTubeVideo?> findVideo(SearchHit hit) async {
+    final mainSong = hit.mainSong;
+    final video = await pickVideo(hit);
     if (video != null) {
       await (mainSong != null
           ? youTubeLibrary.saveMatch(mainSong.id, video)

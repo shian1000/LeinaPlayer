@@ -19,7 +19,7 @@ class _CoverSourcesScreenState extends State<CoverSourcesScreen> {
     CoverSource.file => 'Okładka zapisana w pliku muzycznym na telefonie',
     CoverSource.itunes => 'Wyszukiwanie albumu w iTunes',
     CoverSource.deezer => 'Wyszukiwanie albumu w serwisie Deezer',
-    CoverSource.youtube => 'Miniatura filmu, przycięta do kwadratu — przy teledyskach to kadr z filmu',
+    CoverSource.youtube => 'Miniatura filmu, przycięta do kwadratu — przy teledyskach to kadr z filmu. Utworu z bazy bez linku i okładki szuka na YouTube',
   };
 
   IconData _icon(CoverSource s) => switch (s) {

@@ -15,6 +15,7 @@ import '../widgets/cover_filters.dart';
 import 'combined_search.dart';
 import 'database_sync.dart' show readCurrentWifiIp;
 import 'local_library.dart';
+import 'song_catalog.dart';
 import 'source_settings.dart';
 import 'text_normalizer.dart';
 
@@ -29,6 +30,7 @@ class CoverRequest {
     this.filePath,
     required this.seed,
     this.searchable = true,
+    this.videoSearch,
   }) : album = realAlbum(album);
 
   factory CoverRequest.of(SearchHit hit) => CoverRequest(
@@ -38,6 +40,10 @@ class CoverRequest {
     videoId: hit.youtubeVideoId ?? hit.playlistVideoId,
     filePath: hit.phoneFiles.firstOrNull?.filePath,
     seed: hit.coverSeed,
+    videoSearch:
+        hit.mainSong?.youTube == YouTubeLink.unknown && !hit.notFoundOnYouTube
+        ? hit
+        : null,
   );
 
   factory CoverRequest.ofFile(LocalSong song) => CoverRequest(
@@ -65,6 +71,10 @@ class CoverRequest {
   /// song title.
   final bool searchable;
 
+  /// The MusicDatabase song to look for on YouTube when no source has a cover; `null` unless
+  /// music.db leaves its video open (its "N/A" says there is none).
+  final SearchHit? videoSearch;
+
   /// The same song, now known to play from [id].
   CoverRequest withVideo(String id) => id == videoId
       ? this
@@ -76,6 +86,7 @@ class CoverRequest {
           filePath: filePath,
           seed: seed,
           searchable: searchable,
+          videoSearch: videoSearch,
         );
 
   /// What iTunes/Deezer are asked about: the album, or the song when there's none. A cover
@@ -83,6 +94,10 @@ class CoverRequest {
   late final String lookupKey = album != null
       ? 'album:${normalizeForSearch(artist)}|${normalizeForSearch(album)}'
       : 'song:${normalizeForSearch(artist)}|${normalizeForSearch(title)}';
+
+  /// A video found for a cover is the song's, unlike an album's cover.
+  late final String videoLookupKey =
+      'video:${normalizeForSearch(artist)}|${normalizeForSearch(title)}';
 
   /// Requests with the same identity get the same cover.
   late final String identity = '$lookupKey|$videoId|$filePath|$searchable';
@@ -107,6 +122,9 @@ class CoverUrls {
 
 typedef GetJson = Future<Object?> Function(Uri uri);
 
+/// The video YouTube search picks for a song; `null` when there's no sure match.
+typedef FindVideoId = Future<String?> Function(SearchHit hit);
+
 /// Image bytes, `null` for 404 (e.g. a video without a high-resolution thumbnail).
 typedef GetBytes = Future<Uint8List?> Function(Uri uri);
 
@@ -129,6 +147,7 @@ class AlbumCovers extends ChangeNotifier {
     GetBytes? getBytes,
     Future<bool> Function()? onWifi,
     Future<Uint8List?> Function(String path)? readEmbedded,
+    this._findVideoId,
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
        _now = now ?? DateTime.now,
        _getJson = getJson ?? _httpGetJson,
@@ -147,6 +166,7 @@ class AlbumCovers extends ChangeNotifier {
   final GetBytes _getBytes;
   final Future<bool> Function() _onWifi;
   final Future<Uint8List?> Function(String path) _readEmbedded;
+  final FindVideoId? _findVideoId;
 
   static const _retryMissingAfter = Duration(days: 30);
 
@@ -156,8 +176,8 @@ class AlbumCovers extends ChangeNotifier {
 
   final _lookups = <String, _Lookup>{};
   final _cache = <String, _CacheEntry>{};
-  final _pendingLookups = <String, Future<_Lookup?>>{};
-  final _pendingImages = <String, Future<File?>>{};
+  final _pendingLookups = <String, _Shared<_Lookup?>>{};
+  final _pendingImages = <String, _Shared<File?>>{};
 
   /// What [resolve] last found per song and size, so a newly built cover shows at once instead
   /// of a frame of placeholder while it's worked out again.
@@ -171,6 +191,9 @@ class AlbumCovers extends ChangeNotifier {
   /// iTunes allows about 20 searches a minute.
   final _itunes = _Throttle(const Duration(seconds: 3));
   final _deezer = _Throttle(const Duration(milliseconds: 150));
+
+  /// Scrolling a long list mustn't look like a scraper to YouTube.
+  final _youtube = _Throttle(const Duration(seconds: 4));
   final _downloads = _Throttle(Duration.zero, parallel: 4);
 
   /// A source that just failed (offline, rate limit) is skipped for a while.
@@ -275,8 +298,53 @@ class AlbumCovers extends ChangeNotifier {
         debugPrint('Cover from ${source.name} failed: $e');
       }
     }
-    return null;
+    try {
+      return await _fromVideoSearch(request, large, stillWanted);
+    } catch (e) {
+      debugPrint('Cover from a video search failed: $e');
+      return null;
+    }
   }
+
+  /// The last resort, after every source: a search costs far more than a lookup. What it finds
+  /// serves the cover only — unlike playing, it's no match for the song and goes to no outbox,
+  /// or scrolling a list would fill them.
+  Future<ImageProvider?> _fromVideoSearch(
+    CoverRequest request,
+    bool large,
+    bool Function() wanted,
+  ) async {
+    if (_findVideoId == null ||
+        request.videoSearch == null ||
+        request.videoId != null ||
+        !_settings.youTubeSearchEnabled ||
+        !_settings.activeCoverSources.contains(CoverSource.youtube) ||
+        !wanted()) {
+      return null;
+    }
+    final lookup = await _lookup(
+      CoverSource.youtube,
+      request,
+      wanted,
+      coverKey: request.videoLookupKey,
+    );
+    final urls = lookup?.urls;
+    return urls == null ? null : _thumbnail(urls, large, wanted);
+  }
+
+  static CoverUrls _thumbnailUrls(String videoId) => CoverUrls(
+    'https://i.ytimg.com/vi/$videoId/mqdefault.jpg',
+    'https://i.ytimg.com/vi/$videoId/maxresdefault.jpg',
+  );
+
+  // hqdefault/sddefault are 4:3 with black bars, so the fallback is the small one.
+  Future<ImageProvider?> _thumbnail(
+    CoverUrls urls,
+    bool large,
+    bool Function() wanted,
+  ) async => large
+      ? await _image(urls.large, wanted) ?? await _image(urls.small, wanted)
+      : _image(urls.small, wanted);
 
   Future<ImageProvider?> _from(
     CoverSource source,
@@ -301,15 +369,7 @@ class AlbumCovers extends ChangeNotifier {
       case CoverSource.youtube:
         final id = request.videoId;
         if (id == null) return null;
-        final small = 'https://i.ytimg.com/vi/$id/mqdefault.jpg';
-        // hqdefault/sddefault are 4:3 with black bars, so the fallback is the small one.
-        return large
-            ? await _image(
-                    'https://i.ytimg.com/vi/$id/maxresdefault.jpg',
-                    wanted,
-                  ) ??
-                  await _image(small, wanted)
-            : _image(small, wanted);
+        return _thumbnail(_thumbnailUrls(id), large, wanted);
     }
   }
 
@@ -332,38 +392,48 @@ class AlbumCovers extends ChangeNotifier {
   Future<_Lookup?> _lookup(
     CoverSource source,
     CoverRequest request,
-    bool Function() wanted,
-  ) {
-    final key = '${request.lookupKey}|${source.name}';
+    bool Function() wanted, {
+    String? coverKey,
+  }) {
+    final lookupKey = coverKey ?? request.lookupKey;
+    final key = '$lookupKey|${source.name}';
     final known = _lookups[key];
     if (known != null &&
         (known.urls != null ||
             _now().difference(known.checkedAt) < _retryMissingAfter)) {
       return Future.value(known);
     }
-    return _pendingLookups[key] ??= _askSource(source, request, key, wanted)
-        .whenComplete(() {
-          // Not `=> remove(key)`: that returns this very future, which would then wait on itself.
-          _pendingLookups.remove(key);
-        });
+    return _share(
+      _pendingLookups,
+      key,
+      wanted,
+      (wanted) => _askSource(source, request, lookupKey, key, wanted),
+    );
   }
 
   Future<_Lookup?> _askSource(
     CoverSource source,
     CoverRequest request,
+    String lookupKey,
     String key,
     bool Function() wanted,
   ) async {
     final paused = _pausedUntil[source];
     if (paused != null && _now().isBefore(paused)) return null;
     if (!await _networkAllowed()) return null;
-    final throttle = source == CoverSource.itunes ? _itunes : _deezer;
+    final throttle = switch (source) {
+      CoverSource.itunes => _itunes,
+      CoverSource.deezer => _deezer,
+      _ => _youtube,
+    };
     final ({CoverUrls? urls})? answer;
     try {
       answer = await throttle.run(() async {
-        final urls = source == CoverSource.itunes
-            ? await lookUpItunes(request, _getJson)
-            : await lookUpDeezer(request, _getJson);
+        final urls = await switch (source) {
+          CoverSource.itunes => lookUpItunes(request, _getJson),
+          CoverSource.deezer => lookUpDeezer(request, _getJson),
+          _ => _searchedThumbnail(request),
+        };
         return (urls: urls);
       }, wanted);
     } catch (e) {
@@ -375,13 +445,38 @@ class AlbumCovers extends ChangeNotifier {
     final lookup = _Lookup(answer.urls, _now());
     _lookups[key] = lookup;
     await (await _database()).insert('cover_lookups', {
-      'cover_key': request.lookupKey,
+      'cover_key': lookupKey,
       'source': source.name,
       'small_url': answer.urls?.small,
       'large_url': answer.urls?.large,
       'checked_at': lookup.checkedAt.millisecondsSinceEpoch,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     return lookup;
+  }
+
+  /// One [work] per [key] for everyone asking, wanted as long as any of them wants it: a row
+  /// that was rebuilt mustn't drop the work the new row is waiting for.
+  Future<T> _share<T>(
+    Map<String, _Shared<T>> pending,
+    String key,
+    bool Function() wanted,
+    Future<T> Function(bool Function() wanted) work,
+  ) {
+    final running = pending[key];
+    if (running != null) {
+      running.askers.add(wanted);
+      return running.future;
+    }
+    final shared = _Shared<T>()..askers.add(wanted);
+    pending[key] = shared;
+    return shared.future = work(shared.wanted).whenComplete(() {
+      pending.remove(key);
+    });
+  }
+
+  Future<CoverUrls?> _searchedThumbnail(CoverRequest request) async {
+    final id = await _findVideoId!(request.videoSearch!);
+    return id == null ? null : _thumbnailUrls(id);
   }
 
   Future<ImageProvider?> _image(String url, bool Function() wanted) async {
@@ -393,11 +488,13 @@ class AlbumCovers extends ChangeNotifier {
       }
       await _forget(url);
     }
-    if (!await _networkAllowed()) return null;
-    final file = await (_pendingImages[url] ??= _download(url, wanted)
-        .whenComplete(() {
-          _pendingImages.remove(url);
-        }));
+    if (!await _networkAllowed() || !wanted()) return null;
+    final file = await _share(
+      _pendingImages,
+      url,
+      wanted,
+      (wanted) => _download(url, wanted),
+    );
     return file == null ? null : FileImage(file);
   }
 
@@ -629,6 +726,13 @@ class AlbumCovers extends ChangeNotifier {
       await readCurrentWifiIp() != null;
 }
 
+class _Shared<T> {
+  final askers = <bool Function()>[];
+  late Future<T> future;
+
+  bool wanted() => askers.any((asker) => asker());
+}
+
 class _Lookup {
   const _Lookup(this.urls, this.checkedAt);
 
@@ -811,12 +915,15 @@ bool sameTitle(String a, String b) {
   return na == nb || na.startsWith('$nb ') || nb.startsWith('$na ');
 }
 
-/// "Hey" matches "Hey & Kortez" or "Kortez, Hey", not "Hey Violet".
+/// "Hey" matches "Hey & Kortez" or "Kortez, Hey", not "Hey Violet"; "Adam Baldych" also matches
+/// "Adam Baldych Quartet", as shops often credit a leader's group to the leader.
 bool sameArtist(String a, String b) {
   final na = normalizeForSearch(a);
   final nb = normalizeForSearch(b);
   if (na.isEmpty || nb.isEmpty) return false;
   return na == nb ||
+      na.replaceFirst(_ensembleSuffix, '') ==
+          nb.replaceFirst(_ensembleSuffix, '') ||
       _artistParts(a).contains(nb) ||
       _artistParts(b).contains(na);
 }
@@ -824,6 +931,11 @@ bool sameArtist(String a, String b) {
 final _artistSeparators = RegExp(
   r'\s*(?:&|,|;|/|\+|\bfeat\b\.?|\bft\b\.?|\bfeaturing\b|\bx\b|\band\b|\bi\b)\s*',
   caseSensitive: false,
+);
+
+final _ensembleSuffix = RegExp(
+  r' (?:trio|quartet|quintet|sextet|septet|octet|band|orchestra|ensemble|'
+  r'kwartet|kwintet|sekstet|oktet|orkiestra)$',
 );
 
 Set<String> _artistParts(String name) => {

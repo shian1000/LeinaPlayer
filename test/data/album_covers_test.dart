@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -5,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/album_covers.dart';
+import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
@@ -239,6 +241,91 @@ void main() {
     ]);
   });
 
+  group('searching YouTube for a cover', () {
+    late List<SearchHit> searched;
+    late String? found;
+
+    AlbumCovers searching() => AlbumCovers(
+      local.database,
+      settings,
+      storageRoot: () async => root,
+      getJson: (uri) async => answer(uri),
+      getBytes: (uri) async {
+        downloaded.add(uri);
+        return Uint8List(imageSize);
+      },
+      onWifi: () async => onWifi,
+      readEmbedded: (_) async => null,
+      findVideoId: (hit) async {
+        searched.add(hit);
+        return found;
+      },
+    );
+
+    SearchHit dbSong({String? videoId}) => SearchHit.main(
+      CatalogSong(
+        id: 1,
+        title: 'Chill',
+        artistLabel: 'Davie',
+        youtubeVideoId: videoId,
+      ),
+      const [],
+    );
+
+    setUp(() {
+      searched = [];
+      found = 'found';
+    });
+
+    test(
+      'with no cover anywhere, the found video\'s thumbnail is used, once',
+      () async {
+        final covers = searching();
+        final request = CoverRequest.of(dbSong());
+        expect(await covers.resolve(request), isA<FileImage>());
+        expect(downloaded.last.toString(), endsWith('/found/mqdefault.jpg'));
+        await covers.resolve(request);
+        expect(searched, hasLength(1));
+      },
+    );
+
+    test('finding nothing is remembered', () async {
+      found = null;
+      final covers = searching();
+      final request = CoverRequest.of(dbSong());
+      expect(await covers.resolve(request), isNull);
+      expect(await covers.resolve(request), isNull);
+      expect(searched, hasLength(1));
+    });
+
+    test('not searched when another source has a cover', () async {
+      answer = (uri) => uri.host == 'itunes.apple.com'
+          ? {
+              'results': [
+                {
+                  'artistName': 'Davie',
+                  'trackName': 'Chill',
+                  'artworkUrl100': 'https://is1.mzstatic.com/c/100x100bb.jpg',
+                },
+              ],
+            }
+          : {'data': <Object?>[]};
+      await searching().resolve(CoverRequest.of(dbSong()));
+      expect(searched, isEmpty);
+    });
+
+    test(
+      'not searched when music.db says there is no video, or YouTube is off',
+      () async {
+        final covers = searching();
+        await covers.resolve(CoverRequest.of(dbSong(videoId: 'N/A')));
+        await settings.setCoverSource(CoverSource.youtube, false);
+        await covers.resolve(CoverRequest.of(dbSong()));
+        expect(searched, isEmpty);
+      },
+    );
+  });
+
   test('switched-off sources are skipped, in the user\'s order', () async {
     await settings.setCoverSource(CoverSource.itunes, false);
     await settings.setCoverSource(CoverSource.deezer, false);
@@ -308,6 +395,39 @@ void main() {
     },
   );
 
+  test('a lookup stays wanted while a later row still waits for it', () async {
+    await settings.setCoverWifiOnly(true);
+    final gate = Completer<bool>();
+    answer = (_) => {
+      'results': [_itunesAlbum('Hey', 'Karma')],
+    };
+    final covers = AlbumCovers(
+      local.database,
+      settings,
+      storageRoot: () async => root,
+      getJson: (uri) async {
+        asked.add(uri);
+        return answer(uri);
+      },
+      getBytes: (uri) async => Uint8List(imageSize),
+      onWifi: () => gate.future,
+      readEmbedded: (_) async => null,
+    );
+    await covers.load();
+
+    var firstWanted = true;
+    final first = covers.resolve(song('A'), wanted: () => firstWanted);
+    await Future<void>.delayed(Duration.zero);
+    final second = covers.resolve(song('A'));
+    await Future<void>.delayed(Duration.zero);
+    firstWanted = false;
+    gate.complete(true);
+
+    expect(await second, isA<FileImage>());
+    await first;
+    expect(asked, hasLength(1));
+  });
+
   test('a resolved cover is known at once next time', () async {
     final covers = newCovers(embedded: {'/m/a.mp3': Uint8List(10)});
     final request = song('A', filePath: '/m/a.mp3');
@@ -375,6 +495,11 @@ void main() {
     );
     expect((color!.r * 255).round(), greaterThan(150));
     expect((color.g * 255).round(), lessThan(70));
+  });
+
+  test('a leader matches their group, a longer name still does not', () {
+    expect(sameArtist('Adam Baldych', 'Adam Baldych Quartet'), isTrue);
+    expect(sameArtist('Hey', 'Hey Violet'), isFalse);
   });
 
   test('"Singles" is not an album', () {

@@ -456,7 +456,8 @@ import, Wyświetlanie, Dane, Aplikacja.
   Themes are defined in `lib/src/theme.dart` (see [`agent-notes/theming.md`](agent-notes/theming.md)).
 - Okładki albumów **→ Okładki albumów** (`cover_sources_screen.dart`) — **implemented**: the cover
   sources with switches, drag to reorder (Serwer — dummy, always off; Plik na telefonie; iTunes;
-  Deezer; Miniatura z YouTube); the cover cache is in Oszczędzanie danych › Pamięć podręczna. See
+  Deezer; Miniatura z YouTube — also searches YouTube for a catalog song no source has a cover
+  for); the cover cache is in Oszczędzanie danych › Pamięć podręczna. See
   [`agent-notes/covers.md`](agent-notes/covers.md).
 
 ### Dane
