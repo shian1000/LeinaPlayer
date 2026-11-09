@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../data/combined_search.dart';
+import '../data/cover_credit.dart';
 import '../data/database_sync.dart';
 import '../data/download_files.dart';
 import '../data/mp3_conversion.dart';
@@ -251,6 +252,7 @@ class TrackPlayer {
             artist: hit.artistLabel,
             titleLatin: hit.titleLatin,
             artistLatin: hit.artistLatin,
+            coverOf: hit.coverOf,
             source: hit.phoneFiles.first.filePath,
             coverSeed: hit.coverSeed,
             cover: CoverRequest.of(hit),
@@ -268,6 +270,7 @@ class TrackPlayer {
           artist: hit.artistLabel,
           titleLatin: hit.titleLatin,
           artistLatin: hit.artistLatin,
+          coverOf: hit.coverOf,
           coverSeed: hit.coverSeed,
           cover: CoverRequest.of(hit),
           searchQuery: searchQuery,
@@ -322,6 +325,7 @@ class TrackPlayer {
       artist: hit.artistLabel,
       titleLatin: hit.titleLatin,
       artistLatin: hit.artistLatin,
+      coverOf: hit.coverOf,
       source: source,
       serverFileId: file.id,
       coverSeed: hit.coverSeed,
@@ -403,6 +407,7 @@ class TrackPlayer {
       artist: hit.artistLabel,
       titleLatin: hit.titleLatin,
       artistLatin: hit.artistLatin,
+      coverOf: hit.coverOf,
       coverSeed: hit.coverSeed,
       cover: CoverRequest.of(hit),
       searchQuery: searchQuery,
@@ -637,6 +642,7 @@ class TrackPlayer {
     required String artist,
     String? titleLatin,
     String? artistLatin,
+    CoverOf? coverOf,
     required String coverSeed,
     CoverRequest? cover,
     String? searchQuery,
@@ -661,6 +667,7 @@ class TrackPlayer {
           artist: artist,
           titleLatin: titleLatin,
           artistLatin: artistLatin,
+          coverOf: coverOf,
           source: source,
           coverSeed: coverSeed,
           cover: cover?.withVideo(videoId),

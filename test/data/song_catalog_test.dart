@@ -199,6 +199,75 @@ void main() {
       expect(again.byId(3)!.serverFile!.duration, isNull);
     });
 
+    test('a cover knows its covered artist, stays titled without the credit '
+        'and is recognised by a video title with it', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE artists ADD COLUMN name_latin VARCHAR');
+      await db.execute(
+        'ALTER TABLE songs ADD COLUMN covered_artist_id INTEGER',
+      );
+      await db.rawInsert(
+        'INSERT INTO artists (id, name, synonyms, name_latin) VALUES '
+        "(7, 'Hannah Rue', NULL, NULL), "
+        "(8, 'Radiohead', NULL, NULL), "
+        "(9, 'Кино', NULL, 'Kino')",
+      );
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, language, artist_id, '
+        'covered_artist_id) VALUES '
+        "(16, 'Creep', 'English', 7, 8), "
+        "(17, 'Creep', 'English', 8, NULL), "
+        "(18, 'Группа крови', 'Russian', 7, 9)",
+      );
+      await db.execute('ALTER TABLE songs ADD COLUMN covered_title TEXT');
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, language, artist_id, '
+        'covered_artist_id, covered_title) VALUES '
+        "(19, 'Українська лють', 'Ukrainian', 7, NULL, 'Bella Ciao'), "
+        "(20, 'Дарма', 'Ukrainian', 7, 8, 'Never Meant')",
+      );
+      await db.close();
+      await catalog.ensureLoaded();
+
+      final cover = catalog.byId(16)!;
+      expect(cover.title, 'Creep');
+      expect(cover.artistLabel, 'Hannah Rue');
+      expect(cover.coverOf!.name, 'Radiohead');
+      expect(cover.youTubeTarget.query, 'Hannah Rue Creep Radiohead cover');
+      expect(catalog.byId(17)!.coverOf, isNull);
+      expect(catalog.byId(18)!.coverOf!.latin, 'Kino');
+      final traditional = catalog.byId(19)!;
+      expect(traditional.coverOf!.name, 'Bella Ciao');
+      expect(
+        traditional.youTubeTarget.query,
+        'Hannah Rue Українська лють Bella Ciao cover',
+      );
+      expect(catalog.byId(20)!.coverOf!.name, 'Radiohead');
+      expect(catalog.search('radiohead cover'), contains(cover));
+
+      expect(
+        catalog
+            .findExact(title: 'Creep (Radiohead cover)', artist: 'Hannah Rue')
+            ?.id,
+        16,
+      );
+      expect(
+        catalog
+            .findExact(
+              title: 'Creep (Cover by Hannah Rue)',
+              artist: 'Radiohead',
+            )
+            ?.id,
+        16,
+      );
+      expect(
+        catalog.findExact(title: 'Creep (cover)', artist: 'Radiohead'),
+        isNull,
+      );
+    });
+
     test('Latin forms of names in another alphabet: music.db\'s, else an '
         'artist\'s Latin synonym; found by search', () async {
       final path = (await sync.localFile('music.db')).path;

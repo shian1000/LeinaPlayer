@@ -95,6 +95,11 @@ Full albums — music.db rows that are a whole album in one recording (`songs.ki
 `SongKind`) — are marked "Cały album", can be filtered in search, are left out of the radio,
 Odkrywaj and Przeglądaj's lists, are looked for on YouTube only as long "full album" videos,
 and are marked from Informacje o utworze ([hand-off](docs/handoffs/musicdatabase-song-kind.md)).
+Covers (`songs.covered_artist_id` or `covered_title`, `CatalogSong.coverOf`; MusicDatabase's
+`cover-songs-for-musicdatabaseapp.md`) are shown "Title (Covered cover)" and looked for on YouTube
+with the credit; `cover_credit.dart` adds it for display, never to `songs.title`, and a video
+title's credit only matches a row marked as a cover — a fan's "Radiohead - Creep (cover)" isn't
+Radiohead's own song.
 Changing a song's artist there is a proposal of another artist for that song (`songs.artist_id`
 with a name), never a rename of the shared artist row — that's the separate "Popraw pisownię
 nazwy" ([hand-off](docs/handoffs/musicdatabase-song-artist.md)), which asks first when the new
@@ -324,7 +329,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   the id.
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
-  reaches them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.
+  and a cover's credit reach them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.
 - Lists sorted by a name (playlists, folders, moods, artists, track titles) use `compareNames`
   (`text_normalizer.dart`): numbers by value, so "2. Telefon" comes before "10. Pidvalia" —
   not `normalizeForSearch(a).compareTo(…)` (user's request; numbered names are common there).

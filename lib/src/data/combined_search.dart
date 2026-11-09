@@ -1,4 +1,5 @@
 import 'album_covers.dart';
+import 'cover_credit.dart';
 import 'local_library.dart';
 import 'playlist_library.dart';
 import 'song_catalog.dart';
@@ -105,6 +106,9 @@ class SearchHit {
   String? get titleLatin => mainSong?.titleLatin;
   String? get artistLatin => mainSong?.artistLatin;
   String? get albumLatin => mainSong?.albumLatin;
+
+  /// Whose song this is a cover of; shown after the title, never part of [title].
+  CoverOf? get coverOf => mainSong?.coverOf;
 
   SearchHit._copy(
     SearchHit hit, {

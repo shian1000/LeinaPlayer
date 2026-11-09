@@ -14,6 +14,7 @@ class SongDetails {
     this.artists = const [],
     this.album,
     this.albumArtist,
+    this.coveredArtist,
     this.albumCovers = const [],
     this.tags = const [],
     this.formerIds = const [],
@@ -32,6 +33,9 @@ class SongDetails {
 
   /// `artists.name` of the album's `artist_id`.
   final String? albumArtist;
+
+  /// `artists.name` of `songs.covered_artist_id`, for a cover.
+  final String? coveredArtist;
 
   /// The album's `album_covers` rows (one per source).
   final List<DbRow> albumCovers;
@@ -101,6 +105,13 @@ Future<SongDetails?> readSongDetails(
           ),
     ];
 
+    final coveredArtist = song['covered_artist_id'] == null
+        ? null
+        : (await db.rawQuery('SELECT name FROM artists WHERE id = ?', [
+                song['covered_artist_id'],
+              ])).firstOrNull?['name']
+              as String?;
+
     DbRow? album;
     String? albumArtist;
     var covers = const <DbRow>[];
@@ -155,6 +166,7 @@ Future<SongDetails?> readSongDetails(
           );
 
     return SongDetails(
+      coveredArtist: coveredArtist,
       song: song,
       badVideos: badVideos,
       additionalVideos: additionalVideos,

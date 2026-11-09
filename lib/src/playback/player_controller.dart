@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../data/album_covers.dart';
+import '../data/cover_credit.dart';
 import '../data/latin_names.dart';
 import 'interrupted_players.dart';
 import 'server_audio_source.dart';
@@ -26,6 +27,7 @@ class NowPlaying {
     this.streamQuality,
     this.titleLatin,
     this.artistLatin,
+    this.coverOf,
   }) : _givenCover = cover;
 
   final String title;
@@ -34,6 +36,9 @@ class NowPlaying {
   /// Latin forms of [title] and [artist] from music.db ([SearchHit.titleLatin]).
   final String? titleLatin;
   final String? artistLatin;
+
+  /// Whose song this is a cover of ([SearchHit.coverOf]).
+  final CoverOf? coverOf;
 
   /// A file path on the phone, or an http(s) address of a stream.
   final String source;
@@ -190,9 +195,11 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   void show(NowPlaying track, Duration? duration, Uri? art) {
     final item = MediaItem(
       id: track.youtubeVideoId ?? track.source,
-      title: latinNames
-          ? withLatin(track.title, track.titleLatin)
-          : track.title,
+      title: titleWithCover(
+        latinNames ? withLatin(track.title, track.titleLatin) : track.title,
+        track.coverOf,
+        latin: latinNames,
+      ),
       artist: latinNames
           ? withLatin(track.artist, track.artistLatin)
           : track.artist,

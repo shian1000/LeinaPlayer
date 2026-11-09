@@ -26,6 +26,7 @@ class MatchTarget {
     required this.mainArtists,
     this.featArtists = const [],
     this.fullAlbum = false,
+    this.coverOf,
   });
 
   final String title;
@@ -36,12 +37,18 @@ class MatchTarget {
   /// do, never one of its songs.
   final bool fullAlbum;
 
+  /// The name a cover's credit gives (the covered artist, else the covered song).
+  final String? coverOf;
+
   /// What to type into YouTube's search: main artists and the title, no guests (extra words make
-  /// YouTube's results worse, not better) — "full album" added for a [fullAlbum].
+  /// YouTube's results worse, not better) — "full album" added for a [fullAlbum], the covered
+  /// artist and "cover" for a cover, which would otherwise find the original.
   String get query => [
     ...mainArtists.map((a) => a.name),
     title,
     if (fullAlbum) 'full album',
+    ?coverOf,
+    if (coverOf != null) 'cover',
   ].join(' ').trim();
 }
 
@@ -102,7 +109,8 @@ class _Song {
       featArtists = [
         for (final a in target.featArtists) [for (final n in a.names) _norm(n)],
       ],
-      fullAlbum = target.fullAlbum;
+      fullAlbum = target.fullAlbum,
+      isCover = target.coverOf != null;
 
   /// Whole title, " padded " for whole-word `contains`.
   final String title;
@@ -113,6 +121,7 @@ class _Song {
   final List<List<String>> mainArtists;
   final List<List<String>> featArtists;
   final bool fullAlbum;
+  final bool isCover;
 }
 
 /// What MusicDatabase's hand-off asks of a full album's video: around 20 minutes or more.
@@ -314,7 +323,9 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
   }
   for (final word in _otherVersion) {
     if (_hasWord(title, word)) {
-      score += _hasWord(song.title, word) ? 2 : -3;
+      score += _hasWord(song.title, word) || (song.isCover && word == 'cover')
+          ? 2
+          : -3;
       break;
     }
   }

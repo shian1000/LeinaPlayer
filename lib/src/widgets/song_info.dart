@@ -168,6 +168,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final song = _withLatinColumn(details.song, 'title', 'title_latin');
     const shownElsewhere = {
       'artist_id',
+      'covered_artist_id',
       'album_id',
       'youtube_video_id',
       'music_video_youtube_id',
@@ -179,6 +180,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
           _songKindField(song)
         else if (!shownElsewhere.contains(key))
           _editableField('songs', song, key, _songLabels[key] ?? key),
+      _Field('Cover utworu wykonawcy', details.coveredArtist),
       for (final former in details.formerIds)
         _Field(
           'Dawne ID',
@@ -1026,6 +1028,7 @@ const _songLabels = {
   'artist_id': 'Wykonawca utworu',
   'title': 'Tytuł',
   'title_latin': 'Tytuł alfabetem łacińskim',
+  'covered_title': 'Tytuł oryginału',
   'album': 'Album',
   'year': 'Rok',
   'language': 'Język',

@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'cover_credit.dart';
 import 'database_sync.dart';
 import 'latin_names.dart';
 import 'playlist_library.dart';
@@ -162,6 +163,7 @@ class CatalogSong {
     String? titleLatin,
     String? albumLatin,
     this.artistLatin,
+    this.coverOf,
     this.serverFile,
   }) : countries = [
          ...{
@@ -180,6 +182,7 @@ class CatalogSong {
              title: title,
              mainArtists: [MatchArtist(artistLabel)],
              fullAlbum: kind == SongKind.fullAlbum,
+             coverOf: coverOf?.name,
            ),
        youtubeVideoId = _videoIdOf(youtubeVideoId),
        youTube = _youTubeLinkOf(youtubeVideoId),
@@ -195,7 +198,11 @@ class CatalogSong {
        _fieldTexts = [
          for (final field in SearchField.values)
            normalizeForSearch(switch (field) {
-             SearchField.title => [title, ?titleLatin].join(' '),
+             SearchField.title => [
+               title,
+               ?titleLatin,
+               ?coverOf?.searchText,
+             ].join(' '),
              SearchField.artist => [
                if (artistNames.isEmpty) artistLabel else ...artistNames,
                ...synonyms,
@@ -220,6 +227,7 @@ class CatalogSong {
       album = song.album,
       titleLatin = song.titleLatin,
       artistLatin = song.artistLatin,
+      coverOf = song.coverOf,
       albumLatin = song.albumLatin,
       year = song.year,
       language = song.language,
@@ -284,6 +292,10 @@ class CatalogSong {
 
   /// The Latin form of [album] (`albums.title_latin` of `songs.album_id`).
   final String? albumLatin;
+
+  /// What this song is a cover of, `null` for most songs. A covered artist is never one of
+  /// its artists: [artistLabel] stays the performer.
+  final CoverOf? coverOf;
   final int? year;
   final String? language;
 
@@ -630,7 +642,10 @@ class SongCatalog extends ChangeNotifier {
               await _hasColumn(db, 'albums', 'title_latin')
           ? '(SELECT al.title_latin FROM albums al WHERE al.id = s.album_id)'
           : 'NULL';
-      final rows = await db.rawQuery('''
+      // Before MusicDatabase's migrations 0020 and 0021 the columns aren't there.
+      final covers = columns.contains('covered_artist_id');
+      final rows = await db.rawQuery(
+        '''
         SELECT s.id, s.title, s.album, s.year, s.language,
                ${column('youtube_video_id')} AS youtube_video_id,
                ${column('music_video_youtube_id')} AS music_video_youtube_id,
@@ -639,8 +654,14 @@ class SongCatalog extends ChangeNotifier {
                ${column('genre')} AS genre,
                ${column('kind')} AS kind,
                $albumLatin AS album_latin,
+               ${column('covered_title')} AS covered_title,
+               ${covers ? 'c.name' : 'NULL'} AS covered_name,
+               ${covers ? 'c.synonyms' : 'NULL'} AS covered_synonyms,
+               ${covers && artistLatin != 'NULL' ? 'c.name_latin' : 'NULL'} AS covered_latin,
                a.name AS artist, a.origin, a.synonyms, $artistLatin AS name_latin
-        FROM songs s JOIN artists a ON a.id = s.artist_id''');
+        FROM songs s JOIN artists a ON a.id = s.artist_id
+        ${covers ? 'LEFT JOIN artists c ON c.id = s.covered_artist_id' : ''}''',
+      );
       final extra = await _readAdditionalArtists(db, artistLatin);
       return [
         for (final row in rows)
@@ -663,6 +684,7 @@ class SongCatalog extends ChangeNotifier {
     final otherNames = [
       for (final a in artists) ...[?present(a.synonyms), ?present(a.nameLatin)],
     ];
+    final covered = _coverOfRow(row);
     return CatalogSong(
       id: row['id']! as int,
       title: row['title']! as String,
@@ -685,6 +707,7 @@ class SongCatalog extends ChangeNotifier {
             if (a.role == 'feat') MatchArtist(a.name, _otherNames(a)),
         ],
         fullAlbum: SongKind.of(row['kind']) == SongKind.fullAlbum,
+        coverOf: covered?.name,
       ),
       artistLabel: _artistLabel(artists),
       artistNames: [for (final a in artists) a.name],
@@ -693,7 +716,23 @@ class SongCatalog extends ChangeNotifier {
       titleLatin: row['title_latin'] as String?,
       albumLatin: row['album_latin'] as String?,
       artistLatin: _artistLatinLabel(artists),
+      coverOf: covered,
       serverFile: serverFile,
+    );
+  }
+
+  static CoverOf? _coverOfRow(Map<String, Object?> row) {
+    final name = row['covered_name'] as String?;
+    if (name == null) {
+      final title = (row['covered_title'] as String?)?.trim();
+      return title == null || title.isEmpty ? null : CoverOf(title);
+    }
+    return CoverOf(
+      name,
+      latinFormOf(name, row['covered_latin'] as String?) ??
+          (hasNonLatinLetters(name)
+              ? latinSynonym(row['covered_synonyms'] as String?)
+              : null),
     );
   }
 
@@ -948,7 +987,9 @@ class SongCatalog extends ChangeNotifier {
   /// The song with exactly this title and artist (both compared after normalization, so case,
   /// accents and punctuation don't matter), or `null`. The artist may be any of the song's
   /// artists, the whole "A, B feat. C" label, or one of the artists' other names. Used to tell
-  /// whether a music file on the phone is already in MusicDatabase.
+  /// whether a music file on the phone is already in MusicDatabase. A title with a cover credit
+  /// ("Creep (Radiohead cover)") is also a song music.db marks as a cover, titled without it —
+  /// only such a song: "Radiohead - Creep (cover)" uploaded by a fan isn't Radiohead's row.
   CatalogSong? findExact({required String title, required String artist}) {
     final byTitle = _byTitle ??= () {
       final index = <String, List<CatalogSong>>{};
@@ -959,8 +1000,22 @@ class SongCatalog extends ChangeNotifier {
     }();
     final normalizedArtist = normalizeForSearch(artist);
     if (normalizedArtist.isEmpty) return null;
-    return byTitle[normalizeForSearch(title)]
+    final exact = byTitle[normalizeForSearch(title)]
         ?.where((s) => s._normalizedArtists.contains(normalizedArtist))
+        .firstOrNull;
+    if (exact != null) return exact;
+    final credit = readCoverCredit(title);
+    if (credit == null) return null;
+    final performer = credit.performer == null
+        ? null
+        : normalizeForSearch(credit.performer!);
+    return byTitle[normalizeForSearch(credit.title)]
+        ?.where(
+          (s) =>
+              s.coverOf != null &&
+              (s._normalizedArtists.contains(normalizedArtist) ||
+                  s._normalizedArtists.contains(performer)),
+        )
         .firstOrNull;
   }
 
