@@ -261,7 +261,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
   (the queue and position saved across restarts), `Downloads` ("Pobierz": songs and playlists kept on the phone for good), `YouTubePlayback` (the user's ordered ways
-  of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) `ScheduledMusic` (Ja's scheduled start and stop, `scheduled_music.dart`) and `ListeningTracker` (the listened time of each play, from
+  of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) `ScheduledMusic` (Ja's scheduled start and stop, `scheduled_music.dart`), `InterruptedPlayers` (what a phone call paused and whether to play on after it) and `ListeningTracker` (the listened time of each play, from
   `PlayerController.positionChanges`, for the stats). Never pause between songs — see
   [`local-library.md`](docs/agent-notes/local-library.md) (Android 12+ freezes the app).
 - `lib/src/theme.dart`, `lib/src/theme_controller.dart` — themes and the appearance settings.

@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/widgets.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../data/album_covers.dart';
 import '../data/latin_names.dart';
+import 'interrupted_players.dart';
 import 'server_audio_source.dart';
 
 /// What's loaded in the player.
@@ -112,13 +114,22 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
       p.playbackEventStream.listen((_) {
         if (identical(p, _active)) playbackState.add(_state());
       }, onError: (Object _) {});
+      p.playingStream
+          .where((on) => on)
+          .listen((_) => _interrupted.startedPlaying(p));
     }
+    unawaited(AudioSession.instance.then(_followInterruptions));
   }
 
   /// Ustawienia › Wygląd › "Nazwy w alfabecie łacińskim", for the notification.
   bool latinNames = true;
 
-  final players = (AudioPlayer(), AudioPlayer());
+  final players = (
+    AudioPlayer(handleInterruptions: false),
+    AudioPlayer(handleInterruptions: false),
+  );
+  List<AudioPlayer> get _players => [players.$1, players.$2];
+  final _interrupted = InterruptedPlayers<AudioPlayer>();
   late AudioPlayer _active = players.$1;
   final _skips = StreamController<MediaSkip>.broadcast();
 
@@ -132,6 +143,46 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   }
 
   Stream<MediaSkip> get skips => _skips.stream;
+
+  void _followInterruptions(AudioSession session) {
+    session.becomingNoisyEventStream.listen((_) {
+      _interrupted.forget();
+      for (final p in _players) {
+        unawaited(p.pause());
+      }
+    });
+    session.interruptionEventStream.listen((event) {
+      if (event.type == AudioInterruptionType.duck) {
+        _interrupted.forget();
+      } else if (event.begin) {
+        final playing = _players.where((p) => p.playing).toList();
+        _interrupted.began(playing, () => _outputs(session));
+        for (final p in playing) {
+          unawaited(p.pause());
+        }
+      } else if (event.type == AudioInterruptionType.pause) {
+        unawaited(_resumeInterrupted(session));
+      } else {
+        _interrupted.forget();
+      }
+    });
+  }
+
+  Future<void> _resumeInterrupted(AudioSession session) async {
+    final players = await _interrupted.ended(() => _outputs(session));
+    for (final p in players) {
+      unawaited(p.play());
+    }
+  }
+
+  Future<Set<AudioDevice>> _outputs(AudioSession session) async {
+    try {
+      return await session.getDevices(includeInputs: false);
+    } catch (e) {
+      debugPrint('Reading audio outputs failed: $e');
+      return const {};
+    }
+  }
 
   Timer? _settle;
 
@@ -177,6 +228,7 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   Future<void> stop() async {
     _settle?.cancel();
     _stopped = true;
+    _interrupted.forget();
     beforePause?.call();
     await _active.stop();
     await super.stop();

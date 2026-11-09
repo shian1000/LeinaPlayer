@@ -96,6 +96,11 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   playback stops — never await it. So `PlayerController.playing` turns true only a while after
   `play()` returns (when just_audio reports it): don't check it right after starting a song (test
   fakes report it at once and hide this).
+- Phone calls: `MediaSession`'s players run with `handleInterruptions: false` and it pauses and
+  resumes them itself (`interrupted_players.dart`), comparing the audio outputs at the call's
+  start and end: a speaker or headphones gone in between means no resume. just_audio's own flag
+  can't be cleared once the player is paused (`pause()` returns early), and Android's "becoming
+  noisy" isn't reliable during a call.
 - Never pause between songs. A finished song stays "playing" (just_audio keeps `playing` true in
   the completed state) until the queue has started the next one, or calls
   `PlayerController.stopAtEnd` at the end of the queue. audio_service holds the foreground service
