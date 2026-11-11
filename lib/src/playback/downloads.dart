@@ -242,11 +242,8 @@ class Downloads extends ChangeNotifier {
   Future<void> removeServerFile(int fileId) => _server.remove(fileId);
 
   /// One of [youTubeEntries] back in the cache.
-  Future<void> removeVideo(String videoId) => _youTube.setPinned(
-    videoId,
-    false,
-    limit: _tracks.settings.cacheKeep,
-  );
+  Future<void> removeVideo(String videoId) =>
+      _youTube.setPinned(videoId, false, limit: _tracks.settings.cacheKeep);
 
   /// Takes [hits] off the phone again (a file of the phone's own stays, of course).
   Future<void> remove(List<SearchHit> hits) async {

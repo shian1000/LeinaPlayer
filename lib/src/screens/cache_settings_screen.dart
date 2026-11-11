@@ -343,9 +343,7 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
             ),
             onTap: _forgetNotFound,
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-          ),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0)),
           if (covers != null) ...[
             const SectionTitle('Okładki'),
             ListTile(
