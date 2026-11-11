@@ -94,6 +94,31 @@ void main() {
         artist: 'Merk & Kremont',
         title: 'Sad Story (Out of Luck)',
       ));
+      // A version's bracket stays whole, its year and "Video" too.
+      expect(
+        p(
+          'Dawid Podsiadło i Kaśka Sochacka - samoloty (Live @ Odra, Wrocław / ZORZA 2025)',
+          'Dawid Podsiadło',
+        ),
+        (
+          artist: 'Dawid Podsiadło i Kaśka Sochacka',
+          title: 'samoloty (Live @ Odra, Wrocław / ZORZA 2025)',
+        ),
+      );
+      expect(
+        p(
+          'Kwiat Jabłoni - Dziś późno pójdę spać (Official Acoustic Live Video)',
+          'x',
+        ),
+        (
+          artist: 'Kwiat Jabłoni',
+          title: 'Dziś późno pójdę spać (Official Acoustic Live Video)',
+        ),
+      );
+      expect(p('Kwiat Jabłoni - Dziś późno pójdę spać (2019)', 'x'), (
+        artist: 'Kwiat Jabłoni',
+        title: 'Dziś późno pójdę spać',
+      ));
     });
   });
 }

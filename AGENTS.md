@@ -270,7 +270,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   listened time, synced (`listening_log.dart`), and what's computed from them
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
-  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), and the
+  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), the project a song's names say — Tiny Desk, Męskie Granie (`project_names.dart`, lite `read_project()`), and the
   port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays

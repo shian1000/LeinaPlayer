@@ -86,6 +86,45 @@ Future<void> addVideoDurations(String path, Map<String, int> seconds) async {
   await db.close();
 }
 
+/// Adds music.db's `projects` and `songs.project_id` (MusicDatabase's migration 0019) with
+/// [projects] (id: name, aliases, channels) and the [songs] given (id: title, artist id,
+/// project id), by the [artists] given besides [writeMusicDb]'s (id: name).
+Future<void> addProjects(
+  String path,
+  Map<int, (String, String?, String?)> projects,
+  Map<int, (String, int, int?)> songs, {
+  Map<int, String> artists = const {},
+}) async {
+  final db = await databaseFactoryFfi.openDatabase(path);
+  for (final MapEntry(key: id, value: name) in artists.entries) {
+    await db.insert('artists', {'id': id, 'name': name});
+  }
+  await db.execute(
+    'CREATE TABLE projects (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL UNIQUE, '
+    'aliases VARCHAR, channels VARCHAR)',
+  );
+  await db.execute('ALTER TABLE songs ADD COLUMN project_id INTEGER');
+  for (final MapEntry(key: id, value: (name, aliases, channels))
+      in projects.entries) {
+    await db.insert('projects', {
+      'id': id,
+      'name': name,
+      'aliases': aliases,
+      'channels': channels,
+    });
+  }
+  for (final MapEntry(key: id, value: (title, artist, project))
+      in songs.entries) {
+    await db.insert('songs', {
+      'id': id,
+      'title': title,
+      'artist_id': artist,
+      'project_id': project,
+    });
+  }
+  await db.close();
+}
+
 /// A tag.db like MusicDatabase's since moods (`tags.kind`), or — [withKind] false — an older one.
 Future<void> writeTagDb(
   String path, {

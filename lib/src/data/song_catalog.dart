@@ -11,6 +11,7 @@ import 'database_sync.dart';
 import 'feat_credit.dart';
 import 'latin_names.dart';
 import 'playlist_library.dart';
+import 'project_names.dart';
 import 'song_requests.dart';
 import 'text_normalizer.dart';
 import 'version_names.dart';
@@ -167,6 +168,7 @@ class CatalogSong {
     this.artistLatin,
     this.coverOf,
     this.version,
+    this.project,
     this.serverFile,
   }) : countries = [
          ...{
@@ -234,6 +236,7 @@ class CatalogSong {
       artistLatin = song.artistLatin,
       coverOf = song.coverOf,
       version = song.version,
+      project = song.project,
       albumLatin = song.albumLatin,
       year = song.year,
       language = song.language,
@@ -306,6 +309,11 @@ class CatalogSong {
   /// What kind of version of another song this row is (live, a remix…), `null` for most songs
   /// (and before music.db has the columns). [title] stays without the marker.
   final SongVersion? version;
+
+  /// The name of the project this recording was made for (`songs.project_id`, MusicDatabase's
+  /// migration 0019: Tiny Desk, Męskie Granie), `null` for most songs and before the column.
+  /// [title] and [artistLabel] stay without it.
+  final String? project;
   final int? year;
   final String? language;
 
@@ -446,6 +454,10 @@ class SongCatalog extends ChangeNotifier {
   Duration? videoDuration(String? videoId) =>
       videoId == null ? null : _videoDurations[videoId];
 
+  /// music.db's `projects` dictionary, for reading the project a name says it's from
+  /// ([findByName]); empty before MusicDatabase's migration 0019.
+  List<Project> _projects = const [];
+
   Map<String, int> _additionalVideos = const {};
 
   /// Other uploads of the same recording MusicDatabase knows (`additional_youtube_videos`,
@@ -528,6 +540,7 @@ class SongCatalog extends ChangeNotifier {
         _badVideos = BadVideos.none;
         _additionalVideos = const {};
         _videoDurations = const {};
+        _projects = const [];
         _rejectedSongRequests = RejectedSongRequests.none;
         _status = CatalogStatus.noDatabase;
       } else {
@@ -538,6 +551,7 @@ class SongCatalog extends ChangeNotifier {
         final badVideos = await _readBadVideos(file);
         final additionalVideos = await _readAdditionalVideos(file);
         final videoDurations = await _readVideoDurations(file);
+        final projects = await _readProjects(file);
         final rejected = await _readRejectedSongRequests(file);
         final idChanges = await _readIdChanges(file);
         // All at once, with the indexes below: a search between two awaits would otherwise
@@ -546,6 +560,7 @@ class SongCatalog extends ChangeNotifier {
         _badVideos = badVideos;
         _additionalVideos = additionalVideos;
         _videoDurations = videoDurations;
+        _projects = projects;
         _rejectedSongRequests = rejected;
         _idChanges = idChanges;
         _searchTexts = null;
@@ -563,6 +578,7 @@ class SongCatalog extends ChangeNotifier {
       _badVideos = BadVideos.none;
       _additionalVideos = const {};
       _videoDurations = const {};
+      _projects = const [];
       _rejectedSongRequests = RejectedSongRequests.none;
       _status = CatalogStatus.error;
     } finally {
@@ -656,6 +672,12 @@ class SongCatalog extends ChangeNotifier {
           : 'NULL';
       // Before MusicDatabase's migrations 0020 and 0021 the columns aren't there.
       final covers = columns.contains('covered_artist_id');
+      // Before its migration 0019 neither songs.project_id nor projects is there.
+      final project =
+          columns.contains('project_id') &&
+              await _hasColumn(db, 'projects', 'name')
+          ? '(SELECT p.name FROM projects p WHERE p.id = s.project_id)'
+          : 'NULL';
       final rows = await db.rawQuery(
         '''
         SELECT s.id, s.title, s.album, s.year, s.language,
@@ -670,6 +692,7 @@ class SongCatalog extends ChangeNotifier {
                ${column('version_kind')} AS version_kind,
                ${column('version_label')} AS version_label,
                ${column('version_of')} AS version_of,
+               $project AS project,
                ${covers ? 'c.name' : 'NULL'} AS covered_name,
                ${covers ? 'c.synonyms' : 'NULL'} AS covered_synonyms,
                ${covers && artistLatin != 'NULL' ? 'c.name_latin' : 'NULL'} AS covered_latin,
@@ -735,6 +758,7 @@ class SongCatalog extends ChangeNotifier {
       artistLatin: _artistLatinLabel(artists),
       coverOf: covered,
       version: version,
+      project: row['project'] as String?,
       serverFile: serverFile,
     );
   }
@@ -934,6 +958,29 @@ class SongCatalog extends ChangeNotifier {
     }
   }
 
+  /// `projects` (MusicDatabase's migration 0019); empty before it.
+  Future<List<Project>> _readProjects(File file) async {
+    final db = await (factoryOverride ?? databaseFactory).openDatabase(
+      file.path,
+      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+    );
+    try {
+      if (!await _hasColumn(db, 'projects', 'name')) return const [];
+      return [
+        for (final row in await db.rawQuery(
+          'SELECT name, aliases, channels FROM projects ORDER BY id',
+        ))
+          Project(
+            row['name']! as String,
+            aliases: row['aliases'] as String?,
+            channels: row['channels'] as String?,
+          ),
+      ];
+    } finally {
+      await db.close();
+    }
+  }
+
   /// `additional_song_artists` (role `main` or `feat`) per song id; empty for databases created
   /// before that table existed.
   Future<Map<int, List<_Artist>>> _readAdditionalArtists(
@@ -1049,12 +1096,17 @@ class SongCatalog extends ChangeNotifier {
   /// ("Creep (Radiohead cover)") is also a song music.db marks as a cover, titled without it —
   /// only such a song: "Radiohead - Creep (cover)" uploaded by a fan isn't Radiohead's row.
   /// Versions are kept apart as [_titled] says: "Boję się (Live)" is only a live "Boję się".
-  CatalogSong? findExact({required String title, required String artist}) {
+  /// Only songs of [project] count (`null`: of no project) — [findByName] reads it from the names.
+  CatalogSong? findExact({
+    required String title,
+    required String artist,
+    String? project,
+  }) {
     final normalizedArtist = normalizeForSearch(artist);
     if (normalizedArtist.isEmpty) return null;
     bool byArtist(CatalogSong s) =>
         s._normalizedArtists.contains(normalizedArtist);
-    if (_titled(title).where(byArtist).firstOrNull case final exact?) {
+    if (_titled(title, project).where(byArtist).firstOrNull case final exact?) {
       return exact;
     }
     final credit = readCoverCredit(title);
@@ -1062,7 +1114,7 @@ class SongCatalog extends ChangeNotifier {
     final performer = credit.performer == null
         ? null
         : normalizeForSearch(credit.performer!);
-    return _titled(credit.title)
+    return _titled(credit.title, project)
         .where(
           (s) =>
               s.coverOf != null &&
@@ -1077,7 +1129,9 @@ class SongCatalog extends ChangeNotifier {
   /// first, and rows still titled with the marker (not looked at by MusicDatabase's "Find
   /// versions" yet); any other title never names a version. A plain "(Version)" may be anything
   /// ("Taylor's Version"), so it narrows nothing: such a version first, then songs titled so.
-  List<CatalogSong> _titled(String title) {
+  /// Projects the same way: only songs of [project] (`songs.project_id`), and for `null` only
+  /// songs of none — a Męskie Granie recording isn't the studio song of that title.
+  List<CatalogSong> _titled(String title, String? project) {
     final byTitle = _byTitle ??= () {
       final index = <String, List<CatalogSong>>{};
       for (final song in _songs) {
@@ -1085,17 +1139,19 @@ class SongCatalog extends ChangeNotifier {
       }
       return index;
     }();
+    Iterable<CatalogSong> titledSo(String title) =>
+        (byTitle[normalizeForSearch(title)] ?? const <CatalogSong>[]).where(
+          (song) => song.project == project,
+        );
     final titled = [
-      for (final song
-          in byTitle[normalizeForSearch(title)] ?? const <CatalogSong>[])
+      for (final song in titledSo(title))
         if (song.version == null) song,
     ];
     final wanted = readVersion(title);
     if (wanted == null) return titled;
     final marker = normalizeForSearch(wanted.label ?? wanted.kind.label);
     final versions = [
-      for (final song
-          in byTitle[normalizeForSearch(wanted.title)] ?? const <CatalogSong>[])
+      for (final song in titledSo(wanted.title))
         if (song.version?.kind == wanted.kind) song,
     ];
     return [
@@ -1111,23 +1167,65 @@ class SongCatalog extends ChangeNotifier {
   /// ("Tamagotchi feat. Dawid Podsiadło" is music.db's "Tamagotchi" — [withoutFeatCredits]) or
   /// the artist ("Organek feat. Ralph Kaminski" is music.db's "Ørganek"), else read the other
   /// way round, for an upload titled "Title - Artist" ("skeletons - easy life" read as artist
-  /// "skeletons"). Any other marker still keeps a track apart: "(Bonus track)" may be another
-  /// recording, and "(Live)" names only a live version.
+  /// "skeletons"). A joined credit, "Dawid Podsiadło i Kaśka Sochacka", names the song crediting
+  /// each of them ([_byEveryArtist]). Any other marker still keeps a track apart: "(Bonus track)"
+  /// may be another recording, and "(Live)" names only a live version. A project the names
+  /// say they're from ([readProject]: "Boys (Like a Version)", "Kaunas Acoustics : Liūdni
+  /// slibinai") is cut out of them and names only that project's songs; names that say none
+  /// never name a project's song — a lite version of MusicDatabase's `songs_for_entry(...,
+  /// project)`, which doesn't guess either: a song of no project may be that recording not
+  /// marked yet, and nothing in its names tells.
   CatalogSong? findByName({required String title, required String artist}) {
-    for (final (title, artist) in [(title, artist), (artist, title)]) {
+    final reading = readProject(artist, title, _projects);
+    final project = reading?.project.name;
+    final pairs = reading == null
+        ? [(title, artist), (artist, title)]
+        : [(reading.title, reading.artist), (reading.artist, reading.title)];
+    for (final (title, artist) in pairs) {
       final bareTitle = withoutFeatCredits(title);
       final bareArtist = withoutFeatCredits(artist);
       final song =
-          findExact(title: title, artist: artist) ??
+          findExact(title: title, artist: artist, project: project) ??
           (bareTitle == null
               ? null
-              : findExact(title: bareTitle, artist: artist)) ??
+              : findExact(
+                  title: bareTitle,
+                  artist: artist,
+                  project: project,
+                )) ??
           (bareArtist == null
               ? null
-              : findExact(title: bareTitle ?? title, artist: bareArtist));
+              : findExact(
+                  title: bareTitle ?? title,
+                  artist: bareArtist,
+                  project: project,
+                )) ??
+          _byEveryArtist(bareTitle ?? title, bareArtist ?? artist, project);
       if (song != null) return song;
     }
     return null;
+  }
+
+  /// The song titled [title] that credits every artist of the joined credit [artist]
+  /// ([artistCreditParts]), or whose artists' names stand side by side in it without a
+  /// separator ("Fisz Emade Tworzywo", the trio's channel, is Fisz, Emade and Tworzywo
+  /// Sztuczne, "Tworzywo" by its synonym); nothing for a credit of one artist, or naming someone
+  /// the song doesn't credit — "Simon & Garfunkel" stays a name of its own.
+  CatalogSong? _byEveryArtist(String title, String artist, String? project) {
+    final parts = artistCreditParts(artist)?.map(normalizeForSearch).toList();
+    if (parts != null) {
+      if (parts.any((part) => part.isEmpty)) return null;
+      return _titled(
+        title,
+        project,
+      ).where((s) => parts.every(s._normalizedArtists.contains)).firstOrNull;
+    }
+    final words = normalizeForSearch(artist).split(' ');
+    if (words.length < 2) return null;
+    return _titled(
+      title,
+      project,
+    ).where((s) => _namesInRow(words, s._normalizedArtists)).firstOrNull;
   }
 
   /// music.db's name of the artist that goes by [name]: its name, its Latin form or one of its
@@ -1216,4 +1314,22 @@ class SongCatalogScope extends InheritedNotifier<SongCatalog> {
   /// `null` in widget tests that don't set it up.
   static SongCatalog? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<SongCatalogScope>()?.notifier;
+}
+
+/// [words] (from [from] on) are two or more of [names] one after another, nothing left over:
+/// "fisz emade tworzywo" of {"fisz", "emade", "tworzywo", …}.
+bool _namesInRow(
+  List<String> words,
+  Set<String> names, [
+  int from = 0,
+  int count = 0,
+]) {
+  if (from == words.length) return count >= 2;
+  for (var end = from + 1; end <= words.length; end++) {
+    if (names.contains(words.sublist(from, end).join(' ')) &&
+        _namesInRow(words, names, end, count + 1)) {
+      return true;
+    }
+  }
+  return false;
 }

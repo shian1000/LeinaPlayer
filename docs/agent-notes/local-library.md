@@ -16,7 +16,12 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   normalized artist equal to one of the song's artists, the whole "A feat. B" label, or an
   artist synonym — then without feat. credits, in the title (music.db keeps them out of
   `songs.title`) or in the artist (`withoutFeatCredits`; uploads credit the guest there:
-  "Organek feat. Ralph Kaminski" is music.db's "Ørganek"), then artist and title swapped (fan uploads titled "Title -
+  "Organek feat. Ralph Kaminski" is music.db's "Ørganek"), then a joined credit — "Dawid
+  Podsiadło i Kaśka Sochacka", split by `artistCreditParts()` with MusicDatabase's separators,
+  "i"/"and" included — only when the song credits every part (so "Simon & Garfunkel" can't
+  wander), or the song's artists' names side by side with no separator ("Fisz Emade Tworzywo",
+  the trio's channel, once an artist of its own in music.db before it was split — a re-import
+  matching anew lost the old link), then artist and title swapped (fan uploads titled "Title -
   Artist"). Other markers ("(Bonus track)", "(Live)") are never dropped: on playlist "Ibis"
   (2026-11-11) the bonus track was a different recording (262 s vs 215 s).
 - Versions (music.db's `songs.version_kind` / `version_label` / `version_of`, MusicDatabase's
@@ -29,6 +34,19 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   ("Radio Edit", "Album Version", "Remastered", "Bonus track") is no version, and a plain
   "(Version)" narrows nothing (a version with that marker, else a row titled so). Before 0022
   the columns are missing and there are no versions.
+- Projects (music.db's `songs.project_id` and `projects` dictionary, MusicDatabase's migration
+  0019, hand-off `projects-for-musicdatabaseapp.md`): a Tiny Desk / Męskie Granie recording is
+  a row of its own titled like the studio song, `CatalogSong.project` its name. `findByName`
+  first reads the project the names say (`readProject`, `project_names.dart`, lite
+  `read_project()`: whole dictionary spellings only, a bracket left with only numbers goes too —
+  "(Męskie Granie 2018)"; an artist set apart from it, "Kaunas Acoustics : Liūdni slibinai",
+  loses it; one only containing it, "Męskie Granie Orkiestra 2016", keeps it; a channel as the
+  artist, "NPR Music", leaves who plays in the title), cuts it out, and `_titled` takes only
+  that project's rows — names naming none take only rows of no project (lite
+  `songs_for_entry(..., project)`). Names that don't say it can't be told apart: folder playlist
+  "14. Chersoń" (2026-11-12) has "Nosowska, Igo, Organek, Krzysztof Zalewski - Sobie i Wam" as
+  #6585 (Męskie Granie), which by name is the studio #3822 — MusicDatabase asks the owner there,
+  so don't guess; the stored `song_id` wins anyway. Before 0019 there are no projects.
 - `text_normalizer.dart` mirrors MusicDatabase's `normalize()`. Dart has no Unicode
   decomposition, so the accent table is generated from Python's `unicodedata`; regenerate rather
   than hand-edit it.

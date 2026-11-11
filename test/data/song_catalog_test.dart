@@ -374,6 +374,28 @@ void main() {
         ),
         isNull,
       );
+      // A joined credit: each of its artists credited by the song.
+      for (final artist in ['Artur Rojek i CatchUp', 'CatchUp & Artur Rojek']) {
+        expect(catalog.findByName(title: 'Pusty', artist: artist)?.id, 4);
+      }
+      expect(
+        catalog.findByName(title: 'Pusty', artist: 'Artur Rojek i Afina'),
+        isNull,
+      );
+      // … or their names side by side, a joint channel's.
+      for (final artist in ['Artur Rojek CatchUp', 'CatchUp Artur Rojek']) {
+        expect(catalog.findByName(title: 'Pusty', artist: artist)?.id, 4);
+      }
+      for (final artist in ['Artur Rojek Afina', 'Artur CatchUp']) {
+        expect(catalog.findByName(title: 'Pusty', artist: artist), isNull);
+      }
+      expect(
+        catalog.findByName(
+          title: 'Pusty (Live)',
+          artist: 'Artur Rojek i CatchUp',
+        ),
+        isNull,
+      );
       expect(
         catalog.findExact(
           title: 'Pay Your Respect (feat. CJ Pitts)',
@@ -452,6 +474,93 @@ void main() {
       await loadSample();
       expect(catalog.songs.where((s) => s.version != null), isEmpty);
       expect(catalog.otherVersionsOf(catalog.byId(1)!), isEmpty);
+    });
+
+    test('projects: names naming one match only its songs, names naming none '
+        'never do', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      await addProjects(
+        path,
+        {
+          1: ('Kaunas Acoustics', null, null),
+          2: (
+            'Tiny Desk',
+            'NPR Music Tiny Desk Concert,Tiny Desk Concert',
+            'NPR Music',
+          ),
+          3: ('Like a Version', 'triple j Like a Version', 'triple j'),
+          4: ('Męskie Granie', null, null),
+        },
+        {
+          40: ('Sobie i Wam', 7, null),
+          41: ('Sobie i Wam', 7, 4),
+          42: ('Boys', 8, 3),
+          43: ('Tiny Desk Concert', 9, 2),
+          44: ('Pieno Fabrikėlis', 10, 1),
+          45: ('Wojenka', 11, 4),
+        },
+        artists: {
+          7: 'Nosowska',
+          8: 'Wolf Alice',
+          9: 'Daughter',
+          10: 'Liūdni slibinai',
+          11: 'Męskie Granie Orkiestra 2016',
+        },
+      );
+      await catalog.ensureLoaded();
+
+      expect(catalog.byId(41)!.project, 'Męskie Granie');
+      expect(catalog.byId(41)!.title, 'Sobie i Wam');
+      expect(catalog.byId(40)!.project, isNull);
+
+      int? found(String title, String artist) =>
+          catalog.findByName(title: title, artist: artist)?.id;
+      expect(found('Sobie i Wam', 'Nosowska'), 40);
+      expect(found('Sobie i Wam (Męskie Granie 2018)', 'Nosowska'), 41);
+      expect(found('Sobie i Wam - Live at Męskie Granie', 'Nosowska'), 41);
+      expect(found('Sobie i Wam [MĘSKIE GRANIE]', 'Nosowska'), 41);
+      // Only the project as the artist: who plays isn't said, and the studio song isn't it.
+      expect(found('Sobie i Wam', 'Męskie Granie'), isNull);
+      // An artist whose name only contains the project keeps it.
+      expect(found('Wojenka', 'Męskie Granie Orkiestra 2016'), 45);
+      expect(found('Boys', 'Wolf Alice'), isNull);
+      expect(found('Boys (Like a Version)', 'Wolf Alice'), 42);
+      expect(found('Wolf Alice - Boys | Like a Version', 'triple j'), 42);
+      expect(found('Daughter: Tiny Desk Concert', 'NPR Music'), 43);
+      expect(found('Tiny Desk Concert', 'Daughter'), 43);
+      expect(
+        found('Pieno Fabrikėlis', 'Kaunas Acoustics : Liūdni slibinai'),
+        44,
+      );
+      expect(found('Pieno Fabrikėlis', 'Liūdni slibinai'), isNull);
+      // Swapped, as an upload titled "Title - Artist".
+      expect(found('Nosowska', 'Sobie i Wam (Męskie Granie)'), 41);
+      expect(
+        catalog.findExact(title: 'Sobie i Wam', artist: 'Nosowska')?.id,
+        40,
+      );
+      expect(
+        catalog
+            .findExact(
+              title: 'Sobie i Wam',
+              artist: 'Nosowska',
+              project: 'Męskie Granie',
+            )
+            ?.id,
+        41,
+      );
+    });
+
+    test('no projects in a music.db from before them', () async {
+      await loadSample();
+      expect(catalog.songs.where((s) => s.project != null), isEmpty);
+      expect(
+        catalog
+            .findByName(title: 'Małomiasteczkowy', artist: 'Dawid Podsiadło')
+            ?.id,
+        1,
+      );
     });
 
     test('no Latin forms in a music.db from before them', () async {

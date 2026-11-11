@@ -36,7 +36,8 @@ String? extractPlaylistId(String raw) {
 /// "| channel" suffixes, hashtags and junk brackets ("(Official Video)", "[HD]", "(2019)"), takes
 /// the artist from a "`<Artist> - Topic`" channel, else splits "Artist - Title", else uses the
 /// channel name. "Title - Lyric Video (English / French)" — junk only after the separator — is
-/// the left part by the channel. Real version markers (Remix, Live, feat., …) are kept.
+/// the left part by the channel. Real version markers (Remix, Live, feat., …) are kept, with the
+/// rest of their bracket: "(Live @ Odra, Wrocław / ZORZA 2025)" isn't junk for its year.
 ({String artist, String title}) parseYouTubeTrack(
   String videoTitle,
   String channel,
@@ -44,7 +45,11 @@ String? extractPlaylistId(String raw) {
   var title = videoTitle.replaceAll(_pipeSuffix, '');
   title = title.replaceAllMapped(
     _anyBracket,
-    (m) => _junkAnywhere.hasMatch(m.group(1)!) ? ' ' : m.group(0)!,
+    (m) =>
+        _junkAnywhere.hasMatch(m.group(1)!) &&
+            !_versionMarker.hasMatch(m.group(1)!)
+        ? ' '
+        : m.group(0)!,
   );
   final withHashtags = title;
   title = title.replaceAll(_hashtag, ' ').replaceAll(_spaces, ' ').trim();
@@ -119,14 +124,22 @@ final _junkSuffixWords = RegExp(
   caseSensitive: false,
 );
 
+/// A bracket naming a version of the song is never junk, whatever else it says: "(Live @ Odra,
+/// Wrocław / ZORZA 2025)", "(Official Acoustic Live Video)" (VERSION_MARKER_RE).
+final _versionMarker = RegExp(
+  r'\b(live|cover|remix|acoustic|extended|club edit|unplugged|demo|instrumental)\b',
+  caseSensitive: false,
+);
+
 String _stripJunkSuffix(String title) {
   var result = title.trim();
   while (true) {
     final match = _trailingBracket.firstMatch(result);
     if (match == null) return result;
     final content = match.group(1)!.trim();
-    if (!_junkPhrases.contains(content.toLowerCase()) &&
-        !_junkSuffixWords.hasMatch(content)) {
+    if (_versionMarker.hasMatch(content) ||
+        (!_junkPhrases.contains(content.toLowerCase()) &&
+            !_junkSuffixWords.hasMatch(content))) {
       return result;
     }
     result = result.substring(0, match.start).trim();
