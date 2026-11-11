@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -79,6 +80,64 @@ Future<int?> _probeServer(Uri uri) async {
     return response.statusCode;
   } catch (_) {
     return null;
+  } finally {
+    client.close(force: true);
+  }
+}
+
+/// Bytes in an MP3's ID3v2 tag, its 10-byte header (and footer) included; `null` when
+/// [header] doesn't start one.
+int? id3TagLength(List<int> header) {
+  if (header.length < 10 ||
+      String.fromCharCodes(header.take(3)) != 'ID3' ||
+      header.sublist(6, 10).any((b) => b > 0x7f)) {
+    return null;
+  }
+  final size = header.sublist(6, 10).fold(0, (size, b) => (size << 7) | b);
+  final footer = header[5] & 0x10 != 0 ? 10 : 0;
+  return 10 + size + footer;
+}
+
+/// The ID3v2 tag at the start of the server file at [uri] — where an MP3 keeps its cover — got
+/// with byte ranges, without the audio; `null` for a 404 or a file without one. Throws when
+/// the server can't be reached or can't read the file now.
+Future<Uint8List?> fetchServerFileHead(Uri uri) async {
+  const maxTagBytes = 16 * 1024 * 1024;
+  final client = ServerTrust.instance.client()
+    ..connectionTimeout = const Duration(seconds: 3);
+  Future<Uint8List?> firstBytes(int count) async {
+    final request = await client
+        .getUrl(uri)
+        .timeout(const Duration(seconds: 5));
+    request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-${count - 1}');
+    final response = await request.close().timeout(const Duration(seconds: 10));
+    if (response.statusCode == HttpStatus.notFound) {
+      await response.drain<void>();
+      return null;
+    }
+    if (response.statusCode != HttpStatus.partialContent &&
+        response.statusCode != HttpStatus.ok) {
+      await response.drain<void>();
+      throw HttpException('HTTP ${response.statusCode}', uri: uri);
+    }
+    final builder = BytesBuilder(copy: false);
+    // A server ignoring the range sends the whole song: stop once there's enough.
+    await for (final chunk in response.timeout(const Duration(seconds: 15))) {
+      builder.add(chunk);
+      if (builder.length >= count) break;
+    }
+    final bytes = builder.takeBytes();
+    return bytes.length > count
+        ? Uint8List.sublistView(bytes, 0, count)
+        : bytes;
+  }
+
+  try {
+    final header = await firstBytes(10);
+    if (header == null) return null;
+    final length = id3TagLength(header);
+    if (length == null || length > maxTagBytes) return null;
+    return await firstBytes(length);
   } finally {
     client.close(force: true);
   }
@@ -511,6 +570,22 @@ class TrackPlayer {
     }
     if (settings.queuePrefetchWifiOnly && !await _onWifi()) return false;
     return _cacheYouTube(hit, pin: false);
+  }
+
+  /// The tags at the start of server file [fileId] ([fetchServerFileHead]) from the first of
+  /// MusicDatabase's addresses that answers, for its cover.
+  Future<Uint8List?> serverFileHead(int fileId) async {
+    final addresses = await _serverAddresses();
+    if (addresses.isEmpty) throw StateError('No server address');
+    Object? failure;
+    for (final base in addresses) {
+      try {
+        return await fetchServerFileHead(base.resolve('library/$fileId'));
+      } catch (e) {
+        failure = e;
+      }
+    }
+    throw failure!;
   }
 
   /// "Pobierz": keeps [hit] on the phone for good, from the first source in the play order that

@@ -56,7 +56,8 @@ enum YouTubePlaybackMethod {
 /// Where an album cover can come from; the user switches them on and orders them in
 /// "Ustawienia › Okładki albumów". The first one that has a cover wins.
 enum CoverSource {
-  /// MusicDatabase's server — it has no covers yet (dummy).
+  /// The cover inside the song's file in MusicDatabase's music library on the server (or its
+  /// copy kept with "Pobierz") — MusicDatabase serves no covers of its own yet.
   server('Serwer'),
 
   /// The cover inside the music file on the phone.
@@ -71,10 +72,7 @@ enum CoverSource {
 
   final String label;
 
-  static const defaults = {file, itunes, deezer, youtube};
-
-  /// Not usable yet; shown switched off.
-  bool get available => this != server;
+  static const defaults = {server, file, itunes, deezer, youtube};
 }
 
 /// The music source settings (Ustawienia › YouTube, Spotify, Odtwarzanie). Saved in
@@ -272,7 +270,7 @@ class SourceSettings extends ChangeNotifier {
   /// The switched-on, usable cover sources in the user's order.
   List<CoverSource> get activeCoverSources => [
     for (final s in _coverOrder)
-      if (s.available && _coverSources.contains(s)) s,
+      if (_coverSources.contains(s)) s,
   ];
 
   /// Size limit of the cover cache, in MB.

@@ -15,7 +15,7 @@ class CoverSourcesScreen extends StatefulWidget {
 class _CoverSourcesScreenState extends State<CoverSourcesScreen> {
   String _note(CoverSource s) => switch (s) {
     CoverSource.server =>
-      'Jeszcze niedostępne — serwer bazy danych nie ma okładek',
+      'Okładka zapisana w pliku z biblioteki muzyki na serwerze bazy danych',
     CoverSource.file => 'Okładka zapisana w pliku muzycznym na telefonie',
     CoverSource.itunes => 'Wyszukiwanie albumu w iTunes',
     CoverSource.deezer => 'Wyszukiwanie albumu w serwisie Deezer',
@@ -71,12 +71,8 @@ class _CoverSourcesScreenState extends State<CoverSourcesScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Switch(
-                    value:
-                        source.available &&
-                        settings.coverSources.contains(source),
-                    onChanged: source.available
-                        ? (v) => settings.setCoverSource(source, v)
-                        : null,
+                    value: settings.coverSources.contains(source),
+                    onChanged: (v) => settings.setCoverSource(source, v),
                   ),
                   ReorderableDragStartListener(
                     index: i,

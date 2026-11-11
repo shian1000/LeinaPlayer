@@ -28,6 +28,7 @@ class CoverRequest {
     String? album,
     this.videoId,
     this.filePath,
+    this.serverFileId,
     required this.seed,
     this.searchable = true,
     this.videoSearch,
@@ -39,6 +40,7 @@ class CoverRequest {
     album: hit.album,
     videoId: hit.youtubeVideoId ?? hit.playlistVideoId,
     filePath: hit.phoneFiles.firstOrNull?.filePath,
+    serverFileId: hit.serverFile?.id,
     seed: hit.coverSeed,
     videoSearch:
         hit.mainSong?.youTube == YouTubeLink.unknown && !hit.notFoundOnYouTube
@@ -64,6 +66,9 @@ class CoverRequest {
   final String? videoId;
   final String? filePath;
 
+  /// `files.id` of the song's file in MusicDatabase's music library.
+  final int? serverFileId;
+
   /// Seed for the placeholder cover shown until (or instead of) a real one.
   final String seed;
 
@@ -84,6 +89,7 @@ class CoverRequest {
           album: album,
           videoId: id,
           filePath: filePath,
+          serverFileId: serverFileId,
           seed: seed,
           searchable: searchable,
           videoSearch: videoSearch,
@@ -100,7 +106,8 @@ class CoverRequest {
       'video:${normalizeForSearch(artist)}|${normalizeForSearch(title)}';
 
   /// Requests with the same identity get the same cover.
-  late final String identity = '$lookupKey|$videoId|$filePath|$searchable';
+  late final String identity =
+      '$lookupKey|$videoId|$filePath|$serverFileId|$searchable';
 
   /// [album] if it's really one album, else `null`.
   static String? realAlbum(String? album) {
@@ -128,10 +135,16 @@ typedef FindVideoId = Future<String?> Function(SearchHit hit);
 /// Image bytes, `null` for 404 (e.g. a video without a high-resolution thumbnail).
 typedef GetBytes = Future<Uint8List?> Function(Uri uri);
 
+/// The beginning of a server file (`files.id`) holding its tags; `null` when the server hasn't
+/// got the file or it has no tags there. Throws when no server can be reached.
+typedef ServerFileHead = Future<Uint8List?> Function(int fileId);
+
 /// Album covers from the user's [CoverSource]s, in their order (ADR 0003 lite logic: MusicDatabase
 /// has no covers yet — see `docs/handoffs/musicdatabase-albums-and-covers.md`).
 ///
 /// - A phone file's own cover is read from the file each time (kept in memory while recent).
+/// - A server file's own cover is read from the file's tags, fetched without the audio, and kept
+///   in the cover cache like a downloaded image.
 /// - iTunes/Deezer answers are remembered per album in `local.db` (`cover_lookups`), a "no cover"
 ///   for 30 days, so each album is asked once; these services limit how often they may be asked.
 /// - Downloaded images (iTunes, Deezer, YouTube thumbnails) are kept in `<support
@@ -148,6 +161,8 @@ class AlbumCovers extends ChangeNotifier {
     Future<bool> Function()? onWifi,
     Future<Uint8List?> Function(String path)? readEmbedded,
     this._findVideoId,
+    this._serverFileCopy,
+    this._serverFileHead,
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
        _now = now ?? DateTime.now,
        _getJson = getJson ?? _httpGetJson,
@@ -167,6 +182,10 @@ class AlbumCovers extends ChangeNotifier {
   final Future<bool> Function() _onWifi;
   final Future<Uint8List?> Function(String path) _readEmbedded;
   final FindVideoId? _findVideoId;
+
+  /// Where "Pobierz" keeps a server file (`files.id`) on the phone; `null` when it doesn't.
+  final Future<String?> Function(int fileId)? _serverFileCopy;
+  final ServerFileHead? _serverFileHead;
 
   static const _retryMissingAfter = Duration(days: 30);
 
@@ -332,6 +351,10 @@ class AlbumCovers extends ChangeNotifier {
     return urls == null ? null : _thumbnail(urls, large, wanted);
   }
 
+  /// The cache's key of a server file's cover: no URL, as the server's address changes (home
+  /// network or remote) and the file is fetched only in part.
+  static const _serverFilePrefix = 'server-file:';
+
   static CoverUrls _thumbnailUrls(String videoId) => CoverUrls(
     'https://i.ytimg.com/vi/$videoId/mqdefault.jpg',
     'https://i.ytimg.com/vi/$videoId/maxresdefault.jpg',
@@ -354,7 +377,21 @@ class AlbumCovers extends ChangeNotifier {
   ) async {
     switch (source) {
       case CoverSource.server:
-        return null;
+        final id = request.serverFileId;
+        if (id == null) return null;
+        if (await _serverFileCopy?.call(id) case final path?) {
+          final bytes = await _embeddedCover(path);
+          return bytes == null ? null : MemoryImage(bytes);
+        }
+        if (_serverFileHead == null) return null;
+        final paused = _pausedUntil[source];
+        if (paused != null && _now().isBefore(paused)) return null;
+        try {
+          return await _image('$_serverFilePrefix$id', wanted);
+        } catch (_) {
+          _pausedUntil[source] = _now().add(const Duration(minutes: 1));
+          rethrow;
+        }
       case CoverSource.file:
         final path = request.filePath;
         if (path == null) return null;
@@ -508,7 +545,9 @@ class AlbumCovers extends ChangeNotifier {
     var asked = false;
     final bytes = await _downloads.run(() {
       asked = true;
-      return _getBytes(Uri.parse(url));
+      return url.startsWith(_serverFilePrefix)
+          ? _serverCover(int.parse(url.substring(_serverFilePrefix.length)))
+          : _getBytes(Uri.parse(url));
     }, wanted);
     if (asked && bytes == null) await _rememberMissing(url);
     if (bytes == null || bytes.isEmpty) return null;
@@ -525,6 +564,22 @@ class AlbumCovers extends ChangeNotifier {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
     await _trim(keep: url);
     return _cache.containsKey(url) ? file : null;
+  }
+
+  /// Only the file's tags are fetched, not the whole song; the picture is read from them as from
+  /// a phone file.
+  Future<Uint8List?> _serverCover(int fileId) async {
+    final head = await _serverFileHead!(fileId);
+    if (head == null) return null;
+    final file = File(
+      '${(await _cacheDir()).path}/server_${fileId}_${_fileCounter++}.head',
+    );
+    try {
+      await file.writeAsBytes(head, flush: true);
+      return await _readEmbedded(file.path);
+    } finally {
+      if (await file.exists()) await file.delete();
+    }
   }
 
   Future<void> _touch(String url, _CacheEntry entry) async {

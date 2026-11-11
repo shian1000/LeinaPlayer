@@ -55,7 +55,7 @@ player's YouTube button asks song or music video; play history in
 [ADR 0012](docs/decisions/0012-listening-stats.md)): every play with how long it was really
 heard, counted from that version on and synced with the account; top songs / artists / albums
 and shares over 4 weeks – everything, the week's highlights, and Wrapped-like cards for each
-year and season (meteorological), the last one shared as a picture. Album covers from the phone file, iTunes, Deezer or the YouTube
+year and season (meteorological), the last one shared as a picture. Album covers from the server's or the phone's file, iTunes, Deezer or the YouTube
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
 (synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Names in another

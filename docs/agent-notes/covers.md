@@ -5,10 +5,16 @@
 placeholder `CoverArt`). Lite logic per ADR 0003: MusicDatabase has no covers yet; the hand-off
 asking it for an `albums` table and covers is
 [`../handoffs/musicdatabase-albums-and-covers.md`](../handoffs/musicdatabase-albums-and-covers.md).
-Once it has them, the "Serwer" source (now a dummy) should read them, keyed on `album_id`.
+Once it has them, the "Serwer" source should read them too, keyed on `album_id`.
 
 - **Sources**, the user's order (`SourceSettings.coverOrder`/`coverSources`, Ustawienia › Źródła
-  okładek): Serwer (dummy), Plik na telefonie (the file's own picture, `audio_metadata_reader`
+  okładek): Serwer (the picture inside the song's file in the server's music library —
+  `CoverRequest.serverFileId`; from the "Pobierz" copy when there is one, else only the file's
+  ID3v2 tag is fetched with two byte ranges, `fetchServerFileHead` in `track_player.dart` —
+  ~100 KB, not the song; the picture is cached as `server-file:<files.id>` in `cover_cache`, a
+  file without one is remembered as `missing_image` for 30 days, an unreachable server pauses
+  the source for a minute; every library file is MP3 so far — another format's tags aren't
+  read), Plik na telefonie (the file's own picture, `audio_metadata_reader`
   in an isolate — files can hold multi-MB images), iTunes Search API, Deezer search API, YouTube
   thumbnail (`mqdefault` for lists; `maxresdefault`, falling back to `mqdefault`, for the full
   player — `hqdefault`/`sddefault` are 4:3 with black bars). The first source with a cover wins.

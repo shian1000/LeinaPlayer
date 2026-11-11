@@ -112,7 +112,8 @@ class PrivacyScreen extends StatelessWidget {
 
           const SectionTitle('Serwer MusicDatabase'),
           text(
-            'Baza utworów, Twoje pliki muzyczne (źródło „Serwer”) i zgłoszenia poprawek. Po '
+            'Baza utworów, Twoje pliki muzyczne (źródło „Serwer”; też okładki zapisane w tych '
+            'plikach — sam początek pliku, bez muzyki) i zgłoszenia poprawek. Po '
             'zalogowaniu także synchronizacja konta: playlisty, nastroje, foldery, okładki, '
             'polubione, „Na później”, linki na później (z imieniem nadawcy) i każde '
             'odtworzenie — co, kiedy, jak długo i skąd. Przy logowaniu wysyła też model '

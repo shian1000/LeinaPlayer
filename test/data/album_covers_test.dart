@@ -326,6 +326,111 @@ void main() {
     );
   });
 
+  group('the cover in a server file', () {
+    late List<int> heads;
+    late Uint8List? Function(int id) head;
+    late Map<int, String> copies;
+
+    AlbumCovers serverCovers({Map<String, Uint8List> embedded = const {}}) =>
+        AlbumCovers(
+          local.database,
+          settings,
+          storageRoot: () async => root,
+          getJson: (uri) async {
+            asked.add(uri);
+            return answer(uri);
+          },
+          getBytes: (uri) async {
+            downloaded.add(uri);
+            return Uint8List(imageSize);
+          },
+          onWifi: () async => onWifi,
+          // The tags fetched stand for the picture they hold.
+          readEmbedded: (path) async {
+            if (embedded[path] case final bytes?) return bytes;
+            final file = File(path);
+            if (!file.existsSync()) return null;
+            final bytes = file.readAsBytesSync();
+            return bytes.isEmpty ? null : bytes;
+          },
+          serverFileCopy: (id) async => copies[id],
+          serverFileHead: (id) async {
+            heads.add(id);
+            return head(id);
+          },
+        );
+
+    CoverRequest onServer(String title, int id) => CoverRequest(
+      artist: 'Hey',
+      title: title,
+      album: 'Karma',
+      serverFileId: id,
+      seed: title,
+    );
+
+    setUp(() {
+      heads = [];
+      head = (_) => Uint8List(50);
+      copies = {};
+    });
+
+    test('is read from the file\'s tags, before iTunes, and kept', () async {
+      final covers = serverCovers();
+      expect(await covers.resolve(onServer('A', 7)), isA<FileImage>());
+      expect(heads, [7]);
+      expect(asked, isEmpty);
+      expect(covers.cachedCount, 1);
+      // Only the picture stays, not the tags fetched.
+      expect(
+        Directory('${root.path}/cover_cache')
+            .listSync()
+            .where((f) => f.path.endsWith('.head')),
+        isEmpty,
+      );
+
+      final restarted = serverCovers();
+      await restarted.load();
+      expect(await restarted.resolve(onServer('A', 7)), isA<FileImage>());
+      expect(heads, [7]);
+    });
+
+    test(
+      'a file without a cover is remembered, the next source tried',
+      () async {
+        head = (_) => null;
+        answer = (_) => {
+          'results': [_itunesAlbum('Hey', 'Karma')],
+        };
+        final covers = serverCovers();
+        expect(await covers.resolve(onServer('A', 7)), isA<FileImage>());
+        expect(asked, hasLength(1));
+        await covers.resolve(onServer('B', 7));
+        expect(heads, [7]);
+      },
+    );
+
+    test('an unreachable server is no answer, asked again later', () async {
+      head = (_) => throw const SocketException('unreachable');
+      final covers = serverCovers();
+      expect(await covers.resolve(onServer('A', 7)), isNull);
+      // Skipped for a minute, not remembered as "no cover".
+      await covers.resolve(onServer('B', 8));
+      expect(heads, [7]);
+      head = (_) => Uint8List(50);
+      final restarted = serverCovers();
+      await restarted.load();
+      expect(await restarted.resolve(onServer('A', 7)), isA<FileImage>());
+      expect(heads, [7, 7]);
+    });
+
+    test('a copy kept with "Pobierz" needs no server', () async {
+      copies = {7: '/d/a.mp3'};
+      final covers = serverCovers(embedded: {'/d/a.mp3': Uint8List(10)});
+      expect(await covers.resolve(onServer('A', 7)), isA<MemoryImage>());
+      expect(heads, isEmpty);
+    });
+  });
+
   test('switched-off sources are skipped, in the user\'s order', () async {
     await settings.setCoverSource(CoverSource.itunes, false);
     await settings.setCoverSource(CoverSource.deezer, false);
