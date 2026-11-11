@@ -217,7 +217,7 @@ class StoredSongList extends ChangeNotifier {
 
 /// Songs saved to listen to later — kept apart from playlists and liked songs, so trying
 /// something out doesn't mix it into the user's favourites (Juxtopposed's Spotify redesign).
-/// Newest first (Biblioteka › Na później).
+/// Newest first (Home's "Na później" row).
 class SavedSongs extends StoredSongList {
   SavedSongs({super.now, super.userName}) : super('saved_songs', 'later');
 }

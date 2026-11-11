@@ -12,17 +12,11 @@ import '../widgets/playlist_picker.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 
-/// Biblioteka › Na później ([SavedSongs]) and Polubione utwory ([LikedSongs]): the songs,
-/// newest first.
+/// Biblioteka › Polubione utwory ([LikedSongs]): the songs, newest first. Songs saved "Na
+/// później" are shown only by Home's row of that name, so Biblioteka has no list of them to
+/// mix up with Ja › Na później's links (user's decision).
 class SavedSongsScreen extends StatelessWidget {
-  const SavedSongsScreen({super.key}) : liked = false;
-
-  const SavedSongsScreen.liked({super.key}) : liked = true;
-
-  final bool liked;
-
-  static Future<void> open(BuildContext context) => Navigator.of(context)
-      .push(MaterialPageRoute<void>(builder: (_) => const SavedSongsScreen()));
+  const SavedSongsScreen.liked({super.key});
 
   static Future<void> openLiked(BuildContext context) => Navigator.of(context)
       .push(
@@ -32,10 +26,8 @@ class SavedSongsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final StoredSongList? saved = liked
-        ? LikedSongsScope.maybeOf(context)
-        : SavedSongsScope.maybeOf(context);
-    final id = liked ? likedSongsLabel : 'Na później';
+    final StoredSongList? saved = LikedSongsScope.maybeOf(context);
+    const id = likedSongsLabel;
     final catalog = SongCatalogScope.of(context);
     final library = LocalLibraryScope.of(context);
     final youTube = YouTubeLibraryScope.of(context);
@@ -72,12 +64,9 @@ class SavedSongsScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Text(
-                  liked
-                      ? 'Nic tu jeszcze nie ma. Polub utwór w „Dodaj do playlisty” '
-                            '— przyciskiem ⊕ przy tytule w odtwarzaczu albo z menu ⋮ '
-                            'utworu.'
-                      : 'Nic tu jeszcze nie ma. Zapisz utwór zakładką w „Odkrywaj” '
-                            'albo z menu ⋮ utworu: „Zapisz na później”.',
+                  'Nic tu jeszcze nie ma. Polub utwór w „Dodaj do playlisty” '
+                  '— przyciskiem ⊕ przy tytule w odtwarzaczu albo z menu ⋮ '
+                  'utworu.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.textSecondary),
                 ),

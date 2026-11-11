@@ -778,15 +778,16 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
 - Utwórz (+) **→ sheet "Utwórz"** with prefix `Biblioteka › Utwórz (+)` (see below)
 - Categories (rows with counts, each **→ its own list**, `LibraryCategoryScreen` with the sort
   button and "+"): Polubione utwory **→ Polubione utwory** (`SavedSongsScreen.liked`: liked songs
-  newest first, "Odtwórz", song rows — like Na później below), Playlisty (not albums), Albumy (Spotify album imports), Nastroje ("Brak
+  newest first, "Odtwórz", song rows (dragged left: taken out), ⋮: Dodaj do kolejki /
+  Odtwórz jako następny (every song)), Playlisty (not albums), Albumy (Spotify album imports), Nastroje ("Brak
   nastrojów" and how to add one when there are none), Foldery (only folders), Wykonawcy
   (**implemented**, `ArtistsScreen`: every artist in music.db and of the phone's songs not in it,
-  with song counts, alphabetically, a field to narrow it — **→ the artist's songs**), Na później **→ Na później** (`saved_songs_screen.dart`: saved songs newest first,
-  "Odtwórz", song rows (dragged left: taken out — also in Polubione utwory), ⋮: Dodaj do kolejki /
-  Odtwórz jako następny (every song); saved / taken out with the song menu's "Zapisz na później" / "Usuń z „Na
-  później”" or Odkrywaj's bookmark — `SavedSongs`, synced with the account, ADR 0013), Dynamiczne playlisty **→
+  with song counts, alphabetically, a field to narrow it — **→ the artist's songs**), Dynamiczne playlisty **→
   Dynamiczne playlisty** (`smart_playlist_screen.dart`, below). A category shows its playlists /
-  moods outside folders plus the folders holding any of them (inside, only those).
+  moods outside folders plus the folders holding any of them (inside, only those). No Na później
+  category: songs saved with the song menu's "Zapisz na później" or Odkrywaj's bookmark
+  (`SavedSongs`, synced, ADR 0013) show only in Home's "Na później" row, so they aren't mixed
+  up with Ja › Na później's links (user's decision).
 - Below the categories: everything — folders, playlists and moods outside folders, mixed in the
   sort order — and over it the **filter chips** (**implemented**): Playlisty, Albumy, Nastroje,
   Foldery. Any of them together, none ticked shows everything, remembered on the phone

@@ -68,7 +68,7 @@ List<LibraryEntry> _libraryEntries(
 }
 
 /// Biblioteka: a search over it, its categories (Playlisty, Albumy, Nastroje, Foldery,
-/// Wykonawcy, Na później, Dynamiczne playlisty — each its own list, after Juxtopposed's Spotify
+/// Wykonawcy, Dynamiczne playlisty — each its own list, after Juxtopposed's Spotify
 /// redesign), then everything, in folders or not, ordered by "Sortuj wg", narrowed by filter
 /// chips that are remembered (in [LibraryFolders]). The search goes over everything regardless.
 class LibraryScreen extends StatefulWidget {
@@ -199,7 +199,6 @@ class _Categories extends StatelessWidget {
         .length;
     final moods = MoodLibraryScope.maybeOf(context);
     final folders = LibraryFoldersScope.maybeOf(context)?.folders.length;
-    final saved = SavedSongsScope.maybeOf(context);
     final liked = LikedSongsScope.maybeOf(context);
     final smart = SmartPlaylistsScope.maybeOf(context);
     void open(LibraryCategory category) => Navigator.of(context).push(
@@ -250,13 +249,6 @@ class _Categories extends StatelessWidget {
             MaterialPageRoute<void>(builder: (_) => const ArtistsScreen()),
           ),
         ),
-        if (saved != null)
-          _CategoryRow(
-            icon: Icons.bookmark_border,
-            label: 'Na później',
-            count: saved.songs.length,
-            onTap: () => SavedSongsScreen.open(context),
-          ),
         if (smart != null)
           _CategoryRow(
             icon: Icons.auto_mode,

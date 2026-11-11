@@ -83,8 +83,9 @@ Biblioteka, Ja (the profile, no avatar or drawer); Home's rows arranged by the u
 hide, rows from Biblioteka — `home_layout.dart`); Odkrywaj — one song at a time from all of
 MusicDatabase or a mood; Biblioteka as categories, with "Polubione utwory" (liked in the
 "Dodaj do playlisty" sheet / submenu or with the players' heart — a like is always a heart, empty or full, user's rule),
-songs saved "Na później" (both `saved_songs.dart`, synced with the account —
-[ADR 0013](docs/decisions/0013-saved-songs-sync.md)) and dynamic playlists — a saved search filter
+(`saved_songs.dart`, synced with the account — [ADR 0013](docs/decisions/0013-saved-songs-sync.md);
+songs saved "Na później", synced the same way, are shown only by Home's row — no Biblioteka
+category, not to be mixed up with Ja › Na później's links, user's decision) and dynamic playlists — a saved search filter
 (`smart_playlists.dart`, phone only); the full player's queue button opens the whole queue, and lyrics (looked
 up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the player, above
 "Informacje o utworze" (user's layout: bottom row YouTube, mood filter, share, queue, ⋮; a mood
