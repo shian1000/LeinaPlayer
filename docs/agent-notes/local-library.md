@@ -12,8 +12,22 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 - The file-name fallback ports the first two stages of MusicDatabase's `split_artist_title()`
   (spaced ` - `/` – `/` — `/` _ `, then bare `-`/`_`/`~`). Names with neither (e.g. double
   spaces) get no artist and show as "Nieznany wykonawca"; that's inherited, not a bug here.
-- Matching is `SongCatalog.findExact`: normalized title equal **and** normalized artist equal to
-  one of the song's artists, the whole "A feat. B" label, or an artist synonym.
+- Matching is `SongCatalog.findByName`: first `findExact` — normalized title equal **and**
+  normalized artist equal to one of the song's artists, the whole "A feat. B" label, or an
+  artist synonym — then the title without its feat. credits (`withoutFeatCredits`, music.db
+  keeps them out of `songs.title`), then artist and title swapped (fan uploads titled "Title -
+  Artist"). Other markers ("(Bonus track)", "(Live)") are never dropped: on playlist "Ibis"
+  (2026-11-11) the bonus track was a different recording (262 s vs 215 s).
+- Versions (music.db's `songs.version_kind` / `version_label` / `version_of`, MusicDatabase's
+  migration 0022 and ADR-0007) are rows of their own titled **without** the marker, so the
+  normalized title alone would match the studio row and the live one alike. `findExact` asks
+  `SongCatalog._titled` (lite `songs_for_entry()`): a title whose marker names a version
+  (`readVersion`, `version_names.dart`, lite `read_version()`) matches only versions of that
+  kind — the same marker first ("Live at Opener"), then rows still titled with the marker, then
+  other markers of the kind; a title without one never matches a version. A release's marker
+  ("Radio Edit", "Album Version", "Remastered", "Bonus track") is no version, and a plain
+  "(Version)" narrows nothing (a version with that marker, else a row titled so). Before 0022
+  the columns are missing and there are no versions.
 - `text_normalizer.dart` mirrors MusicDatabase's `normalize()`. Dart has no Unicode
   decomposition, so the accent table is generated from Python's `unicodedata`; regenerate rather
   than hand-edit it.

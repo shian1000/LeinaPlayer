@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart';
 import '../data/album_covers.dart';
 import '../data/cover_credit.dart';
 import '../data/latin_names.dart';
+import '../data/version_names.dart';
 import 'interrupted_players.dart';
 import 'server_audio_source.dart';
 
@@ -28,6 +29,7 @@ class NowPlaying {
     this.titleLatin,
     this.artistLatin,
     this.coverOf,
+    this.version,
   }) : _givenCover = cover;
 
   final String title;
@@ -39,6 +41,9 @@ class NowPlaying {
 
   /// Whose song this is a cover of ([SearchHit.coverOf]).
   final CoverOf? coverOf;
+
+  /// What kind of version of another song this is ([SearchHit.version]).
+  final SongVersion? version;
 
   /// A file path on the phone, or an http(s) address of a stream.
   final String source;
@@ -210,7 +215,10 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
     final item = MediaItem(
       id: track.youtubeVideoId ?? track.source,
       title: titleWithCover(
-        latinNames ? withLatin(track.title, track.titleLatin) : track.title,
+        titleWithVersion(
+          latinNames ? withLatin(track.title, track.titleLatin) : track.title,
+          track.version,
+        ),
         track.coverOf,
         latin: latinNames,
       ),

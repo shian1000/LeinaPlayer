@@ -7,6 +7,7 @@ import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/outbox.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
+import 'package:music_database_app/src/playback/player_controller.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/widgets/song_info.dart';
 import 'package:music_database_app/src/widgets/song_tile.dart';
@@ -14,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../data/fixtures.dart';
+import '../playback_test.dart' show FakeBackend;
 import '../support/waiting.dart';
 
 void main() {
@@ -599,6 +601,64 @@ void main() {
     expect(find.text('Tytuł alfabetem łacińskim'), findsNothing);
     expect(find.text('Nazwa alfabetem łacińskim'), findsNothing);
 
+    sync.dispose();
+    await tester.runAsync(() => root.delete(recursive: true));
+  });
+
+  testWidgets('a version: its kind, and "Inne wersje" with the original and '
+      'its other versions, each with its marker', (tester) async {
+    databaseFactory = databaseFactoryFfi;
+    SharedPreferences.setMockInitialValues({});
+    late Directory root;
+    late DatabaseSync sync;
+    late SongCatalog catalog;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('song_info_test');
+      sync = DatabaseSync(storageRoot: () async => root);
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN version_kind TEXT');
+      await db.execute('ALTER TABLE songs ADD COLUMN version_label TEXT');
+      await db.execute('ALTER TABLE songs ADD COLUMN version_of INTEGER');
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, artist_id, version_kind, '
+        'version_label, version_of) VALUES '
+        "(30, 'Boję się', 5, NULL, NULL, NULL), "
+        "(31, 'Boję się', 5, 'live', NULL, 30), "
+        "(32, 'Boję się', 5, 'remix', 'Ptaki Remix', 30)",
+      );
+      await db.close();
+      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      await catalog.ensureLoaded();
+    });
+    final player = PlayerController(backend: FakeBackend.new);
+    await tester.pumpWidget(
+      SongCatalogScope(
+        notifier: catalog,
+        child: PlayerScope(
+          notifier: player,
+          child: app(
+            SongInfoCard(hit: SearchHit.main(catalog.byId(31)!, const [])),
+            sync: sync,
+          ),
+        ),
+      ),
+    );
+    await pumpUntil(
+      tester,
+      () => find.text('Inne wersje').evaluate().isNotEmpty,
+    );
+
+    expect(find.text('Wersja'), findsOneWidget);
+    expect(find.text('Live'), findsOneWidget);
+    expect(find.text('version_kind'), findsNothing);
+    expect(find.text('Boję się (Ptaki Remix)'), findsOneWidget);
+    // The title field and the original's row: the marker is never part of the title.
+    expect(find.text('Boję się'), findsNWidgets(2));
+    expect(find.text('Boję się (Live)'), findsNothing);
+
+    catalog.dispose();
     sync.dispose();
     await tester.runAsync(() => root.delete(recursive: true));
   });

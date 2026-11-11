@@ -148,14 +148,14 @@ class PlaylistTrack {
   String? get playableVideoId => videoRemoved ? null : youtubeVideoId;
 }
 
-/// The MusicDatabase song [track] is by its exact title and artist ([SongCatalog.findExact]),
+/// The MusicDatabase song [track] is by its title and artist ([SongCatalog.findByName]),
 /// for a track saved before music.db had the song (or from a server folder, never matched on
 /// import). A track without an artist isn't guessed at.
 CatalogSong? playlistSongByName(PlaylistTrack track, SongCatalog catalog) {
   final artist = track.artist;
   return artist == null
       ? null
-      : catalog.findExact(title: track.title, artist: artist);
+      : catalog.findByName(title: track.title, artist: artist);
 }
 
 /// How long [track] is, worked out when reading (hand-off
@@ -1119,7 +1119,7 @@ class PlaylistLibrary extends ChangeNotifier {
     final artists = {track.artists.join(', '), ...track.artists};
     for (final title in titles) {
       for (final artist in artists) {
-        final song = _catalog.findExact(title: title, artist: artist);
+        final song = _catalog.findByName(title: title, artist: artist);
         if (song != null) return song;
       }
     }
@@ -1127,7 +1127,8 @@ class PlaylistLibrary extends ChangeNotifier {
   }
 
   /// The MusicDatabase song a YouTube video is: first by the video itself (music.db's
-  /// `youtube_video_id`, then a video the phone matched earlier), then by artist and title.
+  /// `youtube_video_id`, then a video the phone matched earlier), then by artist and title
+  /// ([SongCatalog.findByName]).
   CatalogSong? matchSong({
     required String videoId,
     required String artist,
@@ -1140,7 +1141,7 @@ class PlaylistLibrary extends ChangeNotifier {
       final song = _catalog.byId(phoneMatched);
       if (song != null) return song;
     }
-    return _catalog.findExact(title: title, artist: artist);
+    return _catalog.findByName(title: title, artist: artist);
   }
 
   /// Removes the playlist. An account's playlist stays as a marker without tracks until

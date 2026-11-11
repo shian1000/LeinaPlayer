@@ -9,6 +9,7 @@ import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/incoming_links.dart';
 import '../data/latin_names.dart';
+import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/outbox.dart';
 import '../data/song_catalog.dart';
@@ -19,6 +20,7 @@ import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'song_tile.dart';
 
 /// "Wyświetl informacje o utworze" from a song's menu: the same [SongInfoCard] as under the
 /// full player, in a sheet that can be dragged up to the whole screen.
@@ -158,6 +160,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
           ),
         if (details.album != null) _albumSection(details),
       ],
+      if (mainSong != null) _versionsSection(mainSong),
       _linksSection(details),
       _moodsSection(context, details),
       _phoneSection(),
@@ -169,6 +172,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
     const shownElsewhere = {
       'artist_id',
       'covered_artist_id',
+      'version_kind',
+      'version_label',
+      'version_of',
       'album_id',
       'youtube_video_id',
       'music_video_youtube_id',
@@ -181,11 +187,43 @@ class _SongInfoCardState extends State<SongInfoCard> {
         else if (!shownElsewhere.contains(key))
           _editableField('songs', song, key, _songLabels[key] ?? key),
       _Field('Cover utworu wykonawcy', details.coveredArtist),
+      if (widget.hit.version case final version?)
+        _Field('Wersja', [version.kind.label, ?version.label].join(' · ')),
       for (final former in details.formerIds)
         _Field(
           'Dawne ID',
           '${former.id}${former.changedAt == null ? '' : ' (do ${former.changedAt})'}',
         ),
+    ]);
+  }
+
+  /// "Inne wersje": the original and its versions (`songs.version_of`), as song rows to play.
+  Widget _versionsSection(CatalogSong song) {
+    final catalog = SongCatalogScope.maybeOf(context);
+    final versions = catalog?.otherVersionsOf(song) ?? const [];
+    if (versions.isEmpty) return const SizedBox.shrink();
+    final library = LocalLibraryScope.maybeOf(context);
+    final youTube = YouTubeLibraryScope.maybeOf(context);
+    SearchHit hitOf(CatalogSong song) {
+      final hit = SearchHit.main(song, library?.filesOf(song.id) ?? const []);
+      return youTube == null ? hit : withPhoneYouTube(hit, youTube);
+    }
+
+    return _Section('Inne wersje', [
+      // The card is padded already.
+      ListTileTheme.merge(
+        contentPadding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            for (final version in versions)
+              SongTile(
+                hit: hitOf(version),
+                menuIdPrefix:
+                    'Informacje o utworze › Inne wersje › Utwór › Menu (⋮)',
+              ),
+          ],
+        ),
+      ),
     ]);
   }
 

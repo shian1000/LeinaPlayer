@@ -8,10 +8,12 @@ import 'package:sqflite/sqflite.dart';
 
 import 'cover_credit.dart';
 import 'database_sync.dart';
+import 'feat_credit.dart';
 import 'latin_names.dart';
 import 'playlist_library.dart';
 import 'song_requests.dart';
 import 'text_normalizer.dart';
+import 'version_names.dart';
 import 'youtube_matcher.dart';
 
 /// What song search can look at, chosen with the filter icon on the Wyszukaj tab.
@@ -164,6 +166,7 @@ class CatalogSong {
     String? albumLatin,
     this.artistLatin,
     this.coverOf,
+    this.version,
     this.serverFile,
   }) : countries = [
          ...{
@@ -183,6 +186,7 @@ class CatalogSong {
              mainArtists: [MatchArtist(artistLabel)],
              fullAlbum: kind == SongKind.fullAlbum,
              coverOf: coverOf?.name,
+             version: version?.marker,
            ),
        youtubeVideoId = _videoIdOf(youtubeVideoId),
        youTube = _youTubeLinkOf(youtubeVideoId),
@@ -202,6 +206,7 @@ class CatalogSong {
                title,
                ?titleLatin,
                ?coverOf?.searchText,
+               ?version?.marker,
              ].join(' '),
              SearchField.artist => [
                if (artistNames.isEmpty) artistLabel else ...artistNames,
@@ -228,6 +233,7 @@ class CatalogSong {
       titleLatin = song.titleLatin,
       artistLatin = song.artistLatin,
       coverOf = song.coverOf,
+      version = song.version,
       albumLatin = song.albumLatin,
       year = song.year,
       language = song.language,
@@ -296,6 +302,10 @@ class CatalogSong {
   /// What this song is a cover of, `null` for most songs. A covered artist is never one of
   /// its artists: [artistLabel] stays the performer.
   final CoverOf? coverOf;
+
+  /// What kind of version of another song this row is (live, a remix…), `null` for most songs
+  /// (and before music.db has the columns). [title] stays without the marker.
+  final SongVersion? version;
   final int? year;
   final String? language;
 
@@ -543,6 +553,7 @@ class SongCatalog extends ChangeNotifier {
         _artistByName = null;
         _byYouTubeId = null;
         _byId = null;
+        _versionsByOriginal = null;
         _status = CatalogStatus.ready;
       }
       _loadedSyncTime = syncTime;
@@ -560,6 +571,7 @@ class SongCatalog extends ChangeNotifier {
       _artistByName = null;
       _byYouTubeId = null;
       _byId = null;
+      _versionsByOriginal = null;
       _loading = null;
       notifyListeners();
     }
@@ -655,6 +667,9 @@ class SongCatalog extends ChangeNotifier {
                ${column('kind')} AS kind,
                $albumLatin AS album_latin,
                ${column('covered_title')} AS covered_title,
+               ${column('version_kind')} AS version_kind,
+               ${column('version_label')} AS version_label,
+               ${column('version_of')} AS version_of,
                ${covers ? 'c.name' : 'NULL'} AS covered_name,
                ${covers ? 'c.synonyms' : 'NULL'} AS covered_synonyms,
                ${covers && artistLatin != 'NULL' ? 'c.name_latin' : 'NULL'} AS covered_latin,
@@ -685,6 +700,7 @@ class SongCatalog extends ChangeNotifier {
       for (final a in artists) ...[?present(a.synonyms), ?present(a.nameLatin)],
     ];
     final covered = _coverOfRow(row);
+    final version = _versionOfRow(row);
     return CatalogSong(
       id: row['id']! as int,
       title: row['title']! as String,
@@ -708,6 +724,7 @@ class SongCatalog extends ChangeNotifier {
         ],
         fullAlbum: SongKind.of(row['kind']) == SongKind.fullAlbum,
         coverOf: covered?.name,
+        version: version?.marker,
       ),
       artistLabel: _artistLabel(artists),
       artistNames: [for (final a in artists) a.name],
@@ -717,7 +734,19 @@ class SongCatalog extends ChangeNotifier {
       albumLatin: row['album_latin'] as String?,
       artistLatin: _artistLatinLabel(artists),
       coverOf: covered,
+      version: version,
       serverFile: serverFile,
+    );
+  }
+
+  /// Before MusicDatabase's migration 0022 the columns aren't there: no versions.
+  static SongVersion? _versionOfRow(Map<String, Object?> row) {
+    final kind = (row['version_kind'] as String?)?.trim();
+    if (kind == null || kind.isEmpty) return null;
+    return SongVersion(
+      VersionKind.of(kind),
+      label: (row['version_label'] as String?)?.trim(),
+      originalId: row['version_of'] as int?,
     );
   }
 
@@ -984,13 +1013,71 @@ class SongCatalog extends ChangeNotifier {
     return null;
   }
 
+  /// The other versions of [song] (Informacje o utworze's "Inne wersje"): the original it's a
+  /// version of and that original's other versions, or, for an original, its versions; empty
+  /// for a version whose original music.db doesn't have, and for most songs.
+  List<CatalogSong> otherVersionsOf(CatalogSong song) {
+    final originalId = song.version == null
+        ? song.id
+        : song.version!.originalId;
+    if (originalId == null) return const [];
+    final versions = _versionsByOriginal ??= () {
+      final index = <int, List<CatalogSong>>{};
+      for (final version in _songs) {
+        if (version.version?.originalId case final id?) {
+          (index[id] ??= []).add(version);
+        }
+      }
+      for (final list in index.values) {
+        list.sort((a, b) => compareNames(a.version!.marker, b.version!.marker));
+      }
+      return index;
+    }();
+    return [
+      if (originalId != song.id) ?byId(originalId),
+      for (final version in versions[originalId] ?? const <CatalogSong>[])
+        if (version.id != song.id) version,
+    ];
+  }
+
+  Map<int, List<CatalogSong>>? _versionsByOriginal;
+
   /// The song with exactly this title and artist (both compared after normalization, so case,
   /// accents and punctuation don't matter), or `null`. The artist may be any of the song's
-  /// artists, the whole "A, B feat. C" label, or one of the artists' other names. Used to tell
-  /// whether a music file on the phone is already in MusicDatabase. A title with a cover credit
+  /// artists, the whole "A, B feat. C" label, or one of the artists' other names. Names read
+  /// from elsewhere go through [findByName], which tries this first. A title with a cover credit
   /// ("Creep (Radiohead cover)") is also a song music.db marks as a cover, titled without it —
   /// only such a song: "Radiohead - Creep (cover)" uploaded by a fan isn't Radiohead's row.
+  /// Versions are kept apart as [_titled] says: "Boję się (Live)" is only a live "Boję się".
   CatalogSong? findExact({required String title, required String artist}) {
+    final normalizedArtist = normalizeForSearch(artist);
+    if (normalizedArtist.isEmpty) return null;
+    bool byArtist(CatalogSong s) =>
+        s._normalizedArtists.contains(normalizedArtist);
+    if (_titled(title).where(byArtist).firstOrNull case final exact?) {
+      return exact;
+    }
+    final credit = readCoverCredit(title);
+    if (credit == null) return null;
+    final performer = credit.performer == null
+        ? null
+        : normalizeForSearch(credit.performer!);
+    return _titled(credit.title)
+        .where(
+          (s) =>
+              s.coverOf != null &&
+              (byArtist(s) || s._normalizedArtists.contains(performer)),
+        )
+        .firstOrNull;
+  }
+
+  /// The songs [title] may name, in the order to try them — a lite version of MusicDatabase's
+  /// rule for versions in `songs_for_entry()` (`src/utils/common/song_kinds.py`; ADR 0003): a
+  /// title marking a version ([readVersion]) names only versions of that kind, the same marker
+  /// first, and rows still titled with the marker (not looked at by MusicDatabase's "Find
+  /// versions" yet); any other title never names a version. A plain "(Version)" may be anything
+  /// ("Taylor's Version"), so it narrows nothing: such a version first, then songs titled so.
+  List<CatalogSong> _titled(String title) {
     final byTitle = _byTitle ??= () {
       final index = <String, List<CatalogSong>>{};
       for (final song in _songs) {
@@ -998,25 +1085,44 @@ class SongCatalog extends ChangeNotifier {
       }
       return index;
     }();
-    final normalizedArtist = normalizeForSearch(artist);
-    if (normalizedArtist.isEmpty) return null;
-    final exact = byTitle[normalizeForSearch(title)]
-        ?.where((s) => s._normalizedArtists.contains(normalizedArtist))
-        .firstOrNull;
-    if (exact != null) return exact;
-    final credit = readCoverCredit(title);
-    if (credit == null) return null;
-    final performer = credit.performer == null
-        ? null
-        : normalizeForSearch(credit.performer!);
-    return byTitle[normalizeForSearch(credit.title)]
-        ?.where(
-          (s) =>
-              s.coverOf != null &&
-              (s._normalizedArtists.contains(normalizedArtist) ||
-                  s._normalizedArtists.contains(performer)),
-        )
-        .firstOrNull;
+    final titled = [
+      for (final song
+          in byTitle[normalizeForSearch(title)] ?? const <CatalogSong>[])
+        if (song.version == null) song,
+    ];
+    final wanted = readVersion(title);
+    if (wanted == null) return titled;
+    final marker = normalizeForSearch(wanted.label ?? wanted.kind.label);
+    final versions = [
+      for (final song
+          in byTitle[normalizeForSearch(wanted.title)] ?? const <CatalogSong>[])
+        if (song.version?.kind == wanted.kind) song,
+    ];
+    return [
+      ...versions.where((s) => s.version!.markerKey == marker),
+      ...titled,
+      if (wanted.kind != VersionKind.other)
+        ...versions.where((s) => s.version!.markerKey != marker),
+    ];
+  }
+
+  /// The song a title and artist read from somewhere else name (a video title, a playlist, a
+  /// file's tags): [findExact], else with the title's featured-artist credits left out
+  /// ("Tamagotchi feat. Dawid Podsiadło" is music.db's "Tamagotchi" — [withoutFeatCredits]),
+  /// else read the other way round, for an upload titled "Title - Artist" ("skeletons - easy
+  /// life" read as artist "skeletons"). Any other marker still keeps a track apart: "(Bonus
+  /// track)" may be another recording, and "(Live)" names only a live version.
+  CatalogSong? findByName({required String title, required String artist}) {
+    for (final (title, artist) in [(title, artist), (artist, title)]) {
+      final song =
+          findExact(title: title, artist: artist) ??
+          switch (withoutFeatCredits(title)) {
+            final bare? => findExact(title: bare, artist: artist),
+            null => null,
+          };
+      if (song != null) return song;
+    }
+    return null;
   }
 
   /// music.db's name of the artist that goes by [name]: its name, its Latin form or one of its

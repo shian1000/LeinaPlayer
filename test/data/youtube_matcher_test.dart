@@ -31,6 +31,22 @@ void main() {
     );
   });
 
+  test('a version: its marker searched, its recording preferred', () {
+    final target = MatchTarget(
+      title: 'Boję się',
+      mainArtists: [MatchArtist('Artur Rojek')],
+      version: 'Live',
+    );
+    expect(target.query, 'Artur Rojek Boję się Live');
+    expect(
+      pickYouTubeVideo(target, [
+        _v('studio', 'Artur Rojek - Boję się', 'Artur Rojek', views: 9000),
+        _v('live', 'Artur Rojek - Boję się (Live)', 'Artur Rojek'),
+      ])?.id,
+      'live',
+    );
+  });
+
   test('a full album: "full album" searched, only a long video accepted', () {
     final target = MatchTarget(
       title: 'Grochów',

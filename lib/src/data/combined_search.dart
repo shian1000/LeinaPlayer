@@ -5,6 +5,7 @@ import 'playlist_library.dart';
 import 'song_catalog.dart';
 import 'source_settings.dart';
 import 'text_normalizer.dart';
+import 'version_names.dart';
 import 'youtube_library.dart';
 import 'youtube_matcher.dart';
 
@@ -109,6 +110,10 @@ class SearchHit {
 
   /// Whose song this is a cover of; shown after the title, never part of [title].
   CoverOf? get coverOf => mainSong?.coverOf;
+
+  /// What kind of version of another song this is; its marker is shown after the title, never
+  /// part of [title].
+  SongVersion? get version => mainSong?.version;
 
   SearchHit._copy(
     SearchHit hit, {

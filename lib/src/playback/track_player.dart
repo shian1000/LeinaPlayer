@@ -12,6 +12,7 @@ import '../data/mp3_conversion.dart';
 import '../data/outbox.dart';
 import '../data/server_downloads.dart';
 import '../data/song_catalog.dart';
+import '../data/version_names.dart';
 import '../data/song_requests.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
@@ -312,6 +313,7 @@ class TrackPlayer {
             titleLatin: hit.titleLatin,
             artistLatin: hit.artistLatin,
             coverOf: hit.coverOf,
+            version: hit.version,
             source: hit.phoneFiles.first.filePath,
             coverSeed: hit.coverSeed,
             cover: CoverRequest.of(hit),
@@ -330,6 +332,7 @@ class TrackPlayer {
           titleLatin: hit.titleLatin,
           artistLatin: hit.artistLatin,
           coverOf: hit.coverOf,
+          version: hit.version,
           coverSeed: hit.coverSeed,
           cover: CoverRequest.of(hit),
           searchQuery: searchQuery,
@@ -385,6 +388,7 @@ class TrackPlayer {
       titleLatin: hit.titleLatin,
       artistLatin: hit.artistLatin,
       coverOf: hit.coverOf,
+      version: hit.version,
       source: source,
       serverFileId: file.id,
       coverSeed: hit.coverSeed,
@@ -467,6 +471,7 @@ class TrackPlayer {
       titleLatin: hit.titleLatin,
       artistLatin: hit.artistLatin,
       coverOf: hit.coverOf,
+      version: hit.version,
       coverSeed: hit.coverSeed,
       cover: CoverRequest.of(hit),
       searchQuery: searchQuery,
@@ -724,6 +729,7 @@ class TrackPlayer {
     String? titleLatin,
     String? artistLatin,
     CoverOf? coverOf,
+    SongVersion? version,
     required String coverSeed,
     CoverRequest? cover,
     String? searchQuery,
@@ -749,6 +755,7 @@ class TrackPlayer {
           titleLatin: titleLatin,
           artistLatin: artistLatin,
           coverOf: coverOf,
+          version: version,
           source: source,
           coverSeed: coverSeed,
           cover: cover?.withVideo(videoId),

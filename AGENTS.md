@@ -101,6 +101,14 @@ Covers (`songs.covered_artist_id` or `covered_title`, `CatalogSong.coverOf`; Mus
 with the credit; `cover_credit.dart` adds it for display, never to `songs.title`, and a video
 title's credit only matches a row marked as a cover — a fan's "Radiohead - Creep (cover)" isn't
 Radiohead's own song.
+Versions — live, remix, acoustic… as rows of their own (`songs.version_kind` / `version_label` /
+`version_of`, `CatalogSong.version`; MusicDatabase's ADR-0007 and
+`song-versions-for-musicdatabaseapp.md`) — are shown "Boję się (Live)" (before a cover's credit:
+"Creep (Live) (Radiohead cover)"), looked for on YouTube with the marker and listed in
+Informacje o utworze's "Inne wersje"; `version_names.dart` adds the marker for display, never to
+`songs.title` or a title correction, and a title matches by name only a version its marker names
+— never the studio row, nor a title without a marker a version
+([`local-library.md`](docs/agent-notes/local-library.md)).
 Changing a song's artist there is a proposal of another artist for that song (`songs.artist_id`
 with a name), never a rename of the shared artist row — that's the separate "Popraw pisownię
 nazwy" ([hand-off](docs/handoffs/musicdatabase-song-artist.md)), which asks first when the new
@@ -262,7 +270,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   listened time, synced (`listening_log.dart`), and what's computed from them
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
-  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), and the
+  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), and the
   port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
@@ -329,8 +337,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   songs music.db doesn't have (`Mood.tracks`). Only a list made of music.db songs (a radio) may use
   the id.
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
-  `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting
-  and a cover's credit reach them; raw values stay for keys, matching, sharing text and requests to MusicDatabase.
+  `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting,
+  a version's marker and a cover's credit reach them (something new carrying a song's names to the
+  player passes `version` and `coverOf` along, as `NowPlaying` does); raw values stay for keys, matching, sharing text and requests to MusicDatabase.
 - Lists sorted by a name (playlists, folders, moods, artists, track titles) use `compareNames`
   (`text_normalizer.dart`): numbers by value, so "2. Telefon" comes before "10. Pidvalia" —
   not `normalizeForSearch(a).compareTo(…)` (user's request; numbered names are common there).

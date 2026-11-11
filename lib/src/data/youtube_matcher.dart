@@ -27,6 +27,7 @@ class MatchTarget {
     this.featArtists = const [],
     this.fullAlbum = false,
     this.coverOf,
+    this.version,
   });
 
   final String title;
@@ -40,12 +41,16 @@ class MatchTarget {
   /// The name a cover's credit gives (the covered artist, else the covered song).
   final String? coverOf;
 
+  /// A version's marker ("Live", "Cid Rim Remix"; `songs.version_kind`), never part of [title].
+  final String? version;
+
   /// What to type into YouTube's search: main artists and the title, no guests (extra words make
-  /// YouTube's results worse, not better) — "full album" added for a [fullAlbum], the covered
-  /// artist and "cover" for a cover, which would otherwise find the original.
+  /// YouTube's results worse, not better) — "full album" added for a [fullAlbum], a version's
+  /// marker, the covered artist and "cover" for a cover: either would otherwise find the original.
   String get query => [
     ...mainArtists.map((a) => a.name),
     title,
+    ?version,
     if (fullAlbum) 'full album',
     ?coverOf,
     if (coverOf != null) 'cover',
@@ -101,7 +106,12 @@ List<ScoredVideo> scoreYouTubeVideos(
 /// The target, normalized once.
 class _Song {
   _Song(MatchTarget target)
-    : title = _padded(target.title),
+    // A version's marker counts as the bracketed part of its title.
+    : title = _padded(
+        target.version == null
+            ? target.title
+            : '${target.title} (${target.version})',
+      ),
       core = _padded(target.title.replaceAll(_brackets, ' ')),
       mainArtists = [
         for (final a in target.mainArtists) [for (final n in a.names) _norm(n)],

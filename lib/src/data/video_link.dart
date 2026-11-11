@@ -54,7 +54,7 @@ Future<SearchHit> hitForVideoLink(
     );
   }
   final parsed = parseYouTubeTrack(video.title, video.channel);
-  final song = catalog.findExact(title: parsed.title, artist: parsed.artist);
+  final song = catalog.findByName(title: parsed.title, artist: parsed.artist);
   if (song != null) {
     // Not over MusicDatabase's own answer, including "not on YouTube" (N/A).
     if (song.youTube == YouTubeLink.unknown &&
@@ -125,7 +125,7 @@ SearchHit hitForSearchedVideo(
     );
   }
   final parsed = parseYouTubeTrack(video.title, video.channel);
-  final song = catalog.findExact(title: parsed.title, artist: parsed.artist);
+  final song = catalog.findByName(title: parsed.title, artist: parsed.artist);
   if (song != null) {
     // Not over MusicDatabase's own answer, including "not on YouTube" (N/A).
     final useVideo =

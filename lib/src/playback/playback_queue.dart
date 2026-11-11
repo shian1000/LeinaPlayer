@@ -915,6 +915,7 @@ class PlaybackQueue extends ChangeNotifier {
       titleLatin: hit.titleLatin,
       artistLatin: hit.artistLatin,
       coverOf: hit.coverOf,
+      version: hit.version,
       source: hit.onPhone ? hit.phoneFiles.first.filePath : '',
       youtubeVideoId: hit.onPhone ? null : hit.youtubeVideoId,
       coverSeed: hit.coverSeed,

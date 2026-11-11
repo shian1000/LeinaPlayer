@@ -141,6 +141,11 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     the other fields the phone uses the new link at once (see `youtube.md`). Once music.db has
     `songs.kind`, "To jest cały album" is a switch instead of a pencil: a `kind` correction of
     `full_album` or empty (hand-off [`musicdatabase-song-kind.md`](handoffs/musicdatabase-song-kind.md)).
+    A version of another song (music.db's `songs.version_kind`) shows "Wersja" (its kind and
+    `version_label`; not editable — MusicDatabase marks versions itself) and, when music.db has
+    its original or other versions (`version_of`), a section **Inne wersje**: the original and
+    its versions as song rows (`SongTile`; tap plays, ⋮ is
+    `Informacje o utworze › Inne wersje › Utwór › Menu (⋮)`).
   - Bottom row, five icons spread evenly (user's order): Otwórz w YouTube (above), Filtr
     nastrojów (**implemented**: filter icon, accent while on, **→ Filtr nastrojów**), Udostępnij
     (**→ Udostępnij utwór**, see below; IDs `Odtwarzacz › Udostępnij › …`), Kolejka

@@ -37,6 +37,11 @@ never counts against a candidate. Returns `null` rather than a doubtful pick. A 
 (`MatchTarget.fullAlbum`, music.db's `songs.kind`) is the other way round: the query gets
 "full album", only videos of ≥20 min with a known duration pass, and "full album" in the title
 is a plus (hand-off [`musicdatabase-song-kind.md`](../handoffs/musicdatabase-song-kind.md)).
+A version (`MatchTarget.version`, music.db's `songs.version_kind` — MusicDatabase's hand-off
+`song-versions-for-musicdatabaseapp.md`) gets its marker in the query ("Artur Rojek Boję się
+Live") and counts as the bracketed part of the title, so "(Live)" in a video title is a plus and
+not the live penalty; without it the search finds the studio original. A cover's credit goes
+into the query the same way (`coverOf`).
 
 Benchmark against MusicDatabase's own picks (plain Dart, no phone; candidates come from
 youtube_explode, whose results look like NewPipe's — both read YouTube's web search):
@@ -209,7 +214,7 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   `MainActivity`): on, it also pushed every forwarded link as a named route, and with no routes
   the app crashed in `_onUnknownRoute` (Pixel, 2026-10-22).
 - A video is recognised like a playlist track (music.db's video, a phone match, then title →
-  `findExact`); a song found by title gets the video saved as a phone match unless MusicDatabase
+  `findByName`); a song found by title gets the video saved as a phone match unless MusicDatabase
   says something about its video (incl. N/A). Reading the title costs one request (NewPipe
   `video`, else youtube_explode `videos.get`); a song known by its video needs none.
 - Testing with adb: target the activity (`am start -n com.shian1000.music_database_app/.LinkChooserActivity

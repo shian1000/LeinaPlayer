@@ -109,7 +109,7 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
 3. Recognising the MusicDatabase song (`PlaylistLibrary.matchSong`): **by the video first** —
    music.db's `youtube_video_id`, then a video the phone matched earlier (`youtube_matches`) —
-   then exact title + artist (`SongCatalog.findExact`). A recognised track stores MusicDatabase's
+   then title + artist (`SongCatalog.findByName`: exact, without feat. credits, swapped; a "(Live)" only a live version — `local-library.md`). A recognised track stores MusicDatabase's
    own spelling.
 
 When shown, `playlistHit()` also re-checks the video against music.db, so a song MusicDatabase

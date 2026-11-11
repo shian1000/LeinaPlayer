@@ -879,7 +879,7 @@ class LocalLibrary extends ChangeNotifier {
   }
 
   CatalogSong? _match(String title, String? artist) =>
-      artist == null ? null : _catalog.findExact(title: title, artist: artist);
+      artist == null ? null : _catalog.findByName(title: title, artist: artist);
 
   Future<void> _recheckPending(Database db, int now) async {
     final rows = await db.query(

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/text_normalizer.dart';
+import 'package:music_database_app/src/data/version_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -326,6 +327,121 @@ void main() {
       expect(catalog.artistNamed('Бумбокс'), 'Бумбокс');
       expect(catalog.artistNamed('led zeppelin'), 'Led Zeppelin');
       expect(catalog.artistNamed('Nobody'), isNull);
+    });
+
+    test('by name: also without the title\'s feat. credit, or swapped; '
+        'another version stays apart', () async {
+      await loadSample();
+      expect(
+        catalog.findByName(title: 'Pay Your Respect', artist: 'Afina')?.id,
+        3,
+      );
+      expect(
+        catalog
+            .findByName(
+              title: 'Pay Your Respect (feat. CJ Pitts)',
+              artist: 'Afina',
+            )
+            ?.id,
+        3,
+      );
+      expect(
+        catalog
+            .findByName(title: 'Pay Your Respect ft. CJ Pitts', artist: 'Afina')
+            ?.id,
+        3,
+      );
+      expect(
+        catalog
+            .findByName(title: 'Led Zeppelin', artist: 'Going to California')
+            ?.id,
+        2,
+      );
+      expect(
+        catalog.findByName(
+          title: 'Going to California (Live)',
+          artist: 'Led Zeppelin',
+        ),
+        isNull,
+      );
+      expect(
+        catalog.findExact(
+          title: 'Pay Your Respect (feat. CJ Pitts)',
+          artist: 'Afina',
+        ),
+        isNull,
+      );
+    });
+
+    test('versions: shown with their marker, matched by it only, '
+        'listed with their original', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN version_kind TEXT');
+      await db.execute('ALTER TABLE songs ADD COLUMN version_label TEXT');
+      await db.execute('ALTER TABLE songs ADD COLUMN version_of INTEGER');
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, language, artist_id, version_kind, '
+        'version_label, version_of) VALUES '
+        "(30, 'Boję się', 'Polish', 5, NULL, NULL, NULL), "
+        "(31, 'Boję się', 'Polish', 5, 'live', NULL, 30), "
+        "(32, 'Boję się', 'Polish', 5, 'live', 'Live at Opener', 30), "
+        "(33, 'Boję się', 'Polish', 5, 'remix', 'Ptaki Remix', 30), "
+        "(34, 'Recover', 'English', 6, 'remix', 'Cid Rim Remix', NULL), "
+        "(35, 'Werewolf (Live)', 'English', 6, NULL, NULL, NULL), "
+        "(36, 'Engel', 'German', 6, 'something new', NULL, NULL)",
+      );
+      await db.close();
+      await catalog.ensureLoaded();
+
+      final live = catalog.byId(31)!;
+      expect(live.title, 'Boję się');
+      expect(live.version!.kind, VersionKind.live);
+      expect(live.version!.marker, 'Live');
+      expect(live.version!.originalId, 30);
+      expect(catalog.byId(32)!.version!.marker, 'Live at Opener');
+      expect(catalog.byId(36)!.version!.kind, VersionKind.other);
+      expect(catalog.byId(30)!.version, isNull);
+      expect(live.youTubeTarget.query, 'Artur Rojek Boję się Live');
+      expect(
+        catalog.byId(34)!.youTubeTarget.query,
+        'CatchUp Recover Cid Rim Remix',
+      );
+      expect(catalog.search('boje sie remix').map((s) => s.id), [33]);
+
+      int? found(String title, [String artist = 'Artur Rojek']) =>
+          catalog.findByName(title: title, artist: artist)?.id;
+      expect(found('Boję się'), 30);
+      expect(found('Boję się (Live)'), 31);
+      expect(found('Boję się [live]'), 31);
+      expect(found('Boję się (Live at Opener)'), 32);
+      expect(found('Boję się - Live at Opener'), 32);
+      expect(found('Boję się (Live in Jarocin)'), 31);
+      expect(found('Boję się (Ptaki Remix)'), 33);
+      expect(found('Boję się (Remix)'), 33);
+      expect(found('Boję się (Acoustic)'), isNull);
+      expect(found('Boję się (Radio Edit)'), isNull);
+      expect(found('Recover', 'CatchUp'), isNull);
+      expect(found('Recover (Cid Rim Remix)', 'CatchUp'), 34);
+      expect(found('Werewolf (Live)', 'CatchUp'), 35);
+      expect(found('Werewolf', 'CatchUp'), isNull);
+      expect(found('Engel (Version)', 'CatchUp'), 36);
+      expect(found('Engel', 'CatchUp'), isNull);
+
+      List<int> others(int id) => [
+        for (final song in catalog.otherVersionsOf(catalog.byId(id)!)) song.id,
+      ];
+      expect(others(30), [31, 32, 33]);
+      expect(others(32), [30, 31, 33]);
+      expect(others(34), isEmpty);
+      expect(others(1), isEmpty);
+    });
+
+    test('no versions in a music.db from before them', () async {
+      await loadSample();
+      expect(catalog.songs.where((s) => s.version != null), isEmpty);
+      expect(catalog.otherVersionsOf(catalog.byId(1)!), isEmpty);
     });
 
     test('no Latin forms in a music.db from before them', () async {
