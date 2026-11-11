@@ -351,6 +351,16 @@ void main() {
             ?.id,
         3,
       );
+      // A YouTube upload credits the guest in the artist: "Afina feat. CJ Pitts - …".
+      expect(
+        catalog
+            .findByName(
+              title: 'Pay Your Respect',
+              artist: 'Afina feat. CJ Pitts',
+            )
+            ?.id,
+        3,
+      );
       expect(
         catalog
             .findByName(title: 'Led Zeppelin', artist: 'Going to California')

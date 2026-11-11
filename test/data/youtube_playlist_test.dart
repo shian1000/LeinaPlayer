@@ -51,6 +51,13 @@ void main() {
       ));
     });
 
+    test('a title that is only a hashtag keeps its word', () {
+      expect(p('#Życzliwość', 'Karaś/Rogucki - Topic'), (
+        artist: 'Karaś/Rogucki',
+        title: 'Życzliwość',
+      ));
+    });
+
     test('no separator: the channel (without VEVO) is the artist', () {
       expect(p('Mr. Vain (Original Radio Edit)', 'CultureBeatVEVO'), (
         artist: 'CultureBeat',

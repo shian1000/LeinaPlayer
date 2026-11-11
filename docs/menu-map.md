@@ -938,7 +938,10 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   (implemented **→ Utwory spoza bazy danych**, `missing_tracks_screen.dart`: the playlist's
   tracks not recognised as MusicDatabase songs, "Poza bazą danych: N z M", rows like the
   playlist's — tapping plays on through the playlist from there; a note instead when music.db
-  isn't downloaded; later the place to ask MusicDatabase to add them), Dodaj do innej playlisty
+  isn't downloaded; **Poproś MusicDatabase o dodanie** (implemented) puts every listed track
+  into the outbox as a song request, as playing it would — not again when already asked for or
+  rejected — then sends the outbox at once like "Wyślij teraz", a snackbar counting new /
+  already-asked / rejected requests and saying whether they were sent), Dodaj do innej playlisty
   (**implemented**: every track → "Dodaj do playlisty"), Przenieś do folderu (**implemented**, see
   Biblioteka).
 - Pobierz (ikona, **implemented**, saved playlists): downloads every song not on the phone yet,

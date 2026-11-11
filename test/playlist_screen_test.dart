@@ -7,6 +7,7 @@ import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/library_folders.dart';
 import 'package:music_database_app/src/data/local_library.dart';
+import 'package:music_database_app/src/data/outbox.dart';
 import 'package:music_database_app/src/data/playlist_bookmarks.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/saved_songs.dart';
@@ -51,6 +52,7 @@ void main() {
   late YouTubeAccount youTubeAccount;
   late LikedSongs liked;
   late PlaylistBookmarks bookmarks;
+  late Outbox outbox;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -64,6 +66,7 @@ void main() {
   });
 
   tearDown(() async {
+    outbox.dispose();
     bookmarks.dispose();
     queue.dispose();
     liked.dispose();
@@ -110,6 +113,10 @@ void main() {
       liked = LikedSongs();
       bookmarks = PlaylistBookmarks();
       player = PlayerController();
+      outbox = Outbox(
+        storageRoot: () async => storage,
+        factoryOverride: databaseFactoryFfi,
+      );
       await writeMusicDb((await sync.localFile('music.db')).path);
       await catalog.ensureLoaded();
       await library.load();
@@ -183,9 +190,12 @@ void main() {
                               notifier: liked,
                               child: PlaylistBookmarksScope(
                                 notifier: bookmarks,
-                                child: MaterialApp(
-                                  theme: buildAppTheme(dummifyTheme),
-                                  home: const Scaffold(body: LibraryScreen()),
+                                child: OutboxScope(
+                                  notifier: outbox,
+                                  child: MaterialApp(
+                                    theme: buildAppTheme(dummifyTheme),
+                                    home: const Scaffold(body: LibraryScreen()),
+                                  ),
                                 ),
                               ),
                             ),
@@ -304,6 +314,21 @@ void main() {
     expect(find.text('Poza bazą danych: 1 z 2'), findsOneWidget);
     expect(find.text('Utwór'), findsOneWidget);
     expect(find.text('Małomiasteczkowy'), findsNothing);
+
+    // Asking MusicDatabase for them: the unrecognised track goes to the outbox once.
+    await tester.tap(find.text('Poproś MusicDatabase o dodanie'));
+    await settle(tester, until: find.textContaining('Nowe prośby o dodanie'));
+    expect(find.textContaining('Nowe prośby o dodanie: 1'), findsOneWidget);
+    final requests = (await tester.runAsync(outbox.waitingSongRequests))!;
+    expect(requests.map((r) => (r.artist, r.title, r.youtubeVideoId)), [
+      ('Nieznany', 'Utwór', 'nn'),
+    ]);
+    await tester.tap(find.text('Poproś MusicDatabase o dodanie'));
+    await settle(
+      tester,
+      until: find.textContaining('Nowe prośby o dodanie: 0'),
+    );
+    expect(find.textContaining('zgłoszone już wcześniej: 1'), findsOneWidget);
   });
 
   /// A Biblioteka playlist of the two songs in [pumpLibrary]'s YouTube playlist.
@@ -751,59 +776,65 @@ void main() {
     expect(find.byType(PlayingBars), findsOneWidget);
   });
 
-  testWidgets('Biblioteka: filter chips narrow the list together and are remembered; the '
-      'search ignores them', (tester) async {
-    await pumpLibrary(tester, before: importDoAuta);
-    Finder chip(String label) => find.widgetWithText(PillChip, label);
-    expect(find.text('Do auta'), findsOneWidget);
+  testWidgets(
+    'Biblioteka: filter chips narrow the list together and are remembered; the '
+    'search ignores them',
+    (tester) async {
+      await pumpLibrary(tester, before: importDoAuta);
+      Finder chip(String label) => find.widgetWithText(PillChip, label);
+      expect(find.text('Do auta'), findsOneWidget);
 
-    await tester.tap(chip('Nastroje'));
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsNothing);
-    expect(folders.filters, {LibraryCategory.moods});
-    final reloaded = LibraryFolders();
-    await tester.runAsync(reloaded.load);
-    expect(reloaded.filters, {LibraryCategory.moods});
+      await tester.tap(chip('Nastroje'));
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsNothing);
+      expect(folders.filters, {LibraryCategory.moods});
+      final reloaded = LibraryFolders();
+      await tester.runAsync(reloaded.load);
+      expect(reloaded.filters, {LibraryCategory.moods});
 
-    await tester.tap(find.byTooltip('Wyszukaj w Bibliotece'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'auta');
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsOneWidget);
-    await tester.tap(find.byTooltip('Zamknij wyszukiwanie'));
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsNothing);
+      await tester.tap(find.byTooltip('Wyszukaj w Bibliotece'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'auta');
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsOneWidget);
+      await tester.tap(find.byTooltip('Zamknij wyszukiwanie'));
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsNothing);
 
-    // Moods and playlists together.
-    await tester.tap(chip('Playlisty'));
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsOneWidget);
-    expect(folders.filters, {LibraryCategory.moods, LibraryCategory.playlists});
-    await tester.tap(chip('Playlisty'));
-    await tester.tap(chip('Nastroje'));
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsOneWidget);
-    expect(folders.filters, isEmpty);
+      // Moods and playlists together.
+      await tester.tap(chip('Playlisty'));
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsOneWidget);
+      expect(folders.filters, {
+        LibraryCategory.moods,
+        LibraryCategory.playlists,
+      });
+      await tester.tap(chip('Playlisty'));
+      await tester.tap(chip('Nastroje'));
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsOneWidget);
+      expect(folders.filters, isEmpty);
 
-    await tester.tap(chip('Albumy'));
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsNothing);
-    expect(find.textContaining('Brak albumów'), findsOneWidget);
-    await tester.tap(chip('Nastroje'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('nie pasuje do tych filtrów'), findsOneWidget);
-    await tester.tap(chip('Nastroje'));
-    await tester.tap(chip('Albumy'));
-    await tester.pumpAndSettle();
+      await tester.tap(chip('Albumy'));
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsNothing);
+      expect(find.textContaining('Brak albumów'), findsOneWidget);
+      await tester.tap(chip('Nastroje'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('nie pasuje do tych filtrów'), findsOneWidget);
+      await tester.tap(chip('Nastroje'));
+      await tester.tap(chip('Albumy'));
+      await tester.pumpAndSettle();
 
-    // "Foldery" alone: only folders; with "Playlisty" also the playlists outside them.
-    await tester.tap(chip('Foldery'));
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsNothing);
-    await tester.tap(chip('Playlisty'));
-    await tester.pumpAndSettle();
-    expect(find.text('Do auta'), findsOneWidget);
-  });
+      // "Foldery" alone: only folders; with "Playlisty" also the playlists outside them.
+      await tester.tap(chip('Foldery'));
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsNothing);
+      await tester.tap(chip('Playlisty'));
+      await tester.pumpAndSettle();
+      expect(find.text('Do auta'), findsOneWidget);
+    },
+  );
 
   testWidgets('Biblioteka: a playlist moved into a new folder shows only inside it; sorting '
       'is remembered', (tester) async {

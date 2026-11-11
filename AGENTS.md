@@ -467,7 +467,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (Kopia zapasowa) and save it locally with Total Commander from the share sheet (it lands in
   `/sdcard/Download/`, pullable). On the Huawei the YouTube app takes a tapped YouTube link
   itself; reach the "Otwórz w…" sheet with `am start -a android.intent.action.VIEW -d <url> -n
-  com.shian1000.music_database_app/.LinkChooserActivity`.
+  com.shian1000.music_database_app/.LinkChooserActivity`; the same with `-a
+  android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT <playlist link>` imports
+  (or re-imports) a playlist, as sharing it from YouTube does. A stored playlist track's title and
+  artist change only by a re-import — a parser fix doesn't reach tracks saved before it.
 - The user's MusicDatabase `sharing_server.py` (systemd service) listens on port 8002 on both the
   Tailscale and LAN addresses. Run test servers on another port and stop them by their own PID —
   never by "whatever listens on the port".

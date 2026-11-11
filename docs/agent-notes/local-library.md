@@ -14,8 +14,9 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   spaces) get no artist and show as "Nieznany wykonawca"; that's inherited, not a bug here.
 - Matching is `SongCatalog.findByName`: first `findExact` — normalized title equal **and**
   normalized artist equal to one of the song's artists, the whole "A feat. B" label, or an
-  artist synonym — then the title without its feat. credits (`withoutFeatCredits`, music.db
-  keeps them out of `songs.title`), then artist and title swapped (fan uploads titled "Title -
+  artist synonym — then without feat. credits, in the title (music.db keeps them out of
+  `songs.title`) or in the artist (`withoutFeatCredits`; uploads credit the guest there:
+  "Organek feat. Ralph Kaminski" is music.db's "Ørganek"), then artist and title swapped (fan uploads titled "Title -
   Artist"). Other markers ("(Bonus track)", "(Live)") are never dropped: on playlist "Ibis"
   (2026-11-11) the bonus track was a different recording (262 s vs 215 s).
 - Versions (music.db's `songs.version_kind` / `version_label` / `version_of`, MusicDatabase's

@@ -1107,19 +1107,24 @@ class SongCatalog extends ChangeNotifier {
   }
 
   /// The song a title and artist read from somewhere else name (a video title, a playlist, a
-  /// file's tags): [findExact], else with the title's featured-artist credits left out
-  /// ("Tamagotchi feat. Dawid Podsiadło" is music.db's "Tamagotchi" — [withoutFeatCredits]),
-  /// else read the other way round, for an upload titled "Title - Artist" ("skeletons - easy
-  /// life" read as artist "skeletons"). Any other marker still keeps a track apart: "(Bonus
-  /// track)" may be another recording, and "(Live)" names only a live version.
+  /// file's tags): [findExact], else with the featured-artist credits left out of the title
+  /// ("Tamagotchi feat. Dawid Podsiadło" is music.db's "Tamagotchi" — [withoutFeatCredits]) or
+  /// the artist ("Organek feat. Ralph Kaminski" is music.db's "Ørganek"), else read the other
+  /// way round, for an upload titled "Title - Artist" ("skeletons - easy life" read as artist
+  /// "skeletons"). Any other marker still keeps a track apart: "(Bonus track)" may be another
+  /// recording, and "(Live)" names only a live version.
   CatalogSong? findByName({required String title, required String artist}) {
     for (final (title, artist) in [(title, artist), (artist, title)]) {
+      final bareTitle = withoutFeatCredits(title);
+      final bareArtist = withoutFeatCredits(artist);
       final song =
           findExact(title: title, artist: artist) ??
-          switch (withoutFeatCredits(title)) {
-            final bare? => findExact(title: bare, artist: artist),
-            null => null,
-          };
+          (bareTitle == null
+              ? null
+              : findExact(title: bareTitle, artist: artist)) ??
+          (bareArtist == null
+              ? null
+              : findExact(title: bareTitle ?? title, artist: bareArtist));
       if (song != null) return song;
     }
     return null;

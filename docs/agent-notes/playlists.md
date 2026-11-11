@@ -103,13 +103,15 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    playlist it knew had 19 — an empty result counts as that method failing.
 2. Each video → artist/title with `parseYouTubeTrack()`, a lite version of MusicDatabase's
    `build_metadata_from_item()` (Topic channel = artist; "Artist - Title"; junk brackets, pipe
-   suffix, hashtags dropped; real versions like Remix/Live kept). When the part after " - " is
+   suffix, hashtags dropped — but a title that is only hashtags keeps their words: YouTube lists
+   Karaś/Rogucki's "#Życzliwość" so, and the empty title left the track unrequestable (`SongRequest.of`
+   skips it) until re-imported; real versions like Remix/Live kept). When the part after " - " is
    junk only ("Glow - Lyric Video (English / French)" by Attic Ocean) the left part is the
    title and the channel (no VEVO) the artist — unless the left part is the channel's own name.
    The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
 3. Recognising the MusicDatabase song (`PlaylistLibrary.matchSong`): **by the video first** —
    music.db's `youtube_video_id`, then a video the phone matched earlier (`youtube_matches`) —
-   then title + artist (`SongCatalog.findByName`: exact, without feat. credits, swapped; a "(Live)" only a live version — `local-library.md`). A recognised track stores MusicDatabase's
+   then title + artist (`SongCatalog.findByName`: exact, without feat. credits in the title or the artist, swapped; a "(Live)" only a live version — `local-library.md`). A recognised track stores MusicDatabase's
    own spelling.
 
 When shown, `playlistHit()` also re-checks the video against music.db, so a song MusicDatabase
@@ -251,9 +253,10 @@ Playing: a track tap (or "Odtwórz playlistę" / "Odtwarzanie losowe") fills the
 with the playlist; see [`local-library.md`](local-library.md) for the queue.
 
 Tracks not recognised as MusicDatabase songs are listed by the playlist ⋮ › "Wyświetl utwory,
-których nie ma w bazie danych" (`missing_tracks_screen.dart`). Only a list so far: sending them
-to MusicDatabase as add requests is the user's intended next step, but how the phone talks back
-to MusicDatabase isn't decided — that needs an ADR first (see `AGENTS.md`, Sources of truth).
+których nie ma w bazie danych" (`missing_tracks_screen.dart`). Its "Poproś MusicDatabase o
+dodanie" asks for all of them at once through the outbox's song requests — the same
+`SongRequest.of` / `Outbox.requestSong` path as playing a song music.db doesn't have, so a song
+already asked for or rejected isn't asked again — and sends the outbox right away.
 
 Not done yet: creating empty playlists by hand, editing (the sync already carries any change), Spotify playlists over 100 tracks, other
 sources, asking MusicDatabase to add the missing tracks.

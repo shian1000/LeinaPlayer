@@ -46,7 +46,12 @@ String? extractPlaylistId(String raw) {
     _anyBracket,
     (m) => _junkAnywhere.hasMatch(m.group(1)!) ? ' ' : m.group(0)!,
   );
+  final withHashtags = title;
   title = title.replaceAll(_hashtag, ' ').replaceAll(_spaces, ' ').trim();
+  // A title that is nothing but hashtags ("#Życzliwość") is their words.
+  if (title.isEmpty) {
+    title = withHashtags.replaceAll('#', ' ').replaceAll(_spaces, ' ').trim();
+  }
 
   final topic = RegExp(r'\s*-\s*topic$', caseSensitive: false);
   String artist;

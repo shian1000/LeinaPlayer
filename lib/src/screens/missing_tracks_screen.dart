@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/database_sync.dart';
 import '../data/local_library.dart';
+import '../data/outbox.dart';
 import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
+import '../data/song_requests.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
@@ -12,8 +15,8 @@ import '../widgets/song_tile.dart';
 import '../widgets/song_names.dart';
 
 /// "Wyświetl utwory, których nie ma w bazie danych" from a playlist's ⋮: its tracks not
-/// recognised as MusicDatabase songs. Only a list for now; later the place to ask
-/// MusicDatabase to add them.
+/// recognised as MusicDatabase songs, with "Poproś MusicDatabase o dodanie" asking for all of
+/// them at once ([_RequestMissingButton]).
 class MissingTracksScreen extends StatelessWidget {
   const MissingTracksScreen({
     super.key,
@@ -91,6 +94,10 @@ class MissingTracksScreen extends StatelessWidget {
                 ),
               ),
             ),
+            if (catalog.status == CatalogStatus.ready &&
+                missing.isNotEmpty &&
+                OutboxScope.maybeOf(context) != null)
+              _RequestMissingButton(hits: [for (final i in missing) hits[i]]),
             if (catalog.status == CatalogStatus.ready)
               for (final i in missing)
                 SongTile(
@@ -107,4 +114,89 @@ class MissingTracksScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Poproś MusicDatabase o dodanie": every listed track goes to the outbox as a song request,
+/// as playing it would ([SongRequest.of]; one already asked for or rejected by MusicDatabase's
+/// owner isn't asked again), then the outbox is sent at once, like "Wyślij teraz".
+class _RequestMissingButton extends StatefulWidget {
+  const _RequestMissingButton({required this.hits});
+
+  final List<SearchHit> hits;
+
+  @override
+  State<_RequestMissingButton> createState() => _RequestMissingButtonState();
+}
+
+class _RequestMissingButtonState extends State<_RequestMissingButton> {
+  bool _busy = false;
+
+  Future<void> _request() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final catalog = SongCatalogScope.of(context);
+    final outbox = OutboxScope.of(context);
+    final sync = DatabaseSyncScope.maybeOf(context);
+    setState(() => _busy = true);
+    var added = 0;
+    var asked = 0;
+    var rejected = 0;
+    var unnamed = 0;
+    String sent;
+    try {
+      for (final hit in widget.hits) {
+        final request = SongRequest.of(hit, artistNamed: catalog.artistNamed);
+        if (request == null) {
+          unnamed++;
+        } else if (catalog.rejectedSongRequests.rejects(request)) {
+          rejected++;
+        } else if (await outbox.requestSong(request)) {
+          added++;
+        } else {
+          asked++;
+        }
+      }
+      if (sync == null || !sync.hasServer) {
+        sent = 'Wyślą się, gdy telefon połączy się z serwerem.';
+      } else {
+        final result = await outbox.send(
+          await sync.serverAddresses(),
+          manual: true,
+        );
+        sent = result.problem == null
+            ? 'Wysłano do MusicDatabase.'
+            : 'Nie wysłano: ${result.problem} Wyślą się przy następnej próbie.';
+      }
+    } catch (e) {
+      sent = 'Nie udało się zapisać próśb: $e';
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    final counts = [
+      'Nowe prośby o dodanie: $added',
+      if (asked > 0) 'zgłoszone już wcześniej: $asked',
+      if (rejected > 0) 'odrzucone przez MusicDatabase: $rejected',
+      if (unnamed > 0) 'bez tytułu: $unnamed',
+    ].join(' · ');
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text('$counts\n$sent')));
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: FilledButton.icon(
+        icon: _busy
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.playlist_add_check),
+        label: const Text('Poproś MusicDatabase o dodanie'),
+        onPressed: _busy ? null : _request,
+      ),
+    ),
+  );
 }
