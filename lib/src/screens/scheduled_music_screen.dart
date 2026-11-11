@@ -105,6 +105,55 @@ class _DayPicker extends StatelessWidget {
   }
 }
 
+Future<bool> _mayStartApp(ScheduledMusic scheduled) async {
+  try {
+    return await scheduled.canStartApp();
+  } catch (e) {
+    debugPrint('Checking the full-screen notification permission failed: $e');
+    return true;
+  }
+}
+
+/// Android 14+ lets only alarm and calling apps open themselves from a full-screen notification
+/// unless the user allows it; without it the scheduled music never starts.
+Future<void> _askToAllowStartingApp(
+  BuildContext context,
+  ScheduledMusic scheduled,
+) async {
+  final open =
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Pozwól otwierać aplikację'),
+          content: const Text(
+            'Telefon nie pozwala Leina Player otworzyć się samemu, więc muzyka '
+            'nie włączy się o czasie — zostanie tylko powiadomienie.\n\n'
+            'Włącz „Powiadomienia pełnoekranowe” dla Leina Player.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Nie teraz'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Otwórz ustawienia'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+  if (open) await _openStartAppSettings(scheduled);
+}
+
+Future<void> _openStartAppSettings(ScheduledMusic scheduled) async {
+  try {
+    await scheduled.openStartAppSettings();
+  } catch (e) {
+    debugPrint('Opening the full-screen notification settings failed: $e');
+  }
+}
+
 /// The time of a scheduled start or stop: tapping picks it and switches it on.
 class _TimeTile extends StatelessWidget {
   const _TimeTile({required this.kind});
@@ -138,6 +187,10 @@ class _TimeTile extends StatelessWidget {
           ),
         ),
       );
+      return;
+    }
+    if (!await _mayStartApp(scheduled) && context.mounted) {
+      await _askToAllowStartingApp(context, scheduled);
     }
   }
 
@@ -224,6 +277,29 @@ class ScheduledStartScreen extends StatefulWidget {
 
 class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
   int? _draggedVolume;
+  bool _canStartApp = true;
+
+  /// The permission is given on Android's own screen: checked again on coming back.
+  late final _lifecycle = AppLifecycleListener(onResume: _checkCanStartApp);
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkCanStartApp());
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkCanStartApp() async {
+    if (!mounted) return;
+    final can = await _mayStartApp(ScheduledMusicScope.of(context));
+    if (mounted && can != _canStartApp) setState(() => _canStartApp = can);
+  }
 
   Future<void> _pickSong(ScheduledMusic scheduled) async {
     final hit = await Navigator.of(
@@ -282,6 +358,18 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           const _TimeTile(kind: ScheduleKind.start),
+          if (scheduled.timeOf(ScheduleKind.start).enabled && !_canStartApp)
+            ListTile(
+              leading: Icon(
+                Icons.warning_amber_rounded,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: const Text('Muzyka nie włączy się sama'),
+              subtitle: const Text(
+                'Dotknij i włącz „Powiadomienia pełnoekranowe” dla Leina Player.',
+              ),
+              onTap: () => _openStartAppSettings(scheduled),
+            ),
           const _DayPicker(kind: ScheduleKind.start),
           const Divider(),
           Padding(

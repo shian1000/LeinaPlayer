@@ -76,6 +76,12 @@ abstract class ScheduledMusicPlatform {
 
   /// Whether the user allowed the notification that brings the app up.
   Future<bool> requestNotifications();
+
+  /// Whether that notification may open the app by itself (Android 14+ asks for it apart).
+  Future<bool> canStartApp();
+
+  /// Opens Android's screen for allowing it; false when there is none.
+  Future<bool> openStartAppSettings();
   Future<void> setVolume(int percent);
 
   /// Takes the app off the lock screen and removes the notification.
@@ -115,6 +121,14 @@ class ChannelScheduledMusicPlatform implements ScheduledMusicPlatform {
   @override
   Future<bool> requestNotifications() async =>
       (await Permission.notification.request()).isGranted;
+
+  @override
+  Future<bool> canStartApp() async =>
+      await _channel.invokeMethod<bool>('canStartApp') ?? true;
+
+  @override
+  Future<bool> openStartAppSettings() async =>
+      await _channel.invokeMethod<bool>('openStartAppSettings') ?? false;
 
   @override
   Future<void> setVolume(int percent) =>
@@ -354,6 +368,10 @@ class ScheduledMusic extends ChangeNotifier {
   }
 
   Future<bool> requestNotifications() => platform.requestNotifications();
+
+  Future<bool> canStartApp() => platform.canStartApp();
+
+  Future<bool> openStartAppSettings() => platform.openStartAppSettings();
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();

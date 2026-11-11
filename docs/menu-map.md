@@ -231,7 +231,10 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   (`scheduled_music_screen.dart`) — **implemented**: the time (tap: picker, which also switches it
   on) with a switch, days to repeat on (Pn–Nd; none ticked: once), Głośność (5–100%, sets the phone's music volume and leaves it there), Co ma
   zagrać: Utwór (→ search, a tap picks) / Playlista (→ list) / Ostatnia kolejka;
-  the app starts if it isn't running and the music plays, nothing to confirm.
+  the app starts if it isn't running and the music plays, nothing to confirm. Under the time,
+  while it's on and Android 14+ doesn't let the app open itself: "Muzyka nie włączy się sama" (tap:
+  Android's "Powiadomienia pełnoekranowe" screen for the app; switching it on asks the same in a
+  dialog, "Pozwól otwierać aplikację").
 - Zaplanowane wyłączenie (when, or "Wyłączone") **→** `ScheduledStopScreen` — **implemented**: the
   time with a switch and the same days; the music fades out and pauses.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference

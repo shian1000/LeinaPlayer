@@ -10,7 +10,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
 import io.flutter.plugin.common.BinaryMessenger
@@ -43,6 +45,9 @@ object ScheduledMusic {
     private const val TAG = "ScheduledMusic"
 
     var bridge: ScheduledMusicBridge? = null
+
+    /** The activity on screen last, to open Android's settings in its task. */
+    var visibleActivity: WeakReference<Activity>? = null
     private var shownActivity: WeakReference<Activity>? = null
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -259,6 +264,8 @@ class ScheduledMusicBridge(val messenger: BinaryMessenger, private val context: 
                 result.success(null)
             }
             "takeStarted" -> result.success(ScheduledMusic.takeStarted(context))
+            "canStartApp" -> result.success(canStartApp())
+            "openStartAppSettings" -> result.success(openStartAppSettings())
             "setVolume" -> {
                 setVolume(call.arguments as Int)
                 result.success(null)
@@ -268,6 +275,36 @@ class ScheduledMusicBridge(val messenger: BinaryMessenger, private val context: 
                 result.success(null)
             }
             else -> result.notImplemented()
+        }
+    }
+
+    /**
+     * Whether the full-screen notification may bring the app up. Android 14+ grants it only to
+     * alarm and calling apps by itself; denied, the notification just sits there (seen on the Pixel).
+     */
+    private fun canStartApp(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+
+    /** Whether Android's screen for allowing it could be opened. */
+    private fun openStartAppSettings(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
+        val intent = Intent(
+            Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+            Uri.parse("package:${context.packageName}"),
+        )
+        // From the activity, Back on that screen comes back to the app, not to Settings' own task.
+        val activity = ScheduledMusic.visibleActivity?.get()
+        return try {
+            if (activity != null) {
+                activity.startActivity(intent)
+            } else {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            true
+        } catch (e: RuntimeException) {
+            Log.w("ScheduledMusic", "Opening the full-screen notification settings failed: $e")
+            false
         }
     }
 

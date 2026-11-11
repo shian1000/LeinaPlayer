@@ -13,6 +13,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.lang.ref.WeakReference
 
 // AudioServiceActivity (a FlutterActivity) lets the media notification/background service and
 // the app share one Flutter engine.
@@ -64,6 +65,11 @@ class MainActivity : AudioServiceActivity() {
         // A new activity on an engine that already runs Dart (music kept it alive) gets the
         // link pushed; on a cold start Dart asks for it once it's ready.
         if (savedInstanceState == null) links?.receive(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ScheduledMusic.visibleActivity = WeakReference(this)
     }
 
     override fun onNewIntent(intent: Intent) {

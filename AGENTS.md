@@ -444,7 +444,12 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (`am stack list`) while a song plays, then opening the app again — the Dart routes survive,
   native per-activity state doesn't (Back's callback was lost that way — `MainActivity`). A scheduled start is tested with the app killed by
   `am kill <package>` after Home (`am force-stop` would cancel Android's alarms too) and the screen off;
-  the time picker's dial rounds minutes to fives, and `dumpsys alarm | grep triggerTime` shows what's set. The
+  the time picker's dial rounds minutes to fives, and `dumpsys alarm | grep triggerTime` shows what's set.
+  It needs Android 14+'s "Powiadomienia pełnoekranowe" permission, which the Pixel doesn't give a
+  sideloaded app by itself: without it only the "Zaplanowana muzyka" notification shows (logcat:
+  `Background activity launch blocked`), so the start screen asks for it and warns. Take it away
+  for a test with `appops set --uid <package> USE_FULL_SCREEN_INTENT deny` (the package mode alone
+  doesn't count) and give it back with `allow`. The
   Huawei has only a swipe lock: wake it (`input keyevent KEYCODE_WAKEUP`) and unlock it with
   `input swipe 540 1800 540 600 300` rather than waiting for the user. It also shows no app logs
   (`logcat -s flutter` stays empty) — diagnose there from the screen. The release build allows no

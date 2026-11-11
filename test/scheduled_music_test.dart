@@ -32,6 +32,12 @@ class _FakePlatform implements ScheduledMusicPlatform {
   Future<bool> requestNotifications() async => true;
 
   @override
+  Future<bool> canStartApp() async => true;
+
+  @override
+  Future<bool> openStartAppSettings() async => true;
+
+  @override
   Future<void> setVolume(int percent) async => volume = percent;
 
   @override
