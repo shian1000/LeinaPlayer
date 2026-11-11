@@ -45,7 +45,7 @@ players, on/off and a strength: one steady gain for the whole song, no compresso
 ReplayGain tags or the phone's own EBU R128 measurement of files it has whole, kept per
 recording, never per song; [`local-library.md`](docs/agent-notes/local-library.md)), dragging a song row right to play it next or add it to the queue (as
 set in Odtwarzanie) and left to take it out of a playlist / mood / Na później, and a
-media notification with previous/next (keeps playing in the background); scrolled down, the full
+media notification with previous/next and a heart to like the song (keeps playing in the background); scrolled down, the full
 player shows everything music.db / tag.db / the phone know about the song (all of it for now,
 to be trimmed later — user's request), and its own fields can be corrected there (the pencil),
 going to the outbox for MusicDatabase while the phone keeps showing music.db's value — except

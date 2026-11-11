@@ -109,7 +109,7 @@ abstract class AudioBackend {
   Future<void> dispose();
 }
 
-/// The media session: the notification with previous / play-pause / next, lock-screen and
+/// The media session: the notification with previous / play-pause / next / ♡, lock-screen and
 /// headset controls, and the foreground service that keeps music playing in the background.
 /// Created once in `main()` by `AudioService.init`; it owns the app's two [AudioPlayer]s — two
 /// so songs can overlap while crossfading — and shows the [active] one.
@@ -140,6 +140,20 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
 
   /// Called before a pause from the notification, so a song fading out doesn't go on alone.
   VoidCallback? beforePause;
+
+  /// Whether the song playing is liked, for the notification's heart; `null` shows no heart.
+  bool? get liked => _liked;
+  bool? _liked;
+  set liked(bool? value) {
+    if (value == _liked) return;
+    _liked = value;
+    playbackState.add(_state());
+  }
+
+  /// The notification's heart was tapped.
+  VoidCallback? onLike;
+
+  static const _likeAction = 'like';
 
   AudioPlayer get active => _active;
   set active(AudioPlayer player) {
@@ -247,6 +261,11 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> skipToPrevious() async => _skips.add(MediaSkip.previous);
 
+  @override
+  Future<void> customAction(String name, [Map<String, dynamic>? extras]) async {
+    if (name == _likeAction) onLike?.call();
+  }
+
   PlaybackState _state() {
     final player = _active;
     if (player.playing) _stopped = false;
@@ -255,6 +274,14 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
         MediaControl.skipToPrevious,
         player.playing ? MediaControl.pause : MediaControl.play,
         MediaControl.skipToNext,
+        if (_liked case final liked?)
+          MediaControl.custom(
+            androidIcon: liked
+                ? 'drawable/ic_favorite'
+                : 'drawable/ic_favorite_border',
+            label: liked ? 'Usuń z polubionych' : 'Polub',
+            name: _likeAction,
+          ),
       ],
       systemActions: const {MediaAction.seek},
       androidCompactActionIndices: const [0, 1, 2],

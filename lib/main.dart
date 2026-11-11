@@ -286,10 +286,30 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   void _updateNotificationNames() =>
       widget.mediaSession?.latinNames = _themeController.latinNames;
 
+  void _updateNotificationLike() =>
+      widget.mediaSession?.liked = switch (_playbackQueue.current) {
+        final hit? => _likedSongs.contains(hit),
+        null => null,
+      };
+
+  void _likeFromNotification() {
+    final hit = _playbackQueue.current;
+    if (hit == null) return;
+    _likedSongs
+        .toggle(hit)
+        .then<void>(
+          (_) {},
+          onError: (Object e) =>
+              debugPrint('Liking from the notification failed: $e'),
+        );
+  }
+
   late final AlbumCovers _albumCovers = AlbumCovers(
     _localLibrary.database,
     _sourceSettings,
     findVideoId: (hit) async => (await _trackPlayer.pickVideo(hit))?.id,
+    serverFileCopy: (id) async => (await _serverDownloads.fileFor(id))?.path,
+    serverFileHead: (id) => _trackPlayer.serverFileHead(id),
   );
   final _customCovers = CustomCovers();
   late final Future<void> _coversLoaded;
@@ -444,6 +464,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.addListener(_updateChooserLook);
     _updateNotificationNames();
     _themeController.addListener(_updateNotificationNames);
+    widget.mediaSession?.onLike = _likeFromNotification;
+    _playbackQueue.addListener(_updateNotificationLike);
+    _likedSongs.addListener(_updateNotificationLike);
     _moodFilter.load().catchError(
       (Object e) => debugPrint('Loading the mood filter failed: $e'),
     );
@@ -737,7 +760,26 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
           await _player.seek(Duration.zero);
         }
         await _player.togglePlay();
-        return _player.playing;
+        return _playingSoon();
+    }
+  }
+
+  /// `togglePlay` returns before the player reports playing.
+  Future<bool> _playingSoon() async {
+    if (_player.playing) return true;
+    final started = Completer<bool>();
+    void check() {
+      if (_player.playing && !started.isCompleted) started.complete(true);
+    }
+
+    _player.addListener(check);
+    try {
+      return await started.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => _player.playing,
+      );
+    } finally {
+      _player.removeListener(check);
     }
   }
 
@@ -908,6 +950,8 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.removeListener(_updateCoverLook);
     _themeController.removeListener(_updateChooserLook);
     _themeController.removeListener(_updateNotificationNames);
+    _playbackQueue.removeListener(_updateNotificationLike);
+    _likedSongs.removeListener(_updateNotificationLike);
     _songCatalog.removeListener(_forgetSettledMatches);
     _songCatalog.removeListener(_useUserYouTubeLinks);
     _outbox.removeListener(_useUserYouTubeLinks);

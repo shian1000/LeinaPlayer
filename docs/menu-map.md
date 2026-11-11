@@ -40,9 +40,15 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
 
 ## Player (`lib/src/screens/now_playing.dart`, `lib/src/playback/player_controller.dart`)
 
-- Media notification (and lock screen): title, artist, progress, previous / pause-play / next —
+- Media notification (and lock screen): title, artist, progress, previous / pause-play / next / ♡ —
   the system's media controls (`MediaSession`, an `audio_service` handler); previous/next go to
-  the queue like the full player's buttons. Headset and car buttons work too.
+  the queue like the full player's buttons; ♡ (**implemented**, a custom action — icons
+  `ic_favorite*.xml`, kept from resource shrinking by `keep.xml`) likes the song or takes the like
+  back, like the players' heart, empty or full; not shown with nothing in the queue. The system
+  draws it in one colour and, on Android 13+, places it among the media controls itself. Android
+  12 and older show no heart: `audio_service` gives a custom control only to the session's
+  `PlaybackState` (what 13+ draws), never as a notification action — it would need another patch
+  of `third_party/audio_service` (not done; the user's Pixel has it, that was enough). Headset and car buttons work too.
 - Mini player — appears above the bottom bar once something plays: cover, title, artist,
   play/pause, thin progress line. Dragging the song (cover and titles) sideways, like the
   reference app (**implemented**): left — the next song, right — the previous one (always that
