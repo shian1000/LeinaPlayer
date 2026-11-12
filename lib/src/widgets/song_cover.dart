@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../data/album_covers.dart';
+import '../data/startup_covers.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
 import 'cover_art.dart';
@@ -65,6 +66,7 @@ class SongCover extends StatefulWidget {
     required this.cover,
     this.size = 56,
     this.filterStrength,
+    this.startup,
   });
 
   final CoverRequest cover;
@@ -72,6 +74,13 @@ class SongCover extends StatefulWidget {
 
   /// Instead of the filter's saved intensity (the slider's preview).
   final double? filterStrength;
+
+  /// A place seen as the app starts (Home's first cards, the mini player), and the song it
+  /// shows: the cover found there is remembered ([StartupCovers]), and on the next start it
+  /// stands in until this one is found again. Until [settled] (Home's songs before music.db
+  /// has loaded, looked for without their album) what's found here is neither shown over the
+  /// stand-in nor remembered: it may be another picture than the song's own cover.
+  final ({String slot, String check, bool settled})? startup;
 
   @override
   State<SongCover> createState() => _SongCoverState();
@@ -99,8 +108,17 @@ class _SongCoverState extends State<SongCover> {
       _image = null;
       _shown = false;
       _resolve();
-    } else if (isLargeCover(old.size) != isLargeCover(widget.size)) {
+    } else if (isLargeCover(old.size) != isLargeCover(widget.size) ||
+        // The same cover, now with the song a video may be searched for (the player's song
+        // shown before music.db loaded, QueueSession.showSaved), and nothing found without it.
+        (_image == null &&
+            old.cover.videoSearch == null &&
+            widget.cover.videoSearch != null)) {
       _resolve();
+    } else if (old.startup?.settled == false &&
+        widget.startup?.settled == true) {
+      // Found while it couldn't be told apart from another picture: the same request now.
+      if (_image case final image?) _remember(image, widget.cover.seed);
     }
   }
 
@@ -119,19 +137,64 @@ class _SongCoverState extends State<SongCover> {
     final request = Object();
     _request = request;
     bool wanted() => mounted && _request == request;
+    final cover = widget.cover;
+    final asked = widget.startup;
     covers
-        .resolve(widget.cover, large: large, wanted: wanted)
+        .resolve(cover, large: large, wanted: wanted)
         .then((image) {
+          // Settled meanwhile (music.db loaded while this was looked for): the same request.
+          final startup = wanted() ? widget.startup : asked;
+          if (image != null && startup != null && startup.settled) {
+            _rememberIn(covers, startup, image, cover.seed);
+          }
           if (wanted() && image != _image) setState(() => _image = image);
         })
         .catchError((Object e) => debugPrint('Showing a cover failed: $e'));
   }
 
+  void _remember(ImageProvider image, String seed) {
+    final covers = AlbumCoversScope.maybeOf(context);
+    final startup = widget.startup;
+    if (covers != null && startup != null) {
+      _rememberIn(covers, startup, image, seed);
+    }
+  }
+
+  static void _rememberIn(
+    AlbumCovers covers,
+    ({String slot, String check, bool settled}) startup,
+    ImageProvider image,
+    String seed,
+  ) {
+    covers.startup
+        ?.remember(startup.slot, startup.check, image, seed)
+        .catchError(
+          (Object e) => debugPrint('Remembering a start-up cover failed: $e'),
+        );
+  }
+
+  /// What stands in for the cover until it's found, from the last start.
+  StartupCover? _standIn(BuildContext context) => switch (widget.startup) {
+    (:final slot, :final check, settled: _) => AlbumCoversScope.maybeOf(
+      context,
+    )?.startup?.of(slot, check),
+    null => null,
+  };
+
   @override
   Widget build(BuildContext context) {
     final size = widget.size;
     final placeholder = CoverArt(seed: widget.cover.seed, size: size);
-    final image = _image;
+    var image = _image;
+    var seed = widget.cover.seed;
+    if (image == null || widget.startup?.settled == false) {
+      final standIn = _standIn(context);
+      if (standIn != null) {
+        // With the seed it was drawn with: once found, the same file is the same image.
+        image = FileImage(standIn.file);
+        seed = standIn.seed;
+      }
+    }
     if (image == null) return placeholder;
     final filter = ThemeScope.maybeOf(context)?.coverFilter ?? CoverFilter.none;
     return ClipRRect(
@@ -141,7 +204,7 @@ class _SongCoverState extends State<SongCover> {
           context,
           image,
           size,
-          widget.cover.seed,
+          seed,
           strength: widget.filterStrength,
         ),
         filterQuality: filter == CoverFilter.monochrome

@@ -34,6 +34,7 @@ import 'src/data/smart_playlists.dart';
 import 'src/data/hidden_songs.dart';
 import 'src/data/server_downloads.dart';
 import 'src/data/song_catalog.dart';
+import 'src/data/startup_covers.dart';
 import 'src/data/source_settings.dart';
 import 'src/data/track_ref.dart';
 import 'src/data/user_backup.dart';
@@ -114,11 +115,19 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Loading appearance settings failed: $e');
   }
+  // Before the first frame, which shows them.
+  final startupCovers = StartupCovers();
+  try {
+    await startupCovers.load();
+  } catch (e) {
+    debugPrint('Reading the start-up covers failed: $e');
+  }
   runApp(
     MusicDatabaseApp(
       themeController: themeController,
       mediaSession: mediaSession,
       userBackup: userBackup,
+      startupCovers: startupCovers,
     ),
   );
 }
@@ -132,6 +141,7 @@ class MusicDatabaseApp extends StatefulWidget {
     this.youTubeAudio,
     this.youTubePlaylists,
     this.userBackup,
+    this.startupCovers,
   });
 
   /// Already-loaded appearance settings; when omitted (tests) defaults are loaded in the
@@ -148,6 +158,9 @@ class MusicDatabaseApp extends StatefulWidget {
 
   /// The one `main` restored a pending backup with; made here when omitted (tests).
   final UserBackup? userBackup;
+
+  /// Read by `main` before the first frame; none when omitted (tests).
+  final StartupCovers? startupCovers;
 
   @override
   State<MusicDatabaseApp> createState() => _MusicDatabaseAppState();
@@ -310,6 +323,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     findVideoId: (hit) async => (await _trackPlayer.pickVideo(hit))?.id,
     serverFileCopy: (id) async => (await _serverDownloads.fileFor(id))?.path,
     serverFileHead: (id) => _trackPlayer.serverFileHead(id),
+    startup: widget.startupCovers,
   );
   final _customCovers = CustomCovers();
   late final Future<void> _coversLoaded;
@@ -557,6 +571,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     });
     _listeningTracker;
     _listeningLog.onManyUnsent = _syncListens;
+    _queueSession.showSaved();
     _restoreSession(localLoaded, youTubeLoaded);
     // After the first frame, when AppShell already listens (the link that started the app
     // would otherwise go nowhere).
@@ -784,6 +799,11 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     }
   }
 
+  /// Reading the playlists and syncing with MusicDatabase on start wait for it: they read and
+  /// write the same database as the queue's songs come back from, and on a slow phone the mini
+  /// player waited seconds.
+  final _sessionRestored = Completer<void>();
+
   /// The last song and queue come back once the songs they refer to can be found.
   Future<void> _restoreSession(Future<void> local, Future<void> youTube) async {
     try {
@@ -792,6 +812,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       debugPrint('Loading songs before restoring the queue failed: $e');
     }
     await _queueSession.restore();
+    _sessionRestored.complete();
     await _scheduledMusic.start().catchError(
       (Object e) => debugPrint('Starting the scheduled music failed: $e'),
     );
@@ -825,12 +846,16 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     final first = !_playlistsLoaded;
     _playlistsUser = user;
     _playlistsLoaded = true;
-    final playlists = _playlistLibrary
-        .load()
+    final restored = _sessionRestored.future;
+    // Read once the queue is back, with the catalog then loaded: reading them before it took
+    // a slow phone as long as reading them again for the catalog, holding the queue up.
+    final playlists = restored
+        .then((_) => _playlistLibrary.load())
         .then((_) => _syncPlaylists())
         .catchError((Object e) => debugPrint('Loading playlists failed: $e'));
     final moods = _moodLibrary
         .load()
+        .then((_) => restored)
         .then((_) => _syncMoods())
         .catchError((Object e) => debugPrint('Loading moods failed: $e'));
     // Folders after both: their items have to be on the phone first.
@@ -838,12 +863,14 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       if (first) await _pruneCovers();
       await _syncFolders();
     });
-    _syncListens();
     _savedSongs.accountChanged();
     _likedSongs.accountChanged();
     _laterLinks.accountChanged();
-    _syncSavedSongs();
-    _syncLaterLinks();
+    restored.then((_) {
+      _syncListens();
+      _syncSavedSongs();
+      _syncLaterLinks();
+    });
   }
 
   /// Lets folders name their playlists and moods for MusicDatabase.

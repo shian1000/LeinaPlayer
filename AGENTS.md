@@ -259,7 +259,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   folders (synced), sort order, filter chips and "last opened" (`library_folders.dart`), songs saved for
   later and liked songs (`saved_songs.dart`, synced item by item with `item_sync.dart`'s `ItemSync`
   like the later links), songs hidden with "Ukryj utwór" (`hidden_songs.dart`), the song last played from each playlist, marked with a bookmark (`playlist_bookmarks.dart`, phone only), dynamic playlists (`smart_playlists.dart`), Home's row layout
-  (`home_layout.dart`) — all three phone only, syncing
+  (`home_layout.dart`), the covers and texts Home's first cards and the mini player showed at the last start (`startup_covers.dart`) — all four phone only, syncing
 playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.sync`), moods
   (`moods.dart`: global ones from tag.db, the user's own synced like playlists), the queue's
   mood filter (`mood_filter.dart`),
@@ -429,7 +429,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   at random (a different test failing each full run). In a widget test wait for what the screen
   shows, not for a notifier's field: `PlaylistLibrary.load` sets `playlists` before its second
   query and its `notifyListeners`, so waiting on the field let the test check the screen too
-  early (and `find.text` also matches an open dialog's `TextField`).
+  early (and `find.text` also matches an open dialog's `TextField`). Work a widget started
+  (in the test's fake time) moves only while frames are pumped: wait for it with `pumpUntil`,
+  never `runAsync(() => thatFuture)` (it hangs), and let it finish before `tearDown` deletes
+  its files (else "disk I/O error" after the test, only with the whole suite running).
 - After `tester.scrollUntilVisible(…)` call `await tester.pump()` before tapping what it found:
   it ends with an `ensureVisible` jump but draws no frame, so `tap` aims where the last drag left
   the widget. Where that is can depend on the screen's content — the listening stats test
@@ -518,7 +521,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   folders, R8 rules.
 - [`covers.md`](docs/agent-notes/covers.md) — album covers: sources and their order, matching,
   rate limits, the cover cache, the MusicDatabase hand-off, playlist/mood collages and picked
-  covers.
+  covers, last start's covers shown at start (`StartupCovers`).
+- [`startup.md`](docs/agent-notes/startup.md) — what a cold start does and why in that order
+  (sqflite's one thread, lazy search texts, playlists after the queue, Home keeping its layout),
+  the ideas left for later, and how to measure a start on the Huawei.
 - [`signing.md`](docs/agent-notes/signing.md) — the release key (outside the repo,
   `android/key.properties`), why it must never change, its SHA-1 in Google Cloud.
 - [`releases.md`](docs/agent-notes/releases.md) — making a GitHub release (tag `<version>+<build>`)

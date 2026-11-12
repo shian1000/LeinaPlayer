@@ -187,9 +187,21 @@ class MoodLibrary extends ChangeNotifier {
     ..._globalMoods,
   ].where((m) => m.key == mood.key).firstOrNull;
 
+  /// The first [load] has finished (also when it failed): no [userMoods] / [globalMoods] means
+  /// none now.
+  bool get loaded => _loaded;
+  bool _loaded = false;
+
   Future<void> load() async {
-    if (!_tagDbLoaded || _sync.lastSync != _tagDbFor) await _loadTagDb();
-    await _loadLocal();
+    try {
+      if (!_tagDbLoaded || _sync.lastSync != _tagDbFor) await _loadTagDb();
+      await _loadLocal();
+    } finally {
+      if (!_loaded) {
+        _loaded = true;
+        notifyListeners();
+      }
+    }
   }
 
   void _onSyncChanged() {

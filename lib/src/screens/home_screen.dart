@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../data/album_covers.dart';
@@ -15,6 +16,7 @@ import '../data/play_history.dart';
 import '../data/playlist_library.dart';
 import '../data/saved_songs.dart';
 import '../data/song_catalog.dart';
+import '../data/startup_covers.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../playback/playback_queue.dart';
@@ -108,6 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Object? _readFor;
   int _reading = 0;
 
+  /// The [_readFor] [_recommended] was made for: until it's the current one, the rows wait.
+  Object? _recommendedFor;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -120,12 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final reading = ++_reading;
     log.listens(account: user).then((listens) {
       if (!mounted || reading != _reading) return;
-      setState(
-        () => _recommended = HomeRecommendations.of(
-          listens,
-          song: catalog.current,
-        ),
-      );
+      setState(() {
+        _recommended = HomeRecommendations.of(listens, song: catalog.current);
+        _recommendedFor = readFor;
+      });
     });
   }
 
@@ -144,10 +147,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListenableBuilder(
       listenable: layout,
       builder: (context, _) {
-        final sections = [
+        final recommendationsReady = _recommendedFor == _readFor;
+        final shown = [
           for (final id in layout.visible)
-            if (_filter.shows(id)) ?_HomeSection.of(context, id, _recommended),
+            if (_filter.shows(id)) id,
         ];
+        final sections = [
+          for (final id in shown)
+            if (_HomeSection.stillReading(context, id, recommendationsReady))
+              ?_HomeSection.reading(id, layout.lastShown[id])
+            else
+              ?_HomeSection.of(context, id, _recommended),
+        ];
+        if (_filter == _HomeFilter.all &&
+            !shown.any(
+              (id) =>
+                  _HomeSection.stillReading(context, id, recommendationsReady),
+            )) {
+          final rows = {
+            for (final section in sections) section.id: section.title,
+          };
+          if (!mapEquals(rows, layout.lastShown)) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => layout
+                  .rememberShown(rows)
+                  .catchError(
+                    (Object e) =>
+                        debugPrint('Remembering Home rows failed: $e'),
+                  ),
+            );
+          }
+        }
         return SafeArea(
           child: Column(
             children: [
@@ -181,8 +211,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     : ListView.builder(
                         padding: const EdgeInsets.only(bottom: 24),
                         itemCount: sections.length,
-                        itemBuilder: (context, i) =>
-                            _SectionRow(section: sections[i], layout: layout),
+                        itemBuilder: (context, i) => _SectionRow(
+                          section: sections[i],
+                          layout: layout,
+                          row: i,
+                        ),
                       ),
               ),
             ],
@@ -203,6 +236,42 @@ class _HomeSection {
 
   /// Built lazily; an empty list shows a note instead.
   final List<Widget> Function(BuildContext context) cards;
+
+  /// The place of a row still being read at start ([stillReading]), titled as it was
+  /// [HomeLayout.lastShown]; `null` when it wasn't shown then, as it may well be empty.
+  static _HomeSection? reading(String id, String? title) => title == null
+      ? null
+      : _HomeSection(
+          id,
+          title,
+          id == 'rec:artists' ? 185 : 205,
+          (_) => List.filled(4, const _CardPlaceholder()),
+        );
+
+  /// Whether what [id] shows is still being read at start: an empty row then isn't empty yet.
+  static bool stillReading(
+    BuildContext context,
+    String id,
+    bool recommendationsReady,
+  ) {
+    final catalogRead = _catalogRead(context);
+    if (_recommendations.containsKey(id)) {
+      return !catalogRead || !recommendationsReady;
+    }
+    final playlistsRead = PlaylistLibraryScope.maybeOf(context)?.loaded ?? true;
+    final moodsRead = MoodLibraryScope.maybeOf(context)?.loaded ?? true;
+    return switch (id) {
+      'lib:recent' => !(PlayHistoryScope.maybeOf(context)?.loaded ?? true),
+      'lib:liked' => !(LikedSongsScope.maybeOf(context)?.loaded ?? true),
+      'lib:saved' => !(SavedSongsScope.maybeOf(context)?.loaded ?? true),
+      'lib:playlists' => !playlistsRead,
+      'lib:moods' => !moodsRead,
+      _ when id.startsWith('playlist:') => !playlistsRead,
+      // A global mood's songs are music.db's.
+      _ when id.startsWith('mood:') => !moodsRead || !catalogRead,
+      _ => false,
+    };
+  }
 
   /// `null` when the section's playlist / mood is gone, or a library row has nothing to show.
   static _HomeSection? of(
@@ -225,16 +294,19 @@ class _HomeSection {
         if (history == null || history.entries.isEmpty) return null;
         if (catalog == null || library == null || youTube == null) return null;
         final seen = <String>{};
-        final hits = [
+        final tracks = [
           for (final played in history.entries)
-            if (seen.add(played.track.key))
-              resolveTrack(played.track, catalog, library, youTube),
+            if (seen.add(played.track.key)) played.track,
         ].take(_rowLimit).toList();
+        final hits = [
+          for (final track in tracks)
+            resolveTrack(track, catalog, library, youTube),
+        ];
         return _HomeSection(
           id,
           _librarySections[id]!,
           songHeight,
-          (_) => _songCards(hits),
+          (_) => _songCards(hits, keys: [for (final t in tracks) t.key]),
         );
       case 'lib:saved' || 'lib:liked':
         final StoredSongList? saved = id == 'lib:liked'
@@ -242,15 +314,15 @@ class _HomeSection {
             : SavedSongsScope.maybeOf(context);
         if (saved == null || saved.songs.isEmpty) return null;
         if (catalog == null || library == null || youTube == null) return null;
+        final refs = saved.songs.take(_rowLimit).toList();
         final hits = [
-          for (final ref in saved.songs.take(_rowLimit))
-            resolveTrack(ref, catalog, library, youTube),
+          for (final ref in refs) resolveTrack(ref, catalog, library, youTube),
         ];
         return _HomeSection(
           id,
           _librarySections[id]!,
           songHeight,
-          (_) => _songCards(hits),
+          (_) => _songCards(hits, keys: [for (final r in refs) r.key]),
         );
       case 'lib:playlists':
         if (playlists == null || playlists.playlists.isEmpty) return null;
@@ -433,16 +505,20 @@ class _HomeSection {
   }
 }
 
+/// [keys]: what each song is kept as ([TrackRef.key]), for a row whose songs are found again
+/// from what the phone keeps; the same before music.db has loaded and after.
 List<Widget> _songCards(
   List<SearchHit> hits, {
   String? playlistName,
   String? moodKey,
   int? playlistId,
   String? youTubeListId,
+  List<String>? keys,
 }) => [
   for (final (i, hit) in hits.indexed)
     _SongCard(
       hit: hit,
+      songKey: keys?[i] ?? TrackRef.of(hit).key,
       onTap: (context) {
         final queue = PlaybackQueueScope.of(context);
         runQueueAction(
@@ -462,10 +538,21 @@ List<Widget> _songCards(
 ];
 
 class _SectionRow extends StatelessWidget {
-  const _SectionRow({required this.section, required this.layout});
+  const _SectionRow({
+    required this.section,
+    required this.layout,
+    required this.row,
+  });
 
   final _HomeSection section;
   final HomeLayout layout;
+
+  /// Its place on Home, from the top.
+  final int row;
+
+  /// The cards on screen as Home opens, whose covers show from the start ([StartupCovers]).
+  static const _startupRows = 3;
+  static const _startupCards = 3;
 
   @override
   Widget build(BuildContext context) {
@@ -497,7 +584,9 @@ class _SectionRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: cards.length,
             separatorBuilder: (_, _) => const SizedBox(width: 14),
-            itemBuilder: (context, i) => cards[i],
+            itemBuilder: (context, i) => row < _startupRows && i < _startupCards
+                ? _StartupSlot(slot: 'home:${section.id}#$i', child: cards[i])
+                : cards[i],
           ),
         ),
       ],
@@ -588,19 +677,53 @@ class _NothingShown extends StatelessWidget {
 
 /// A card of a song: its cover, title and artist; tapping plays the row from it.
 class _SongCard extends StatelessWidget {
-  const _SongCard({required this.hit, required this.onTap});
+  const _SongCard({
+    required this.hit,
+    required this.songKey,
+    required this.onTap,
+  });
 
   final SearchHit hit;
+
+  /// The song as the phone keeps it, which tells the card [StartupCovers] remembered for this
+  /// place: its names may still change as music.db loads (a video's title, then music.db's).
+  final String songKey;
   final void Function(BuildContext context) onTap;
 
   @override
-  Widget build(BuildContext context) => _Card(
-    cover: SongCover(cover: CoverRequest.of(hit), size: _cardWidth),
-    title: hit.shownTitle(context),
-    subtitle: hit.shownArtist(context),
-    onTap: () => onTap(context),
-    onLongPress: () => showSongMenu(context, hit, idPrefix: '$_id › Utwór'),
-  );
+  Widget build(BuildContext context) {
+    var (title, subtitle) = (hit.shownTitle(context), hit.shownArtist(context));
+    final slot = _StartupSlot.of(context);
+    final check = songKey;
+    // Before music.db, the song is looked for without its album, and named without its Latin
+    // form.
+    final settled = _catalogRead(context);
+    final startup = AlbumCoversScope.maybeOf(context)?.startup;
+    if (slot != null && settled) {
+      startup?.rememberTexts(slot, check, title, subtitle);
+    } else if (slot != null) {
+      // As it was shown last time until music.db can say so again.
+      if (startup?.of(slot, check) case StartupCover(
+        title: final shownTitle?,
+        subtitle: final shownSubtitle?,
+      )) {
+        (title, subtitle) = (shownTitle, shownSubtitle);
+      }
+    }
+    return _Card(
+      cover: SongCover(
+        cover: CoverRequest.of(hit),
+        size: _cardWidth,
+        startup: slot == null
+            ? null
+            : (slot: slot, check: check, settled: settled),
+      ),
+      title: title,
+      subtitle: subtitle,
+      onTap: () => onTap(context),
+      onLongPress: () => showSongMenu(context, hit, idPrefix: '$_id › Utwór'),
+    );
+  }
 }
 
 class _PlaylistCard extends StatelessWidget {
@@ -732,6 +855,96 @@ class _Card extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Whether music.db's songs are read, or there are none to read.
+bool _catalogRead(BuildContext context) {
+  final catalog = SongCatalogScope.maybeOf(context);
+  return catalog == null ||
+      const {
+        CatalogStatus.ready,
+        CatalogStatus.noDatabase,
+        CatalogStatus.error,
+      }.contains(catalog.status);
+}
+
+/// A card among the first on Home ([_SectionRow]), named for [StartupCovers].
+class _StartupSlot extends InheritedWidget {
+  const _StartupSlot({required this.slot, required super.child});
+
+  final String slot;
+
+  static String? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_StartupSlot>()?.slot;
+
+  @override
+  bool updateShouldNotify(_StartupSlot old) => slot != old.slot;
+}
+
+/// A card's place in a row still being read at start ([_HomeSection.reading]).
+class _CardPlaceholder extends StatelessWidget {
+  const _CardPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final box = Container(
+      width: _cardWidth,
+      height: _cardWidth,
+      decoration: BoxDecoration(
+        color: palette.surfaceHigh,
+        borderRadius: palette.radius(4),
+      ),
+    );
+    // The card shown in this place last time, which is most likely what comes.
+    if (_StartupSlot.of(context) case final slot?) {
+      final shown = AlbumCoversScope.maybeOf(context)?.startup?.at(slot);
+      if (shown != null && shown.title != null) {
+        return _Card(
+          cover: ClipRRect(
+            borderRadius: palette.radius(4),
+            child: Image(
+              image: coverImageFor(
+                context,
+                FileImage(shown.file),
+                _cardWidth,
+                shown.seed,
+              ),
+              width: _cardWidth,
+              height: _cardWidth,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => box,
+            ),
+          ),
+          title: shown.title!,
+          subtitle: shown.subtitle ?? '',
+          onTap: () {},
+        );
+      }
+    }
+    Widget bar(double width) => Container(
+      width: width,
+      height: AppFontSize.small,
+      margin: const EdgeInsets.only(top: 6),
+      decoration: BoxDecoration(
+        color: palette.surfaceHigh,
+        borderRadius: palette.radius(2),
+      ),
+    );
+    return SizedBox(
+      width: _cardWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          box,
+          const SizedBox(height: 4),
+          bar(_cardWidth * 0.7),
+          bar(_cardWidth * 0.45),
+        ],
+      ),
+    );
+  }
 }
 
 /// A recommended artist: their most played song's cover in a circle; tapping opens their songs.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
@@ -159,6 +160,114 @@ void main() {
       ], reason: 'starts where it was, without the song\'s start heard first');
       expect(after.player.currentPosition, const Duration(seconds: 42));
       expect(after.player.restored, isFalse);
+    },
+  );
+
+  /// A session saved with "b" paused at 0:42, "c" after it.
+  Future<void> saveSession() async {
+    final before = app();
+    final session = QueueSession(
+      queue: before.queue,
+      player: before.player,
+      resolve: _resolve,
+    );
+    await session.restore();
+    await before.queue.start(
+      [_file('a'), _file('b'), _file('c')],
+      1,
+      playlistName: 'Do auta',
+    );
+    before.backend.at(const Duration(seconds: 42));
+    await flush();
+    await before.player.togglePlay();
+    await session.save();
+    session.dispose();
+  }
+
+  test('the saved song shows before its queue can be put back, which then '
+      'takes its place', () async {
+    await saveSession();
+    final after = app();
+    var resolved = 0;
+    final session = QueueSession(
+      queue: after.queue,
+      player: after.player,
+      resolve: (ref) {
+        resolved++;
+        return _resolve(ref);
+      },
+    );
+    await session.showSaved();
+    final early = after.player.current;
+    expect(early?.title, 'b');
+    expect(early?.playlistName, 'Do auta');
+    expect(after.player.restored, isTrue);
+    expect(after.player.currentPosition, const Duration(seconds: 42));
+    expect(resolved, 0, reason: 'no song is looked up for it');
+    expect(after.queue.current, isNull);
+
+    await after.player.seek(const Duration(seconds: 50));
+    await session.restore();
+    expect(after.queue.current?.title, 'b');
+    expect([for (final e in after.queue.upcoming) e.hit.title], ['c']);
+    expect(after.player.current, isNot(same(early)));
+    expect(after.player.current?.title, 'b');
+    expect(
+      after.player.current?.cover.identity,
+      early?.cover.identity,
+      reason: 'the same cover, shown at once',
+    );
+    expect(after.player.restored, isTrue);
+    expect(
+      after.player.currentPosition,
+      const Duration(seconds: 50),
+      reason: 'moved while shown early',
+    );
+    expect(after.backend.opened, isEmpty);
+  });
+
+  test('"Odtwórz" on the song shown early plays it once the queue is back, '
+      'where it was', () async {
+    await saveSession();
+    final after = app();
+    final session = QueueSession(
+      queue: after.queue,
+      player: after.player,
+      resolve: _resolve,
+    );
+    await session.showSaved();
+    final tapped = after.player.togglePlay();
+    await flush();
+    expect(after.backend.opened, isEmpty, reason: 'waits for the queue');
+
+    await session.restore();
+    await tapped;
+    expect(after.backend.opened, ['/music/b.mp3']);
+    expect(after.backend.calls, ['open', 'seek 42', 'play']);
+    expect(after.queue.current?.title, 'b');
+    expect(after.player.restored, isFalse);
+  });
+
+  test(
+    'a session saved without what the player showed waits for the queue',
+    () async {
+      await saveSession();
+      final prefs = await SharedPreferences.getInstance();
+      final saved = (jsonDecode(prefs.getString('playback.session')!) as Map)
+        ..remove('shown');
+      await prefs.setString('playback.session', jsonEncode(saved));
+
+      final after = app();
+      final session = QueueSession(
+        queue: after.queue,
+        player: after.player,
+        resolve: _resolve,
+      );
+      await session.showSaved();
+      expect(after.player.current, isNull);
+      await session.restore();
+      expect(after.player.current?.title, 'b');
+      expect(after.player.currentPosition, const Duration(seconds: 42));
     },
   );
 

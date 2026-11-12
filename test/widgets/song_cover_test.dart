@@ -8,6 +8,7 @@ import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
+import 'package:music_database_app/src/data/startup_covers.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/theme_controller.dart';
 import 'package:music_database_app/src/widgets/cover_art.dart';
@@ -27,6 +28,10 @@ void main() {
   late SourceSettings settings;
   late ThemeController themes;
   late AlbumCovers covers;
+  late StartupCovers startup;
+
+  /// A PNG file, as the cover cache keeps them.
+  late File cachedPng;
 
   final cover = CoverRequest(
     artist: 'Lain',
@@ -59,9 +64,12 @@ void main() {
       final png = (await image.toByteData(format: ui.ImageByteFormat.png))!
           .buffer
           .asUint8List();
+      cachedPng = File('${root.path}/cached.png')..writeAsBytesSync(png);
+      startup = StartupCovers(storageRoot: () async => root);
       covers = AlbumCovers(
         local.database,
         settings,
+        startup: startup,
         storageRoot: () async => root,
         readEmbedded: (path) async => path == cover.filePath ? png : null,
         getJson: (_) async => throw const SocketException('offline'),
@@ -132,4 +140,75 @@ void main() {
       expect(find.byType(CoverArt), findsNothing);
     },
   );
+
+  testWidgets('the cover a start-up place showed last time stands in until '
+      'its own is found', (tester) async {
+    await setUpAll(tester);
+    await tester.runAsync(
+      () => startup.remember('mini', 'x', FileImage(cachedPng), 'old'),
+    );
+    // Nothing finds this one (offline, no file): only the stand-in can show.
+    final unfound = CoverRequest(artist: 'A', title: 'B', seed: 'b');
+    await tester.pumpWidget(
+      app(
+        SongCover(
+          cover: unfound,
+          startup: (slot: 'mini', check: 'x', settled: true),
+        ),
+      ),
+    );
+    await waitForCover(tester);
+
+    // Another song in that place: no stand-in.
+    await tester.pumpWidget(app(const SizedBox()));
+    await tester.pumpWidget(
+      app(
+        SongCover(
+          cover: unfound,
+          startup: (slot: 'mini', check: 'y', settled: true),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byType(CoverArt), findsOneWidget);
+    // Its look-up done, before the files go.
+    var done = false;
+    covers.resolve(unfound).whenComplete(() => done = true);
+    await pumpUntil(tester, () => done);
+  });
+
+  testWidgets('a found cover is remembered for the place once its song is '
+      'settled, not before', (tester) async {
+    await setUpAll(tester);
+    await tester.runAsync(
+      () => startup.remember('home:r#0', 'x', FileImage(cachedPng), 'old'),
+    );
+    await tester.pumpWidget(
+      app(
+        SongCover(
+          cover: cover,
+          startup: (slot: 'home:r#0', check: 'x', settled: false),
+        ),
+      ),
+    );
+    // Found meanwhile (the song file's own picture), but not remembered yet.
+    await pumpUntil(tester, () => covers.known(cover) != null);
+    await tester.pump();
+    expect(startup.of('home:r#0', 'x')?.file.path, cachedPng.path);
+
+    await tester.pumpWidget(
+      app(
+        SongCover(
+          cover: cover,
+          startup: (slot: 'home:r#0', check: 'x', settled: true),
+        ),
+      ),
+    );
+    await pumpUntil(
+      tester,
+      () => startup.of('home:r#0', 'x')?.file.path != cachedPng.path,
+    );
+    expect(startup.of('home:r#0', 'x')?.seed, cover.seed);
+    await tester.runAsync(startup.flush);
+  });
 }

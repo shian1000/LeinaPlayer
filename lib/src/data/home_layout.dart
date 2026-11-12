@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,6 +13,7 @@ class HomeLayout extends ChangeNotifier {
   HomeLayout({required this.defaults});
 
   static const _key = 'home_layout';
+  static const _shownKey = 'home_layout.last_shown';
 
   /// Built-in sections in their first order.
   final List<String> defaults;
@@ -23,6 +25,22 @@ class HomeLayout extends ChangeNotifier {
   bool _recommendations = true;
 
   bool get recommendations => _recommendations;
+
+  /// The rows Home showed the last time all of them were read, with their titles: at start a
+  /// row whose songs, playlists or moods are still being read keeps its place if it was there,
+  /// so the rows below don't move when it comes.
+  Map<String, String> get lastShown => _lastShown;
+  Map<String, String> _lastShown = const {};
+
+  Future<void> rememberShown(Map<String, String> rows) async {
+    if (mapEquals(rows, _lastShown)) return;
+    _lastShown = Map.unmodifiable(rows);
+    await (await SharedPreferences.getInstance()).setString(
+      _shownKey,
+      jsonEncode(rows),
+    );
+  }
+
   bool isPinned(String id) => _pinned.contains(id);
   bool isHidden(String id) => _hidden.contains(id);
   bool isAdded(String id) => _added.contains(id);
@@ -52,7 +70,11 @@ class HomeLayout extends ChangeNotifier {
   ];
 
   Future<void> load() async {
-    final raw = (await SharedPreferences.getInstance()).getString(_key);
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(_shownKey) case final shown?) {
+      _lastShown = Map.unmodifiable((jsonDecode(shown) as Map).cast());
+    }
+    final raw = prefs.getString(_key);
     if (raw == null) return;
     final json = (jsonDecode(raw) as Map).cast<String, Object?>();
     List<String> strings(String key) => [...?(json[key] as List?)?.cast()];

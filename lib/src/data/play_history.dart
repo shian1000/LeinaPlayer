@@ -48,18 +48,26 @@ class PlayHistory extends ChangeNotifier {
   /// Newest first.
   List<PlayedTrack> get entries => _entries;
 
+  /// [load] has finished (also when it failed): an empty [entries] means none now.
+  bool get loaded => _loaded;
+  bool _loaded = false;
+
   Future<void> load() async {
-    _keepDays =
-        (await SharedPreferences.getInstance()).getInt(_keepDaysKey) ??
-        _keepDays;
-    await _deleteOld();
-    final rows = await (await _database()).query(
-      'play_history',
-      orderBy: 'played_at DESC, id DESC',
-      limit: limit,
-    );
-    _entries = [for (final row in rows) _fromRow(row)];
-    notifyListeners();
+    try {
+      _keepDays =
+          (await SharedPreferences.getInstance()).getInt(_keepDaysKey) ??
+          _keepDays;
+      await _deleteOld();
+      final rows = await (await _database()).query(
+        'play_history',
+        orderBy: 'played_at DESC, id DESC',
+        limit: limit,
+      );
+      _entries = [for (final row in rows) _fromRow(row)];
+    } finally {
+      _loaded = true;
+      notifyListeners();
+    }
   }
 
   Future<void> record(

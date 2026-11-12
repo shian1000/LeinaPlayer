@@ -61,6 +61,8 @@ class UserBackup extends ChangeNotifier {
     'updates.last_check_ms',
     'updates.latest',
     'updates.dismissed_build',
+    // Paths of this phone's cover files (StartupCovers).
+    'startup_covers',
   };
 
   static bool _kept(String key) =>

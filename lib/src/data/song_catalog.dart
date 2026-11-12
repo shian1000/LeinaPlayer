@@ -145,6 +145,14 @@ List<String> artistNamesOf(String label) => [
   },
 ];
 
+typedef _SearchNames = ({
+  String? titleLatin,
+  String? albumLatin,
+  List<String> artistNames,
+  List<String> synonyms,
+  List<String> origins,
+});
+
 /// One row of MusicDatabase's `songs` table, with its artists already joined in.
 class CatalogSong {
   CatalogSong({
@@ -195,36 +203,13 @@ class CatalogSong {
        musicVideoId = _videoIdOf(musicVideoId),
        userLinks = null,
        _fromMusicDb = null,
-       _normalizedTitle = normalizeForSearch(title),
-       _normalizedArtists = {
-         normalizeForSearch(artistLabel),
-         for (final name in [...artistNames, ...synonyms])
-           normalizeForSearch(name),
-       },
-       _fieldTexts = [
-         for (final field in SearchField.values)
-           normalizeForSearch(switch (field) {
-             SearchField.title => [
-               title,
-               ?titleLatin,
-               ?coverOf?.searchText,
-               ?version?.marker,
-             ].join(' '),
-             SearchField.artist => [
-               if (artistNames.isEmpty) artistLabel else ...artistNames,
-               ...synonyms,
-               ?artistLatin,
-             ].join(' '),
-             SearchField.album =>
-               album == null ? null : [album, ?albumLatin].join(' '),
-             SearchField.year => year?.toString(),
-             // "Unknown" is MusicDatabase's placeholder, not a language to find songs by.
-             SearchField.language => language == 'Unknown' ? null : language,
-             SearchField.origin => origins.join(' '),
-             // Moods change while the song doesn't: SongCatalog adds them when searching.
-             SearchField.mood => null,
-           }),
-       ];
+       _names = (
+         titleLatin: titleLatin,
+         albumLatin: albumLatin,
+         artistNames: artistNames,
+         synonyms: synonyms,
+         origins: origins,
+       );
 
   /// [song] with the YouTube links the user set on the phone ([links]) in place of music.db's.
   CatalogSong._withUserLinks(CatalogSong song, UserYouTubeLinks links)
@@ -257,9 +242,7 @@ class CatalogSong {
       youTubeTarget = song.youTubeTarget,
       userLinks = links,
       _fromMusicDb = song,
-      _normalizedTitle = song._normalizedTitle,
-      _normalizedArtists = song._normalizedArtists,
-      _fieldTexts = song._fieldTexts;
+      _names = null;
 
   static String? _videoIdOf(String? value) =>
       const {null, '', 'N/A'}.contains(value) ? null : value;
@@ -353,14 +336,53 @@ class CatalogSong {
   /// What to look for when the phone searches YouTube for this song itself.
   final MatchTarget youTubeTarget;
 
-  final String _normalizedTitle;
+  /// The names the texts below are made from, as music.db gives them; `null` with
+  /// [_fromMusicDb], which has the texts. The texts are made on first use: normalizing every
+  /// song's names as music.db loaded held the restored queue up for seconds on a slow phone.
+  final _SearchNames? _names;
+
+  late final String _normalizedTitle =
+      _fromMusicDb?._normalizedTitle ?? normalizeForSearch(title);
 
   /// Every name the song's artists go by (label, each artist, synonyms), normalized — for
   /// matching a file's "artist" against this song in [SongCatalog.findExact].
-  final Set<String> _normalizedArtists;
+  late final Set<String> _normalizedArtists =
+      _fromMusicDb?._normalizedArtists ?? _artistTexts(_names!);
+
+  Set<String> _artistTexts(_SearchNames names) => {
+    normalizeForSearch(artistLabel),
+    for (final name in [...names.artistNames, ...names.synonyms])
+      normalizeForSearch(name),
+  };
 
   /// Normalized text of each [SearchField], indexed by `SearchField.index`.
-  final List<String> _fieldTexts;
+  late final List<String> _fieldTexts =
+      _fromMusicDb?._fieldTexts ?? _fieldTextsOf(_names!);
+
+  List<String> _fieldTextsOf(_SearchNames names) => [
+    for (final field in SearchField.values)
+      normalizeForSearch(switch (field) {
+        SearchField.title => [
+          title,
+          ?names.titleLatin,
+          ?coverOf?.searchText,
+          ?version?.marker,
+        ].join(' '),
+        SearchField.artist => [
+          if (names.artistNames.isEmpty) artistLabel else ...names.artistNames,
+          ...names.synonyms,
+          ?artistLatin,
+        ].join(' '),
+        SearchField.album =>
+          album == null ? null : [album, ?names.albumLatin].join(' '),
+        SearchField.year => year?.toString(),
+        // "Unknown" is MusicDatabase's placeholder, not a language to find songs by.
+        SearchField.language => language == 'Unknown' ? null : language,
+        SearchField.origin => names.origins.join(' '),
+        // Moods change while the song doesn't: SongCatalog adds them when searching.
+        SearchField.mood => null,
+      }),
+  ];
 
   String _textFor(Set<SearchField> fields) => [
     for (final field in SearchField.values)
@@ -544,16 +566,39 @@ class SongCatalog extends ChangeNotifier {
         _rejectedSongRequests = RejectedSongRequests.none;
         _status = CatalogStatus.noDatabase;
       } else {
-        final songs = await _readSongs(
-          file,
-          await _readServerFiles(await _sync.localFile('files.db')),
+        final serverFiles = await _readServerFiles(
+          await _sync.localFile('files.db'),
         );
-        final badVideos = await _readBadVideos(file);
-        final additionalVideos = await _readAdditionalVideos(file);
-        final videoDurations = await _readVideoDurations(file);
-        final projects = await _readProjects(file);
-        final rejected = await _readRejectedSongRequests(file);
-        final idChanges = await _readIdChanges(file);
+        // Opened once for every table: on Android each call waits in sqflite's one queue
+        // behind whatever else the app reads at start, so each extra round trip costs.
+        final db = await (factoryOverride ?? databaseFactory).openDatabase(
+          file.path,
+          options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+        );
+        final List<CatalogSong> songs;
+        final BadVideos badVideos;
+        final Map<String, int> additionalVideos;
+        final Map<String, Duration> videoDurations;
+        final List<Project> projects;
+        final RejectedSongRequests rejected;
+        final Map<int, int?> idChanges;
+        try {
+          final tables = {
+            for (final row in await db.rawQuery(
+              "SELECT name FROM sqlite_master WHERE type = 'table'",
+            ))
+              row['name']! as String,
+          };
+          songs = await _readSongs(db, tables, serverFiles);
+          badVideos = await _readBadVideos(db, tables);
+          additionalVideos = await _readAdditionalVideos(db, tables);
+          videoDurations = await _readVideoDurations(db, tables);
+          projects = await _readProjects(db);
+          rejected = await RejectedSongRequests.read(db);
+          idChanges = await _readIdChanges(db, tables);
+        } finally {
+          await db.close();
+        }
         // All at once, with the indexes below: a search between two awaits would otherwise
         // read the new songs through the old search texts.
         _songs = songs;
@@ -648,40 +693,35 @@ class SongCatalog extends ChangeNotifier {
   }
 
   Future<List<CatalogSong>> _readSongs(
-    File file,
+    Database db,
+    Set<String> tables,
     Map<int, ServerFile> serverFiles,
   ) async {
-    final db = await (factoryOverride ?? databaseFactory).openDatabase(
-      file.path,
-      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-    );
-    try {
-      // Older databases have no youtube_video_id / spotify_url / music_video_youtube_id column.
-      final columns = {
-        for (final c in await db.rawQuery('PRAGMA table_info(songs)'))
-          c['name'],
-      };
-      String column(String name) => columns.contains(name) ? 's.$name' : 'NULL';
-      final artistLatin = await _hasColumn(db, 'artists', 'name_latin')
-          ? 'a.name_latin'
-          : 'NULL';
-      // Before MusicDatabase's Latin forms (hand-off musicdatabase-latin-names.md) and its
-      // albums table, the columns aren't there.
-      final albumLatin =
-          columns.contains('album_id') &&
-              await _hasColumn(db, 'albums', 'title_latin')
-          ? '(SELECT al.title_latin FROM albums al WHERE al.id = s.album_id)'
-          : 'NULL';
-      // Before MusicDatabase's migrations 0020 and 0021 the columns aren't there.
-      final covers = columns.contains('covered_artist_id');
-      // Before its migration 0019 neither songs.project_id nor projects is there.
-      final project =
-          columns.contains('project_id') &&
-              await _hasColumn(db, 'projects', 'name')
-          ? '(SELECT p.name FROM projects p WHERE p.id = s.project_id)'
-          : 'NULL';
-      final rows = await db.rawQuery(
-        '''
+    // Older databases have no youtube_video_id / spotify_url / music_video_youtube_id column.
+    final columns = {
+      for (final c in await db.rawQuery('PRAGMA table_info(songs)')) c['name'],
+    };
+    String column(String name) => columns.contains(name) ? 's.$name' : 'NULL';
+    final artistLatin = await _hasColumn(db, 'artists', 'name_latin')
+        ? 'a.name_latin'
+        : 'NULL';
+    // Before MusicDatabase's Latin forms (hand-off musicdatabase-latin-names.md) and its
+    // albums table, the columns aren't there.
+    final albumLatin =
+        columns.contains('album_id') &&
+            await _hasColumn(db, 'albums', 'title_latin')
+        ? '(SELECT al.title_latin FROM albums al WHERE al.id = s.album_id)'
+        : 'NULL';
+    // Before MusicDatabase's migrations 0020 and 0021 the columns aren't there.
+    final covers = columns.contains('covered_artist_id');
+    // Before its migration 0019 neither songs.project_id nor projects is there.
+    final project =
+        columns.contains('project_id') &&
+            await _hasColumn(db, 'projects', 'name')
+        ? '(SELECT p.name FROM projects p WHERE p.id = s.project_id)'
+        : 'NULL';
+    final rows = await db.rawQuery(
+      '''
         SELECT s.id, s.title, s.album, s.year, s.language,
                ${column('youtube_video_id')} AS youtube_video_id,
                ${column('music_video_youtube_id')} AS music_video_youtube_id,
@@ -701,18 +741,15 @@ class SongCatalog extends ChangeNotifier {
                a.name AS artist, a.origin, a.synonyms, $artistLatin AS name_latin
         FROM songs s JOIN artists a ON a.id = s.artist_id
         ${covers ? 'LEFT JOIN artists c ON c.id = s.covered_artist_id' : ''}''',
-      );
-      final extra = await _readAdditionalArtists(db, artistLatin);
-      return [
-        for (final row in rows)
-          _song(row, [
-            _artistOf(row, 'main'),
-            ...?extra[row['id']! as int],
-          ], serverFiles[row['id']! as int]),
-      ];
-    } finally {
-      await db.close();
-    }
+    );
+    final extra = await _readAdditionalArtists(db, tables, artistLatin);
+    return [
+      for (final row in rows)
+        _song(row, [
+          _artistOf(row, 'main'),
+          ...?extra[row['id']! as int],
+        ], serverFiles[row['id']! as int]),
+    ];
   }
 
   static CatalogSong _song(
@@ -842,158 +879,93 @@ class SongCatalog extends ChangeNotifier {
 
   /// `song_id_changes`: what each old id became when MusicDatabase merged or renumbered a song
   /// (`null`: deleted); empty for databases before that table.
-  Future<Map<int, int?>> _readIdChanges(File file) async {
-    final db = await (factoryOverride ?? databaseFactory).openDatabase(
-      file.path,
-      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-    );
-    try {
-      final hasTable = await db.rawQuery(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
-        "AND name = 'song_id_changes'",
-      );
-      if (hasTable.isEmpty) return const {};
-      return {
-        for (final row in await db.rawQuery(
-          'SELECT old_song_id, new_song_id FROM song_id_changes '
-          'ORDER BY changed_at',
-        ))
-          row['old_song_id']! as int: row['new_song_id'] as int?,
-      };
-    } finally {
-      await db.close();
-    }
-  }
-
-  Future<RejectedSongRequests> _readRejectedSongRequests(File file) async {
-    final db = await (factoryOverride ?? databaseFactory).openDatabase(
-      file.path,
-      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-    );
-    try {
-      return await RejectedSongRequests.read(db);
-    } finally {
-      await db.close();
-    }
+  Future<Map<int, int?>> _readIdChanges(Database db, Set<String> tables) async {
+    if (!tables.contains('song_id_changes')) return const {};
+    return {
+      for (final row in await db.rawQuery(
+        'SELECT old_song_id, new_song_id FROM song_id_changes '
+        'ORDER BY changed_at',
+      ))
+        row['old_song_id']! as int: row['new_song_id'] as int?,
+    };
   }
 
   /// `bad_youtube_videos`; none in a music.db from before MusicDatabase's migration 0010.
-  Future<BadVideos> _readBadVideos(File file) async {
-    final db = await (factoryOverride ?? databaseFactory).openDatabase(
-      file.path,
-      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-    );
-    try {
-      final hasTable = await db.rawQuery(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
-        "AND name = 'bad_youtube_videos'",
-      );
-      if (hasTable.isEmpty) return BadVideos.none;
-      final everySong = <String>{};
-      final forSong = <int, Set<String>>{};
-      for (final row in await db.rawQuery(
-        'SELECT video_id, song_id FROM bad_youtube_videos',
-      )) {
-        final video = (row['video_id'] as String?)?.trim();
-        if (video == null || video.isEmpty) continue;
-        final song = row['song_id'] as int?;
-        if (song == null) {
-          everySong.add(video);
-        } else {
-          (forSong[song] ??= {}).add(video);
-        }
+  Future<BadVideos> _readBadVideos(Database db, Set<String> tables) async {
+    if (!tables.contains('bad_youtube_videos')) return BadVideos.none;
+    final everySong = <String>{};
+    final forSong = <int, Set<String>>{};
+    for (final row in await db.rawQuery(
+      'SELECT video_id, song_id FROM bad_youtube_videos',
+    )) {
+      final video = (row['video_id'] as String?)?.trim();
+      if (video == null || video.isEmpty) continue;
+      final song = row['song_id'] as int?;
+      if (song == null) {
+        everySong.add(video);
+      } else {
+        (forSong[song] ??= {}).add(video);
       }
-      return BadVideos(everySong: everySong, forSong: forSong);
-    } finally {
-      await db.close();
     }
+    return BadVideos(everySong: everySong, forSong: forSong);
   }
 
   /// `additional_youtube_videos` (MusicDatabase's migration 0018); empty before it.
-  Future<Map<String, int>> _readAdditionalVideos(File file) async {
-    final db = await (factoryOverride ?? databaseFactory).openDatabase(
-      file.path,
-      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-    );
-    try {
-      final hasTable = await db.rawQuery(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
-        "AND name = 'additional_youtube_videos'",
-      );
-      if (hasTable.isEmpty) return const {};
-      return {
-        for (final row in await db.rawQuery(
-          'SELECT video_id, song_id FROM additional_youtube_videos',
-        ))
-          if ((row['video_id'] as String?)?.trim() case final video?
-              when video.isNotEmpty)
-            video: row['song_id']! as int,
-      };
-    } finally {
-      await db.close();
-    }
+  Future<Map<String, int>> _readAdditionalVideos(
+    Database db,
+    Set<String> tables,
+  ) async {
+    if (!tables.contains('additional_youtube_videos')) return const {};
+    return {
+      for (final row in await db.rawQuery(
+        'SELECT video_id, song_id FROM additional_youtube_videos',
+      ))
+        if ((row['video_id'] as String?)?.trim() case final video?
+            when video.isNotEmpty)
+          video: row['song_id']! as int,
+    };
   }
 
   /// `youtube_video_durations` (MusicDatabase's migration 0017); empty before it.
-  Future<Map<String, Duration>> _readVideoDurations(File file) async {
-    final db = await (factoryOverride ?? databaseFactory).openDatabase(
-      file.path,
-      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-    );
-    try {
-      final hasTable = await db.rawQuery(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
-        "AND name = 'youtube_video_durations'",
-      );
-      if (hasTable.isEmpty) return const {};
-      return {
-        for (final row in await db.rawQuery(
-          'SELECT video_id, duration_s FROM youtube_video_durations '
-          'WHERE duration_s > 0',
-        ))
-          row['video_id']! as String: Duration(
-            seconds: row['duration_s']! as int,
-          ),
-      };
-    } finally {
-      await db.close();
-    }
+  Future<Map<String, Duration>> _readVideoDurations(
+    Database db,
+    Set<String> tables,
+  ) async {
+    if (!tables.contains('youtube_video_durations')) return const {};
+    return {
+      for (final row in await db.rawQuery(
+        'SELECT video_id, duration_s FROM youtube_video_durations '
+        'WHERE duration_s > 0',
+      ))
+        row['video_id']! as String: Duration(
+          seconds: row['duration_s']! as int,
+        ),
+    };
   }
 
   /// `projects` (MusicDatabase's migration 0019); empty before it.
-  Future<List<Project>> _readProjects(File file) async {
-    final db = await (factoryOverride ?? databaseFactory).openDatabase(
-      file.path,
-      options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-    );
-    try {
-      if (!await _hasColumn(db, 'projects', 'name')) return const [];
-      return [
-        for (final row in await db.rawQuery(
-          'SELECT name, aliases, channels FROM projects ORDER BY id',
-        ))
-          Project(
-            row['name']! as String,
-            aliases: row['aliases'] as String?,
-            channels: row['channels'] as String?,
-          ),
-      ];
-    } finally {
-      await db.close();
-    }
+  Future<List<Project>> _readProjects(Database db) async {
+    if (!await _hasColumn(db, 'projects', 'name')) return const [];
+    return [
+      for (final row in await db.rawQuery(
+        'SELECT name, aliases, channels FROM projects ORDER BY id',
+      ))
+        Project(
+          row['name']! as String,
+          aliases: row['aliases'] as String?,
+          channels: row['channels'] as String?,
+        ),
+    ];
   }
 
   /// `additional_song_artists` (role `main` or `feat`) per song id; empty for databases created
   /// before that table existed.
   Future<Map<int, List<_Artist>>> _readAdditionalArtists(
     Database db,
+    Set<String> tables,
     String nameLatin,
   ) async {
-    final hasTable = await db.rawQuery(
-      "SELECT 1 FROM sqlite_master WHERE type = 'table' "
-      "AND name = 'additional_song_artists'",
-    );
-    if (hasTable.isEmpty) return const {};
+    if (!tables.contains('additional_song_artists')) return const {};
     final rows = await db.rawQuery('''
       SELECT x.song_id, x.role, a.name, a.origin, a.synonyms,
              $nameLatin AS name_latin

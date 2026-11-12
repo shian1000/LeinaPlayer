@@ -74,6 +74,14 @@ Once it has them, the "Serwer" source should read them too, keyed on `album_id`.
   rebuilds all song rows) reloaded each filtered cover with a frame of placeholder; and
   `SongCover`'s `frameBuilder` never goes back to the placeholder once the song's cover was shown.
   `test/widgets/song_cover_test.dart` guards this.
+- **Last start's covers** (`StartupCovers`, `startup_covers.dart`; read in `main` before the first
+  frame, owned by `AlbumCovers.startup`): Home's first 3 cards of its first 3 rows and the mini
+  player (`SongCover.startup`: a slot, the song's check, `settled`) remember the cover they showed
+  — a cover-cache file by its path, a song file's own picture copied to `startup_covers/` — with
+  its filter seed (so the found cover is the same image-cache entry: no flash), the mini player
+  its tint, Home's cards their texts. On the next start it stands in until the cover is found;
+  until `settled` (Home before music.db, looked for without the album) it wins over what's found,
+  which isn't remembered. Cleared with the cover cache; its key is in `UserBackup.keptKeys`.
 
 ## Playlist and mood covers
 

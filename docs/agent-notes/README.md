@@ -1,12 +1,14 @@
 # Agent notes
 
 - [`covers.md`](covers.md) — album covers: sources, matching, rate limits, the cover cache,
-  filters, avoiding placeholder flashes, the MusicDatabase hand-off.
+  filters, avoiding placeholder flashes, last start's covers, the MusicDatabase hand-off.
 - [`local-library.md`](local-library.md) — phone library scan, matching, `local.db`, search
   availability, playback order, crossfade, background playback.
 - [`playlists.md`](playlists.md) — Biblioteka playlists: tables, YouTube and Spotify import,
   recognising songs, videos YouTube removed, searching YouTube/Spotify playlists and previews,
   Spotify albums and track links, sharing playlists and songs, adding songs, phone-only folders.
+- [`startup.md`](startup.md) — a cold start: what waits for what and why, ideas left for later,
+  measuring a start on the Huawei.
 - [`signing.md`](signing.md) — the release key outside the repo, `android/key.properties`, why it
   must never change, its SHA-1 in Google Cloud.
 - [`releases.md`](releases.md) — making a GitHub release and the app's update check.

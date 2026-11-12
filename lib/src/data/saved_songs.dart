@@ -128,21 +128,29 @@ class StoredSongList extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// [load] has finished (also when it failed): an empty [songs] means none now.
+  bool get loaded => _loaded;
+  bool _loaded = false;
+
   Future<void> load() async {
-    final raw = (await SharedPreferences.getInstance()).getString(_key);
-    if (raw == null) return;
-    final now = _now().millisecondsSinceEpoch;
-    _all = [
-      // Stored before syncing: newest first, without times.
-      for (final (i, json) in (jsonDecode(raw) as List).indexed)
-        StoredSong.fromJson(
-          (json as Map).cast<String, Object?>(),
-          list: list,
-          fallbackTime: DateTime.fromMillisecondsSinceEpoch(now - i),
-        ),
-    ];
-    _songs = null;
-    notifyListeners();
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString(_key);
+      if (raw == null) return;
+      final now = _now().millisecondsSinceEpoch;
+      _all = [
+        // Stored before syncing: newest first, without times.
+        for (final (i, json) in (jsonDecode(raw) as List).indexed)
+          StoredSong.fromJson(
+            (json as Map).cast<String, Object?>(),
+            list: list,
+            fallbackTime: DateTime.fromMillisecondsSinceEpoch(now - i),
+          ),
+      ];
+      _songs = null;
+    } finally {
+      _loaded = true;
+      notifyListeners();
+    }
   }
 
   Future<void> save() async => (await SharedPreferences.getInstance())

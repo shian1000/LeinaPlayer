@@ -286,6 +286,24 @@ void main() {
     expect(server.requests, ['GET /users/tester/playlists']);
   });
 
+  test('a sync that brings nothing new leaves the playlists as read, one that '
+      'does reads them again', () async {
+    await playlists.importYouTube(data(['a', 'b']));
+    await syncNow();
+    // Behind the library's back, to see whether the next sync reads the playlists again.
+    await (await local.database()).update('playlists', {'name': 'Obok'});
+
+    await syncNow();
+    expect(playlists.lastSync!.problem, isNull);
+    expect(playlists.playlists.single.name, 'Moja');
+
+    final stored = server.playlists.values.single;
+    stored['name'] = 'Z serwera';
+    stored['revision'] = ++server.counter;
+    await syncNow();
+    expect(playlists.playlists.single.name, 'Z serwera');
+  });
+
   test(
     'a track removed from an imported playlist stays out on other phones too',
     () async {

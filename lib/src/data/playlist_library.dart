@@ -277,7 +277,22 @@ class PlaylistLibrary extends ChangeNotifier {
     super.dispose();
   }
 
+  /// The first [load] has finished (also when it failed): no [playlists] means none now.
+  bool get loaded => _loaded;
+  bool _loaded = false;
+
   Future<void> load() async {
+    try {
+      await _load();
+    } finally {
+      if (!_loaded) {
+        _loaded = true;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> _load() async {
     final scope = _scope('p.');
     _lengthsFrom = (_catalog.status, _catalog.loadedSyncTime);
     final linked = await _linkByName();
@@ -1218,6 +1233,7 @@ class PlaylistLibrary extends ChangeNotifier {
     final token = _authToken();
     if (user == null || token == null || servers.isEmpty) return;
     _syncing = true;
+    _syncChanged = false;
     notifyListeners();
     try {
       do {
@@ -1229,9 +1245,14 @@ class PlaylistLibrary extends ChangeNotifier {
       } while (_syncAgain && _userName() == user && _authToken() == token);
     } finally {
       _syncing = false;
-      await load();
+      // Reading every playlist's tracks again takes a slow phone a second; most syncs (every
+      // start) change nothing here.
+      _syncChanged ? await load() : notifyListeners();
     }
   }
+
+  /// Whether this [sync] wrote anything into the phone's playlists.
+  bool _syncChanged = false;
 
   Future<String?> _syncWith(
     List<Uri> servers,
@@ -1281,6 +1302,7 @@ class PlaylistLibrary extends ChangeNotifier {
             (local.first['dirty'] == 1 || local.first['deleted_at'] != null)) {
           continue;
         }
+        _syncChanged = true;
         await _applyRemote(txn, remote, user);
       }
     });
@@ -1309,6 +1331,7 @@ class PlaylistLibrary extends ChangeNotifier {
           whereArgs: [row['id'], deletedAt],
         );
         if (still.isEmpty) return;
+        _syncChanged = true;
         final remote = answer.body! as Map<String, Object?>;
         if (remote['deleted'] == true) {
           await txn.delete(
@@ -1344,6 +1367,7 @@ class PlaylistLibrary extends ChangeNotifier {
           whereArgs: [id],
         );
         if (now.isEmpty) return;
+        _syncChanged = true;
         // Changed again here while this was being sent: the answer's revision is the base the
         // newer change goes with next time; its tracks would undo that change.
         if (now.first['updated_at'] != row['updated_at'] ||

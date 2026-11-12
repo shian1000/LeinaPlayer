@@ -106,7 +106,8 @@ Data: `lib/src/data/database_sync.dart` downloads MusicDatabase's `music.db` and
 user-set address once a day ([`decisions/0002-database-download.md`](decisions/0002-database-download.md)).
 `DatabaseSync` is a `ChangeNotifier` created in `main.dart` and exposed via `DatabaseSyncScope`, the
 same pattern as `ThemeScope`. `lib/src/data/song_catalog.dart` (`SongCatalog`, exposed via
-`SongCatalogScope`) reads `music.db` read-only with `sqflite` the first time search is opened —
+`SongCatalogScope`) reads `music.db` read-only with `sqflite` at start (the restored queue waits for it —
+[`agent-notes/startup.md`](agent-notes/startup.md)) —
 the whole `songs` table with artists (incl. `additional_song_artists`, their origin and
 synonyms), kept in memory and filtered in Dart on every keystroke over the fields chosen in the
 "Szukaj w" sheet (`SearchField`, saved in `shared_preferences`) —

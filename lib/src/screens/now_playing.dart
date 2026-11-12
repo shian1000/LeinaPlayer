@@ -35,10 +35,18 @@ const _id = 'Odtwarzacz';
 /// Background tint of the players, from the album cover's colour like the reference app (the
 /// placeholder's colour when there's no cover); changes fade.
 class _CoverTint extends StatefulWidget {
-  const _CoverTint({required this.track, required this.builder});
+  const _CoverTint({
+    required this.track,
+    required this.builder,
+    this.startupSlot,
+  });
 
   final NowPlaying track;
   final Widget Function(BuildContext context, Color tint) builder;
+
+  /// Set for the mini player: its colour is remembered with its cover ([StartupCovers]) and
+  /// tints it from the next start's first frame.
+  final String? startupSlot;
 
   @override
   State<_CoverTint> createState() => _CoverTintState();
@@ -63,9 +71,15 @@ class _CoverTintState extends State<_CoverTint> {
     final covers = AlbumCoversScope.maybeOf(context);
     if (covers == null) return;
     final track = widget.track;
+    final slot = widget.startupSlot;
+    final check = track.cover.identity;
+    if (slot != null) {
+      _cover ??= covers.startup?.of(slot, check)?.color;
+    }
     covers
         .colorOf(track.cover)
         .then((color) {
+          if (slot != null) covers.startup?.rememberColor(slot, check, color);
           if (mounted && identical(track, widget.track)) {
             setState(() => _cover = color);
           }
@@ -180,6 +194,7 @@ class MiniPlayer extends StatelessWidget {
       track: track,
       child: _CoverTint(
         track: track,
+        startupSlot: 'mini',
         builder: (context, tint) => Padding(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
           child: Material(
@@ -204,7 +219,15 @@ class MiniPlayer extends StatelessWidget {
                           child: _SwipeTracks(
                             child: Row(
                               children: [
-                                SongCover(cover: track.cover, size: 40),
+                                SongCover(
+                                  cover: track.cover,
+                                  size: 40,
+                                  startup: (
+                                    slot: 'mini',
+                                    check: track.cover.identity,
+                                    settled: true,
+                                  ),
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
@@ -296,7 +319,18 @@ class _LikeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final hit = this.hit;
     final likedSongs = LikedSongsScope.maybeOf(context);
-    if (hit == null || likedSongs == null) return const SizedBox.shrink();
+    if (likedSongs == null) return const SizedBox.shrink();
+    // The song shown before its queue is back (QueueSession.showSaved): its place kept, so the
+    // buttons don't move when the heart comes — empty or full, it isn't known yet.
+    if (hit == null) {
+      return Visibility.maintain(
+        visible: false,
+        child: IconButton(
+          onPressed: null,
+          icon: Icon(Icons.favorite_border, size: size),
+        ),
+      );
+    }
     final liked = likedSongs.contains(hit);
     return IconButton(
       tooltip: liked ? 'Usuń z polubionych' : 'Polub',

@@ -17,6 +17,7 @@ import 'database_sync.dart' show readCurrentWifiIp;
 import 'local_library.dart';
 import 'song_catalog.dart';
 import 'source_settings.dart';
+import 'startup_covers.dart';
 import 'text_normalizer.dart';
 
 /// The song whose cover is wanted: what identifies its album, plus what the per-song sources
@@ -163,6 +164,7 @@ class AlbumCovers extends ChangeNotifier {
     this._findVideoId,
     this._serverFileCopy,
     this._serverFileHead,
+    this.startup,
   }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
        _now = now ?? DateTime.now,
        _getJson = getJson ?? _httpGetJson,
@@ -175,6 +177,9 @@ class AlbumCovers extends ChangeNotifier {
 
   final Future<Database> Function() _database;
   final SourceSettings _settings;
+
+  /// What Home and the mini player showed last time, shown until their covers are found here.
+  final StartupCovers? startup;
   final Future<Directory> Function() _storageRoot;
   final DateTime Function() _now;
   final GetJson _getJson;
@@ -735,6 +740,7 @@ class AlbumCovers extends ChangeNotifier {
     await for (final file in dir.list()) {
       if (file is File) await file.delete();
     }
+    await startup?.clear();
     notifyListeners();
   }
 
