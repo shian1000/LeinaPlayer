@@ -372,7 +372,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   along; scroll the inner controller to `RenderAbstractViewport.getOffsetToReveal` instead.
 - Context menus are `showMenuSheet`: rare options go in `quickEntries` (a small block on top),
   and options with choices of their own unfold in place via `MenuSheetEntry.submenu` rather than
-  opening a second sheet (Juxtopposed's redesign, user's choice). The sheet closes itself before
+  opening a second sheet (Juxtopposed's redesign, user's choice); a submenu's entry may unfold
+  once more (a Biblioteka folder's playlists in "Dodaj do playlisty ›"), no deeper. Lists of
+  playlists to pick from show those in a folder under its row, not loose (user's request). The sheet closes itself before
   an entry's `onTap` runs — an `onTap` that pops again takes the screen underneath with it (a
   black screen, then Back closes the app).
 - Gestures work the same wherever they can (user's rule): any list row that can be queued or

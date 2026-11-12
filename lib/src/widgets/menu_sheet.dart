@@ -24,7 +24,8 @@ class MenuSheetEntry {
   final VoidCallback? onTap;
 
   /// Its own options, unfolded under it in the same sheet ("Dodaj do playlisty ›") instead of
-  /// opening another sheet (Juxtopposed's Spotify redesign); built when unfolded.
+  /// opening another sheet (Juxtopposed's Spotify redesign); built when unfolded. An entry of a
+  /// submenu may have one too (a folder of playlists), one level deeper at most.
   final List<MenuSheetEntry> Function()? submenu;
 
   /// What a long press does — an explanation of the option ([showFeatureInfo]), opened over
@@ -53,106 +54,125 @@ Future<void> showMenuSheet(
     isScrollControlled: true,
     builder: (sheetContext) {
       String? open;
+      String? openInner;
       return StatefulBuilder(
-        builder: (sheetContext, setState) => ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
-          ),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.only(bottom: 16),
-            children: [
-              if (header != null) ...[header, const Divider()],
-              if (quickEntries.isNotEmpty) ...[
-                for (final entry in quickEntries)
-                  ListTile(
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                    leading: Icon(
-                      entry.icon,
-                      color: palette.textSecondary,
-                      size: 22,
-                    ),
-                    title: Text(entry.label),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      entry.onTap?.call();
-                    },
-                  ),
-                const Divider(),
-              ],
-              for (final entry in entries) ...[
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 0,
-                  ),
-                  leading: largeIcons
-                      ? CircleAvatar(
-                          radius: 24,
-                          backgroundColor: palette.chip,
-                          child: Icon(entry.icon, color: palette.textPrimary),
-                        )
-                      : Icon(
-                          entry.icon,
-                          color: palette.textSecondary,
-                          size: 26,
-                        ),
-                  title: Text(
-                    entry.label,
-                    style: TextStyle(
-                      fontSize: AppFontSize.listTitle,
-                      fontWeight: largeIcons ? FontWeight.bold : null,
-                    ),
-                  ),
-                  subtitle: entry.subtitle == null
-                      ? null
-                      : Text(entry.subtitle!),
-                  trailing: entry.premium
-                      ? const PremiumBadge()
-                      : entry.submenu == null
-                      ? null
-                      : Icon(
-                          open == entry.label
-                              ? Icons.expand_less
-                              : Icons.chevron_right,
-                        ),
-                  onLongPress: entry.onLongPress,
-                  onTap: entry.submenu != null
-                      ? () => setState(
-                          () => open = open == entry.label ? null : entry.label,
-                        )
-                      : () {
-                          Navigator.of(sheetContext).pop();
-                          entry.onTap?.call();
-                        },
-                ),
-                if (entry.submenu != null && open == entry.label)
-                  for (final inner in entry.submenu!())
+        builder: (sheetContext, setState) {
+          Widget innerTile(MenuSheetEntry inner, double indent) => ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.only(left: indent, right: 20),
+            leading: Icon(inner.icon, color: palette.textSecondary),
+            title: ScrollingText(inner.label),
+            subtitle: inner.subtitle == null ? null : Text(inner.subtitle!),
+            trailing: inner.submenu != null
+                ? Icon(
+                    openInner == inner.label
+                        ? Icons.expand_less
+                        : Icons.chevron_right,
+                  )
+                : inner.checked
+                ? Icon(Icons.check_circle, color: palette.accent)
+                : null,
+            onTap: inner.submenu != null
+                ? () => setState(
+                    () => openInner = openInner == inner.label
+                        ? null
+                        : inner.label,
+                  )
+                : () {
+                    Navigator.of(sheetContext).pop();
+                    inner.onTap?.call();
+                  },
+          );
+
+          return ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: 16),
+              children: [
+                if (header != null) ...[header, const Divider()],
+                if (quickEntries.isNotEmpty) ...[
+                  for (final entry in quickEntries)
                     ListTile(
                       dense: true,
-                      contentPadding: const EdgeInsets.only(
-                        left: 56,
-                        right: 20,
+                      visualDensity: VisualDensity.compact,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
                       ),
-                      leading: Icon(inner.icon, color: palette.textSecondary),
-                      title: ScrollingText(inner.label),
-                      subtitle: inner.subtitle == null
-                          ? null
-                          : Text(inner.subtitle!),
-                      trailing: inner.checked
-                          ? Icon(Icons.check_circle, color: palette.accent)
-                          : null,
+                      leading: Icon(
+                        entry.icon,
+                        color: palette.textSecondary,
+                        size: 22,
+                      ),
+                      title: Text(entry.label),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        inner.onTap?.call();
+                        entry.onTap?.call();
                       },
                     ),
+                  const Divider(),
+                ],
+                for (final entry in entries) ...[
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 0,
+                    ),
+                    leading: largeIcons
+                        ? CircleAvatar(
+                            radius: 24,
+                            backgroundColor: palette.chip,
+                            child: Icon(entry.icon, color: palette.textPrimary),
+                          )
+                        : Icon(
+                            entry.icon,
+                            color: palette.textSecondary,
+                            size: 26,
+                          ),
+                    title: Text(
+                      entry.label,
+                      style: TextStyle(
+                        fontSize: AppFontSize.listTitle,
+                        fontWeight: largeIcons ? FontWeight.bold : null,
+                      ),
+                    ),
+                    subtitle: entry.subtitle == null
+                        ? null
+                        : Text(entry.subtitle!),
+                    trailing: entry.premium
+                        ? const PremiumBadge()
+                        : entry.submenu == null
+                        ? null
+                        : Icon(
+                            open == entry.label
+                                ? Icons.expand_less
+                                : Icons.chevron_right,
+                          ),
+                    onLongPress: entry.onLongPress,
+                    onTap: entry.submenu != null
+                        ? () => setState(() {
+                            open = open == entry.label ? null : entry.label;
+                            openInner = null;
+                          })
+                        : () {
+                            Navigator.of(sheetContext).pop();
+                            entry.onTap?.call();
+                          },
+                  ),
+                  if (entry.submenu != null && open == entry.label)
+                    for (final inner in entry.submenu!()) ...[
+                      innerTile(inner, 56),
+                      if (inner.submenu != null && openInner == inner.label)
+                        for (final innermost in inner.submenu!())
+                          innerTile(innermost, 92),
+                    ],
+                ],
               ],
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       );
     },
   );

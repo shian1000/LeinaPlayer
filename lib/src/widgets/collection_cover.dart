@@ -271,3 +271,28 @@ Future<void> _pickCover(
     );
   }
 }
+
+/// A Biblioteka folder's cover: the folder icon on a chip-coloured square.
+class FolderCover extends StatelessWidget {
+  const FolderCover({super.key, required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: palette.chip,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Icon(
+        Icons.folder_outlined,
+        size: size * 0.5,
+        color: palette.textSecondary,
+      ),
+    );
+  }
+}

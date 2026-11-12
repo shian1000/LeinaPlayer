@@ -638,7 +638,7 @@ class LibraryEntryTile extends StatelessWidget {
     final coverSize = gridSize ?? 64;
     final (leading, subtitle) = switch (entry) {
       FolderEntry(:final contents) => (
-        _FolderIcon(size: coverSize),
+        FolderCover(size: coverSize),
         'Folder • ${_itemCount(contents)}',
       ),
       PlaylistEntry(:final playlist) => (
@@ -734,30 +734,6 @@ class LibraryEntryTile extends StatelessWidget {
   }
 }
 
-class _FolderIcon extends StatelessWidget {
-  const _FolderIcon({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: palette.chip,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Icon(
-        Icons.folder_outlined,
-        size: size * 0.5,
-        color: palette.textSecondary,
-      ),
-    );
-  }
-}
-
 /// A folder's menu: rename it or delete it (what's in it goes back to Biblioteka).
 Future<void> showFolderMenu(
   BuildContext context,
@@ -769,7 +745,7 @@ Future<void> showFolderMenu(
     context,
     idPrefix: '$_id › Folder › Menu (⋮)',
     header: MenuSheetHeader(
-      cover: const _FolderIcon(size: 48),
+      cover: const FolderCover(size: 48),
       title: folder.name,
       subtitle: 'Folder',
     ),

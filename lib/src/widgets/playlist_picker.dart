@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../data/library_folders.dart';
 import '../data/playlist_library.dart';
 import '../data/saved_songs.dart';
 import '../data/track_ref.dart';
@@ -27,8 +28,8 @@ MenuSheetEntry? playlistMenuEntry(
 }
 
 /// "Dodaj do playlisty ›" unfolding the playlists in the same sheet ([MenuSheetEntry.submenu]):
-/// "Polubione utwory", "Nowa playlista", then every playlist made on the phone; `null` like
-/// [playlistMenuEntry].
+/// "Polubione utwory", "Nowa playlista", then every saved playlist, those in a Biblioteka folder
+/// unfolding under it ([_grouped]); `null` like [playlistMenuEntry].
 MenuSheetEntry? playlistSubmenuEntry(
   BuildContext context,
   List<SearchHit> hits,
@@ -36,6 +37,7 @@ MenuSheetEntry? playlistSubmenuEntry(
   final library = PlaylistLibraryScope.maybeOf(context);
   if (library == null || hits.isEmpty) return null;
   final liked = LikedSongsScope.maybeOf(context);
+  final folders = LibraryFoldersScope.read(context);
   final messenger = ScaffoldMessenger.of(context);
   void said(String text) => messenger
     ..clearSnackBars()
@@ -45,6 +47,15 @@ MenuSheetEntry? playlistSubmenuEntry(
     'Dodaj do playlisty',
     submenu: () {
       final held = _heldCounts(library, hits);
+      MenuSheetEntry playlistEntry(PlaylistSummary playlist) => MenuSheetEntry(
+        Icons.queue_music,
+        playlist.name,
+        subtitle: _playlistLine(playlist, held[playlist.id] ?? 0, hits.length),
+        checked: held[playlist.id] == hits.length,
+        onTap: () async {
+          said(await togglePlaylist(library, playlist, hits));
+        },
+      );
       return [
         if (liked != null)
           liked.containsAll(hits)
@@ -69,23 +80,57 @@ MenuSheetEntry? playlistSubmenuEntry(
             said('Utworzono playlistę „$name”');
           },
         ),
-        for (final playlist in library.playlists)
-          MenuSheetEntry(
-            Icons.queue_music,
-            playlist.name,
-            subtitle: _playlistLine(
-              playlist,
-              held[playlist.id] ?? 0,
-              hits.length,
+        for (final (:folder, :playlists) in _grouped(library, folders))
+          if (folder == null)
+            playlistEntry(playlists.single)
+          else
+            MenuSheetEntry(
+              Icons.folder_outlined,
+              folder.name,
+              subtitle: _folderLine(playlists, held, hits.length),
+              submenu: () => [for (final p in playlists) playlistEntry(p)],
             ),
-            checked: held[playlist.id] == hits.length,
-            onTap: () async {
-              said(await togglePlaylist(library, playlist, hits));
-            },
-          ),
       ];
     },
   );
+}
+
+/// [library]'s playlists in its order, those in one of Biblioteka's [folders] gathered under it,
+/// where the first of them would be; a playlist in no folder stands alone (`folder` `null`).
+List<({LibraryFolder? folder, List<PlaylistSummary> playlists})> _grouped(
+  PlaylistLibrary library,
+  LibraryFolders? folders,
+) {
+  final folderOf = <String, LibraryFolder>{
+    for (final folder in folders?.folders ?? const <LibraryFolder>[])
+      for (final key in folder.items) key: folder,
+  };
+  final groups = <({LibraryFolder? folder, List<PlaylistSummary> playlists})>[];
+  final inFolder = <String, List<PlaylistSummary>>{};
+  for (final playlist in library.playlists) {
+    final folder = folderOf[LibraryFolders.playlistKey(playlist.id)];
+    if (folder == null) {
+      groups.add((folder: null, playlists: [playlist]));
+    } else if (inFolder[folder.id] case final list?) {
+      list.add(playlist);
+    } else {
+      groups.add((folder: folder, playlists: inFolder[folder.id] = [playlist]));
+    }
+  }
+  return groups;
+}
+
+/// A folder's number of playlists and how many of them already have all of the songs.
+String _folderLine(
+  List<PlaylistSummary> playlists,
+  Map<int, int> held,
+  int songs,
+) {
+  final n = playlists.length;
+  final size =
+      'Folder • $n ${pluralWord(n, 'playlista', 'playlisty', 'playlist')}';
+  final holding = playlists.where((p) => held[p.id] == songs).length;
+  return holding == 0 ? size : '$size · już w $holding';
 }
 
 /// How many of [hits] each playlist already has, by its id.
@@ -174,13 +219,15 @@ Future<String?> askPlaylistName(BuildContext context) async {
 }
 
 /// Puts [hits] at the end of a saved playlist or into a new one, or takes them out of a playlist
-/// holding them all ([togglePlaylist]).
+/// holding them all ([togglePlaylist]); playlists in a Biblioteka folder unfold under it
+/// ([_grouped]).
 Future<void> showAddToPlaylistSheet(
   BuildContext context,
   List<SearchHit> hits,
 ) {
   final library = PlaylistLibraryScope.of(context);
   final liked = LikedSongsScope.maybeOf(context);
+  final folders = LibraryFoldersScope.read(context);
   final messenger = ScaffoldMessenger.of(context);
   final what = hits.length == 1
       ? hits.single.title
@@ -196,76 +243,103 @@ Future<void> showAddToPlaylistSheet(
     builder: (sheetContext) {
       final palette = sheetContext.palette;
       final held = _heldCounts(library, hits);
-      return ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
-        ),
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.only(bottom: 16),
-          children: [
-            MenuSheetHeader(
-              cover: const Icon(Icons.playlist_add, size: 40),
-              title: 'Dodaj do playlisty',
-              subtitle: what,
+      final groups = _grouped(library, folders);
+      final open = <String>{};
+      Widget playlistTile(PlaylistSummary playlist, {double indent = 20}) =>
+          ListTile(
+            contentPadding: EdgeInsets.only(left: indent, right: 20),
+            leading: PlaylistCover(playlist: playlist, size: 48),
+            title: ScrollingText(playlist.name),
+            subtitle: Text(
+              _playlistLine(playlist, held[playlist.id] ?? 0, hits.length),
             ),
-            const Divider(),
-            if (liked != null)
-              ListenableBuilder(
-                listenable: liked,
-                builder: (_, _) {
-                  final all = liked.containsAll(hits);
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                    leading: const LikedSongsCover(),
-                    title: const Text(likedSongsLabel),
-                    subtitle: Text(
-                      '${liked.songs.length} ${songsWord(liked.songs.length)}',
-                    ),
-                    trailing: Icon(
-                      all ? Icons.favorite : Icons.favorite_border,
-                      color: all ? palette.accent : palette.textSecondary,
-                    ),
-                    onTap: () async {
-                      Navigator.of(sheetContext).pop();
-                      said(await toggleLiked(liked, hits));
-                    },
-                  );
-                },
+            trailing: held[playlist.id] == hits.length
+                ? Icon(Icons.check_circle, color: palette.accent)
+                : Icon(Icons.add_circle_outline, color: palette.textSecondary),
+            onTap: () async {
+              Navigator.of(sheetContext).pop();
+              said(await togglePlaylist(library, playlist, hits));
+            },
+          );
+
+      return StatefulBuilder(
+        builder: (sheetContext, setState) => ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.8,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(bottom: 16),
+            children: [
+              MenuSheetHeader(
+                cover: const Icon(Icons.playlist_add, size: 40),
+                title: 'Dodaj do playlisty',
+                subtitle: what,
               ),
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-              leading: Icon(Icons.add, color: palette.textSecondary),
-              title: const Text('Nowa playlista'),
-              onTap: () async {
-                final navigator = Navigator.of(sheetContext);
-                final name = await askPlaylistName(sheetContext);
-                if (name == null) return;
-                navigator.pop();
-                await library.create(name, hits);
-                said('Utworzono playlistę „$name”');
-              },
-            ),
-            for (final playlist in library.playlists)
+              const Divider(),
+              if (liked != null)
+                ListenableBuilder(
+                  listenable: liked,
+                  builder: (_, _) {
+                    final all = liked.containsAll(hits);
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                      ),
+                      leading: const LikedSongsCover(),
+                      title: const Text(likedSongsLabel),
+                      subtitle: Text(
+                        '${liked.songs.length} ${songsWord(liked.songs.length)}',
+                      ),
+                      trailing: Icon(
+                        all ? Icons.favorite : Icons.favorite_border,
+                        color: all ? palette.accent : palette.textSecondary,
+                      ),
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        said(await toggleLiked(liked, hits));
+                      },
+                    );
+                  },
+                ),
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                leading: PlaylistCover(playlist: playlist, size: 48),
-                title: ScrollingText(playlist.name),
-                subtitle: Text(
-                  _playlistLine(playlist, held[playlist.id] ?? 0, hits.length),
-                ),
-                trailing: held[playlist.id] == hits.length
-                    ? Icon(Icons.check_circle, color: palette.accent)
-                    : Icon(
-                        Icons.add_circle_outline,
-                        color: palette.textSecondary,
-                      ),
+                leading: Icon(Icons.add, color: palette.textSecondary),
+                title: const Text('Nowa playlista'),
                 onTap: () async {
-                  Navigator.of(sheetContext).pop();
-                  said(await togglePlaylist(library, playlist, hits));
+                  final navigator = Navigator.of(sheetContext);
+                  final name = await askPlaylistName(sheetContext);
+                  if (name == null) return;
+                  navigator.pop();
+                  await library.create(name, hits);
+                  said('Utworzono playlistę „$name”');
                 },
               ),
-          ],
+              for (final (:folder, :playlists) in groups)
+                if (folder == null)
+                  playlistTile(playlists.single)
+                else ...[
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                    leading: const FolderCover(size: 48),
+                    title: ScrollingText(folder.name),
+                    subtitle: Text(_folderLine(playlists, held, hits.length)),
+                    trailing: Icon(
+                      open.contains(folder.id)
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      color: palette.textSecondary,
+                    ),
+                    onTap: () => setState(() {
+                      if (!open.remove(folder.id)) open.add(folder.id);
+                    }),
+                  ),
+                  if (open.contains(folder.id))
+                    for (final playlist in playlists)
+                      playlistTile(playlist, indent: 44),
+                ],
+            ],
+          ),
         ),
       );
     },

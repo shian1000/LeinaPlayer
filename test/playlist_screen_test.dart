@@ -609,6 +609,73 @@ void main() {
     expect(playlists.byId(held.id)!.trackCount, 0);
   });
 
+  testWidgets('Dodaj do playlisty shows the playlists of a Biblioteka folder '
+      'under it', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pumpLibrary(
+      tester,
+      before: () async {
+        final hit = SearchHit.phoneOnly(
+          LocalSong(
+            id: 1,
+            filePath: '/m/a.mp3',
+            title: 'Lubiany',
+            pending: true,
+          ),
+        );
+        await liked.setAll([hit], true);
+        await playlists.create('Ma go', [hit]);
+        await playlists.create('Nie ma', const []);
+        await playlists.create('Luźna', const []);
+        final folder = await folders.create('Mój folder');
+        for (final name in ['Ma go', 'Nie ma']) {
+          final id = playlists.playlists.firstWhere((p) => p.name == name).id;
+          await folders.move(LibraryFolders.playlistKey(id), folder.id);
+        }
+      },
+    );
+    await tester.tap(find.text('Polubione utwory'));
+    await tester.pumpAndSettle();
+
+    Finder check(String playlist) => find.descendant(
+      of: find.ancestor(
+        of: find.text(playlist),
+        matching: find.byType(ListTile),
+      ),
+      matching: find.byIcon(Icons.check_circle),
+    );
+    Future<void> seeFolder() async {
+      expect(find.text('Luźna'), findsOneWidget);
+      expect(find.text('Folder • 2 playlisty · już w 1'), findsOneWidget);
+      expect(find.text('Ma go'), findsNothing);
+      await tester.tap(find.text('Mój folder'));
+      await tester.pumpAndSettle();
+      expect(check('Ma go'), findsOneWidget);
+      expect(find.text('Nie ma'), findsOneWidget);
+    }
+
+    await tester.tap(find.byTooltip('Menu utworu (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dodaj do playlisty'));
+    await tester.pumpAndSettle();
+    await seeFolder();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('Lubiany'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Do playlisty'));
+    await tester.pumpAndSettle();
+    await seeFolder();
+    await tester.tap(find.text('Nie ma'));
+    await pumpUntil(
+      tester,
+      () => find.text('Dodano do playlisty „Nie ma”').evaluate().isNotEmpty,
+    );
+  });
+
   testWidgets('a song taken out through its menu leaves the open playlist', (
     tester,
   ) async {

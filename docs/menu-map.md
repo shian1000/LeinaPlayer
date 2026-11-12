@@ -712,8 +712,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     The same ⋮ is used in
     Ostatnie (`Ostatnie › Utwór › Menu (⋮)`). Entries with › unfold their options under them in
     the same sheet (`MenuSheetEntry.submenu`): Dodaj do playlisty › (Polub / Usuń z polubionych,
-    Nowa playlista, then every saved playlist, ✓ on those holding the song, tapped to add or take
-    it out — see the sheet "Dodaj do playlisty") and Przejdź do wykonawców › (each artist of the song — **→ its
+    Nowa playlista, then every saved playlist — those in a folder unfolding under its row —, ✓ on
+    those holding the song, tapped to add or take it out — see the sheet "Dodaj do playlisty") and Przejdź do wykonawców › (each artist of the song — **→ its
     songs**: `openArtistSongs`, every song in music.db and on the phone with that artist, a song
     list with Odtwórz / Losowo and a ⋮ with Dodaj do kolejki / Odtwórz jako następny for all
     its songs; `song_list_screen.dart`).
@@ -871,8 +871,11 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   keeps them — `playlists.md`). A playlist already holding all these songs has an accent ✓ (else ⊕;
   several songs, some there: "już tu: 3 z 5" — `PlaylistLibrary.playlistsWith`). Tapping is a toggle
   (`togglePlaylist`, user's decision): only the songs it lacks are added, never a second copy, and a
-  playlist with ✓ loses them ("Usunięto z playlisty", no Cofnij). The song menu's "Dodaj do playlisty ›"
-  submenu works the same way.
+  playlist with ✓ loses them ("Usunięto z playlisty", no Cofnij). Playlists in a Biblioteka folder
+  aren't listed on their own: the folder is one row (folder cover, "Folder • 3 playlisty", "· już w 1"
+  when some of them have all these songs) where its first playlist would be, tapped to unfold its
+  playlists under it (user's request, 2026-11-12). The song menu's "Dodaj do playlisty ›" submenu
+  works the same way, a folder unfolding one level deeper.
 
 ## Sheet "Dodaj do nastroju" (`mood_sheet.dart`)
 
