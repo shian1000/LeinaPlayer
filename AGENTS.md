@@ -86,8 +86,9 @@ MusicDatabase or a mood; Biblioteka as categories, with "Polubione utwory" (like
 (`saved_songs.dart`, synced with the account — [ADR 0013](docs/decisions/0013-saved-songs-sync.md);
 songs saved "Na później", synced the same way, are shown only by Home's row — no Biblioteka
 category, not to be mixed up with Ja › Na później's links, user's decision) and dynamic playlists — a saved search filter
-(`smart_playlists.dart`, phone only); the full player's queue button opens the whole queue, and lyrics (looked
-up by the phone on LRCLIB, `lyrics.dart`, in memory only) are a card under the player, above
+(`smart_playlists.dart`, phone only); the full player's queue button opens the whole queue, and lyrics (from
+MusicDatabase's server, else looked up by the phone on LRCLIB — [ADR 0017](docs/decisions/0017-server-lyrics.md),
+`lyrics.dart`, in memory only) are a card under the player, above
 "Informacje o utworze" (user's layout: bottom row YouTube, mood filter, share, queue, ⋮; a mood
 button where "Polub" was); song menus unfold "Dodaj do playlisty ›" / "Przejdź do
 wykonawców ›" in place; Wyszukaj's "Przeglądaj" is grouped (moods, genres, decades, languages,
@@ -189,7 +190,8 @@ moods (`/users/<name>/moods`), changes to global moods (`/global-moods/…`) and
 (`GET /users/<name>`) — [ADR 0008](docs/decisions/0008-moods.md). Covers picked for playlists and moods go with them: the picture as
 `/users/<name>/covers/<sha256>`, global moods' own covers as `/users/<name>/global-mood-covers`
 ([ADR 0009](docs/decisions/0009-cover-sync.md)). The music library's files are streamed from
-`GET /library/<files.id>` ([ADR 0010](docs/decisions/0010-server-files.md)). Biblioteka's folders go as JSON too
+`GET /library/<files.id>` ([ADR 0010](docs/decisions/0010-server-files.md)), a song's lyrics
+from `GET /lyrics/<songs.id>` ([ADR 0017](docs/decisions/0017-server-lyrics.md)). Biblioteka's folders go as JSON too
 (`/users/<name>/folders`, [ADR 0011](docs/decisions/0011-folder-sync.md); server side in a
 [hand-off](docs/handoffs/musicdatabase-folders.md)); its sort order, filter chips and "last opened" stay on the
 phone (`library_folders.dart`), not synced. Liked songs and songs saved "Na później" go as
@@ -272,7 +274,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
   (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), the project a song's names say — Tiny Desk, Męskie Granie (`project_names.dart`, lite `read_project()`), and the
-  port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
+  port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from the server or LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`

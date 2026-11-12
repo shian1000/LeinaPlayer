@@ -113,7 +113,8 @@ class PrivacyScreen extends StatelessWidget {
           const SectionTitle('Serwer MusicDatabase'),
           text(
             'Baza utworów, Twoje pliki muzyczne (źródło „Serwer”; też okładki zapisane w tych '
-            'plikach — sam początek pliku, bez muzyki) i zgłoszenia poprawek. Po '
+            'plikach — sam początek pliku, bez muzyki), teksty piosenek (dostaje id utworu, '
+            'gdy otwarty jest pełny odtwarzacz) i zgłoszenia poprawek. Po '
             'zalogowaniu także synchronizacja konta: playlisty, nastroje, foldery, okładki, '
             'polubione, „Na później”, linki na później (z imieniem nadawcy) i każde '
             'odtworzenie — co, kiedy, jak długo i skąd. Przy logowaniu wysyła też model '
@@ -255,7 +256,8 @@ class PrivacyScreen extends StatelessWidget {
 
           const SectionTitle('LRCLIB: teksty piosenek'),
           text(
-            'Tekst utworu na karcie pod odtwarzaczem, gdy otwarty jest pełny odtwarzacz. LRCLIB '
+            'Tekst utworu na karcie pod odtwarzaczem, gdy otwarty jest pełny odtwarzacz, a '
+            'serwer MusicDatabase nie ma tekstu tego utworu (albo nie odpowiada). LRCLIB '
             '(projekt społecznościowy) dostaje tytuł, wykonawcę, album i długość utworu. Teksty '
             'nie są zapisywane na telefonie.',
           ),

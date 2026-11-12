@@ -46,8 +46,8 @@ class DataSaverScreen extends StatelessWidget {
             secondary: const Icon(Icons.lyrics_outlined),
             title: const Text('Pobieraj teksty piosenek'),
             subtitle: const Text(
-              'Z serwisu LRCLIB, gdy otwarty jest odtwarzacz. Wyłączone: bez karty z tekstem '
-              'i bez połączeń z LRCLIB',
+              'Z serwera MusicDatabase, a gdy go nie zna — z serwisu LRCLIB, gdy otwarty jest '
+              'odtwarzacz. Wyłączone: bez karty z tekstem i bez tych połączeń',
             ),
             value: settings.lyrics,
             onChanged: settings.setLyrics,

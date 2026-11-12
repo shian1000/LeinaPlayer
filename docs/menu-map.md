@@ -153,12 +153,13 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     in place of the cover first — removed, user's decision 2026-10-31), `Odtwarzacz › Menu (⋮)`
     (**→ the song's menu**).
   - Scrolled down: **Tekst** (**implemented**, a card right under the player, scrolling inside
-    itself): the lyrics from LRCLIB (`data/lyrics.dart`, kept in memory for the run; a lite
-    gap-fill while MusicDatabase has none) — time-synced lines follow the song, the current one
+    itself): the lyrics from MusicDatabase's server (`GET /lyrics/<id>`), else LRCLIB
+    (`data/lyrics.dart`, kept in memory for the run; ADR 0017; songs whose language is
+    "Instrumental" aren't looked up) — time-synced lines follow the song, the current one
     bold and kept in view inside the card, tapping a line jumps there; else the plain text;
     "Szukam tekstu…", "Nie znalazłem tekstu tego utworu.", "Utwór instrumentalny." or no
-    connection with "Spróbuj ponownie"; "Teksty: LRCLIB" under it. Not shown at all (and LRCLIB
-    never asked) with Oszczędzanie danych › "Pobieraj teksty piosenek" off. Then Informacje o utworze.
+    connection with "Spróbuj ponownie"; "Teksty: <source>" under it ("MusicDatabase (Genius)", "LRCLIB").
+    Not shown at all (and neither asked) with Oszczędzanie danych › "Pobieraj teksty piosenek" off. Then Informacje o utworze.
   - Kolejka
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
     e.g. by caching ahead): opens at "Teraz odtwarzane"; scrolled up, "Poprzednie" — the last
@@ -481,7 +482,7 @@ import, Wyświetlanie, Dane, Aplikacja.
   Wi-Fi" (off by default; Wi-Fi = the phone has a Wi-Fi IP address), "Pobieraj okładki tylko
   przez Wi-Fi" (off by default; on cellular only cached covers and covers inside phone files show),
   "Pobieraj teksty piosenek" (on by default; off hides the full player's lyrics card and never
-  asks LRCLIB — `SourceSettings.lyrics`),
+  asks the server or LRCLIB for lyrics — `SourceSettings.lyrics`),
   "Miejsce na pobrane utwory" (`download_folder.dart`, `SourceSettings.downloadFolder`; subtitle:
   "W aplikacji — niewidoczne dla innych aplikacji" or the folder, with "Pamięć telefonu" / "Karta
   SD" for the storage) — a sheet: "W aplikacji" (default) or "Wybierz folder…" (the system folder

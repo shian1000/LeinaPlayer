@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
+import '../data/database_sync.dart';
 import '../data/lyrics.dart';
 import '../data/source_settings.dart';
 import '../data/mood_filter.dart';
@@ -927,9 +928,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   }
 }
 
-/// The song's lyrics in a card under the player, from LRCLIB ([LyricsFinder]) while
-/// MusicDatabase has none: time-synced lines follow the song (the current one highlighted,
-/// kept in view inside the card), else the plain text.
+/// The song's lyrics in a card under the player, from MusicDatabase's server or else LRCLIB
+/// ([LyricsFinder]): time-synced lines follow the song (the current one highlighted, kept in
+/// view inside the card), else the plain text.
 class _LyricsCard extends StatefulWidget {
   const _LyricsCard();
 
@@ -940,6 +941,7 @@ class _LyricsCard extends StatefulWidget {
 class _LyricsCardState extends State<_LyricsCard> {
   SearchHit? _hit;
   Future<Lyrics?>? _lyrics;
+  Future<List<Uri>> Function()? _servers;
   final _lineKeys = <int, GlobalKey>{};
   final _scroll = ScrollController();
   int _shownLine = -1;
@@ -953,10 +955,11 @@ class _LyricsCardState extends State<_LyricsCard> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _servers = DatabaseSyncScope.maybeOf(context)?.serverAddresses;
     final hit = PlaybackQueueScope.of(context).current;
     if (hit != null && !identical(hit, _hit)) {
       _hit = hit;
-      _lyrics = LyricsFinder.instance.find(hit);
+      _lyrics = LyricsFinder.instance.find(hit, servers: _servers);
       _lineKeys.clear();
       _shownLine = -1;
     }
@@ -1033,7 +1036,10 @@ class _LyricsCardState extends State<_LyricsCard> {
                       icon: const Icon(Icons.refresh),
                       label: const Text('Spróbuj ponownie'),
                       onPressed: () => setState(() {
-                        _lyrics = LyricsFinder.instance.find(_hit!);
+                        _lyrics = LyricsFinder.instance.find(
+                          _hit!,
+                          servers: _servers,
+                        );
                       }),
                     ),
                   );
@@ -1103,11 +1109,16 @@ class _LyricsCardState extends State<_LyricsCard> {
               },
             ),
           ),
-          Text(
-            'Teksty: LRCLIB',
-            style: TextStyle(
-              fontSize: AppFontSize.badge,
-              color: palette.textSecondary,
+          FutureBuilder<Lyrics?>(
+            future: _lyrics,
+            builder: (context, snapshot) => ScrollingText(
+              snapshot.data == null
+                  ? 'Teksty: MusicDatabase, LRCLIB'
+                  : 'Teksty: ${snapshot.data!.source}',
+              style: TextStyle(
+                fontSize: AppFontSize.badge,
+                color: palette.textSecondary,
+              ),
             ),
           ),
         ],
