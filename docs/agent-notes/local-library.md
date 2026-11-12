@@ -30,7 +30,10 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   `SongCatalog._titled` (lite `songs_for_entry()`): a title whose marker names a version
   (`readVersion`, `version_names.dart`, lite `read_version()`) matches only versions of that
   kind — the same marker first ("Live at Opener"), then rows still titled with the marker, then
-  other markers of the kind; a title without one never matches a version. A release's marker
+  other markers of the kind; a title without one never matches a version — except one with
+  the marker run on, no bracket or dash ("Dancing Shoes KAMP! REMIX", a YouTube title):
+  `readVersion` can't tell where the title ends, so it names the version whose title and marker
+  together normalize to it, after any row titled so. A release's marker
   ("Radio Edit", "Album Version", "Remastered", "Bonus track") is no version, and a plain
   "(Version)" narrows nothing (a version with that marker, else a row titled so). Before 0022
   the columns are missing and there are no versions.

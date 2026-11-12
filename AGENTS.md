@@ -107,7 +107,8 @@ Versions — live, remix, acoustic… as rows of their own (`songs.version_kind`
 "Creep (Live) (Radiohead cover)"), looked for on YouTube with the marker and listed in
 Informacje o utworze's "Inne wersje"; `version_names.dart` adds the marker for display, never to
 `songs.title` or a title correction, and a title matches by name only a version its marker names
-— never the studio row, nor a title without a marker a version
+— never the studio row, nor a title without a marker a version (unless the marker is run on
+without a bracket: "Dancing Shoes KAMP! REMIX" is the "Kamp! remix" version)
 ([`local-library.md`](docs/agent-notes/local-library.md)).
 Changing a song's artist there is a proposal of another artist for that song (`songs.artist_id`
 with a name), never a rename of the shared artist row — that's the separate "Popraw pisownię

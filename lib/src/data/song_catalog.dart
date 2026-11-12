@@ -565,6 +565,7 @@ class SongCatalog extends ChangeNotifier {
         _idChanges = idChanges;
         _searchTexts = null;
         _byTitle = null;
+        _byMarkedTitle = null;
         _artistByName = null;
         _byYouTubeId = null;
         _byId = null;
@@ -584,6 +585,7 @@ class SongCatalog extends ChangeNotifier {
     } finally {
       _searchTexts = null;
       _byTitle = null;
+      _byMarkedTitle = null;
       _artistByName = null;
       _byYouTubeId = null;
       _byId = null;
@@ -1021,6 +1023,7 @@ class SongCatalog extends ChangeNotifier {
   }
 
   Map<String, List<CatalogSong>>? _byTitle;
+  Map<String, List<CatalogSong>>? _byMarkedTitle;
   Map<String, String?>? _artistByName;
   Map<String, CatalogSong>? _byYouTubeId;
 
@@ -1129,6 +1132,9 @@ class SongCatalog extends ChangeNotifier {
   /// first, and rows still titled with the marker (not looked at by MusicDatabase's "Find
   /// versions" yet); any other title never names a version. A plain "(Version)" may be anything
   /// ("Taylor's Version"), so it narrows nothing: such a version first, then songs titled so.
+  /// A title with the marker run on, no bracket or dash ("Dancing Shoes KAMP! REMIX"), can't be
+  /// cut by [readVersion]; it names the version whose title and marker together read so, after
+  /// any song titled so.
   /// Projects the same way: only songs of [project] (`songs.project_id`), and for `null` only
   /// songs of none — a Męskie Granie recording isn't the studio song of that title.
   List<CatalogSong> _titled(String title, String? project) {
@@ -1148,7 +1154,24 @@ class SongCatalog extends ChangeNotifier {
         if (song.version == null) song,
     ];
     final wanted = readVersion(title);
-    if (wanted == null) return titled;
+    if (wanted == null) {
+      final byMarkedTitle = _byMarkedTitle ??= () {
+        final index = <String, List<CatalogSong>>{};
+        for (final song in _songs) {
+          if (song.version case final version?) {
+            final key = normalizeForSearch('${song.title} ${version.marker}');
+            (index[key] ??= []).add(song);
+          }
+        }
+        return index;
+      }();
+      return [
+        ...titled,
+        ...?byMarkedTitle[normalizeForSearch(title)]?.where(
+          (song) => song.project == project,
+        ),
+      ];
+    }
     final marker = normalizeForSearch(wanted.label ?? wanted.kind.label);
     final versions = [
       for (final song in titledSo(wanted.title))

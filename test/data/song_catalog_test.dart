@@ -456,6 +456,9 @@ void main() {
       expect(found('Boję się (Radio Edit)'), isNull);
       expect(found('Recover', 'CatchUp'), isNull);
       expect(found('Recover (Cid Rim Remix)', 'CatchUp'), 34);
+      expect(found('Recover CID RIM REMIX', 'CatchUp'), 34);
+      expect(found('Recover Remix', 'CatchUp'), isNull);
+      expect(found('Boję się Live'), 31);
       expect(found('Werewolf (Live)', 'CatchUp'), 35);
       expect(found('Werewolf', 'CatchUp'), isNull);
       expect(found('Engel (Version)', 'CatchUp'), 36);
