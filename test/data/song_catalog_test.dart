@@ -42,7 +42,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       storage = await Directory.systemTemp.createTemp('song_catalog_test');
       sync = DatabaseSync(storageRoot: () async => storage);
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
     });
 
     tearDown(() async {
@@ -67,7 +67,7 @@ void main() {
       () async {
         final path = (await sync.localFile('music.db')).path;
         await writeMusicDb(path);
-        final before = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+        final before = SongCatalog(sync);
         await before.ensureLoaded();
         expect(before.status, CatalogStatus.ready);
         expect(before.badVideos.everySong, isEmpty);
@@ -105,7 +105,7 @@ void main() {
         'none without the table', () async {
       final path = (await sync.localFile('music.db')).path;
       await writeMusicDb(path);
-      final before = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final before = SongCatalog(sync);
       await before.ensureLoaded();
       expect(before.status, CatalogStatus.ready);
       expect(before.findByYouTubeId('live1234567'), isNull);
@@ -163,7 +163,7 @@ void main() {
         (12, 'Unknown/track.mp3', 4000, null),
         (13, 'Led Zeppelin/Going to California.mp3', 6000, 2),
       ]);
-      final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final again = SongCatalog(sync);
       addTearDown(again.dispose);
       await again.ensureLoaded();
       expect(again.byId(1)!.serverFile!.id, 10);
@@ -190,7 +190,7 @@ void main() {
         ],
         durations: {10: 211},
       );
-      final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final again = SongCatalog(sync);
       addTearDown(again.dispose);
       await again.ensureLoaded();
       expect(again.videoDuration('X2XWBcd5jn0'), const Duration(seconds: 245));
@@ -629,7 +629,7 @@ void main() {
       await db.rawUpdate("UPDATE songs SET kind = 'full_album' WHERE id = 2");
       await db.rawUpdate("UPDATE songs SET kind = 'dj_mix' WHERE id = 3");
       await db.close();
-      final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final again = SongCatalog(sync);
       addTearDown(again.dispose);
       await again.ensureLoaded();
       expect(again.byId(2)!.kind, SongKind.fullAlbum);
@@ -725,7 +725,7 @@ void main() {
       expect(catalog.searchFields, SearchField.defaults);
 
       await catalog.setSearchFields({SearchField.year, SearchField.title});
-      final again = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final again = SongCatalog(sync);
       addTearDown(again.dispose);
       await waitUntil(() => again.searchFields.length == 2);
       expect(again.searchFields, {SearchField.year, SearchField.title});

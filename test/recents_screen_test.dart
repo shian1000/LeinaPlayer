@@ -59,7 +59,7 @@ void main() {
   Future<void> pumpRecents(WidgetTester tester, String yesterday) async {
     await tester.runAsync(() async {
       sync = DatabaseSync(storageRoot: () async => storage);
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
       library = LocalLibrary(
         catalog,
         storageRoot: () async => storage,

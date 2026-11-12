@@ -812,6 +812,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       debugPrint('Loading songs before restoring the queue failed: $e');
     }
     await _queueSession.restore();
+    // Once the frame showing it is drawn: the playlists' read that waits for this keeps the main
+    // isolate busy for half a second on a slow phone, which held that frame up.
+    await WidgetsBinding.instance.endOfFrame;
     _sessionRestored.complete();
     await _scheduledMusic.start().catchError(
       (Object e) => debugPrint('Starting the scheduled music failed: $e'),

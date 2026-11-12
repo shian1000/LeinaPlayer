@@ -71,7 +71,7 @@ void main() {
           1: ('Globalny', 'mood', [1]),
         },
       );
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
       library = LocalLibrary(
         catalog,
         storageRoot: () async => storage,
@@ -85,7 +85,6 @@ void main() {
       moods = MoodLibrary(
         library.database,
         sync,
-        factoryOverride: databaseFactoryFfi,
         userName: () => 'tester',
         authToken: () => 'tok',
         canEditGlobal: () => true,

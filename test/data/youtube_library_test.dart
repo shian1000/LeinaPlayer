@@ -36,7 +36,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     root = await Directory.systemTemp.createTemp('youtube_library_test');
     sync = DatabaseSync(storageRoot: () async => root);
-    catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    catalog = SongCatalog(sync);
     local = newLocal();
     now = DateTime(2026, 10, 11, 12);
   });

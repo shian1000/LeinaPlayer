@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqlite3/sqlite3.dart' as sql;
 
 import 'combined_search.dart';
 import 'custom_covers.dart';
@@ -115,7 +117,6 @@ class MoodLibrary extends ChangeNotifier {
   MoodLibrary(
     this._database,
     this._sync, {
-    this.factoryOverride,
     DateTime Function()? now,
     String? Function()? userName,
     String? Function()? authToken,
@@ -136,9 +137,6 @@ class MoodLibrary extends ChangeNotifier {
 
   final Future<Database> Function() _database;
   final DatabaseSync _sync;
-
-  /// SQLite implementation for reading tag.db instead of sqflite's global `databaseFactory`.
-  final DatabaseFactory? factoryOverride;
   final DateTime Function() _now;
   final String? Function() _userName;
   final String? Function() _authToken;
@@ -292,37 +290,12 @@ class MoodLibrary extends ChangeNotifier {
 
   Future<void> _loadTagDb() async {
     final syncTime = _sync.lastSync;
-    final moods = <int, ({String name, Set<int> songs})>{};
+    var moods = <int, ({String name, Set<int> songs})>{};
     var hasMoods = false;
     try {
       final file = await _sync.localFile('tag.db');
       if (await file.exists()) {
-        final db = await (factoryOverride ?? databaseFactory).openDatabase(
-          file.path,
-          options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
-        );
-        try {
-          final columns = {
-            for (final c in await db.rawQuery('PRAGMA table_info(tags)'))
-              c['name'],
-          };
-          hasMoods = columns.contains('kind');
-          if (hasMoods) {
-            for (final row in await db.rawQuery('''
-              SELECT t.id, t.name, s.song_id
-              FROM tags t LEFT JOIN song_tags s ON s.tag_id = t.id
-              WHERE t.kind = 'mood' ''')) {
-              final mood = moods[row['id']! as int] ??= (
-                name: row['name']! as String,
-                songs: <int>{},
-              );
-              final songId = row['song_id'] as int?;
-              if (songId != null) mood.songs.add(songId);
-            }
-          }
-        } finally {
-          await db.close();
-        }
+        (:hasMoods, :moods) = await _readTagDb(file.path);
       }
     } catch (e) {
       debugPrint('Reading moods from tag.db failed: $e');
@@ -333,6 +306,38 @@ class MoodLibrary extends ChangeNotifier {
     // A tag.db from before moods (no `tags.kind`) says nothing about them.
     if (hasMoods) await _forgetSettledChanges();
   }
+
+  /// tag.db's moods and their songs, read like music.db ([SongCatalog]): in a background
+  /// isolate with SQLite called directly — through sqflite its rows held up the one queue
+  /// local.db's reads wait in at start (the queue's YouTube links among them).
+  static Future<
+    ({bool hasMoods, Map<int, ({String name, Set<int> songs})> moods})
+  >
+  _readTagDb(String path) => Isolate.run(() {
+    final db = sql.sqlite3.open(path, mode: sql.OpenMode.readOnly);
+    try {
+      final moods = <int, ({String name, Set<int> songs})>{};
+      final hasMoods = db
+          .select('PRAGMA table_info(tags)')
+          .any((c) => c['name'] == 'kind');
+      if (hasMoods) {
+        for (final row in db.select('''
+          SELECT t.id, t.name, s.song_id
+          FROM tags t LEFT JOIN song_tags s ON s.tag_id = t.id
+          WHERE t.kind = 'mood' ''')) {
+          final mood = moods[row['id']! as int] ??= (
+            name: row['name']! as String,
+            songs: <int>{},
+          );
+          final songId = row['song_id'] as int?;
+          if (songId != null) mood.songs.add(songId);
+        }
+      }
+      return (hasMoods: hasMoods, moods: moods);
+    } finally {
+      db.close();
+    }
+  });
 
   /// Drops this phone's global mood changes the downloaded tag.db already shows, those
   /// overtaken by a later change to the same song, and those MusicDatabase accepted long ago.

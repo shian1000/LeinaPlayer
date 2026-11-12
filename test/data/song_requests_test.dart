@@ -8,6 +8,7 @@ import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/song_requests.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqlite3/sqlite3.dart' as sql;
 
 void main() {
   sqfliteFfiInit();
@@ -153,31 +154,26 @@ void main() {
   test(
     'rejected_song_requests turns down a song by name, video or Spotify track',
     () async {
-      final path = '${root.path}/music.db';
-      final db = await databaseFactoryFfi.openDatabase(path);
-      expect(
-        await RejectedSongRequests.read(db),
-        same(RejectedSongRequests.none),
-      );
-      await db.execute(
+      final db = sql.sqlite3.open('${root.path}/music.db');
+      expect(RejectedSongRequests.read(db), same(RejectedSongRequests.none));
+      db.execute(
         '''
       CREATE TABLE rejected_song_requests (
         id INTEGER PRIMARY KEY, artist TEXT, title TEXT NOT NULL,
         youtube_video_id TEXT, spotify_track_id TEXT, rejected_at TEXT NOT NULL)''',
       );
-      await db.insert('rejected_song_requests', {
-        'artist': 'Elise Trouw',
-        'title': 'Unseen',
-        'youtube_video_id': 'v1',
-        'rejected_at': '2026-10-18T10:00:00+02:00',
-      });
-      await db.insert('rejected_song_requests', {
-        'title': 'Some track',
-        'spotify_track_id': 'sp9',
-        'rejected_at': '2026-10-18T10:00:00+02:00',
-      });
-      final rejected = await RejectedSongRequests.read(db);
-      await db.close();
+      db.execute(
+        'INSERT INTO rejected_song_requests '
+        '(artist, title, youtube_video_id, rejected_at) VALUES (?, ?, ?, ?)',
+        ['Elise Trouw', 'Unseen', 'v1', '2026-10-18T10:00:00+02:00'],
+      );
+      db.execute(
+        'INSERT INTO rejected_song_requests '
+        '(title, spotify_track_id, rejected_at) VALUES (?, ?, ?)',
+        ['Some track', 'sp9', '2026-10-18T10:00:00+02:00'],
+      );
+      final rejected = RejectedSongRequests.read(db);
+      db.close();
 
       bool rejects(SearchHit hit) => rejected.rejects(SongRequest.of(hit)!);
       expect(rejects(video('UNSEEN', 'elise trouw', 'other')), isTrue);

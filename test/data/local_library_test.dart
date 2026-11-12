@@ -57,7 +57,7 @@ void main() {
       music = await Directory('${root.path}/Music').create();
       sync = DatabaseSync(storageRoot: () async => root);
       await writeMusicDb((await sync.localFile('music.db')).path);
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
       library = newLibrary(catalog);
       await library.load();
     });
@@ -153,7 +153,7 @@ void main() {
 
       // A fresh catalog reads the updated music.db (in the app a download triggers this).
       library.dispose();
-      final updated = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final updated = SongCatalog(sync);
       addTearDown(updated.dispose);
       library = newLibrary(updated);
       await library.load();
@@ -165,7 +165,7 @@ void main() {
     test('without a downloaded database every file is pending', () async {
       await (await sync.localFile('music.db')).delete();
       library.dispose();
-      final empty = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final empty = SongCatalog(sync);
       addTearDown(empty.dispose);
       library = newLibrary(empty);
       await library.load();

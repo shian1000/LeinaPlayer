@@ -23,7 +23,7 @@ class _Phone {
   _Phone(this.root)
     : sync = DatabaseSync(storageRoot: () async => root),
       links = _FakeLaterLinks() {
-    catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    catalog = SongCatalog(sync);
     library = LocalLibrary(
       catalog,
       storageRoot: () async => root,

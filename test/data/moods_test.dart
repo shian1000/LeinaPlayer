@@ -233,7 +233,6 @@ void main() {
       MoodLibrary(
         local.database,
         sync,
-        factoryOverride: databaseFactoryFfi,
         now: () => clock,
         userName: () => userName,
         authToken: () => token,
@@ -259,7 +258,7 @@ void main() {
       1: ('Siłownia', 'mood', [1, 2]),
       2: ('spellchecked', 'marker', [1, 2, 3]),
     });
-    catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    catalog = SongCatalog(sync);
     local = LocalLibrary(
       catalog,
       storageRoot: () async => root,

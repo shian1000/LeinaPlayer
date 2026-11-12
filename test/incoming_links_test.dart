@@ -79,7 +79,7 @@ void main() {
       root = await Directory.systemTemp.createTemp('video_link_test');
       final sync = DatabaseSync(storageRoot: () async => root);
       await writeMusicDb((await sync.localFile('music.db')).path);
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
       library = LocalLibrary(
         catalog,
         storageRoot: () async => root,

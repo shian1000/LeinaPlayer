@@ -1,10 +1,11 @@
 import 'dart:collection';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 import 'cover_credit.dart';
 import 'database_sync.dart';
@@ -393,6 +394,18 @@ class CatalogSong {
 
 enum CatalogStatus { notLoaded, loading, ready, noDatabase, error }
 
+/// What [SongCatalog] reads from music.db and files.db at once.
+typedef _CatalogRead = ({
+  List<CatalogSong> songs,
+  BadVideos badVideos,
+  Map<String, int> additionalVideos,
+  Map<String, Duration> videoDurations,
+  List<Project> projects,
+  RejectedSongRequests rejected,
+  Map<int, int?> idChanges,
+  String? filesError,
+});
+
 /// Read-only, in-memory copy of the songs in the downloaded `music.db`, for search.
 ///
 /// The whole table is loaded once (a few thousand rows) and filtered in Dart, which keeps every
@@ -416,7 +429,7 @@ class BadVideos {
 }
 
 class SongCatalog extends ChangeNotifier {
-  SongCatalog(this._sync, {this.factoryOverride}) {
+  SongCatalog(this._sync) {
     _sync.addListener(_onSyncChanged);
     _loadSearchFields();
   }
@@ -424,10 +437,6 @@ class SongCatalog extends ChangeNotifier {
   static const _searchFieldsKey = 'search.fields';
 
   final DatabaseSync _sync;
-
-  /// SQLite implementation to use instead of sqflite's global `databaseFactory` (which is looked
-  /// up only when reading, so tests can also swap the global one).
-  final DatabaseFactory? factoryOverride;
 
   CatalogStatus _status = CatalogStatus.notLoaded;
   List<CatalogSong> _songs = const [];
@@ -566,48 +575,23 @@ class SongCatalog extends ChangeNotifier {
         _rejectedSongRequests = RejectedSongRequests.none;
         _status = CatalogStatus.noDatabase;
       } else {
-        final serverFiles = await _readServerFiles(
-          await _sync.localFile('files.db'),
-        );
-        // Opened once for every table: on Android each call waits in sqflite's one queue
-        // behind whatever else the app reads at start, so each extra round trip costs.
-        final db = await (factoryOverride ?? databaseFactory).openDatabase(
+        final read = await _readInBackground(
           file.path,
-          options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+          (await _sync.localFile('files.db')).path,
         );
-        final List<CatalogSong> songs;
-        final BadVideos badVideos;
-        final Map<String, int> additionalVideos;
-        final Map<String, Duration> videoDurations;
-        final List<Project> projects;
-        final RejectedSongRequests rejected;
-        final Map<int, int?> idChanges;
-        try {
-          final tables = {
-            for (final row in await db.rawQuery(
-              "SELECT name FROM sqlite_master WHERE type = 'table'",
-            ))
-              row['name']! as String,
-          };
-          songs = await _readSongs(db, tables, serverFiles);
-          badVideos = await _readBadVideos(db, tables);
-          additionalVideos = await _readAdditionalVideos(db, tables);
-          videoDurations = await _readVideoDurations(db, tables);
-          projects = await _readProjects(db);
-          rejected = await RejectedSongRequests.read(db);
-          idChanges = await _readIdChanges(db, tables);
-        } finally {
-          await db.close();
+        // Logged here: a background isolate's debugPrint doesn't reach the error log.
+        if (read.filesError case final error?) {
+          debugPrint('Reading files.db failed: $error');
         }
         // All at once, with the indexes below: a search between two awaits would otherwise
         // read the new songs through the old search texts.
-        _songs = songs;
-        _badVideos = badVideos;
-        _additionalVideos = additionalVideos;
-        _videoDurations = videoDurations;
-        _projects = projects;
-        _rejectedSongRequests = rejected;
-        _idChanges = idChanges;
+        _songs = read.songs;
+        _badVideos = read.badVideos;
+        _additionalVideos = read.additionalVideos;
+        _videoDurations = read.videoDurations;
+        _projects = read.projects;
+        _rejectedSongRequests = read.rejected;
+        _idChanges = read.idChanges;
         _searchTexts = null;
         _byTitle = null;
         _byMarkedTitle = null;
@@ -652,21 +636,68 @@ class SongCatalog extends ChangeNotifier {
     }
   }
 
-  /// `files.db`'s files of each song, the largest one when a song has several; empty when there's
-  /// no `files.db` or it can't be read — the songs still load, only without server files.
-  Future<Map<int, ServerFile>> _readServerFiles(File file) async {
-    if (!await file.exists()) return const {};
+  /// Read in a background isolate (a static closure: nothing of this catalog goes along), with
+  /// SQLite called directly: through sqflite every row crossed the platform channel and was
+  /// decoded on the main isolate, in one queue with everything else the app reads at start.
+  /// The result comes back without being copied ([Isolate.run] ends with `Isolate.exit`).
+  static Future<_CatalogRead> _readInBackground(
+    String musicDb,
+    String filesDb,
+  ) => Isolate.run(() => _readCatalog(musicDb, filesDb));
+
+  static Future<_CatalogRead> _readCatalog(
+    String musicDb,
+    String filesDb,
+  ) async {
+    // files.db in an isolate of its own, read while music.db is: its query alone took a slow
+    // phone 150 ms.
+    final serverFilesRead = Isolate.run(() => _readServerFiles(filesDb));
+    final db = sqlite3.open(musicDb, mode: OpenMode.readOnly);
     try {
-      final db = await (factoryOverride ?? databaseFactory).openDatabase(
-        file.path,
-        options: OpenDatabaseOptions(readOnly: true, singleInstance: false),
+      final tables = {
+        for (final row in db.select(
+          "SELECT name FROM sqlite_master WHERE type = 'table'",
+        ))
+          row['name']! as String,
+      };
+      final songRows = _querySongs(db, tables);
+      final badVideos = _readBadVideos(db, tables);
+      final additionalVideos = _readAdditionalVideos(db, tables);
+      final videoDurations = _readVideoDurations(db, tables);
+      final projects = _readProjects(db);
+      final rejected = RejectedSongRequests.read(db);
+      final idChanges = _readIdChanges(db, tables);
+      final serverFiles = await serverFilesRead;
+      return (
+        songs: _songsOf(songRows, serverFiles.files),
+        badVideos: badVideos,
+        additionalVideos: additionalVideos,
+        videoDurations: videoDurations,
+        projects: projects,
+        rejected: rejected,
+        idChanges: idChanges,
+        filesError: serverFiles.error,
       );
+    } finally {
+      db.close();
+    }
+  }
+
+  /// `files.db`'s files of each song, the largest one when a song has several; empty when there's
+  /// no `files.db` or it can't be read (with [error]) — the songs still load, only without server
+  /// files.
+  static ({Map<int, ServerFile> files, String? error}) _readServerFiles(
+    String path,
+  ) {
+    if (!File(path).existsSync()) return (files: const {}, error: null);
+    try {
+      final db = sqlite3.open(path, mode: OpenMode.readOnly);
       try {
-        final duration = await _hasColumn(db, 'files', 'duration_s')
+        final duration = _hasColumn(db, 'files', 'duration_s')
             ? 'duration_s'
             : 'NULL';
         final found = <int, ServerFile>{};
-        for (final row in await db.rawQuery(
+        for (final row in db.select(
           'SELECT id, path, song_id, $duration AS duration_s FROM files '
           'WHERE song_id IS NOT NULL ORDER BY size DESC, id',
         )) {
@@ -682,45 +713,42 @@ class SongCatalog extends ChangeNotifier {
             ),
           );
         }
-        return found;
+        return (files: found, error: null);
       } finally {
-        await db.close();
+        db.close();
       }
     } catch (e) {
-      debugPrint('Reading files.db failed: $e');
-      return const {};
+      return (files: const {}, error: '$e');
     }
   }
 
-  Future<List<CatalogSong>> _readSongs(
+  /// `songs` with their artists, as rows, and each song's additional artists.
+  static ({ResultSet rows, Map<int, List<_Artist>> extra}) _querySongs(
     Database db,
     Set<String> tables,
-    Map<int, ServerFile> serverFiles,
-  ) async {
+  ) {
     // Older databases have no youtube_video_id / spotify_url / music_video_youtube_id column.
     final columns = {
-      for (final c in await db.rawQuery('PRAGMA table_info(songs)')) c['name'],
+      for (final c in db.select('PRAGMA table_info(songs)')) c['name'],
     };
     String column(String name) => columns.contains(name) ? 's.$name' : 'NULL';
-    final artistLatin = await _hasColumn(db, 'artists', 'name_latin')
+    final artistLatin = _hasColumn(db, 'artists', 'name_latin')
         ? 'a.name_latin'
         : 'NULL';
     // Before MusicDatabase's Latin forms (hand-off musicdatabase-latin-names.md) and its
     // albums table, the columns aren't there.
     final albumLatin =
-        columns.contains('album_id') &&
-            await _hasColumn(db, 'albums', 'title_latin')
+        columns.contains('album_id') && _hasColumn(db, 'albums', 'title_latin')
         ? '(SELECT al.title_latin FROM albums al WHERE al.id = s.album_id)'
         : 'NULL';
     // Before MusicDatabase's migrations 0020 and 0021 the columns aren't there.
     final covers = columns.contains('covered_artist_id');
     // Before its migration 0019 neither songs.project_id nor projects is there.
     final project =
-        columns.contains('project_id') &&
-            await _hasColumn(db, 'projects', 'name')
+        columns.contains('project_id') && _hasColumn(db, 'projects', 'name')
         ? '(SELECT p.name FROM projects p WHERE p.id = s.project_id)'
         : 'NULL';
-    final rows = await db.rawQuery(
+    final rows = db.select(
       '''
         SELECT s.id, s.title, s.album, s.year, s.language,
                ${column('youtube_video_id')} AS youtube_video_id,
@@ -742,15 +770,19 @@ class SongCatalog extends ChangeNotifier {
         FROM songs s JOIN artists a ON a.id = s.artist_id
         ${covers ? 'LEFT JOIN artists c ON c.id = s.covered_artist_id' : ''}''',
     );
-    final extra = await _readAdditionalArtists(db, tables, artistLatin);
-    return [
-      for (final row in rows)
-        _song(row, [
-          _artistOf(row, 'main'),
-          ...?extra[row['id']! as int],
-        ], serverFiles[row['id']! as int]),
-    ];
+    return (rows: rows, extra: _readAdditionalArtists(db, tables, artistLatin));
   }
+
+  static List<CatalogSong> _songsOf(
+    ({ResultSet rows, Map<int, List<_Artist>> extra}) query,
+    Map<int, ServerFile> serverFiles,
+  ) => [
+    for (final row in query.rows)
+      _song(row, [
+        _artistOf(row, 'main'),
+        ...?query.extra[row['id']! as int],
+      ], serverFiles[row['id']! as int]),
+  ];
 
   static CatalogSong _song(
     Map<String, Object?> row,
@@ -855,13 +887,8 @@ class SongCatalog extends ChangeNotifier {
     return _artistLabel(latin);
   }
 
-  static Future<bool> _hasColumn(
-    Database db,
-    String table,
-    String column,
-  ) async =>
-      (await db.rawQuery('PRAGMA table_info($table)'))
-          .any((c) => c['name'] == column);
+  static bool _hasColumn(Database db, String table, String column) =>
+      db.select('PRAGMA table_info($table)').any((c) => c['name'] == column);
 
   static String? _spotifyTrackId(String? url) => url == null
       ? null
@@ -879,10 +906,10 @@ class SongCatalog extends ChangeNotifier {
 
   /// `song_id_changes`: what each old id became when MusicDatabase merged or renumbered a song
   /// (`null`: deleted); empty for databases before that table.
-  Future<Map<int, int?>> _readIdChanges(Database db, Set<String> tables) async {
+  static Map<int, int?> _readIdChanges(Database db, Set<String> tables) {
     if (!tables.contains('song_id_changes')) return const {};
     return {
-      for (final row in await db.rawQuery(
+      for (final row in db.select(
         'SELECT old_song_id, new_song_id FROM song_id_changes '
         'ORDER BY changed_at',
       ))
@@ -891,11 +918,11 @@ class SongCatalog extends ChangeNotifier {
   }
 
   /// `bad_youtube_videos`; none in a music.db from before MusicDatabase's migration 0010.
-  Future<BadVideos> _readBadVideos(Database db, Set<String> tables) async {
+  static BadVideos _readBadVideos(Database db, Set<String> tables) {
     if (!tables.contains('bad_youtube_videos')) return BadVideos.none;
     final everySong = <String>{};
     final forSong = <int, Set<String>>{};
-    for (final row in await db.rawQuery(
+    for (final row in db.select(
       'SELECT video_id, song_id FROM bad_youtube_videos',
     )) {
       final video = (row['video_id'] as String?)?.trim();
@@ -911,13 +938,13 @@ class SongCatalog extends ChangeNotifier {
   }
 
   /// `additional_youtube_videos` (MusicDatabase's migration 0018); empty before it.
-  Future<Map<String, int>> _readAdditionalVideos(
+  static Map<String, int> _readAdditionalVideos(
     Database db,
     Set<String> tables,
-  ) async {
+  ) {
     if (!tables.contains('additional_youtube_videos')) return const {};
     return {
-      for (final row in await db.rawQuery(
+      for (final row in db.select(
         'SELECT video_id, song_id FROM additional_youtube_videos',
       ))
         if ((row['video_id'] as String?)?.trim() case final video?
@@ -927,13 +954,13 @@ class SongCatalog extends ChangeNotifier {
   }
 
   /// `youtube_video_durations` (MusicDatabase's migration 0017); empty before it.
-  Future<Map<String, Duration>> _readVideoDurations(
+  static Map<String, Duration> _readVideoDurations(
     Database db,
     Set<String> tables,
-  ) async {
+  ) {
     if (!tables.contains('youtube_video_durations')) return const {};
     return {
-      for (final row in await db.rawQuery(
+      for (final row in db.select(
         'SELECT video_id, duration_s FROM youtube_video_durations '
         'WHERE duration_s > 0',
       ))
@@ -944,10 +971,10 @@ class SongCatalog extends ChangeNotifier {
   }
 
   /// `projects` (MusicDatabase's migration 0019); empty before it.
-  Future<List<Project>> _readProjects(Database db) async {
-    if (!await _hasColumn(db, 'projects', 'name')) return const [];
+  static List<Project> _readProjects(Database db) {
+    if (!_hasColumn(db, 'projects', 'name')) return const [];
     return [
-      for (final row in await db.rawQuery(
+      for (final row in db.select(
         'SELECT name, aliases, channels FROM projects ORDER BY id',
       ))
         Project(
@@ -960,13 +987,13 @@ class SongCatalog extends ChangeNotifier {
 
   /// `additional_song_artists` (role `main` or `feat`) per song id; empty for databases created
   /// before that table existed.
-  Future<Map<int, List<_Artist>>> _readAdditionalArtists(
+  static Map<int, List<_Artist>> _readAdditionalArtists(
     Database db,
     Set<String> tables,
     String nameLatin,
-  ) async {
+  ) {
     if (!tables.contains('additional_song_artists')) return const {};
-    final rows = await db.rawQuery('''
+    final rows = db.select('''
       SELECT x.song_id, x.role, a.name, a.origin, a.synonyms,
              $nameLatin AS name_latin
       FROM additional_song_artists x JOIN artists a ON a.id = x.artist_id

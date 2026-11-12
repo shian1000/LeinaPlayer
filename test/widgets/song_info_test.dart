@@ -629,7 +629,7 @@ void main() {
         "(32, 'Boję się', 5, 'remix', 'Ptaki Remix', 30)",
       );
       await db.close();
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
       await catalog.ensureLoaded();
     });
     final player = PlayerController(backend: FakeBackend.new);

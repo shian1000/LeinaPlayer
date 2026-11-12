@@ -414,6 +414,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - `MainActivity`'s overrides mustn't touch `flutterEngine` before `configureFlutterEngine`: an
   activity restored after its process was killed gets `setFrameworkHandlesBack` from
   FlutterActivity's `onCreate`, with no delegate yet — a crash at start (`engineConfigured`).
+- MusicDatabase's files (music.db, files.db, tag.db) are read with the `sqlite3` package in a
+  background isolate (`Isolate.run`, no sqflite — [`startup.md`](docs/agent-notes/startup.md));
+  `local.db` only ever through sqflite, never opened with `sqlite3`: that package bundles its own
+  SQLite, and two SQLite copies writing one file in one process can corrupt it.
 - `local.db` code can't use UPSERT (`INSERT … ON CONFLICT … DO UPDATE`): Android 10's SQLite
   is 3.22, older than it. Update, then insert with `ConflictAlgorithm.ignore`
   (`Recordings._putIn`); `ConflictAlgorithm.replace` would wipe the row's other columns.
@@ -525,7 +529,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   rate limits, the cover cache, the MusicDatabase hand-off, playlist/mood collages and picked
   covers, last start's covers shown at start (`StartupCovers`).
 - [`startup.md`](docs/agent-notes/startup.md) — what a cold start does and why in that order
-  (sqflite's one thread, lazy search texts, playlists after the queue, Home keeping its layout),
+  (sqflite's one thread, MusicDatabase's files read with `sqlite3` in isolates, lazy search texts,
+  playlists after the queue, Home keeping its layout),
   the ideas left for later, and how to measure a start on the Huawei.
 - [`signing.md`](docs/agent-notes/signing.md) — the release key (outside the repo,
   `android/key.properties`), why it must never change, its SHA-1 in Google Cloud.

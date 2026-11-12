@@ -114,7 +114,7 @@ void main() {
     sqfliteFfiInit();
     final root = await Directory.systemTemp.createTemp('server_download_mp3');
     final sync = DatabaseSync(storageRoot: () async => root);
-    final catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    final catalog = SongCatalog(sync);
     final local = LocalLibrary(
       catalog,
       storageRoot: () async => root,
@@ -168,7 +168,7 @@ void main() {
         'server_download_play',
       );
       final sync = DatabaseSync(storageRoot: () async => root);
-      final catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      final catalog = SongCatalog(sync);
       final local = LocalLibrary(
         catalog,
         storageRoot: () async => root,

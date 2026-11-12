@@ -58,7 +58,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     root = await Directory.systemTemp.createTemp('album_covers_test');
     sync = DatabaseSync(storageRoot: () async => root);
-    catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    catalog = SongCatalog(sync);
     local = LocalLibrary(
       catalog,
       storageRoot: () async => root,

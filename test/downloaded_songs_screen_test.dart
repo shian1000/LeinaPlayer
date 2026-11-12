@@ -67,7 +67,7 @@ void main() {
       (10, 'Dawid Podsiadło/Małomiasteczkowy.mp3', 5000, 1),
       (13, 'Led Zeppelin/Going to California.mp3', 6000, 2),
     ]);
-    catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    catalog = SongCatalog(sync);
     local = LocalLibrary(
       catalog,
       storageRoot: () async => storage,

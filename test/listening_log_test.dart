@@ -127,7 +127,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     root = await Directory.systemTemp.createTemp('listening_log_test');
     sync = DatabaseSync(storageRoot: () async => root);
-    catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    catalog = SongCatalog(sync);
     library = LocalLibrary(
       catalog,
       storageRoot: () async => root,

@@ -1,4 +1,4 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 import 'combined_search.dart';
 import 'text_normalizer.dart';
@@ -104,8 +104,8 @@ class RejectedSongRequests {
           spotifyTracks.contains(request.spotifyTrackId));
 
   /// None in a music.db from before MusicDatabase's migration 0015.
-  static Future<RejectedSongRequests> read(Database db) async {
-    final hasTable = await db.rawQuery(
+  static RejectedSongRequests read(Database db) {
+    final hasTable = db.select(
       "SELECT 1 FROM sqlite_master WHERE type = 'table' "
       "AND name = 'rejected_song_requests'",
     );
@@ -113,7 +113,7 @@ class RejectedSongRequests {
     final keys = <String>{};
     final videos = <String>{};
     final tracks = <String>{};
-    for (final row in await db.rawQuery(
+    for (final row in db.select(
       'SELECT artist, title, youtube_video_id, spotify_track_id '
       'FROM rejected_song_requests',
     )) {

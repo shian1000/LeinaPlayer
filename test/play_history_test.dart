@@ -17,7 +17,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final root = await Directory.systemTemp.createTemp('play_history_test');
     final sync = DatabaseSync(storageRoot: () async => root);
-    final catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    final catalog = SongCatalog(sync);
     final library = LocalLibrary(
       catalog,
       storageRoot: () async => root,
@@ -54,7 +54,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final root = await Directory.systemTemp.createTemp('play_history_test');
     final sync = DatabaseSync(storageRoot: () async => root);
-    final catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    final catalog = SongCatalog(sync);
     final library = LocalLibrary(
       catalog,
       storageRoot: () async => root,

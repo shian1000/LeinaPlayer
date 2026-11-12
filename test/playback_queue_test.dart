@@ -685,7 +685,7 @@ void main() {
       await tester.runAsync(() async {
         root = await Directory.systemTemp.createTemp('queue_playlist_test');
         sync = DatabaseSync(storageRoot: () async => root);
-        catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+        catalog = SongCatalog(sync);
         local = LocalLibrary(
           catalog,
           storageRoot: () async => root,

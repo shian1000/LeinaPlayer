@@ -52,7 +52,7 @@ void main() {
     await tester.runAsync(() async {
       storage = await Directory.systemTemp.createTemp('stats_screen_test');
       sync = DatabaseSync(storageRoot: () async => storage);
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
       library = LocalLibrary(
         catalog,
         storageRoot: () async => storage,

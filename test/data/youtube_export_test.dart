@@ -30,7 +30,7 @@ void main() {
     root = await Directory.systemTemp.createTemp('youtube_export_test');
     sync = DatabaseSync(storageRoot: () async => root);
     await writeMusicDb((await sync.localFile('music.db')).path);
-    catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+    catalog = SongCatalog(sync);
     local = LocalLibrary(
       catalog,
       storageRoot: () async => root,

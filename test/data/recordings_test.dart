@@ -100,7 +100,7 @@ void main() {
       music = await Directory('${root.path}/Music').create();
       sync = DatabaseSync(storageRoot: () async => root);
       await writeMusicDb((await sync.localFile('music.db')).path);
-      catalog = SongCatalog(sync, factoryOverride: databaseFactoryFfi);
+      catalog = SongCatalog(sync);
       library = LocalLibrary(
         catalog,
         storageRoot: () async => root,
