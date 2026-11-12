@@ -112,7 +112,11 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   [ADR 0010](../decisions/0010-server-files.md)): `TrackPlayer` sends a `HEAD` first so an
   unreachable address is passed over in seconds and "no connection" (queue retries) is told from
   404/503 (queue moves on), and when the server can't play it the next source in the order
-  does. A new `PlaybackSource` lands in saved orders right after the value it follows by
+  does. So does a phone file that can't play: one gone since the last scan (moved or deleted —
+  the scan runs only on request, so `local.db` keeps such files) is dropped from `local.db`
+  right then (`TrackPlayer.onPhoneFileGone` → `LocalLibrary.forgetGone`) without being opened;
+  one that's there but fails to open is kept. A queue entry still holds its old `phoneFiles`,
+  so it tries the gone path (a quick `File.exists`) each time it plays. A new `PlaybackSource` lands in saved orders right after the value it follows by
   default (`_withAll`), not at the end — otherwise YouTube would keep winning. YouTube is searched (`YouTubeSearch`) only on an explicit
   action — the "Wyszukaj na YouTubie" button or tapping a song no source has — never per
   keystroke. YouTube search, matching and playback: [`youtube.md`](youtube.md).
@@ -123,7 +127,11 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   (`lib/src/playback/playback_queue.dart`) decides what comes next and plays each song through
   `TrackPlayer` (`track_player.dart`: the source choice, YouTube search and matching — no UI, so
   it also works with the screen off). On `PlayerController.completions` the queue plays the next
-  song that can be played; moving on by itself never opens the YouTube app. "Poprzedni" uses
+  song that can be played; moving on by itself never opens the YouTube app. "Następny" from the
+  notification / a headset (`MediaSkip.next`) does the same (`_skipToNext` → `_playOn`), not
+  `next()`: `next()` gives up on a song that fails and leaves the player empty — just_audio
+  idle, which `MediaSession` reports as loading — so the notification hung on "loading"
+  with nothing playing and no message (seen on the Pixel). "Poprzedni" uses
   `PlayerController.currentPosition` (5 s rule). Entries are `SearchHit`s, resolved only when
   played (YouTube stream URLs expire). `just_audio`'s `play()` future completes only when
   playback stops — never await it. So `PlayerController.playing` turns true only a while after

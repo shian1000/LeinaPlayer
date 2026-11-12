@@ -187,7 +187,7 @@ class PlaybackQueue extends ChangeNotifier {
   }) : _random = random ?? Random() {
     _completions = _tracks.player.completions.listen((_) => _advance());
     _skips = _tracks.player.skips.listen(
-      (skip) => skip == MediaSkip.next ? next() : previous(),
+      (skip) => skip == MediaSkip.next ? _skipToNext() : previous(),
     );
     filter?.addListener(_filterChanged);
     hidden?.addListener(_filterChanged);
@@ -740,6 +740,15 @@ class PlaybackQueue extends ChangeNotifier {
     return _play(entry, allowExternal: true, onStatus: onStatus);
   }
 
+  /// "Następny" pressed outside the app (the notification, a headset): no message can be shown
+  /// there, so songs that can't play are passed over as when a song ends, and the YouTube app
+  /// isn't opened from the background. [next] gave up on the first one and left the
+  /// notification loading for good.
+  Future<void> _skipToNext() async {
+    _tracks.player.cancelFade();
+    await _playOn(++_generation);
+  }
+
   /// Takes the next song [filter] allows out of [_upcoming]; the hidden ones before it go to
   /// the history, as passed.
   QueueEntry? _moveNext() {
@@ -836,6 +845,12 @@ class PlaybackQueue extends ChangeNotifier {
       final outcome = await _play(_current!, allowExternal: false);
       if (outcome.played || generation != _generation) return;
     }
+    await _playOn(generation);
+  }
+
+  /// Plays the next song that can be played, skipping the ones that can't; with no connection
+  /// it tries the song again, then stops on it.
+  Future<void> _playOn(int generation) async {
     while (generation == _generation) {
       final entry = _moveNext();
       if (entry == null) break;

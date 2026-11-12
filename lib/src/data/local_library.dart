@@ -735,6 +735,19 @@ class LocalLibrary extends ChangeNotifier {
   /// Every song file the phone knows (Biblioteka › Wykonawcy counts their artists).
   List<LocalSong> get songs => _songs;
 
+  /// [path] was about to play but isn't there any more (moved or deleted since the last scan):
+  /// dropped now, as the next scan would, so the song stops counting as on the phone. A scan
+  /// that finds it again adds it back.
+  Future<void> forgetGone(String path) async {
+    await (await database()).delete(
+      'local_songs',
+      where: 'file_path = ?',
+      whereArgs: [path],
+    );
+    await Recordings(database, now: _now).forget((RecordingSource.file, path));
+    await _refreshCounts();
+  }
+
   /// The phone song stored at [path], if it's still known.
   LocalSong? fileAt(String path) =>
       _songs.where((s) => s.filePath == path).firstOrNull;

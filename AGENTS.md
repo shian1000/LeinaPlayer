@@ -462,7 +462,13 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   doesn't count) and give it back with `allow`. The
   Huawei has only a swipe lock: wake it (`input keyevent KEYCODE_WAKEUP`) and unlock it with
   `input swipe 540 1800 540 600 300` rather than waiting for the user. It also shows no app logs
-  (`logcat -s flutter` stays empty) — diagnose there from the screen. The release build allows no
+  (`logcat -s flutter` stays empty) — diagnose there from the screen. On the Pixel the `main`
+  logcat buffer keeps only a few minutes, so a problem from earlier is gone from it: read the
+  app's own log (Informacje i pomoc › Dziennik błędów, `uiautomator dump` gives its text) and
+  the sharing server's journal (`journalctl --user -u musicdatabase-share.service`), which shows
+  what the phone asked for (`HEAD` + `GET /library/<id>` = the song streamed; two `GET` 206 alone
+  = only its cover read); `dumpsys media_session` and `dumpsys audio` (players created and
+  released) show where playback stands. The release build allows no
   `run-as`, so the app's files can't be read over adb: check its data on screen, or make a backup
   (Kopia zapasowa) and save it locally with Total Commander from the share sheet (it lands in
   `/sdcard/Download/`, pullable). On the Huawei the YouTube app takes a tapped YouTube link

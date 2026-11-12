@@ -22,6 +22,9 @@ class FakeBackend implements AudioBackend {
   Duration? lastSeek;
   bool failOpen = false;
 
+  /// Sources that can't be opened, while others can.
+  final failing = <String>{};
+
   @override
   Stream<Duration> get position => _position.stream;
   @override
@@ -33,7 +36,9 @@ class FakeBackend implements AudioBackend {
 
   @override
   Future<void> open(NowPlaying track) async {
-    if (failOpen) throw Exception('cannot open');
+    if (failOpen || failing.contains(track.source)) {
+      throw Exception('cannot open');
+    }
     opened.add(track.source);
     _duration.add(const Duration(minutes: 4, seconds: 26));
   }

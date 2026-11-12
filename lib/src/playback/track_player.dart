@@ -145,8 +145,9 @@ Future<Uint8List?> fetchServerFileHead(Uri uri) async {
 }
 
 /// Plays one song from the first source in the user's order that has it
-/// ([SourceSettings.activePlaybackOrder] — switched-off sources are never used): a phone file, a file on MusicDatabase's server (when the
-/// server can't play it, the next source does), or YouTube ([YouTubePlayback]). When no source
+/// ([SourceSettings.activePlaybackOrder] — switched-off sources are never used): a phone file, a file on MusicDatabase's server, or
+/// YouTube ([YouTubePlayback]); when the phone file or the server can't play it, the next
+/// source does. When no source
 /// has it but YouTube might, YouTube is searched, the best video picked ([pickYouTubeVideo]) and
 /// remembered on the phone. No UI here, so the queue can use it with the screen off.
 class TrackPlayer {
@@ -162,6 +163,7 @@ class TrackPlayer {
     this.serverDownloads,
     this.mp3Converter,
     this.coverBytes,
+    this.onPhoneFileGone,
     Future<List<Uri>> Function()? serverAddresses,
     Future<bool> Function()? onWifi,
   }) : _serverAddresses = serverAddresses ?? _noServer,
@@ -194,6 +196,11 @@ class TrackPlayer {
 
   /// [hit]'s album cover for the MP3's tag (`AlbumCovers.coverBytes`); `null` when there's none.
   final Future<Uint8List?> Function(SearchHit hit)? coverBytes;
+
+  /// A phone file about to play is no longer there (moved or deleted since the last scan):
+  /// `local.db` forgets it ([LocalLibrary.forgetGone]) and the next source plays the song.
+  /// `null`: files aren't checked before playing (tests with made-up paths).
+  final Future<void> Function(String path)? onPhoneFileGone;
 
   /// MusicDatabase's server as the phone reaches it now, best address first
   /// ([DatabaseSync.serverAddresses]), for [PlaybackSource.server].
@@ -276,10 +283,10 @@ class TrackPlayer {
     String? youTubeListId,
     required bool allowExternal,
     void Function(String status)? onStatus,
-    bool skipServer = false,
+    Set<PlaybackSource> skip = const {},
   }) async {
     final source = settings.activePlaybackOrder
-        .where((s) => !(skipServer && s == PlaybackSource.server))
+        .where((s) => !skip.contains(s))
         .where(hit.playableFrom)
         .firstOrNull;
     switch (source) {
@@ -300,13 +307,17 @@ class TrackPlayer {
           youTubeListId: youTubeListId,
           allowExternal: allowExternal,
           onStatus: onStatus,
-          skipServer: true,
+          skip: {...skip, PlaybackSource.server},
         );
         return fallback.played || fallback.goneVideo != null
             ? fallback
             : outcome;
       case PlaybackSource.phone:
-        final ok = await player.play(
+        final file = hit.phoneFiles.first.filePath;
+        final String? failure;
+        if (await _phoneFileGone(file)) {
+          failure = 'Pliku ${file.split('/').last} nie ma już na telefonie.';
+        } else if (await player.play(
           NowPlaying(
             title: hit.title,
             artist: hit.artistLabel,
@@ -314,16 +325,30 @@ class TrackPlayer {
             artistLatin: hit.artistLatin,
             coverOf: hit.coverOf,
             version: hit.version,
-            source: hit.phoneFiles.first.filePath,
+            source: file,
             coverSeed: hit.coverSeed,
             cover: CoverRequest.of(hit),
             searchQuery: searchQuery,
             playlistName: playlistName,
           ),
+        )) {
+          return const PlayOutcome.played();
+        } else {
+          failure = player.lastError;
+        }
+        // A file gone or broken: the song may still be on the server or on YouTube.
+        final fallback = await _playOnce(
+          hit,
+          searchQuery: searchQuery,
+          playlistName: playlistName,
+          youTubeListId: youTubeListId,
+          allowExternal: allowExternal,
+          onStatus: onStatus,
+          skip: {...skip, PlaybackSource.phone},
         );
-        return ok
-            ? const PlayOutcome.played()
-            : PlayOutcome.failed(player.lastError);
+        return fallback.played || fallback.goneVideo != null
+            ? fallback
+            : PlayOutcome.failed(failure);
       case PlaybackSource.youtube:
         return playVideo(
           videoId: hit.youtubeVideoId!,
@@ -368,6 +393,20 @@ class TrackPlayer {
           onStatus: onStatus,
         );
     }
+  }
+
+  /// Whether the phone file at [path] is gone; a gone one is forgotten ([onPhoneFileGone]).
+  Future<bool> _phoneFileGone(String path) async {
+    final forget = onPhoneFileGone;
+    if (forget == null || await File(path).exists()) return false;
+    // By its name only: its folders may name people, and the log goes to someone else.
+    debugPrint('Phone file ${path.split('/').last} is gone: forgotten');
+    try {
+      await forget(path);
+    } catch (e) {
+      debugPrint('Forgetting a gone phone file failed: $e');
+    }
+    return true;
   }
 
   /// [file] streamed from the first of MusicDatabase's addresses that answers for it

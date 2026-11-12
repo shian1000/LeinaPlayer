@@ -120,6 +120,23 @@ void main() {
       expect(library.pendingCount, 0);
     });
 
+    test(
+      'a file gone before a rescan is forgotten when played; a scan finds it '
+      'again',
+      () async {
+        final gone = await touch('Dawid Podsiadło - Małomiasteczkowy.mp3');
+        await library.addFolder(music.path);
+        await library.scan();
+
+        await library.forgetGone(gone.path);
+        expect(library.songCount, 0);
+        expect(library.fileAt(gone.path), isNull);
+
+        expect((await library.scan()).added, 1);
+        expect(library.fileAt(gone.path), isNotNull);
+      },
+    );
+
     test('pending files are re-checked once MusicDatabase has them', () async {
       await touch('Dawid Podsiadło - Nowa.mp3');
       await library.addFolder(music.path);

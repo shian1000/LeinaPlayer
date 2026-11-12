@@ -532,6 +532,18 @@ void main() {
     },
   );
 
+  test(
+    '"Następny" in the media notification passes over a song that can\'t play',
+    () async {
+      await queue.start([_file('a'), _unplayable('b'), _file('c')], 0);
+      backend.skipPresses.add(MediaSkip.next);
+      await flush();
+      await flush();
+      expect(backend.opened, ['/music/a.mp3', '/music/c.mp3']);
+      expect(queue.current?.title, 'c');
+    },
+  );
+
   // The song playing animates for ever, so no pumpAndSettle.
   Future<void> settle(WidgetTester tester) async {
     for (var i = 0; i < 10; i++) {

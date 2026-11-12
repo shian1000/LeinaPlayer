@@ -22,6 +22,7 @@ import 'playback_test.dart' show FakeBackend;
 SearchHit _song({
   String? youtubeVideoId = 'N/A',
   String path = 'Artist/Song.mp3',
+  String? phoneFile,
 }) => SearchHit.main(
   CatalogSong(
     id: 1,
@@ -33,7 +34,16 @@ SearchHit _song({
     youtubeVideoId: youtubeVideoId,
     serverFile: ServerFile(id: 42, path: path),
   ),
-  const [],
+  [
+    if (phoneFile != null)
+      LocalSong(
+        id: 5,
+        filePath: phoneFile,
+        title: 'Song',
+        mainDbId: 1,
+        pending: false,
+      ),
+  ],
 );
 
 void main() {
@@ -80,6 +90,7 @@ void main() {
     List<Uri> Function() addresses, {
     ServerDownloads? downloads,
     Mp3Converter? mp3Converter,
+    Future<void> Function(String path)? onPhoneFileGone,
   }) => TrackPlayer(
     player: player,
     settings: settings,
@@ -94,6 +105,7 @@ void main() {
     openExternal: (_) async => true,
     serverDownloads: downloads,
     mp3Converter: mp3Converter,
+    onPhoneFileGone: onPhoneFileGone,
     coverBytes: (_) async => Uint8List.fromList([0xff, 0xd8, 0xff]),
     serverAddresses: () async => addresses(),
   );
@@ -221,6 +233,59 @@ void main() {
         .play(_song(youtubeVideoId: 'abcdefghijk'));
     expect(linked.played, isTrue);
     expect(backend.opened, ['https://yt/abcdefghijk']);
+  });
+
+  group('a phone file that can\'t play gives way to the next source', () {
+    late Directory dir;
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('phone_file_fallback');
+    });
+    tearDown(() => dir.delete(recursive: true));
+
+    test('gone since the scan: forgotten, and the server plays it', () async {
+      final gone = '${dir.path}/Artist - Song.mp3';
+      final forgotten = <String>[];
+      final outcome = await tracks(
+        () => [base()],
+        onPhoneFileGone: (path) async => forgotten.add(path),
+      ).play(_song(phoneFile: gone));
+      expect(outcome.played, isTrue);
+      expect(forgotten, [gone]);
+      expect(backend.opened, [
+        '${base()}library/42',
+      ], reason: 'the gone file is not even opened');
+    });
+
+    test(
+      'there but unplayable: the server plays it, the file is kept',
+      () async {
+        final broken = '${dir.path}/Artist - Song.mp3';
+        await File(broken).writeAsBytes([1, 2, 3]);
+        backend.failing.add(broken);
+        final forgotten = <String>[];
+        final outcome = await tracks(
+          () => [base()],
+          onPhoneFileGone: (path) async => forgotten.add(path),
+        ).play(_song(phoneFile: broken));
+        expect(outcome.played, isTrue);
+        expect(backend.opened, ['${base()}library/42']);
+        expect(forgotten, isEmpty);
+      },
+    );
+
+    test('with no other source the phone file\'s failure is told', () async {
+      final gone = '${dir.path}/Artist - Song.mp3';
+      await settings.setYouTubeSearchEnabled(false);
+      final outcome =
+          await tracks(() => [base()], onPhoneFileGone: (_) async {}).play(
+            SearchHit.phoneOnly(
+              LocalSong(id: 5, filePath: gone, title: 'Song', pending: true),
+            ),
+          );
+      expect(outcome.played, isFalse);
+      expect(outcome.message, contains('Artist - Song.mp3'));
+      expect(backend.opened, isEmpty);
+    });
   });
 
   test('YouTube first in the order wins over the server', () async {
