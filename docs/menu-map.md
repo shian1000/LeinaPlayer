@@ -879,13 +879,15 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
 
 ## Sheet "Dodaj do nastroju" (`mood_sheet.dart`)
 
-- Header with the song; "Nowy nastrój" (name dialog; the new mood gets the song); "Twoje
+- Header with the song; "Szukaj nastroju" (a search field kept on top, narrowing both lists by
+  name — words in any order, case and accents ignored; "Żaden nastrój nie pasuje…" when none
+  does); "Nowy nastrój" (name dialog, filled in with what was searched; the new mood gets the song); "Twoje
   nastroje" with a checkbox each (ticking adds / removes right away), for any song; "Globalne" the
   same, only for MusicDatabase songs and with the `edit_global_moods` permission. Moods show a crescent moon (`moodIcon`) everywhere.
 
 ## Sheet "Nastrój dla wszystkich utworów" (`showMoodPickerForAll` in `mood_sheet.dart`)
 
-From the playlist ⋮, the mood ⋮ and Kolejka (moon icon). The same lists as "Dodaj do nastroju",
+From the playlist ⋮, the mood ⋮ and Kolejka (moon icon). The same search and lists as "Dodaj do nastroju",
 each mood ticked when all the songs are in it, a dash and "N z M" when some are. Tapping one asks
 "Czy na pewno? Dodać N utworów do nastroju „…”?" (the missing ones) — or, when all are in,
 "Usunąć N utworów z…" — and changes them at once. "Nowy nastrój" makes one with all of them.

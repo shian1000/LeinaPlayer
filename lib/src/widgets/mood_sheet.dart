@@ -4,6 +4,7 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
+import '../data/text_normalizer.dart';
 import '../theme.dart';
 import 'common.dart';
 import 'menu_sheet.dart';
@@ -131,19 +132,20 @@ Future<void> showMoodFilterSheet(BuildContext context) {
 Future<bool> createMood(
   BuildContext context, {
   Iterable<SearchHit> hits = const [],
+  String name = '',
 }) async {
   final moods = MoodLibraryScope.of(context);
   final messenger = ScaffoldMessenger.of(context);
-  final name = await showDialog<String>(
+  final typed = await showDialog<String>(
     context: context,
-    builder: (_) => const TextInputDialog(
+    builder: (_) => TextInputDialog(
       title: 'Nowy nastrój',
       hint: 'Nazwa, np. Siłownia',
-      initial: '',
+      initial: name,
     ),
   );
-  if (name == null) return false;
-  final problem = await moods.create(name, hits: hits);
+  if (typed == null) return false;
+  final problem = await moods.create(typed, hits: hits);
   if (problem != null) {
     messenger.showSnackBar(SnackBar(content: Text(problem)));
   }
@@ -166,7 +168,6 @@ Future<void> showMoodPicker(BuildContext context, SearchHit hit) {
         child: ListenableBuilder(
           listenable: moods,
           builder: (sheetContext, _) {
-            final palette = sheetContext.palette;
             Widget tile(Mood mood) => CheckboxListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               secondary: const Icon(moodIcon),
@@ -174,34 +175,22 @@ Future<void> showMoodPicker(BuildContext context, SearchHit hit) {
               value: mood.has(hit),
               onChanged: (inMood) => moods.setHits(mood, [hit], inMood!),
             );
-            return ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.only(bottom: 16),
-              children: [
+            return _MoodPickerBody(
+              header: [
                 MenuSheetHeader(
                   cover: SongCover(cover: CoverRequest.of(hit)),
                   title: 'Dodaj do nastroju',
                   subtitle:
                       '${hit.shownTitle(context)} • ${hit.shownArtist(context)}',
                 ),
-                const Divider(),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  leading: Icon(Icons.add, color: palette.textSecondary),
-                  title: const Text('Nowy nastrój'),
-                  onTap: () => createMood(sheetContext, hits: [hit]),
-                ),
-                if (moods.userMoods.isNotEmpty) ...[
-                  const SectionTitle('Twoje nastroje'),
-                  for (final mood in moods.userMoods) tile(mood),
-                ],
-                if (hit.mainSong != null &&
-                    moods.canEditGlobal &&
-                    moods.globalMoods.isNotEmpty) ...[
-                  const SectionTitle('Globalne'),
-                  for (final mood in moods.globalMoods) tile(mood),
-                ],
               ],
+              onNewMood: (name) =>
+                  createMood(sheetContext, hits: [hit], name: name),
+              userMoods: moods.userMoods,
+              globalMoods: hit.mainSong != null && moods.canEditGlobal
+                  ? moods.globalMoods
+                  : const [],
+              tile: tile,
             );
           },
         ),
@@ -281,10 +270,8 @@ Future<void> showMoodPickerForAll(
               );
             }
 
-            return ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.only(bottom: 16),
-              children: [
+            return _MoodPickerBody(
+              header: [
                 MenuSheetHeader(
                   cover: const Icon(moodIcon, size: 40),
                   title: 'Nastrój dla wszystkich utworów',
@@ -301,28 +288,123 @@ Future<void> showMoodPickerForAll(
                       style: TextStyle(color: palette.textSecondary),
                     ),
                   ),
-                const Divider(),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  leading: Icon(Icons.add, color: palette.textSecondary),
-                  title: const Text('Nowy nastrój'),
-                  onTap: () => createMood(sheetContext, hits: songs),
-                ),
-                if (moods.userMoods.isNotEmpty) ...[
-                  const SectionTitle('Twoje nastroje'),
-                  for (final mood in moods.userMoods) tile(mood),
-                ],
-                if (moods.canEditGlobal && moods.globalMoods.isNotEmpty) ...[
-                  const SectionTitle('Globalne'),
-                  for (final mood in moods.globalMoods) tile(mood),
-                ],
               ],
+              onNewMood: (name) =>
+                  createMood(sheetContext, hits: songs, name: name),
+              userMoods: moods.userMoods,
+              globalMoods: moods.canEditGlobal ? moods.globalMoods : const [],
+              tile: tile,
             );
           },
         ),
       );
     },
   );
+}
+
+/// A mood picker's sheet: [header], a search over the moods' names (kept on top while the list
+/// scrolls), "Nowy nastrój" — named as searched — and the moods that match, own ones first.
+class _MoodPickerBody extends StatefulWidget {
+  const _MoodPickerBody({
+    required this.header,
+    required this.onNewMood,
+    required this.userMoods,
+    required this.globalMoods,
+    required this.tile,
+  });
+
+  final List<Widget> header;
+  final void Function(String name) onNewMood;
+  final List<Mood> userMoods;
+  final List<Mood> globalMoods;
+  final Widget Function(Mood mood) tile;
+
+  @override
+  State<_MoodPickerBody> createState() => _MoodPickerBodyState();
+}
+
+class _MoodPickerBodyState extends State<_MoodPickerBody> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final words = normalizeForSearch(_search.text).split(' ')
+      ..removeWhere((w) => w.isEmpty);
+    List<Mood> matching(List<Mood> moods) => [
+      for (final mood in moods)
+        if (words.every(normalizeForSearch(mood.name).contains)) mood,
+    ];
+    final userMoods = matching(widget.userMoods);
+    final globalMoods = matching(widget.globalMoods);
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...widget.header,
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+            child: TextField(
+              controller: _search,
+              decoration: InputDecoration(
+                hintText: 'Szukaj nastroju',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _search.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Wyczyść',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(_search.clear),
+                      ),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: 16),
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  leading: Icon(Icons.add, color: palette.textSecondary),
+                  title: const Text('Nowy nastrój'),
+                  onTap: () => widget.onNewMood(_search.text.trim()),
+                ),
+                if (userMoods.isNotEmpty) ...[
+                  const SectionTitle('Twoje nastroje'),
+                  for (final mood in userMoods) widget.tile(mood),
+                ],
+                if (globalMoods.isNotEmpty) ...[
+                  const SectionTitle('Globalne'),
+                  for (final mood in globalMoods) widget.tile(mood),
+                ],
+                if (words.isNotEmpty &&
+                    userMoods.isEmpty &&
+                    globalMoods.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: Text(
+                      'Żaden nastrój nie pasuje do „${_search.text.trim()}”.',
+                      style: TextStyle(color: palette.textSecondary),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// "Czy na pewno?" before changing [changed] songs of [mood] at once.

@@ -185,6 +185,48 @@ void main() {
     );
   });
 
+  testWidgets('the mood picker searches the moods by name', (tester) async {
+    await pumpApp(
+      tester,
+      Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showMoodPicker(context, video),
+            child: const Text('otwórz'),
+          ),
+        ),
+      ),
+    );
+    await tester.runAsync(() => moods.create('Siłownia'));
+    await tester.tap(find.text('otwórz'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chill'), findsOneWidget);
+    expect(find.text('Siłownia'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'siło');
+    await tester.pump();
+    expect(find.text('Chill'), findsNothing);
+    expect(find.text('Siłownia'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'bieganie');
+    await tester.pump();
+    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(
+      find.text('Żaden nastrój nie pasuje do „bieganie”.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Nowy nastrój'));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('bieganie'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('the mood screen lists such a song and takes it out', (
     tester,
   ) async {
