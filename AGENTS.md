@@ -373,6 +373,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - `Scrollable.ensureVisible` scrolls every scrollable above the widget too — inside a card that
   scrolls on its own within a page (the lyrics under the full player) it drags the whole page
   along; scroll the inner controller to `RenderAbstractViewport.getOffsetToReveal` instead.
+- A long song list that opens scrolled far down (the playlist's bookmark) needs its rows' extent
+  known — `SliverPrototypeExtentList` / `itemExtent`: a plain `ListView` / `SliverList` builds and
+  lays out every row above the target in one frame, each `SongCover` starting a cover lookup
+  (row 463 of 588 froze the Huawei for ~4 s; `playlist_screen.dart`).
 - Context menus are `showMenuSheet`: rare options go in `quickEntries` (a small block on top),
   and options with choices of their own unfold in place via `MenuSheetEntry.submenu` rather than
   opening a second sheet (Juxtopposed's redesign, user's choice); a submenu's entry may unfold
@@ -446,7 +450,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   bar's `Tooltip`, leaving the card under the app bar).
 - For UI changes, actually run the app and look at it — a green test suite does not confirm the
   screen looks right. Use the `run-on-physical-phone` skill (release build on the USB Huawei, with
-  the Gradle memory precautions) or `share-build-tailscale` for the user's Pixel 7a; check screens
+  the Gradle memory precautions; the Huawei is for debugging only, so a build with temporary
+  probes may stay on it) or `share-build-tailscale` for the user's Pixel 7a; check screens
   with `adb exec-out screencap`. A green frame around the screen after `input keyevent` / `input
   text` is Android's focus highlight, not the app; a tap clears it. To check a gesture mid-way, hold it with
   `input motionevent DOWN/MOVE … ` and screenshot before `UP` (each adb call takes ~0.2 s, so

@@ -87,7 +87,10 @@ Perfetto trace to see the engine's start before Dart.
   (Informacje i pomoc › Dziennik błędów), newest first, so take a run's lines up to its `main`.
   Never commit the marks.
 - Useful probes: a 250 ms `Timer.periodic` printing its lateness (main isolate blocked) and the
-  time a `SELECT 1` on local.db takes (sqflite queue busy).
+  time a `SELECT 1` on local.db takes (sqflite queue busy). For one screen's jank:
+  `SchedulerBinding.addTimingsCallback` logging frames over ~40 ms, a mark in a post-frame
+  callback after the suspect step, and global counters of `SongTile` builds / `SongCover`
+  lookups — they showed the playlist's jump to its bookmark building 473 rows in one frame.
 - The Huawei has no `screenrecord`. `adb exec-out screencap` (raw, no `-p`) takes a frame every
   ~0.7 s; PNG ones every ~1.2 s. Convert the raw ones with the 12-byte header (width, height,
   format) skipped.
