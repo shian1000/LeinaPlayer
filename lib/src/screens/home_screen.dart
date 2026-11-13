@@ -1,5 +1,10 @@
+import 'dart:async';
+import 'dart:ui' as ui;
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
@@ -734,6 +739,9 @@ class _PlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Card(
     cover: PlaylistCover(playlist: playlist, size: _cardWidth),
+    snapshotOf:
+        'playlist:${playlist.id}:'
+        '${playlist.updatedAt.millisecondsSinceEpoch}:${playlist.cover}',
     title: playlist.name,
     subtitle: playlist.source == PlaylistSource.spotifyAlbum
         ? 'Album'
@@ -760,6 +768,9 @@ class _MoodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Card(
     cover: MoodCover(mood: mood, size: _cardWidth),
+    snapshotOf:
+        'mood:${mood.key}:${mood.cover}:'
+        '${mood.songIds.length}+${mood.tracks.length}',
     title: mood.name,
     subtitle: mood.global ? 'Nastrój globalny' : 'Twój nastrój',
     onTap: () => MoodScreen.open(context, mood),
@@ -822,6 +833,7 @@ class _Card extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.onLongPress,
+    this.snapshotOf,
   });
 
   final Widget cover;
@@ -832,6 +844,10 @@ class _Card extends StatelessWidget {
   /// The card's menu: "Dodaj do kolejki", "Odtwórz jako następny"…
   final VoidCallback? onLongPress;
 
+  /// What [cover] shows, for a card whose cover has no one file to remember (a collage, a
+  /// picked cover): among Home's first cards it's remembered as a picture ([_StartupSnapshot]).
+  final String? snapshotOf;
+
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
@@ -841,7 +857,16 @@ class _Card extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          cover,
+          switch ((snapshotOf, _StartupSlot.of(context))) {
+            (final what?, final slot?) => _StartupSnapshot(
+              slot: slot,
+              what: what,
+              title: title,
+              subtitle: subtitle,
+              child: cover,
+            ),
+            _ => cover,
+          },
           const SizedBox(height: 8),
           ScrollingText(title),
           ScrollingText(
@@ -881,6 +906,100 @@ class _StartupSlot extends InheritedWidget {
   bool updateShouldNotify(_StartupSlot old) => slot != old.slot;
 }
 
+/// A Home card's cover remembered as a picture of itself for the next start ([StartupCovers]),
+/// once it has had time to settle (a collage's covers found): taken once a run for each [what]
+/// in each place, and saved only when it looks different from the last one.
+class _StartupSnapshot extends StatefulWidget {
+  const _StartupSnapshot({
+    required this.slot,
+    required this.what,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String slot;
+  final String what;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  State<_StartupSnapshot> createState() => _StartupSnapshotState();
+}
+
+class _StartupSnapshotState extends State<_StartupSnapshot> {
+  static final _taken = <String>{};
+
+  final _boundary = GlobalKey();
+  Timer? _soon;
+
+  String get _key => '${widget.slot}|${widget.what}';
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(_StartupSnapshot old) {
+    super.didUpdateWidget(old);
+    _schedule();
+  }
+
+  void _schedule() {
+    if (_taken.contains(_key)) return;
+    _soon?.cancel();
+    _soon = Timer(const Duration(seconds: 3), _take);
+  }
+
+  @override
+  void dispose() {
+    _soon?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _take() async {
+    final startup = AlbumCoversScope.maybeOf(context)?.startup;
+    final boundary = _boundary.currentContext?.findRenderObject();
+    if (startup == null || boundary is! RenderRepaintBoundary) return;
+    final key = _key;
+    if (!_taken.add(key)) return;
+    final (slot, what, title, subtitle) = (
+      widget.slot,
+      widget.what,
+      widget.title,
+      widget.subtitle,
+    );
+    try {
+      final image = await boundary.toImage(
+        pixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (data == null) return;
+      final bytes = data.buffer.asUint8List();
+      final check = 'snapshot:$what:${md5.convert(bytes)}';
+      await startup.remember(
+        slot,
+        check,
+        MemoryImage(bytes),
+        '',
+        snapshot: true,
+      );
+      startup.rememberTexts(slot, check, title, subtitle);
+    } catch (e) {
+      _taken.remove(key);
+      debugPrint('Remembering a Home card failed: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      RepaintBoundary(key: _boundary, child: widget.child);
+}
+
 /// A card's place in a row still being read at start ([_HomeSection.reading]).
 class _CardPlaceholder extends StatelessWidget {
   const _CardPlaceholder();
@@ -900,16 +1019,20 @@ class _CardPlaceholder extends StatelessWidget {
     if (_StartupSlot.of(context) case final slot?) {
       final shown = AlbumCoversScope.maybeOf(context)?.startup?.at(slot);
       if (shown != null && shown.title != null) {
+        final image = FileImage(shown.file);
         return _Card(
           cover: ClipRRect(
             borderRadius: palette.radius(4),
             child: Image(
-              image: coverImageFor(
-                context,
-                FileImage(shown.file),
-                _cardWidth,
-                shown.seed,
-              ),
+              image: shown.snapshot
+                  // Drawn with its filter already.
+                  ? ResizeImage(
+                      image,
+                      height:
+                          (_cardWidth * MediaQuery.devicePixelRatioOf(context))
+                              .round(),
+                    )
+                  : coverImageFor(context, image, _cardWidth, shown.seed),
               width: _cardWidth,
               height: _cardWidth,
               fit: BoxFit.cover,
@@ -1010,6 +1133,7 @@ class _AlbumCard extends StatelessWidget {
               cover: CoverRequest.of(hitOfStatsSong(context, song)),
               size: _cardWidth,
             ),
+      snapshotOf: 'album:${album.name}:${song?.songId}:${song?.title}',
       title: album.name,
       subtitle: album.detail ?? 'Album',
       onTap: () => openAlbumSongs(context, album.name),

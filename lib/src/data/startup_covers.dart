@@ -20,6 +20,7 @@ class StartupCover {
     this.file,
     this.check,
     this.seed, {
+    this.snapshot = false,
     this.color,
     this.title,
     this.subtitle,
@@ -30,6 +31,10 @@ class StartupCover {
   /// What the place showed it for ([StartupCovers.of] compares it).
   final String check;
   final String seed;
+
+  /// A picture of the cover as it was drawn (a collage, a picked cover; its filter already on):
+  /// shown as it is.
+  final bool snapshot;
   final Color? color;
 
   /// A Home card's title and subtitle as shown, for its row still being read at start.
@@ -42,6 +47,7 @@ class StartupCover {
     file,
     check,
     seed,
+    snapshot: snapshot,
     color: extras.color,
     title: extras.title,
     subtitle: extras.subtitle,
@@ -51,6 +57,7 @@ class StartupCover {
     'file': file.path,
     'check': check,
     'seed': seed,
+    if (snapshot) 'snapshot': true,
     if (color case final color?) 'color': color.toARGB32(),
     'title': ?title,
     'subtitle': ?subtitle,
@@ -60,6 +67,7 @@ class StartupCover {
     File(json['file']! as String),
     json['check']! as String,
     json['seed']! as String,
+    snapshot: json['snapshot'] == true,
     color: switch (json['color']) {
       final int value => Color(value),
       _ => null,
@@ -104,13 +112,15 @@ class StartupCovers {
   /// yet.
   StartupCover? at(String slot) => _covers[slot];
 
-  /// [image] as [slot]'s cover for [check]'s song, drawn with [seed].
+  /// [image] as [slot]'s cover for [check]'s song, drawn with [seed] — or, with [snapshot], a
+  /// picture of the cover as drawn.
   Future<void> remember(
     String slot,
     String check,
     ImageProvider image,
-    String seed,
-  ) async {
+    String seed, {
+    bool snapshot = false,
+  }) async {
     final known = _covers[slot];
     final ownFile = known != null && await _isOwn(known.file);
     final File file;
@@ -133,13 +143,14 @@ class StartupCovers {
     }
     if (ownFile && known.file.path != file.path) await _delete(known.file);
     final early = _early.remove(slot);
-    _covers[slot] = StartupCover(file, check, seed)._withExtras(
-      early?.check == check
-          ? early!.extras
-          : known?.check == check
-          ? known!._extras
-          : _noExtras,
-    );
+    _covers[slot] = StartupCover(file, check, seed, snapshot: snapshot)
+        ._withExtras(
+          early?.check == check
+              ? early!.extras
+              : known?.check == check
+              ? known!._extras
+              : _noExtras,
+        );
     _save();
   }
 

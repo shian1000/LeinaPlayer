@@ -80,6 +80,13 @@ covers and the history show remembered stand-ins anyway); move the playlists' re
 main-isolate work), recommendations and stats off the main isolate; a profile build with a
 Perfetto trace to see the engine's start before Dart.
 
+Open, parked by the user until the Pixel is connected for wireless debugging: on the Pixel 7a
+(its taller screen shows Home's third row, "Twoje playlisty") the playlist cards still visibly
+change at start, even with their covers remembered as pictures (`_StartupSnapshot`, `covers.md`)
+— not seen on the Huawei, whose first screenshots come only as the playlists are read. Find out
+there whether the stand-in shows at all (a snapshot taken? the row's slot? the theme's own card
+look?) before changing anything.
+
 ## Measuring
 
 - The Huawei shows no app logs. Temporary `debugPrint('STARTUP …ms: …')` marks (a top-level

@@ -8,6 +8,7 @@ import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/home_layout.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/play_history.dart';
+import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/startup_covers.dart';
@@ -33,8 +34,11 @@ void main() {
   late SourceSettings settings;
   late StartupCovers startup;
   late AlbumCovers covers;
+  PlaylistLibrary? playlists;
 
   tearDown(() async {
+    playlists?.dispose();
+    playlists = null;
     covers.dispose();
     settings.dispose();
     layout.dispose();
@@ -53,6 +57,7 @@ void main() {
     Map<String, String>? lastShown,
     Future<void> Function()? prepare,
     bool catalogLoaded = true,
+    bool withPlaylists = false,
   }) async {
     SharedPreferences.setMockInitialValues({
       'home_layout.last_shown': ?(lastShown == null
@@ -93,9 +98,16 @@ void main() {
         getJson: (_) async => throw const SocketException('offline'),
         getBytes: (_) async => throw const SocketException('offline'),
       );
+      if (withPlaylists) {
+        playlists = PlaylistLibrary(library.database, catalog, youTubeLibrary);
+      }
       await prepare?.call();
     });
     history = PlayHistory(library.database);
+    final app = MaterialApp(
+      theme: buildAppTheme(dummifyTheme),
+      home: const Scaffold(body: HomeScreen()),
+    );
     await tester.pumpWidget(
       SongCatalogScope(
         notifier: catalog,
@@ -109,10 +121,13 @@ void main() {
                 notifier: layout,
                 child: AlbumCoversScope(
                   notifier: covers,
-                  child: MaterialApp(
-                    theme: buildAppTheme(dummifyTheme),
-                    home: const Scaffold(body: HomeScreen()),
-                  ),
+                  child: switch (playlists) {
+                    final playlists? => PlaylistLibraryScope(
+                      notifier: playlists,
+                      child: app,
+                    ),
+                    null => app,
+                  },
                 ),
               ),
             ),
@@ -226,6 +241,58 @@ void main() {
     expect(find.text('Kino (Кино)'), findsOneWidget);
     expect(find.text('Gruppa krovi (Группа крови)'), findsOneWidget);
     expect(find.text('Gruppa krovi'), findsNothing);
+    await tester.runAsync(startup.flush);
+  });
+
+  testWidgets("a playlist card among Home's first is remembered as a picture "
+      'once settled', (tester) async {
+    await pumpHome(
+      tester,
+      withPlaylists: true,
+      prepare: () async {
+        await playlists!.create('Do auta', const []);
+        await playlists!.load();
+      },
+    );
+    await loadHistory(tester);
+    expect(find.text('Do auta'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 3));
+    await pumpUntil(tester, () => startup.at('home:lib:playlists#0') != null);
+    final shown = startup.at('home:lib:playlists#0')!;
+    expect(shown.snapshot, isTrue);
+    expect(shown.title, 'Do auta');
+    expect(shown.subtitle, 'Playlista');
+    expect(shown.file.existsSync(), isTrue);
+    await tester.runAsync(startup.flush);
+  });
+
+  testWidgets('a playlist row still being read shows the picture of its card '
+      'from last time', (tester) async {
+    await pumpHome(
+      tester,
+      withPlaylists: true,
+      lastShown: {'lib:playlists': 'Twoje playlisty'},
+      prepare: () async {
+        final file = File('${storage.path}/card.png')..writeAsBytesSync([1]);
+        await startup.remember(
+          'home:lib:playlists#0',
+          'snapshot:x',
+          MemoryImage(file.readAsBytesSync()),
+          '',
+          snapshot: true,
+        );
+        startup.rememberTexts(
+          'home:lib:playlists#0',
+          'snapshot:x',
+          'Do auta',
+          'Playlista',
+        );
+      },
+    );
+    expect(playlists!.loaded, isFalse);
+    expect(find.text('Twoje playlisty'), findsOneWidget);
+    expect(find.text('Do auta'), findsOneWidget);
     await tester.runAsync(startup.flush);
   });
 }

@@ -81,7 +81,12 @@ Once it has them, the "Serwer" source should read them too, keyed on `album_id`.
   its filter seed (so the found cover is the same image-cache entry: no flash), the mini player
   its tint, Home's cards their texts. On the next start it stands in until the cover is found;
   until `settled` (Home before music.db, looked for without the album) it wins over what's found,
-  which isn't remembered. Cleared with the cover cache; its key is in `UserBackup.keptKeys`.
+  which isn't remembered. Cards with no one file to remember — a playlist's or mood's collage or
+  picked cover, an album card — are remembered as a picture of the drawn cover (`_Card.snapshotOf`,
+  `_StartupSnapshot`: a `RepaintBoundary` drawn to PNG 3 s after the card settles, once a run per
+  what it shows, saved only when its MD5 differs; `StartupCover.snapshot`, shown without the
+  filter, which it already has). Cleared with the cover cache; its key is in
+  `UserBackup.keptKeys`.
 
 ## Playlist and mood covers
 
