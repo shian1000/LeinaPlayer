@@ -2,6 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/text_normalizer.dart';
 
 void main() {
+  test(
+    'normalizeForSearch folds Greek and Cyrillic letters as normalize() does',
+    () {
+      // Values from MusicDatabase's normalize().
+      expect(normalizeForSearch('Вахтёрам'), 'вахтерам');
+      expect(normalizeForSearch('Летний'), 'летнии');
+      expect(normalizeForSearch('Їжак Ўладзімір'), 'іжак уладзімір');
+      expect(normalizeForSearch('Άλφα Ϊσος ϐήτα'), 'αλφα ισος βητα');
+      expect(normalizeForSearch('Апостроф\u02b9 \u0374 ok'), 'апостроф ok');
+    },
+  );
+
   test('compareNames orders numbers by value', () {
     final names = [
       '10. Pidvalia',

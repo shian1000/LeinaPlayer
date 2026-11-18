@@ -5,8 +5,10 @@
 library;
 
 // Dart has no Unicode decomposition, so letters whose NFKD form is "ASCII letter + combining
-// marks" are listed here, generated from Python's `unicodedata` (Latin-1 Supplement, Latin
-// Extended-A/B, Latin Extended Additional). Index i of [_accented] maps to index i of [_plain].
+// marks" (or, like "ſ" and "ϐ", one other letter) are listed here, generated from Python's
+// `unicodedata` (Latin-1 Supplement, Latin Extended-A/B, Latin Extended Additional, Greek and
+// Cyrillic: "Вахтёрам" is "вахтерам", "Летний" "летнии"). Index i of [_accented] maps to index i
+// of [_plain].
 const _accented =
     'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüýÿĀāĂăĄąĆ'
     'ćĈĉĊċČčĎďĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĨĩĪīĬĭĮįİĴĵĶķĹĺĻļĽľŃńŅņŇňŌōŎŏŐő'
@@ -16,7 +18,9 @@ const _accented =
     'ḷḸḹḺḻḼḽḾḿṀṁṂṃṄṅṆṇṈṉṊṋṌṍṎṏṐṑṒṓṔṕṖṗṘṙṚṛṜṝṞṟṠṡṢṣṤṥṦṧṨṩṪṫṬṭṮṯṰṱṲ'
     'ṳṴṵṶṷṸṹṺṻṼṽṾṿẀẁẂẃẄẅẆẇẈẉẊẋẌẍẎẏẐẑẒẓẔẕẖẗẘẙẛẠạẢảẤấẦầẨẩẪẫẬậẮắẰằẲẳ'
     'ẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữ'
-    'ỰựỲỳỴỵỶỷỸỹ';
+    'ỰựỲỳỴỵỶỷỸỹ'
+    'ΆΈΉΊΌΎΏΐΪΫάέήίΰϊϋόύώϐϑϒϓϔϕϖϰϱϲϴϵϹЀЁЃЇЌЍЎЙй'
+    'ѐёѓїќѝўѶѷӁӂӐӑӒӓӖӗӚӛӜӝӞӟӢӣӤӥӦӧӪӫӬӭӮӯӰӱӲӳӴӵӸӹ';
 const _plain =
     'AAAAAACEEEEIIIINOOOOOUUUUYaaaaaaceeeeiiiinooooouuuuyyAaAaAaC'
     'cCcCcCcDdEeEeEeEeEeGgGgGgGgHhIiIiIiIiIJjKkLlLlLlNnNnNnOoOoOo'
@@ -26,7 +30,9 @@ const _plain =
     'lLlLlLlMmMmMmNnNnNnNnOoOoOoOoPpPpRrRrRrRrSsSsSsSsSsTtTtTtTtU'
     'uUuUuUuUuVvVvWwWwWwWwWwXxXxYyZzZzZzhtwysAaAaAaAaAaAaAaAaAaAa'
     'AaAaEeEeEeEeEeEeEeEeIiIiOoOoOoOoOoOoOoOoOoOoOoOoUuUuUuUuUuUu'
-    'UuYyYyYyYy';
+    'UuYyYyYyYy'
+    'ΑΕΗΙΟΥΩιΙΥαεηιυιυουωβθΥΥΥφπκρςΘεΣЕЕГІКИУИи'
+    'еегікиуѴѵЖжАаАаЕеӘәЖжЗзИиИиОоӨөЭэУуУуУуЧчЫы';
 
 /// Letters that don't decompose; same table as `_SPECIAL_REPLACEMENTS` in normalizer.py.
 const _special = {
@@ -49,7 +55,7 @@ final _letterMap = <int, String>{
 };
 
 final _apostrophes = RegExp(
-  '[\'`\u00b4\u02bc\u02bb\uff07\u2018\u2019\u201a\u201b\u2032\u2035]',
+  '[\'`\u00b4\u02b9\u02bc\u02bb\u02bd\u0374\uff07\u2018\u2019\u201a\u201b\u2032\u2035]',
 );
 final _punctuation = RegExp(r'[^\p{L}\p{N}_\s]', unicode: true);
 final _spaces = RegExp(r'\s+');

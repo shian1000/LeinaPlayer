@@ -12,6 +12,12 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
 - The file-name fallback ports the first two stages of MusicDatabase's `split_artist_title()`
   (spaced ` - `/` – `/` — `/` _ `, then bare `-`/`_`/`~`). Names with neither (e.g. double
   spaces) get no artist and show as "Nieznany wykonawca"; that's inherited, not a bug here.
+- `normalizeForSearch()` folds what MusicDatabase's `normalize()` folds, Greek and Cyrillic
+  too ("Вахтёрам" = "вахтерам", "й" = "и"; the table is generated from Python's `unicodedata`).
+  `local.db` keeps keys made by it (`mood_tracks`, `youtube_track_matches`, `youtube_not_found`,
+  `cover_lookups`): a change to what it folds needs a schema version that makes them again
+  (`_renormalizeKeys`, version 24), or old rows are never hit. Code spelling Cyrillic in Latin
+  letters does it before normalising (`Outbox.cleanSenderName`): after it "Цой" is "tsoi".
 - Matching is `SongCatalog.findByName`: first `findExact` — normalized title equal **and**
   normalized artist equal to one of the song's artists, the whole "A feat. B" label, or an
   artist synonym — then without feat. credits, in the title (music.db keeps them out of

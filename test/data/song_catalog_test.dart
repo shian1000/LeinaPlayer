@@ -329,6 +329,44 @@ void main() {
       expect(catalog.artistNamed('Nobody'), isNull);
     });
 
+    test('by a video\'s title and channel: the owner\'s "Gitara (2018.01)" '
+        'uploads', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.rawInsert(
+        "INSERT INTO artists VALUES (10, 'Renata Przemyk', NULL, NULL), "
+        "(11, 'Smith & Burrows', NULL, NULL), (12, 'Бумбокс', NULL, NULL), "
+        "(13, 'little by little', NULL, NULL), (14, 'Peaky Blinders', NULL, NULL)",
+      );
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, artist_id) VALUES '
+        "(378, 'Bo jeśli tak ma być', 10), (381, 'Aniolek', 10), "
+        "(207, 'Wonderful Life', 11), (385, 'Вахтёрам', 12), "
+        "(3944, '悲しみをやさしさに', 13)",
+      );
+      await db.close();
+      await catalog.ensureLoaded();
+
+      int? song(String title, String channel) =>
+          catalog.findByVideoTitle(title, channel)?.id;
+      expect(song('renata przemyk bo jesli tak ma byc', 'thericeburner'), 378);
+      expect(song("Renata Przemyk- ''Aniolek''", 'ilona117'), 381);
+      // The channel is an artist music.db knows too, and still not this song's.
+      expect(song('Wonderful Life (Smith & Burrows)', 'Peaky Blinders'), 207);
+      expect(song('вахтерам', 'Бумбокс'), 385);
+      // Romanized against the Japanese title: nothing the phone can tell.
+      expect(
+        song(
+          '[FULL] Naruto OP 3 -Kanashimi wo Yasashisa ni- ...',
+          '〖 AnimeSongsLуrics 〗',
+        ),
+        isNull,
+      );
+      // A title's first words are an artist only when music.db's song follows them.
+      expect(song('renata przemyk nieznana piosenka', 'thericeburner'), isNull);
+    });
+
     test('by name: also without the title\'s feat. credit, or swapped; '
         'another version stays apart', () async {
       await loadSample();

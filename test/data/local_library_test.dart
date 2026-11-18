@@ -35,6 +35,113 @@ void main() {
     });
   });
 
+  test(
+    'version 24 makes keys of normalised names again: "ё" is "е" now',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final root = await Directory.systemTemp.createTemp('local_library_v23');
+      final sync = DatabaseSync(storageRoot: () async => root);
+      final catalog = SongCatalog(sync);
+      final dir = await Directory('${root.path}/local').create();
+      var db = await databaseFactoryFfi.openDatabase('${dir.path}/local.db');
+      // Only what the upgrade touches, with keys as version 23 made them.
+      await db.execute(
+        'CREATE TABLE mood_tracks (mood_id INTEGER NOT NULL, '
+        'track_key VARCHAR NOT NULL, title VARCHAR NOT NULL, artist VARCHAR, '
+        'PRIMARY KEY (mood_id, track_key))',
+      );
+      await db.execute(
+        'CREATE TABLE youtube_track_matches (track_key VARCHAR PRIMARY KEY, '
+        'video_id VARCHAR NOT NULL)',
+      );
+      await db.execute(
+        'CREATE TABLE youtube_not_found (not_found_key VARCHAR PRIMARY KEY, '
+        'checked_at INTEGER NOT NULL)',
+      );
+      await db.execute(
+        'CREATE TABLE cover_lookups (cover_key VARCHAR NOT NULL, '
+        'source VARCHAR NOT NULL, PRIMARY KEY (cover_key, source))',
+      );
+      for (final (mood, key, title) in [
+        (1, 'бумбокс|вахтёрам', 'Вахтёрам'),
+        // Already there under the new key: one row stays.
+        (2, 'бумбокс|вахтёрам', 'Вахтёрам'),
+        (2, 'бумбокс|вахтерам', 'Вахтерам'),
+        (1, 'kult|arahja', 'Arahja'),
+      ]) {
+        await db.insert('mood_tracks', {
+          'mood_id': mood,
+          'track_key': key,
+          'title': title,
+        });
+      }
+      await db.insert('youtube_track_matches', {
+        'track_key': 'бумбокс\nлетний',
+        'video_id': 'v',
+      });
+      await db.insert('youtube_not_found', {
+        'not_found_key': 'track:їжак\nёлка',
+        'checked_at': 1,
+      });
+      await db.insert('youtube_not_found', {
+        'not_found_key': 'db:5',
+        'checked_at': 1,
+      });
+      for (final key in [
+        'album:бумбокс|ёлка',
+        'video:бумбокс|ёлка',
+        'https://example.com/ёлка.jpg',
+      ]) {
+        await db.insert('cover_lookups', {
+          'cover_key': key,
+          'source': 'itunes',
+        });
+      }
+      await db.setVersion(23);
+      await db.close();
+
+      final upgraded = LocalLibrary(
+        catalog,
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
+      db = await upgraded.database();
+      expect(
+        [
+          for (final r in await db.query(
+            'mood_tracks',
+            orderBy: 'mood_id, title',
+          ))
+            (r['mood_id'], r['track_key']),
+        ],
+        [(1, 'kult|arahja'), (1, 'бумбокс|вахтерам'), (2, 'бумбокс|вахтерам')],
+      );
+      expect(
+        (await db.query('youtube_track_matches')).single['track_key'],
+        'бумбокс\nлетнии',
+      );
+      expect(
+        {
+          for (final r in await db.query('youtube_not_found'))
+            r['not_found_key'],
+        },
+        {'track:іжак\nелка', 'db:5'},
+      );
+      expect(
+        {for (final r in await db.query('cover_lookups')) r['cover_key']},
+        {
+          'album:бумбокс|елка',
+          'video:бумбокс|елка',
+          'https://example.com/ёлка.jpg',
+        },
+      );
+      upgraded.dispose();
+      catalog.dispose();
+      sync.dispose();
+      await root.delete(recursive: true);
+    },
+  );
+
   group('LocalLibrary', () {
     late Directory root;
     late Directory music;

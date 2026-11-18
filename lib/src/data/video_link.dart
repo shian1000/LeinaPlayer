@@ -53,8 +53,7 @@ Future<SearchHit> hitForVideoLink(
       playlistVideoId: playlistVideoId,
     );
   }
-  final parsed = parseYouTubeTrack(video.title, video.channel);
-  final song = catalog.findByName(title: parsed.title, artist: parsed.artist);
+  final song = catalog.findByVideoTitle(video.title, video.channel);
   if (song != null) {
     // Not over MusicDatabase's own answer, including "not on YouTube" (N/A).
     if (song.youTube == YouTubeLink.unknown &&
@@ -63,6 +62,7 @@ Future<SearchHit> hitForVideoLink(
     }
     return hitOf(song);
   }
+  final parsed = parseYouTubeTrack(video.title, video.channel);
   return SearchHit.youTubeOnly(
     title: parsed.title,
     artistLabel: parsed.artist,
@@ -124,8 +124,7 @@ SearchHit hitForSearchedVideo(
       phoneMatch: known.youtubeVideoId == null ? video.id : null,
     );
   }
-  final parsed = parseYouTubeTrack(video.title, video.channel);
-  final song = catalog.findByName(title: parsed.title, artist: parsed.artist);
+  final song = catalog.findByVideoTitle(video.title, video.channel);
   if (song != null) {
     // Not over MusicDatabase's own answer, including "not on YouTube" (N/A).
     final useVideo =
@@ -137,6 +136,7 @@ SearchHit hitForSearchedVideo(
       phoneMatch: useVideo ? video.id : null,
     );
   }
+  final parsed = parseYouTubeTrack(video.title, video.channel);
   return SearchHit.youTubeOnly(
     title: parsed.title,
     artistLabel: parsed.artist,

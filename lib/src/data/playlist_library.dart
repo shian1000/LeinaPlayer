@@ -671,11 +671,7 @@ class PlaylistLibrary extends ChangeNotifier {
     return (
       artist: parsed.artist,
       title: parsed.title,
-      song: matchSong(
-        videoId: video.id,
-        artist: parsed.artist,
-        title: parsed.title,
-      ),
+      song: matchSong(video),
       videoId: video.id,
       spotifyTrackId: null,
       duration: video.duration,
@@ -1142,21 +1138,17 @@ class PlaylistLibrary extends ChangeNotifier {
   }
 
   /// The MusicDatabase song a YouTube video is: first by the video itself (music.db's
-  /// `youtube_video_id`, then a video the phone matched earlier), then by artist and title
-  /// ([SongCatalog.findByName]).
-  CatalogSong? matchSong({
-    required String videoId,
-    required String artist,
-    required String title,
-  }) {
-    final byVideo = _catalog.findByYouTubeId(videoId);
+  /// `youtube_video_id`, then a video the phone matched earlier), then by the artist and title
+  /// its title and channel name ([SongCatalog.findByVideoTitle]).
+  CatalogSong? matchSong(YouTubeVideo video) {
+    final byVideo = _catalog.findByYouTubeId(video.id);
     if (byVideo != null) return byVideo;
-    final phoneMatched = _youTube.songForVideo(videoId);
+    final phoneMatched = _youTube.songForVideo(video.id);
     if (phoneMatched != null) {
       final song = _catalog.byId(phoneMatched);
       if (song != null) return song;
     }
-    return _catalog.findByName(title: title, artist: artist);
+    return _catalog.findByVideoTitle(video.title, video.channel);
   }
 
   /// Removes the playlist. An account's playlist stays as a marker without tracks until

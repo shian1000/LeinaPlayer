@@ -17,6 +17,7 @@ import 'song_requests.dart';
 import 'text_normalizer.dart';
 import 'version_names.dart';
 import 'youtube_matcher.dart';
+import 'youtube_playlist.dart';
 
 /// What song search can look at, chosen with the filter icon on the Wyszukaj tab.
 enum SearchField {
@@ -1226,6 +1227,19 @@ class SongCatalog extends ChangeNotifier {
       if (song != null) return song;
     }
     return null;
+  }
+
+  /// The song a YouTube video's title and channel name: [findByName] on what
+  /// [parseYouTubeTrack] reads, else on its other readings with an artist music.db knows
+  /// ([channelVideoReadings]). The video itself (`songs.youtube_video_id`, a match the phone
+  /// made) is looked up first, by the caller: a name never overrides a song the video names.
+  CatalogSong? findByVideoTitle(String videoTitle, String channel) {
+    final parsed = parseYouTubeTrack(videoTitle, channel);
+    return findByName(title: parsed.title, artist: parsed.artist) ??
+        channelVideoReadings(videoTitle, channel, artistNamed)
+            .map((r) => findByName(title: r.title, artist: r.artist))
+            .nonNulls
+            .firstOrNull;
   }
 
   /// The song titled [title] that credits every artist of the joined credit [artist]

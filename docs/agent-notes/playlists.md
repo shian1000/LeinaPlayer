@@ -108,11 +108,17 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    skips it) until re-imported; real versions like Remix/Live kept). When the part after " - " is
    junk only ("Glow - Lyric Video (English / French)" by Attic Ocean) the left part is the
    title and the channel (no VEVO) the artist — unless the left part is the channel's own name.
-   The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
+   "Renata Przemyk- ''Aniolek''" (the dash glued to the artist) splits too, and a title in quotes
+   loses them. The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
 3. Recognising the MusicDatabase song (`PlaylistLibrary.matchSong`): **by the video first** —
    music.db's `youtube_video_id`, then a video the phone matched earlier (`youtube_matches`) —
-   then title + artist (`SongCatalog.findByName`: exact, without feat. credits in the title or the artist, swapped; a "(Live)" only a live version — `local-library.md`). A recognised track stores MusicDatabase's
-   own spelling.
+   then title + artist (`SongCatalog.findByVideoTitle` → `findByName`: exact, without feat. credits in the title or the artist, swapped; a "(Live)" only a live version — `local-library.md`).
+   When the parse could only take the artist from the channel and names no song,
+   `channelVideoReadings()` tries a title starting with a whole artist name music.db knows
+   ("renata przemyk bo jesli tak ma byc" by "thericeburner"; `SongCatalog.artistNamed`, longest
+   name first) and an artist in the trailing bracket ("Wonderful Life (Smith & Burrows)" by
+   "Peaky Blinders") — MusicDatabase's `name-matching-for-musicdatabaseapp.md`, the owner's real
+   misses. A recognised track stores MusicDatabase's own spelling.
 
 When shown, `playlistHit()` also re-checks the video against music.db, so a song MusicDatabase
 links later shows as recognised without re-importing; failing that, exact title + artist

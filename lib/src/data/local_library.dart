@@ -180,7 +180,7 @@ class LocalLibrary extends ChangeNotifier {
   final String? Function() _downloadFolder;
 
   /// `local.db`'s version; a backup from a newer one isn't restored (`user_backup.dart`).
-  static const schemaVersion = 23;
+  static const schemaVersion = 24;
 
   static const _foldersKey = 'local_music.folders';
   static const _lastScanKey = 'local_music.last_scan_ms';
@@ -314,9 +314,59 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 20) await _addAddedTrackColumn(db);
           if (from < 22) await _createRecordingsTable(db);
           if (from < 23) await _createMoodTracksTable(db);
+          if (from < 24) await _renormalizeKeys(db);
         },
       ),
     );
+  }
+
+  /// Version 24: [normalizeForSearch] folds Greek and Cyrillic letters too ("Вахтёрам" is
+  /// "вахтерам"), so the keys made of normalised names before it are made again — an old one
+  /// would never be looked up. Normalising a key's parts once more gives what the names give now.
+  static Future<void> _renormalizeKeys(Database db) async {
+    String parts(String key, String separator) =>
+        key.split(separator).map(normalizeForSearch).join(separator);
+    String prefixed(String key, RegExp prefix, String separator) =>
+        switch (prefix.firstMatch(key)) {
+          final m? => '${m[0]}${parts(key.substring(m.end), separator)}',
+          null => key,
+        };
+    final keys = <(String, String, String Function(String))>[
+      ('mood_tracks', 'track_key', (k) => parts(k, '|')),
+      ('youtube_track_matches', 'track_key', (k) => parts(k, '\n')),
+      (
+        'youtube_not_found',
+        'not_found_key',
+        (k) => prefixed(k, RegExp('^track:'), '\n'),
+      ),
+      (
+        'cover_lookups',
+        'cover_key',
+        (k) => prefixed(k, RegExp('^(album|song|video):'), '|'),
+      ),
+    ];
+    for (final (table, column, renormalized) in keys) {
+      final exists = await db.rawQuery(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        [table],
+      );
+      if (exists.isEmpty) continue;
+      for (final row in await db.query(
+        table,
+        columns: [column],
+        distinct: true,
+      )) {
+        final old = row[column]! as String;
+        final key = renormalized(old);
+        if (key == old) continue;
+        // A row whose new key another one already has is the same song twice: one stays.
+        await db.rawUpdate(
+          'UPDATE OR IGNORE $table SET $column = ? WHERE $column = ?',
+          [key, old],
+        );
+        await db.delete(table, where: '$column = ?', whereArgs: [old]);
+      }
+    }
   }
 
   /// Version 23: songs music.db doesn't have in the user's own moods (`moods.dart`, ADR 0008).

@@ -728,9 +728,10 @@ class Outbox extends ChangeNotifier {
   /// letters, spaces become `-`, anything else is dropped; `null` when fewer than 2 characters
   /// are left — the files then go without a name, rather than with an invented one.
   static String? cleanSenderName(String typed) {
-    final latin = normalizeForSearch(typed).split('').map((c) {
-      return _cyrillic[c] ?? c;
-    }).join();
+    // Spelt in Latin letters before normalising, which folds "й" into "и".
+    final latin = normalizeForSearch(
+      typed.toLowerCase().split('').map((c) => _cyrillic[c] ?? c).join(),
+    );
     var name = latin
         .replaceAll(' ', '-')
         .replaceAll(RegExp(r'[^a-z0-9_-]'), '')

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/text_normalizer.dart';
 import 'package:music_database_app/src/data/youtube_playlist.dart';
 
 void main() {
@@ -85,6 +86,22 @@ void main() {
       ));
     });
 
+    test(
+      '"Artist- Title" with the dash glued to the artist; quotes dropped',
+      () {
+        expect(p("Renata Przemyk- ''Aniolek''", 'ilona117'), (
+          artist: 'Renata Przemyk',
+          title: 'Aniolek',
+        ));
+        expect(p('Kult - „Arahja”', 'Kult'), (artist: 'Kult', title: 'Arahja'));
+        // Not a dash inside a word.
+        expect(p('Jean-Michel Jarre', 'x'), (
+          artist: 'x',
+          title: 'Jean-Michel Jarre',
+        ));
+      },
+    );
+
     test('real versions are kept', () {
       expect(
         p('Björk - Army of Me (Sucker Punch Remix) [From Sucker Punch]', 'x'),
@@ -119,6 +136,69 @@ void main() {
         artist: 'Kwiat Jabłoni',
         title: 'Dziś późno pójdę spać',
       ));
+    });
+  });
+
+  group('channelVideoReadings', () {
+    String? artistNamed(String name) => const {
+      'renata przemyk': 'Renata Przemyk',
+      'smith burrows': 'Smith & Burrows',
+      'renata': 'Renata',
+    }[normalizeForSearch(name)];
+
+    test('the title starting with an artist music.db knows, longest first', () {
+      expect(
+        channelVideoReadings(
+          'renata przemyk bo jesli tak ma byc',
+          'thericeburner',
+          artistNamed,
+        ),
+        [
+          (artist: 'Renata Przemyk', title: 'bo jesli tak ma byc'),
+          (artist: 'Renata', title: 'przemyk bo jesli tak ma byc'),
+        ],
+      );
+      // A whole name only, and a title left after it.
+      expect(channelVideoReadings('renata przemykowa', 'x', artistNamed), [
+        (artist: 'Renata', title: 'przemykowa'),
+      ]);
+      expect(channelVideoReadings('Renata Przemyk', 'x', artistNamed), [
+        (artist: 'Renata', title: 'Przemyk'),
+      ]);
+    });
+
+    test('the artist in a trailing bracket', () {
+      expect(
+        channelVideoReadings(
+          'Wonderful Life (Smith & Burrows)',
+          'Peaky Blinders',
+          artistNamed,
+        ),
+        [(artist: 'Smith & Burrows', title: 'Wonderful Life')],
+      );
+      expect(
+        channelVideoReadings('Wonderful Life (Acoustic)', 'x', artistNamed),
+        isEmpty,
+      );
+    });
+
+    test('nothing when the title names its artist itself', () {
+      expect(
+        channelVideoReadings(
+          'Renata Przemyk - Bo jeśli tak ma być',
+          'thericeburner',
+          artistNamed,
+        ),
+        isEmpty,
+      );
+      expect(
+        channelVideoReadings(
+          'Renata Przemyk bo',
+          'Renata - Topic',
+          artistNamed,
+        ),
+        isEmpty,
+      );
     });
   });
 }

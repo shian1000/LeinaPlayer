@@ -214,7 +214,7 @@ YouTube and Spotify links alike (Spotify's side: [`playlists.md`](playlists.md))
   `MainActivity`): on, it also pushed every forwarded link as a named route, and with no routes
   the app crashed in `_onUnknownRoute` (Pixel, 2026-10-22).
 - A video is recognised like a playlist track (music.db's video, a phone match, then title →
-  `findByName`); a song found by title gets the video saved as a phone match unless MusicDatabase
+  `findByVideoTitle`); a song found by title gets the video saved as a phone match unless MusicDatabase
   says something about its video (incl. N/A). Reading the title costs one request (NewPipe
   `video`, else youtube_explode `videos.get`); a song known by its video needs none.
 - Testing with adb: target the activity (`am start -n com.shian1000.music_database_app/.LinkChooserActivity
