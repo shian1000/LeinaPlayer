@@ -56,6 +56,17 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   "14. Chersoń" (2026-11-12) has "Nosowska, Igo, Organek, Krzysztof Zalewski - Sobie i Wam" as
   #6585 (Męskie Granie), which by name is the studio #3822 — MusicDatabase asks the owner there,
   so don't guess; the stored `song_id` wins anyway. Before 0019 there are no projects.
+- Soundtrack works (music.db's `soundtrack_works`, MusicDatabase's migration 0025, hand-off
+  `soundtrack-works-for-musicdatabaseapp.md`): uploads and files credit a song to the film,
+  game or anime ("Nana - Kuroi Namida" is 土屋アンナ's "黒い涙" on "Nana OST"). When nothing
+  else matched, `findByName`'s last step (`_creditedToWork`, lite `match_work()`) asks
+  `SoundtrackWorks` (`soundtrack_works.dart`) whether the artist is a work — a listed name or
+  alias as a whole name, a work of a non-single `albums` title ending in a soundtrack word with
+  two words or more ("Rio OST" doesn't make "Rio" a film), or a name ending in one — and takes
+  the one song of any artist titled so (`songs.title`, `title_latin` or `other_titles` — only
+  this step counts the latter two so far) whose album or artists' names hold the work as whole
+  words; several or none: no match. `findByVideoTitle` tries it only after the channel
+  readings. Without the table only albums and endings make works.
 - `text_normalizer.dart` mirrors MusicDatabase's `normalize()`. Dart has no Unicode
   decomposition, so the accent table is generated from Python's `unicodedata`; regenerate rather
   than hand-edit it.

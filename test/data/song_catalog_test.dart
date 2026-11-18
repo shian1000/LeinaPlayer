@@ -703,6 +703,136 @@ void main() {
       );
     });
 
+    Future<void> writeSoundtrackSongs({required bool listed}) async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN title_latin VARCHAR');
+      await db.execute('ALTER TABLE songs ADD COLUMN other_titles TEXT');
+      await db.execute(
+        'CREATE TABLE albums (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL, '
+        'type VARCHAR)',
+      );
+      if (listed) {
+        await db.execute(
+          'CREATE TABLE soundtrack_works (id INTEGER PRIMARY KEY NOT NULL, '
+          'name TEXT NOT NULL UNIQUE, aliases TEXT)',
+        );
+        await db.insert('soundtrack_works', {
+          'name': 'Nana',
+          'aliases': 'NANA Anime',
+        });
+      }
+      for (final (id, name, synonyms) in [
+        (20, 'Nana', null),
+        (21, '土屋アンナ', 'Anna Tsuchiya'),
+        (22, 'Somebody', null),
+        (23, 'Namco Sound Team', null),
+        (24, 'Daisuke Amaya', null),
+        (25, 'Rio Reiser', null),
+        (26, 'Somebody Else', null),
+        (27, 'Hitomi', null),
+        (28, 'Joe Hisaishi', null),
+      ]) {
+        await db.insert('artists', {
+          'id': id,
+          'name': name,
+          'synonyms': synonyms,
+        });
+      }
+      for (final (title, type) in [
+        ('Nana OST', 'soundtrack'),
+        ('Tekken 5 OST', 'soundtrack'),
+        ('Cave Story OST', 'album'),
+        ('Rio OST', 'soundtrack'),
+        ('Spirited Away OST', 'single'),
+      ]) {
+        await db.insert('albums', {'title': title, 'type': type});
+      }
+      for (final (id, title, artist, album, latin, others) in [
+        (
+          50,
+          'Starless Night',
+          20,
+          "OLIVIA inspi' REIRA (TRAPNEST)",
+          null,
+          null,
+        ),
+        (51, '黒い涙', 21, 'Nana OST', 'Kuroi Namida', null),
+        (52, 'Lonely', 22, 'Other Album', null, null),
+        (53, 'Main Theme', 23, 'Tekken 5 OST', null, null),
+        (54, 'Main Theme', 24, 'Cave Story OST', null, null),
+        (55, 'Junimond', 25, 'Rio OST', null, null),
+        (
+          56,
+          'Rose',
+          21,
+          "Anna Tsuchiya Inspi' Nana (Black Stones)",
+          null,
+          null,
+        ),
+        (57, 'Rose', 26, 'Nana Best', null, null),
+        (58, 'Wish', 27, 'Nana OST', null, 'Negai; Nana no Negai'),
+        (59, 'One Summer Day', 28, 'Spirited Away OST', null, null),
+      ]) {
+        await db.insert('songs', {
+          'id': id,
+          'title': title,
+          'artist_id': artist,
+          'album': album,
+          'title_latin': latin,
+          'other_titles': others,
+        });
+      }
+      await db.close();
+      await catalog.ensureLoaded();
+    }
+
+    test('a song credited to a film, game or anime is the one of that title '
+        'whose album or artists name it', () async {
+      await writeSoundtrackSongs(listed: true);
+      int? found(String title, String artist) =>
+          catalog.findByName(title: title, artist: artist)?.id;
+
+      // The playlist track MusicDatabase added a second time.
+      expect(found('Kuroi Namida', 'Nana'), 51);
+      expect(found('黒い涙', 'NANA'), 51);
+      expect(found('Kuroi Namida', 'Nana Anime'), 51);
+      expect(found('Negai', 'Nana'), 58);
+      expect(
+        catalog.findByVideoTitle('Nana - Kuroi Namida', 'anime fan')?.id,
+        51,
+      );
+      // A name ending in a soundtrack word, and a work of an OST album of two words or more.
+      expect(found('Main Theme', 'Tekken 5 OST'), 53);
+      expect(found('Main Theme', 'Cave Story'), 54);
+      // A song whose album doesn't name the work isn't taken, nor two that do.
+      expect(found('Lonely', 'Nana'), isNull);
+      expect(found('Rose', 'Nana'), isNull);
+      // Names that aren't a work: a singer, a one-word work only read from an album, a single.
+      expect(found('Kuroi Namida', 'Nana Mouskouri'), isNull);
+      expect(found('Kuroi Namida', 'Black Stones'), isNull);
+      expect(found('Junimond', 'Rio'), isNull);
+      expect(found('One Summer Day', 'Spirited Away'), isNull);
+      // The artist's own song still wins.
+      expect(found('Starless Night', 'Nana'), 50);
+    });
+
+    test(
+      'without soundtrack_works only the albums say what a work is',
+      () async {
+        await writeSoundtrackSongs(listed: false);
+        expect(
+          catalog.findByName(title: 'Kuroi Namida', artist: 'Nana'),
+          isNull,
+        );
+        expect(
+          catalog.findByName(title: 'Main Theme', artist: 'Cave Story')?.id,
+          54,
+        );
+      },
+    );
+
     test('no Latin forms in a music.db from before them', () async {
       await loadSample();
       expect(catalog.byId(1)!.titleLatin, isNull);

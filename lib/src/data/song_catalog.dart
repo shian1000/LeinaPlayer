@@ -14,6 +14,7 @@ import 'latin_names.dart';
 import 'playlist_library.dart';
 import 'project_names.dart';
 import 'song_requests.dart';
+import 'soundtrack_works.dart';
 import 'text_normalizer.dart';
 import 'version_names.dart';
 import 'youtube_matcher.dart';
@@ -176,6 +177,7 @@ class CatalogSong {
     String? titleLatin,
     String? albumLatin,
     this.artistLatin,
+    this.otherTitles = const [],
     this.coverOf,
     this.version,
     this.project,
@@ -221,6 +223,7 @@ class CatalogSong {
       album = song.album,
       titleLatin = song.titleLatin,
       artistLatin = song.artistLatin,
+      otherTitles = song.otherTitles,
       coverOf = song.coverOf,
       version = song.version,
       project = song.project,
@@ -287,6 +290,11 @@ class CatalogSong {
   /// The Latin form of [album] (`albums.title_latin` of `songs.album_id`).
   final String? albumLatin;
 
+  /// `songs.other_titles` (MusicDatabase's migration 0023): the title in other languages, a
+  /// wrong title people know it by. So far only [SongCatalog.findByName]'s soundtrack-work step
+  /// counts them; empty before the column.
+  final List<String> otherTitles;
+
   /// What this song is a cover of, `null` for most songs. A covered artist is never one of
   /// its artists: [artistLabel] stays the performer.
   final CoverOf? coverOf;
@@ -346,6 +354,13 @@ class CatalogSong {
   late final String _normalizedTitle =
       _fromMusicDb?._normalizedTitle ?? normalizeForSearch(title);
 
+  /// [title], [titleLatin] and [otherTitles], normalized, each once.
+  Set<String> get _normalizedTitles => {
+    _normalizedTitle,
+    for (final other in [?titleLatin, ...otherTitles])
+      normalizeForSearch(other),
+  }..remove('');
+
   /// Every name the song's artists go by (label, each artist, synonyms), normalized — for
   /// matching a file's "artist" against this song in [SongCatalog.findExact].
   late final Set<String> _normalizedArtists =
@@ -402,6 +417,7 @@ typedef _CatalogRead = ({
   Map<String, int> additionalVideos,
   Map<String, Duration> videoDurations,
   List<Project> projects,
+  SoundtrackWorks works,
   RejectedSongRequests rejected,
   SettledSongRequests settled,
   Map<int, int?> idChanges,
@@ -490,6 +506,10 @@ class SongCatalog extends ChangeNotifier {
   /// music.db's `projects` dictionary, for reading the project a name says it's from
   /// ([findByName]); empty before MusicDatabase's migration 0019.
   List<Project> _projects = const [];
+
+  /// The films, games and anime a song may be credited to instead of who sings it
+  /// (`soundtrack_works` and `"<work> OST"` albums), for [findByName]'s last step.
+  SoundtrackWorks _soundtrackWorks = SoundtrackWorks.none;
 
   Map<String, int> _additionalVideos = const {};
 
@@ -600,6 +620,7 @@ class SongCatalog extends ChangeNotifier {
         _additionalVideos = const {};
         _videoDurations = const {};
         _projects = const [];
+        _soundtrackWorks = SoundtrackWorks.none;
         _rejectedSongRequests = RejectedSongRequests.none;
         _settledSongRequests = SettledSongRequests.none;
         _status = CatalogStatus.noDatabase;
@@ -619,12 +640,15 @@ class SongCatalog extends ChangeNotifier {
         _additionalVideos = read.additionalVideos;
         _videoDurations = read.videoDurations;
         _projects = read.projects;
+        _soundtrackWorks = read.works;
         _rejectedSongRequests = read.rejected;
         _settledSongRequests = read.settled;
         _idChanges = read.idChanges;
         _searchTexts = null;
         _byTitle = null;
         _byMarkedTitle = null;
+        _byEveryTitle = null;
+        _byEveryMarkedTitle = null;
         _artistByName = null;
         _byYouTubeId = null;
         _byId = null;
@@ -639,6 +663,7 @@ class SongCatalog extends ChangeNotifier {
       _additionalVideos = const {};
       _videoDurations = const {};
       _projects = const [];
+      _soundtrackWorks = SoundtrackWorks.none;
       _rejectedSongRequests = RejectedSongRequests.none;
       _settledSongRequests = SettledSongRequests.none;
       _status = CatalogStatus.error;
@@ -646,6 +671,8 @@ class SongCatalog extends ChangeNotifier {
       _searchTexts = null;
       _byTitle = null;
       _byMarkedTitle = null;
+      _byEveryTitle = null;
+      _byEveryMarkedTitle = null;
       _artistByName = null;
       _byYouTubeId = null;
       _byId = null;
@@ -696,6 +723,7 @@ class SongCatalog extends ChangeNotifier {
       final additionalVideos = _readAdditionalVideos(db, tables);
       final videoDurations = _readVideoDurations(db, tables);
       final projects = _readProjects(db);
+      final works = SoundtrackWorks.read(db, tables);
       final rejected = RejectedSongRequests.read(db);
       final settled = SettledSongRequests.read(db);
       final idChanges = _readIdChanges(db, tables);
@@ -706,6 +734,7 @@ class SongCatalog extends ChangeNotifier {
         additionalVideos: additionalVideos,
         videoDurations: videoDurations,
         projects: projects,
+        works: works,
         rejected: rejected,
         settled: settled,
         idChanges: idChanges,
@@ -788,6 +817,7 @@ class SongCatalog extends ChangeNotifier {
                ${column('music_video_youtube_id')} AS music_video_youtube_id,
                ${column('spotify_url')} AS spotify_url,
                ${column('title_latin')} AS title_latin,
+               ${column('other_titles')} AS other_titles,
                ${column('genre')} AS genre,
                ${column('kind')} AS kind,
                $albumLatin AS album_latin,
@@ -860,12 +890,22 @@ class SongCatalog extends ChangeNotifier {
       titleLatin: row['title_latin'] as String?,
       albumLatin: row['album_latin'] as String?,
       artistLatin: _artistLatinLabel(artists),
+      otherTitles: _otherTitlesOf(row['other_titles'] as String?),
       coverOf: covered,
       version: version,
       project: row['project'] as String?,
       serverFile: serverFile,
     );
   }
+
+  /// `songs.other_titles` is ";"-separated (MusicDatabase's migration 0023).
+  static List<String> _otherTitlesOf(String? value) =>
+      value == null || value.trim().isEmpty
+      ? const []
+      : [
+          for (final other in value.split(';'))
+            if (other.trim() case final title when title.isNotEmpty) title,
+        ];
 
   /// Before MusicDatabase's migration 0022 the columns aren't there: no versions.
   static SongVersion? _versionOfRow(Map<String, Object?> row) {
@@ -1056,6 +1096,8 @@ class SongCatalog extends ChangeNotifier {
 
   Map<String, List<CatalogSong>>? _byTitle;
   Map<String, List<CatalogSong>>? _byMarkedTitle;
+  Map<String, List<CatalogSong>>? _byEveryTitle;
+  Map<String, List<CatalogSong>>? _byEveryMarkedTitle;
   Map<String, String?>? _artistByName;
   Map<String, CatalogSong>? _byYouTubeId;
 
@@ -1169,14 +1211,15 @@ class SongCatalog extends ChangeNotifier {
   /// any song titled so.
   /// Projects the same way: only songs of [project] (`songs.project_id`), and for `null` only
   /// songs of none — a Męskie Granie recording isn't the studio song of that title.
-  List<CatalogSong> _titled(String title, String? project) {
-    final byTitle = _byTitle ??= () {
-      final index = <String, List<CatalogSong>>{};
-      for (final song in _songs) {
-        (index[song._normalizedTitle] ??= []).add(song);
-      }
-      return index;
-    }();
+  /// With [everyTitle] a song's Latin title and other titles count as its title too.
+  List<CatalogSong> _titled(
+    String title,
+    String? project, {
+    bool everyTitle = false,
+  }) {
+    final byTitle = everyTitle
+        ? _byEveryTitle ??= _indexBy((song) => song._normalizedTitles)
+        : _byTitle ??= _indexBy((song) => [song._normalizedTitle]);
     Iterable<CatalogSong> titledSo(String title) =>
         (byTitle[normalizeForSearch(title)] ?? const <CatalogSong>[]).where(
           (song) => song.project == project,
@@ -1187,16 +1230,22 @@ class SongCatalog extends ChangeNotifier {
     ];
     final wanted = readVersion(title);
     if (wanted == null) {
-      final byMarkedTitle = _byMarkedTitle ??= () {
-        final index = <String, List<CatalogSong>>{};
-        for (final song in _songs) {
-          if (song.version case final version?) {
-            final key = normalizeForSearch('${song.title} ${version.marker}');
-            (index[key] ??= []).add(song);
-          }
-        }
-        return index;
-      }();
+      Iterable<String> markedTitles(CatalogSong song, List<String> titles) => [
+        if (song.version case final version?)
+          for (final title in titles)
+            normalizeForSearch('$title ${version.marker}'),
+      ];
+      final byMarkedTitle = everyTitle
+          ? _byEveryMarkedTitle ??= _indexBy(
+              (song) => markedTitles(song, [
+                song.title,
+                ?song.titleLatin,
+                ...song.otherTitles,
+              ]),
+            )
+          : _byMarkedTitle ??= _indexBy(
+              (song) => markedTitles(song, [song.title]),
+            );
       return [
         ...titled,
         ...?byMarkedTitle[normalizeForSearch(title)]?.where(
@@ -1217,6 +1266,19 @@ class SongCatalog extends ChangeNotifier {
     ];
   }
 
+  /// Every song under each of its [keys], once per key.
+  Map<String, List<CatalogSong>> _indexBy(
+    Iterable<String> Function(CatalogSong song) keys,
+  ) {
+    final index = <String, List<CatalogSong>>{};
+    for (final song in _songs) {
+      for (final key in keys(song).toSet()) {
+        (index[key] ??= []).add(song);
+      }
+    }
+    return index;
+  }
+
   /// The song a title and artist read from somewhere else name (a video title, a playlist, a
   /// file's tags): [findExact], else with the featured-artist credits left out of the title
   /// ("Tamagotchi feat. Dawid Podsiadło" is music.db's "Tamagotchi" — [withoutFeatCredits]) or
@@ -1230,7 +1292,12 @@ class SongCatalog extends ChangeNotifier {
   /// never name a project's song — a lite version of MusicDatabase's `songs_for_entry(...,
   /// project)`, which doesn't guess either: a song of no project may be that recording not
   /// marked yet, and nothing in its names tells.
-  CatalogSong? findByName({required String title, required String artist}) {
+  /// Last, for an artist that is a film, game or anime ([_creditedToWork]): "Nana - Kuroi
+  /// Namida" is Anna Tsuchiya's song on "Nana OST".
+  CatalogSong? findByName({required String title, required String artist}) =>
+      _byArtistName(title, artist) ?? _creditedToWork(title, artist);
+
+  CatalogSong? _byArtistName(String title, String artist) {
     final reading = readProject(artist, title, _projects);
     final project = reading?.project.name;
     final pairs = reading == null
@@ -1267,11 +1334,49 @@ class SongCatalog extends ChangeNotifier {
   /// made) is looked up first, by the caller: a name never overrides a song the video names.
   CatalogSong? findByVideoTitle(String videoTitle, String channel) {
     final parsed = parseYouTubeTrack(videoTitle, channel);
-    return findByName(title: parsed.title, artist: parsed.artist) ??
-        channelVideoReadings(videoTitle, channel, artistNamed)
-            .map((r) => findByName(title: r.title, artist: r.artist))
-            .nonNulls
-            .firstOrNull;
+    return _byArtistName(parsed.title, parsed.artist) ??
+        channelVideoReadings(
+          videoTitle,
+          channel,
+          artistNamed,
+        ).map((r) => _byArtistName(r.title, r.artist)).nonNulls.firstOrNull ??
+        _creditedToWork(parsed.title, parsed.artist);
+  }
+
+  /// For names crediting a film, game or anime instead of who sings it — a listed work, one of
+  /// an `"<work> OST"` album, a name ending in "OST" ([SoundtrackWorks.creditedWork]): the one
+  /// song of that title (or Latin or other title), by any artist, whose album or artists name
+  /// the work as whole words — "Anna Tsuchiya Inspi' Nana (Black Stones)". `null` when no song
+  /// or several do. Versions, covers and projects as in [findExact]. A lite version of
+  /// MusicDatabase's `LocalSongMatcher.match_work()` (`src/utils/discoveries/import_engine.py`).
+  CatalogSong? _creditedToWork(String title, String artist) {
+    final reading = readProject(artist, title, _projects);
+    final project = reading?.project.name;
+    if (reading != null) (title, artist) = (reading.title, reading.artist);
+    final work = _soundtrackWorks.creditedWork(artist);
+    if (work == null) return null;
+    final spellings = _soundtrackWorks.spellingsOf(work);
+    if (spellings.isEmpty) return null;
+    bool namesTheWork(CatalogSong song) =>
+        namesWork(song.album, spellings) ||
+        namesWork(song.albumLatin, spellings) ||
+        song._normalizedArtists.any((name) => namesWork(name, spellings));
+    for (final title in {title, ?withoutFeatCredits(title)}) {
+      final credit = readCoverCredit(title);
+      final found = {
+        for (final song
+            in credit == null
+                ? _titled(title, project, everyTitle: true)
+                : _titled(
+                    credit.title,
+                    project,
+                    everyTitle: true,
+                  ).where((song) => song.coverOf != null))
+          if (namesTheWork(song)) song,
+      };
+      if (found.isNotEmpty) return found.length == 1 ? found.single : null;
+    }
+    return null;
   }
 
   /// The song titled [title] that credits every artist of the joined credit [artist]
