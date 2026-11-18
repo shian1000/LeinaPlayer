@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
+import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
+import 'package:music_database_app/src/data/song_requests.dart';
 import 'package:music_database_app/src/data/text_normalizer.dart';
 import 'package:music_database_app/src/data/version_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -150,6 +152,103 @@ void main() {
       expect(catalog.findByYouTubeId('X2XWBcd5jn0')?.id, 1);
       expect(catalog.findByYouTubeId('wrong123456'), isNull);
       expect(catalog.findByOwnYouTubeId('live1234567'), isNull);
+    });
+
+    test('recognises the requests MusicDatabase settled as its songs; '
+        'none without the table', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      const caveStory = PlaylistTrack(
+        position: 0,
+        title:
+            '[1-01] Cave Story (Main Theme) - Cave Story Remastered Soundtrack',
+      );
+      final before = SongCatalog(sync);
+      await before.ensureLoaded();
+      expect(before.status, CatalogStatus.ready);
+      expect(playlistSongByName(caveStory, before), isNull);
+      before.dispose();
+
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('''
+        CREATE TABLE settled_song_requests (
+          id INTEGER PRIMARY KEY, artist TEXT, title TEXT NOT NULL,
+          youtube_video_id TEXT, spotify_track_id TEXT, song_id INTEGER NOT NULL,
+          settled_at TEXT NOT NULL)''');
+      await db.execute('''
+        CREATE TABLE bad_youtube_videos (
+          id INTEGER PRIMARY KEY, video_id TEXT NOT NULL, song_id INTEGER,
+          reason TEXT NOT NULL, marked_at TEXT NOT NULL)''');
+      for (final (artist, title, video, spotify, song) in [
+        (null, caveStory.title, null, null, 3),
+        ('ledzeppelin', 'Going 2 California', 'gtc12345678', null, 2),
+        ('Someone', 'Wrong one', 'wrong123456', null, 4),
+        ('Nobody', 'On Spotify', null, 'sp1', 5),
+      ]) {
+        await db.insert('settled_song_requests', {
+          'artist': artist,
+          'title': title,
+          'youtube_video_id': video,
+          'spotify_track_id': spotify,
+          'song_id': song,
+          'settled_at': '2026-11-18 12:00:00',
+        });
+      }
+      await db.insert('bad_youtube_videos', {
+        'video_id': 'wrong123456',
+        'song_id': 4,
+        'reason': 'wrong_for_song',
+        'marked_at': '2026-11-18 12:00:00',
+      });
+      await db.close();
+      await catalog.ensureLoaded();
+
+      // A phone file with no artist and names no matcher reconciles.
+      expect(playlistSongByName(caveStory, catalog)?.id, 3);
+      expect(
+        catalog
+            .findSettledRequest(
+              title: caveStory.title,
+              artist: SongRequest.unknownArtist,
+            )
+            ?.id,
+        3,
+      );
+      // By the request's names as sent (normalized), or its video, or its Spotify track.
+      expect(
+        catalog
+            .findSettledRequest(
+              title: 'going 2 california',
+              artist: 'LedZeppelin',
+            )
+            ?.id,
+        2,
+      );
+      expect(
+        catalog
+            .findSettledRequest(title: 'Other name', videoId: 'gtc12345678')
+            ?.id,
+        2,
+      );
+      expect(
+        catalog
+            .findSettledRequest(title: 'Other name', spotifyTrackId: 'sp1')
+            ?.id,
+        5,
+      );
+      // Not by a video MusicDatabase marked wrong for that song; its names still count.
+      expect(
+        catalog.findSettledRequest(title: 'Other', videoId: 'wrong123456'),
+        isNull,
+      );
+      expect(
+        catalog.findSettledRequest(title: 'Wrong one', artist: 'Someone')?.id,
+        4,
+      );
+      expect(
+        catalog.findSettledRequest(title: 'Unseen', artist: 'Elise Trouw'),
+        isNull,
+      );
     });
 
     test('files on the server come from files.db, the largest one per song; '

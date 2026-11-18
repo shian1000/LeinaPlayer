@@ -403,6 +403,7 @@ typedef _CatalogRead = ({
   Map<String, Duration> videoDurations,
   List<Project> projects,
   RejectedSongRequests rejected,
+  SettledSongRequests settled,
   Map<int, int?> idChanges,
   String? filesError,
 });
@@ -504,6 +505,32 @@ class SongCatalog extends ChangeNotifier {
   /// again ([SongRequest]).
   RejectedSongRequests get rejectedSongRequests => _rejectedSongRequests;
 
+  SettledSongRequests _settledSongRequests = SettledSongRequests.none;
+
+  /// The song MusicDatabase settled a request with these names, YouTube video or Spotify track
+  /// as (`settled_song_requests`): the request's artist and title first, then the video (not
+  /// one MusicDatabase marked wrong for that song), then the Spotify track; `null` for none, or
+  /// a song gone since. [SongRequest.unknownArtist] counts as no artist, as in a request.
+  CatalogSong? findSettledRequest({
+    required String title,
+    String? artist,
+    String? videoId,
+    String? spotifyTrackId,
+  }) {
+    final settled = _settledSongRequests;
+    final byVideo = videoId == null ? null : settled.videos[videoId];
+    final id =
+        settled.keys[songRequestKey(
+          artist == SongRequest.unknownArtist ? null : artist,
+          title,
+        )] ??
+        (byVideo == null || _badVideos.isWrongFor(byVideo, videoId!)
+            ? null
+            : byVideo) ??
+        (spotifyTrackId == null ? null : settled.spotifyTracks[spotifyTrackId]);
+    return id == null ? null : current(id);
+  }
+
   /// When the `music.db` now loaded was downloaded (`DatabaseSync.lastSync` at load time).
   DateTime? get loadedSyncTime => _loadedSyncTime;
   int get songCount => _songs.length;
@@ -574,6 +601,7 @@ class SongCatalog extends ChangeNotifier {
         _videoDurations = const {};
         _projects = const [];
         _rejectedSongRequests = RejectedSongRequests.none;
+        _settledSongRequests = SettledSongRequests.none;
         _status = CatalogStatus.noDatabase;
       } else {
         final read = await _readInBackground(
@@ -592,6 +620,7 @@ class SongCatalog extends ChangeNotifier {
         _videoDurations = read.videoDurations;
         _projects = read.projects;
         _rejectedSongRequests = read.rejected;
+        _settledSongRequests = read.settled;
         _idChanges = read.idChanges;
         _searchTexts = null;
         _byTitle = null;
@@ -611,6 +640,7 @@ class SongCatalog extends ChangeNotifier {
       _videoDurations = const {};
       _projects = const [];
       _rejectedSongRequests = RejectedSongRequests.none;
+      _settledSongRequests = SettledSongRequests.none;
       _status = CatalogStatus.error;
     } finally {
       _searchTexts = null;
@@ -667,6 +697,7 @@ class SongCatalog extends ChangeNotifier {
       final videoDurations = _readVideoDurations(db, tables);
       final projects = _readProjects(db);
       final rejected = RejectedSongRequests.read(db);
+      final settled = SettledSongRequests.read(db);
       final idChanges = _readIdChanges(db, tables);
       final serverFiles = await serverFilesRead;
       return (
@@ -676,6 +707,7 @@ class SongCatalog extends ChangeNotifier {
         videoDurations: videoDurations,
         projects: projects,
         rejected: rejected,
+        settled: settled,
         idChanges: idChanges,
         filesError: serverFiles.error,
       );

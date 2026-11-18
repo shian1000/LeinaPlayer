@@ -567,7 +567,8 @@ class TrackPlayer {
     await _report(() => outbox?.reportDeadYouTubeLink(song, gone));
   }
 
-  /// Only against a loaded music.db: it says what MusicDatabase has and what its owner rejected.
+  /// Only against a loaded music.db: it says what MusicDatabase has, what its owner rejected
+  /// and which requests it settled as one of its songs.
   Future<void> _requestIfMissing(SearchHit hit) async {
     final catalog = this.catalog;
     if (outbox == null ||
@@ -576,7 +577,15 @@ class TrackPlayer {
       return;
     }
     final request = SongRequest.of(hit, artistNamed: catalog.artistNamed);
-    if (request == null || catalog.rejectedSongRequests.rejects(request)) {
+    if (request == null ||
+        catalog.rejectedSongRequests.rejects(request) ||
+        catalog.findSettledRequest(
+              title: request.title,
+              artist: request.artist,
+              videoId: request.youtubeVideoId,
+              spotifyTrackId: request.spotifyTrackId,
+            ) !=
+            null) {
       return;
     }
     await _report(() => outbox?.requestSong(request));

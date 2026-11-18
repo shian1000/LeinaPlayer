@@ -148,14 +148,22 @@ class PlaylistTrack {
   String? get playableVideoId => videoRemoved ? null : youtubeVideoId;
 }
 
-/// The MusicDatabase song [track] is by its title and artist ([SongCatalog.findByName]),
-/// for a track saved before music.db had the song (or from a server folder, never matched on
-/// import). A track without an artist isn't guessed at.
+/// The MusicDatabase song [track] is by its title and artist, for a track saved before music.db
+/// had the song (or from a server folder, never matched on import): the song MusicDatabase
+/// settled a request for it as ([SongCatalog.findSettledRequest], by its names, video or Spotify
+/// track — MusicDatabase's answer wins), else [SongCatalog.findByName]. A track without an
+/// artist isn't guessed at, only found as a settled request.
 CatalogSong? playlistSongByName(PlaylistTrack track, SongCatalog catalog) {
   final artist = track.artist;
-  return artist == null
-      ? null
-      : catalog.findByName(title: track.title, artist: artist);
+  return catalog.findSettledRequest(
+        title: track.title,
+        artist: artist,
+        videoId: track.playableVideoId,
+        spotifyTrackId: track.spotifyTrackId,
+      ) ??
+      (artist == null
+          ? null
+          : catalog.findByName(title: track.title, artist: artist));
 }
 
 /// How long [track] is, worked out when reading (hand-off
@@ -404,7 +412,7 @@ class PlaylistLibrary extends ChangeNotifier {
     for (final row in await db.rawQuery('''
       SELECT t.* FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id
       WHERE p.deleted_at IS NULL AND ${scope.where}
-        AND t.main_db_id IS NULL AND t.artist IS NOT NULL''', scope.args)) {
+        AND t.main_db_id IS NULL''', scope.args)) {
       final track = _track(row);
       final videoId = track.playableVideoId;
       if (videoId != null && _catalog.findByYouTubeId(videoId) != null) {

@@ -130,3 +130,50 @@ class RejectedSongRequests {
     );
   }
 }
+
+/// music.db's `settled_song_requests` (MusicDatabase's migration 0024, hand-off
+/// `settled-song-requests-for-musicdatabaseapp.md`): songs asked for that MusicDatabase found it
+/// had or added, with the `songs.id` each became. A track is that song by the request's artist
+/// and title ([songRequestKey]), its YouTube video or its Spotify track — even when nothing
+/// else connects them (a phone file with no video, names the catalog's matcher can't reconcile).
+class SettledSongRequests {
+  const SettledSongRequests({
+    this.keys = const {},
+    this.videos = const {},
+    this.spotifyTracks = const {},
+  });
+
+  static const none = SettledSongRequests();
+
+  /// Each a `songs.id`, kept current by MusicDatabase (merges, deletions).
+  final Map<String, int> keys;
+  final Map<String, int> videos;
+  final Map<String, int> spotifyTracks;
+
+  /// None in a music.db from before MusicDatabase's migration 0024.
+  static SettledSongRequests read(Database db) {
+    final hasTable = db.select(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+      "AND name = 'settled_song_requests'",
+    );
+    if (hasTable.isEmpty) return none;
+    final keys = <String, int>{};
+    final videos = <String, int>{};
+    final tracks = <String, int>{};
+    for (final row in db.select(
+      'SELECT artist, title, youtube_video_id, spotify_track_id, song_id '
+      'FROM settled_song_requests ORDER BY id',
+    )) {
+      final song = row['song_id']! as int;
+      keys[songRequestKey(row['artist'] as String?, row['title']! as String)] =
+          song;
+      if (row['youtube_video_id'] case final String v) videos[v] = song;
+      if (row['spotify_track_id'] case final String t) tracks[t] = song;
+    }
+    return SettledSongRequests(
+      keys: keys,
+      videos: videos,
+      spotifyTracks: tracks,
+    );
+  }
+}

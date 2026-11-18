@@ -178,7 +178,12 @@ saves it for later with the person who sent it (Ja › Na później,
   the user's corrections of song / artist / album fields — incl. YouTube links set by hand — and
   songs played that music.db doesn't have, asked to be added (`song_requests.dart`; ones
   MusicDatabase's owner rejected come back in music.db's `rejected_song_requests` and aren't
-  asked for again); each kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
+  asked for again, and the ones it found or added come back in `settled_song_requests` with
+  the song each became — `SongCatalog.findSettledRequest()`, tried first by
+  `playlistSongByName()` and the phone files' matcher, so such a track is that song even when
+  nothing else connects them; MusicDatabase's hand-off
+  `settled-song-requests-for-musicdatabaseapp.md`);
+  each kind in files of its own), sent to MusicDatabase's inbox (`PUT /inbox/<name>` on the
   sharing server — the request format is a contract, see the
   [hand-off](docs/handoffs/musicdatabase-outbox.md)). The phone logs in with a MusicDatabase user
   (Ustawienia › Konto, `account.dart`; `POST /login` — with the phone's model as `device`, kept by the

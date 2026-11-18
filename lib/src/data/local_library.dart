@@ -941,8 +941,14 @@ class LocalLibrary extends ChangeNotifier {
     }
   }
 
+  /// The song MusicDatabase settled a request for the file as ([SongCatalog.findSettledRequest]:
+  /// a file's names may be anything, "[1-01] Cave Story (Main Theme)"), else by its tags'
+  /// title and artist; a file without an artist isn't guessed at.
   CatalogSong? _match(String title, String? artist) =>
-      artist == null ? null : _catalog.findByName(title: title, artist: artist);
+      _catalog.findSettledRequest(title: title, artist: artist) ??
+      (artist == null
+          ? null
+          : _catalog.findByName(title: title, artist: artist));
 
   Future<void> _recheckPending(Database db, int now) async {
     final rows = await db.query(
