@@ -500,16 +500,17 @@ class _EmptyNote extends StatelessWidget {
   );
 }
 
-/// "Sortuj wg" and the list / grid switch.
+/// "Sortuj wg" (of the folder [folderId], else of Biblioteka) and the list / grid switch.
 class _ViewRow extends StatelessWidget {
-  const _ViewRow({required this.folders});
+  const _ViewRow({required this.folders, this.folderId});
 
   final LibraryFolders folders;
+  final String? folderId;
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      _SortButton(folders: folders),
+      _SortButton(folders: folders, folderId: folderId),
       const Spacer(),
       IconButton(
         tooltip: folders.grid ? 'Widok listy' : 'Widok siatki',
@@ -569,13 +570,18 @@ class LibraryEntries extends StatelessWidget {
   }
 }
 
-/// "Sortuj wg": shows the order and opens the sheet to change it.
+/// "Sortuj wg": shows the order and opens the sheet to change it. In a folder ([folderId]) it
+/// changes only that folder's order, which can go back to following Biblioteka's.
 class _SortButton extends StatelessWidget {
-  const _SortButton({required this.folders});
+  const _SortButton({required this.folders, this.folderId});
 
   final LibraryFolders folders;
+  final String? folderId;
 
   void _showSortSheet(BuildContext context) {
+    final folderId = this.folderId;
+    final own = folderId != null && folders.hasOwnSort(folderId);
+    final current = folders.sortOf(folderId);
     showMenuSheet(
       context,
       idPrefix: '$_id › Sortuj wg',
@@ -594,9 +600,20 @@ class _SortButton extends StatelessWidget {
       entries: [
         for (final option in LibrarySort.values)
           MenuSheetEntry(
-            option == folders.sort ? Icons.check : Icons.circle_outlined,
+            (folderId == null || own) && option == current
+                ? Icons.check
+                : Icons.circle_outlined,
             option.label,
-            onTap: () => folders.setSort(option),
+            onTap: () => folderId == null
+                ? folders.setSort(option)
+                : folders.setFolderSort(folderId, option),
+          ),
+        if (folderId != null)
+          MenuSheetEntry(
+            own ? Icons.circle_outlined : Icons.check,
+            'Jak w Bibliotece',
+            subtitle: folders.sort.label,
+            onTap: () => folders.setFolderSort(folderId, null),
           ),
       ],
     );
@@ -607,7 +624,7 @@ class _SortButton extends StatelessWidget {
     style: TextButton.styleFrom(foregroundColor: context.palette.textPrimary),
     icon: const Icon(Icons.swap_vert),
     label: Text(
-      folders.sort.label,
+      folders.sortOf(folderId).label,
       style: const TextStyle(fontWeight: FontWeight.bold),
     ),
     onPressed: () => _showSortSheet(context),
@@ -780,8 +797,8 @@ Future<void> showFolderMenu(
   );
 }
 
-/// What's in a Biblioteka folder that the filter it was opened from lets through, in
-/// Biblioteka's order.
+/// What's in a Biblioteka folder that the filter it was opened from lets through, in the
+/// folder's own order or else Biblioteka's.
 class FolderScreen extends StatelessWidget {
   const FolderScreen({
     super.key,
@@ -852,7 +869,7 @@ class FolderScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 16),
         children: [
-          _ViewRow(folders: folders),
+          _ViewRow(folders: folders, folderId: folderId),
           if (entries.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),

@@ -250,8 +250,8 @@ class MoodEntry extends LibraryEntry {
 /// (for "Ostatnie"), in `shared_preferences`. The logged-in account's folders are exchanged with
 /// MusicDatabase by [sync] (`/users/<name>/folders`: whole folders, newer change wins, deleting
 /// deletes everywhere — like playlists, ADR 0011); ones made while logged out stay on the phone
-/// until [addPhoneOnlyToAccount], another account's are hidden. The sort order, the filter chip
-/// and "Ostatnie" stay on each phone (user's decision).
+/// until [addPhoneOnlyToAccount], another account's are hidden. The sort order (Biblioteka's
+/// and each folder's own), the filter chip and "Ostatnie" stay on each phone (user's decision).
 ///
 /// An item is in at most one folder; folders don't nest.
 class LibraryFolders extends ChangeNotifier {
@@ -265,6 +265,7 @@ class LibraryFolders extends ChangeNotifier {
 
   static const _foldersKey = 'library.folders';
   static const _sortKey = 'library.sort';
+  static const _folderSortsKey = 'library.folderSorts';
   static const _gridKey = 'library.grid';
   // Not 'library.filter': older builds left a String there, and reading it as a list throws.
   static const _filtersKey = 'library.filters';
@@ -285,6 +286,9 @@ class LibraryFolders extends ChangeNotifier {
   /// Every account's folders and the deletions not sent yet.
   List<LibraryFolder> _all = const [];
   LibrarySort _sort = LibrarySort.recent;
+
+  /// Folders ordered their own way, by folder id; the others follow [_sort].
+  Map<String, LibrarySort> _folderSorts = const {};
   bool _grid = false;
   Set<LibraryCategory> _filters = const {};
   Map<String, int> _opened = const {};
@@ -305,6 +309,12 @@ class LibraryFolders extends ChangeNotifier {
 
   LibrarySort get sort => _sort;
 
+  /// How the folder [folderId] is ordered: its own order, else Biblioteka's ([sort]).
+  LibrarySort sortOf(String? folderId) => _folderSorts[folderId] ?? _sort;
+
+  /// Whether [folderId] has an order of its own rather than following Biblioteka's.
+  bool hasOwnSort(String folderId) => _folderSorts.containsKey(folderId);
+
   /// Biblioteka's playlists, moods and folders as a grid of covers instead of a list.
   bool get grid => _grid;
 
@@ -323,6 +333,13 @@ class LibraryFolders extends ChangeNotifier {
       ];
       final opened = jsonDecode(prefs.getString(_openedKey) ?? '{}') as Map;
       _opened = opened.cast<String, int>();
+      final sorts = LibrarySort.values.asNameMap();
+      final folderSorts =
+          jsonDecode(prefs.getString(_folderSortsKey) ?? '{}') as Map;
+      _folderSorts = {
+        for (final MapEntry(:key, :value) in folderSorts.entries)
+          key as String: ?sorts[value],
+      };
     } on FormatException catch (e) {
       debugPrint('Biblioteka folders unreadable, starting empty: $e');
     }
@@ -347,6 +364,26 @@ class LibraryFolders extends ChangeNotifier {
       sort.name,
     );
   }
+
+  /// Orders the folder [folderId] by [sort], or by Biblioteka's order again for `null`.
+  Future<void> setFolderSort(String folderId, LibrarySort? sort) async {
+    _folderSorts = {
+      for (final MapEntry(:key, :value) in _folderSorts.entries)
+        if (key != folderId) key: value,
+      folderId: ?sort,
+    };
+    notifyListeners();
+    await _saveFolderSorts();
+  }
+
+  Future<void> _saveFolderSorts() async =>
+      (await SharedPreferences.getInstance()).setString(
+        _folderSortsKey,
+        jsonEncode({
+          for (final MapEntry(:key, :value) in _folderSorts.entries)
+            key: value.name,
+        }),
+      );
 
   Future<void> setGrid(bool grid) async {
     _grid = grid;
@@ -419,6 +456,10 @@ class LibraryFolders extends ChangeNotifier {
             dirty: false,
           ),
     ];
+    if (_folderSorts.containsKey(folderId)) {
+      _folderSorts = {..._folderSorts}..remove(folderId);
+      await _saveFolderSorts();
+    }
     await _changed();
   }
 
@@ -776,7 +817,7 @@ class LibraryFolders extends ChangeNotifier {
   /// Biblioteka's rows: [playlists] and [moods] not in a folder, plus the folders with what's in
   /// them of these. A folder with none of them is left out unless [keepEmptyFolders] (a filter
   /// passes [playlists] or [moods] only, and shows just the folders holding those). Sorted by
-  /// [sort].
+  /// [sort], what's in a folder by [sortOf] it.
   List<LibraryEntry> entries({
     required List<PlaylistSummary> playlists,
     required List<Mood> moods,
@@ -793,7 +834,9 @@ class LibraryFolders extends ChangeNotifier {
       final contents = [for (final key in folder.items) ?byKey[key]];
       inFolders.addAll(folder.items);
       if (contents.isEmpty && !keepEmptyFolders) continue;
-      folders.add(FolderEntry(folder, sorted(contents)));
+      folders.add(
+        FolderEntry(folder, sorted(contents, sort: sortOf(folder.id))),
+      );
     }
     return sorted([
       ...folders,
@@ -801,8 +844,8 @@ class LibraryFolders extends ChangeNotifier {
     ]);
   }
 
-  /// [entries] in the order [sort] gives.
-  List<LibraryEntry> sorted(List<LibraryEntry> entries) {
+  /// [entries] in the order [sort] gives (by default Biblioteka's, [LibraryFolders.sort]).
+  List<LibraryEntry> sorted(List<LibraryEntry> entries, {LibrarySort? sort}) {
     int byName(LibraryEntry a, LibraryEntry b) => compareNames(a.name, b.name);
     // Newest first; entries without a time go last.
     int newest(DateTime? a, DateTime? b) => a == null
@@ -810,7 +853,7 @@ class LibraryFolders extends ChangeNotifier {
         : b == null
         ? -1
         : b.compareTo(a);
-    final compare = switch (_sort) {
+    final compare = switch (sort ?? _sort) {
       LibrarySort.recent => (LibraryEntry a, LibraryEntry b) => newest(
         _recency(a),
         _recency(b),

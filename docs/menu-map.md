@@ -807,7 +807,9 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   Losowo, song rows; ⋮: Dodaj do kolejki, Odtwórz jako następną, Dodaj do playlisty, Usuń
   dynamiczną playlistę.
 - Sort button (shows current order) **→ sheet "Sortuj wg"** — **implemented**
-  (`LibraryFolders` in `data/library_folders.dart`, remembered on the phone; also in a folder):
+  (`LibraryFolders` in `data/library_folders.dart`, remembered on the phone; also in a folder,
+  where it sets that folder's own order — `LibraryFolders.sortOf` — or "Jak w Bibliotece",
+  the default, to follow Biblioteka's; not synced):
   - Ostatnie: last opened (playlist, mood or folder; a folder also by its newest item), else
     last changed; never-opened global moods last
   - Ostatnio dodane: when saved on the phone / made (global moods last)

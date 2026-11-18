@@ -144,4 +144,46 @@ void main() {
       contains('Żeglarskie'),
     );
   });
+
+  test('a folder can have an order of its own, kept, and follows Biblioteka '
+      'again when that is dropped or it is deleted', () async {
+    final folders = LibraryFolders();
+    await folders.load();
+    final folder = await folders.create('Stare z YouTube\'a');
+    for (final id in [1, 2, 3]) {
+      await folders.move(LibraryFolders.playlistKey(id), folder.id);
+    }
+    List<String> inFolder(LibraryFolders folders) => names(
+      folders
+          .entries(playlists: playlists, moods: const [])
+          .whereType<FolderEntry>()
+          .single
+          .contents,
+    );
+
+    await folders.setSort(LibrarySort.alphabetical);
+    expect(folders.sortOf(folder.id), LibrarySort.alphabetical);
+    expect(inFolder(folders), ['ambient', 'Ballady', 'Żeglarskie']);
+
+    await folders.setFolderSort(folder.id, LibrarySort.recent);
+    expect(folders.sort, LibrarySort.alphabetical);
+    expect(inFolder(folders), ['Żeglarskie', 'Ballady', 'ambient']);
+
+    final reloaded = LibraryFolders();
+    await reloaded.load();
+    expect(reloaded.hasOwnSort(folder.id), isTrue);
+    expect(reloaded.sortOf(folder.id), LibrarySort.recent);
+    await reloaded.setSort(LibrarySort.creator);
+    expect(reloaded.sortOf(folder.id), LibrarySort.recent);
+
+    await reloaded.setFolderSort(folder.id, null);
+    expect(reloaded.sortOf(folder.id), LibrarySort.creator);
+    expect(inFolder(reloaded), ['Ballady', 'Żeglarskie', 'ambient']);
+
+    await reloaded.setFolderSort(folder.id, LibrarySort.added);
+    await reloaded.delete(folder.id);
+    final afterDelete = LibraryFolders();
+    await afterDelete.load();
+    expect(afterDelete.hasOwnSort(folder.id), isFalse);
+  });
 }
