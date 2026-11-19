@@ -278,7 +278,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   listened time, synced (`listening_log.dart`), and what's computed from them
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
-  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), the project a song's names say — Tiny Desk, Męskie Granie (`project_names.dart`, lite `read_project()`), and the
+  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), the project a song's names say — Tiny Desk, Męskie Granie (`project_names.dart`, lite `read_project()`), the films, games and anime a song may be credited to instead of its singer — "Nana - Kuroi Namida" (`soundtrack_works.dart`, music.db's `soundtrack_works`; lite `match_work()`), and the
   port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from the server or LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
@@ -438,6 +438,15 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 ## Testing & verification
 
 - Run `flutter analyze` and `flutter test` before considering a change complete.
+- **The machine is shared and small** (7.3 GB RAM, 4 GB swap; other Claude sessions build and
+  test their own projects on it at the same time). On 2026-11-18 this repo's full test suite
+  (several Dart frontend servers and testers), a LeinaTube build in another session and seven
+  Claude processes filled RAM and swap; the kernel killed the Claude app and the desktop froze
+  until a reboot (the machine's own notes, outside the repo). Run
+  `tool/check_resources.sh` before every Gradle build **and** before the full `flutter test`; on
+  exit 1 don't start — show the user its output (it names each heavy process's folder) and let
+  them decide; never kill processes that aren't this session's. One heavy thing at a time: no
+  tests or analyze while a build runs.
 - Tests waiting for real background work (files, SQLite, isolates, a local HTTP server) wait
   for the condition with `waitUntil` / `pumpUntil` from `test/support/waiting.dart` — never a
   fixed number of short sleeps: with the whole suite in parallel on this machine those timed out

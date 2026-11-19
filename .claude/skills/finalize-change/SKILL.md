@@ -44,7 +44,9 @@ section this belongs to instead.
    made with the user (e.g. "no screen-size scaling", "theme isn't persisted yet"). That reasoning
    only exists in your context and is exactly what's worth capturing.
 3. If the session changed Dart code, run `flutter analyze` and `flutter test` (both read-only)
-   unless they already passed after the last code edit this session. Report failures in Step 4
+   unless they already passed after the last code edit this session — after
+   `tool/check_resources.sh` (the full suite runs several Dart compilers and testers at once; don't
+   start it while the script says `NOT ENOUGH` or while a build runs). Report failures in Step 4
    and don't present the change as finished — but don't start fixing code inside this skill
    unless the user asks.
 

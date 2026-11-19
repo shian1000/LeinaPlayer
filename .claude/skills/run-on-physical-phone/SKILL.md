@@ -47,27 +47,29 @@ If it prints `fresh`, the existing release APK already contains the current code
 check and the build, and go straight to the install in Step 3. Otherwise (`missing` or
 `stale: <file>`) continue below. Rebuild anyway if the user asks for it.
 
-## Step 2b — Check memory before building
+## Step 2b — Check the machine has room before building
 
-This machine has only ~7.6 GB of RAM and a release build (of the sibling CustomMapMarker project)
-previously got OOM-killed (exit code 137), forcing the user to reboot. Check memory **before**
-every build:
+This machine has ~7.3 GB of RAM and 4 GB of swap shared by everything the user runs — other Claude
+sessions build and test their own projects (LeinaTube, CustomMapMarker…) at the same time. A
+release build of CustomMapMarker once got OOM-killed (exit code 137) with the uncapped template
+settings; on 2026-11-18 this repo's full test suite, a LeinaTube build in another session and seven
+Claude processes filled RAM and swap — the kernel killed the Claude app and the desktop froze until
+a reboot (the machine's own notes, outside the repo). So **before every build**:
 
 ```bash
-free -m
-pgrep -af 'GradleDaemon|KotlinCompileDaemon'
+tool/check_resources.sh
 ```
 
-- Leftover Gradle/Kotlin daemons from earlier builds of this project are ours — stop them first to
-  reclaim their memory: `(cd android && JAVA_HOME=/snap/android-studio/current/jbr ./gradlew --stop)`.
-- Then read the `available` column of `free -m`. With the caps below, a release build succeeded
-  starting from ~2.7 GB available (plus 4 GB swap); the OOM kill happened with the uncapped
-  template settings.
-  - **≥ 2500 MB available**: build.
-  - **Below 2500 MB**: don't build yet. Show the user the biggest memory users
-    (`ps -eo pid,rss,comm --sort=-rss | head -8`; RSS is in KB, convert to MB when reporting) and
-    ask whether they want to close something first or build anyway. Never kill the user's own
-    processes yourself.
+- It prints available RAM, swap use and every heavy process (Gradle/Kotlin daemons, Dart frontend
+  servers, `flutter_tester`s, emulators, Claude) with the folder it runs in, so another project's
+  build or tests show up by name.
+- Leftover Gradle/Kotlin daemons of **this** repo are ours — stop them and check again:
+  `(cd android && JAVA_HOME=/snap/android-studio/current/jbr ./gradlew --stop)`.
+- Exit 0 (`OK`, ≥ 2500 MB available and swap under 80%): build. With the caps below a release
+  build succeeded from ~2.7 GB available.
+- Exit 1: **don't build.** Show the user its output and ask whether to wait, close something, or
+  build anyway. Never kill processes that aren't this session's.
+- One heavy thing at a time: no `flutter test` / `flutter analyze` while the build runs.
 - Keep the memory caps in `android/gradle.properties` (`-Xmx2G`, `kotlin.daemon.jvmargs=-Xmx1G`).
   The Flutter template default is `-Xmx8G`, more than the machine's whole RAM; if a Flutter upgrade
   or `flutter create` restores it, put the caps back before building.

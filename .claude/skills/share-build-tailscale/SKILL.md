@@ -12,7 +12,7 @@ a build at the same time without either link changing).
 ## What this does, in order
 
 1. Check whether the release APK reflects the current code.
-2. If not, rebuild it (with the same memory precautions as run-on-physical-phone).
+2. If not, rebuild it (after the same machine check as run-on-physical-phone).
 3. Serve only that APK over Tailscale for 15 minutes; the server then stops on its own.
 4. Give the user the direct download link and the time it expires.
 
@@ -35,9 +35,10 @@ The script only compares file times. If the user says code changed in a way it c
 
 ## Step 2 — Rebuild
 
-Follow **Step 2b (memory check)** and **Step 3 (build)** of
+Follow **Step 2b (check the machine has room)** and **Step 3 (build)** of
 `.claude/skills/run-on-physical-phone/SKILL.md`, but skip the install. That means: stop leftover
-Gradle daemons, check `free -m` (ask the user before building below 2500 MB available), run
+Gradle daemons of this repo, run `tool/check_resources.sh` (exit 1 → show the user and ask
+before building), run
 `tool/build_release_apk.sh` (the release build with its version numbering) with the Studio JBR as `JAVA_HOME`, then stop the Gradle daemon.
 Don't copy those commands here from memory; read that file so both skills stay in sync.
 

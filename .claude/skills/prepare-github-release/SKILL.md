@@ -33,8 +33,10 @@ tool/build_info.sh
 
 ## Step 2 — Build (two builds, ~10–15 min)
 
-Memory first, as in `run-on-physical-phone` Step 2b (`free -m`; stop leftover Gradle daemons;
-below 2500 MB available ask the owner before building). Then, in the background:
+The machine first, as in `run-on-physical-phone` Step 2b: stop leftover Gradle daemons of this
+repo, run `tool/check_resources.sh` and ask the owner before building when it exits 1 (two builds
+in a row; another session's build or tests at the same time froze the computer on 2026-11-18).
+Then, in the background:
 
 ```bash
 export JAVA_HOME=/snap/android-studio/current/jbr PATH=/snap/android-studio/current/jbr/bin:$PATH
