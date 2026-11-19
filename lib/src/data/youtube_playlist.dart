@@ -120,7 +120,9 @@ List<({String artist, String title})> channelVideoReadings(
     }
   }
   song = _stripArtist(song, artist);
-  song = _stripJunkSuffix(song).replaceAll(_doubleQuotes, '').trim();
+  song = stripTrailingJunkSuffix(_stripJunkSuffix(song))
+      .replaceAll(_doubleQuotes, '')
+      .trim();
   song = song.replaceFirstMapped(_quoted, (m) => m.group(1)!).trim();
   return (
     artist: artist,
@@ -168,6 +170,11 @@ const _junkPhrases = {
   'explicit',
   'clean version',
   'edit',
+  'full song',
+  'opening theme',
+  'ending theme',
+  'opening song',
+  'ending song',
 };
 
 /// … or it contains one of these words, or a year (YOUTUBE_TITLE_JUNK_MARKER_WORDS).
@@ -182,6 +189,54 @@ final _versionMarker = RegExp(
   r'\b(live|cover|remix|acoustic|extended|club edit|unplugged|demo|instrumental)\b',
   caseSensitive: false,
 );
+
+/// Phrases cut from the very end of a title, unbracketed: MusicDatabase's
+/// `TITLE_JUNK_SUFFIXES` (`src/config/constants.py`).
+const _titleJunkSuffixes = [
+  'official music video',
+  'official lyric video',
+  'official video',
+  'official audio',
+  'music video',
+  'lyric video',
+  'video clip',
+  'videoclip',
+  'musicvideo',
+  'dance performance video',
+  'performance video',
+  'm/v',
+  'full song',
+  // An anime's or a game's theme named by its place in the show: "Cowboy Bebop - The Real
+  // Folk Blues ending theme".
+  'opening theme',
+  'ending theme',
+  'opening song',
+  'ending song',
+  'oficjalny odsłuch',
+  'hd',
+  'hq',
+  '4k',
+];
+
+final _titleJunkSuffix = RegExp(
+  '\\s*\\b(?:${_titleJunkSuffixes.map(RegExp.escape).join('|')})\\s*\$',
+  caseSensitive: false,
+);
+final _leftoverSeparator = RegExp(r'\s*[-–—:|]+$');
+
+/// [title] without the junk phrases stacked at its end ("Song Music Video Official Audio") and
+/// the separator one leaves dangling ("Secret Youth - Music Video"); a title that is nothing but
+/// such a phrase ("Ending Theme") stays — a port of MusicDatabase's
+/// `strip_trailing_junk_suffix()` (`src/utils/common/sanitize/text.py`).
+String stripTrailingJunkSuffix(String title) {
+  var result = title.trim();
+  while (true) {
+    final cut = result.replaceFirst(_titleJunkSuffix, '').trim();
+    final left = cut.replaceFirst(_leftoverSeparator, '');
+    if (cut == result || left.isEmpty) return result;
+    result = left;
+  }
+}
 
 String _stripJunkSuffix(String title) {
   var result = title.trim();

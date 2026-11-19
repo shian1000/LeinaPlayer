@@ -50,11 +50,14 @@ final _artistTitle = RegExp(r'\s+[-–—]\s+|\s+:\s+');
 // A spelling naming a performance itself: only then can a title be the whole set of whoever it
 // names. "Męskie Granie" - "Rilke" is just a song.
 final _wholeSetWord = RegExp(
-  '(?<!$_word)(?:concerts?|koncert|sessions?|sesja)(?!$_word)',
+  '(?<!$_word)(?:concerts?|koncert|sessions?|sesja|shows?)(?!$_word)',
   unicode: true,
   caseSensitive: false,
 );
 final _spaces = RegExp(r'\s+');
+// A capital "I" typed for "|" right next to the project: "The Dø I A Take Away Show".
+final _iBefore = RegExp(r'\sI\s*$');
+final _iAfter = RegExp(r'^\s*I\s');
 final _spellingPatterns = <String, RegExp?>{};
 
 RegExp? _spellingPattern(String spelling) =>
@@ -124,8 +127,9 @@ String _strip(String text, String characters) {
 }
 
 /// The project [text] names, [text] without it and the spelling as written, or `null`:
-/// "Boys (Like a Version)" is "Boys", "Daughter | Tiny Desk Concert" is "Daughter". A bracket
-/// left with nothing but numbers in it goes too: "(Męskie Granie 2018)" is that edition.
+/// "Boys (Like a Version)" is "Boys", "Daughter | Tiny Desk Concert" is "Daughter" (also typed
+/// "Daughter I Tiny Desk Concert" — only next to the project, "I" is a word anywhere else). A
+/// bracket left with nothing but numbers in it goes too: "(Męskie Granie 2018)" is that edition.
 (Project, String, String)? _cut(String? text, List<Project> projects) {
   final found = _find(text, projects);
   if (found == null) return null;
@@ -136,6 +140,10 @@ String _strip(String text, String characters) {
         text.substring(open + 1, start) + text.substring(end, close),
       )) {
     (start, end) = (open, close + 1);
+  } else if (_iBefore.firstMatch(text.substring(0, start)) case final before?) {
+    start = before.start;
+  } else if (_iAfter.matchAsPrefix(text.substring(end)) case final after?) {
+    end += after.end;
   }
   final rest = (text.substring(0, start) + text.substring(end))
       .replaceAll(_spaces, ' ')

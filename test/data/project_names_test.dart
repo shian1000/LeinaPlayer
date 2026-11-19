@@ -101,4 +101,42 @@ void main() {
       isNull,
     );
   });
+
+  test(
+    'a capital "I" next to the project is typed for "|"; a show is a whole set',
+    () {
+      // MusicDatabase's test_a_take_away_show_with_an_i_typed_for_the_bar.
+      final shows = [
+        Project(
+          'Take Away Show',
+          aliases: 'A Take Away Show',
+          channels: 'Blogothèque, La Blogothèque',
+        ),
+      ];
+      (String, String)? readShow(String artist, String title) {
+        final reading = readProject(artist, title, shows);
+        return reading == null ? null : (reading.artist, reading.title);
+      }
+
+      expect(readShow('Blogothèque', 'The Dø I A Take Away Show'), (
+        'The Dø',
+        'A Take Away Show',
+      ));
+      expect(readShow('The Dø', 'A Take Away Show'), (
+        'The Dø',
+        'A Take Away Show',
+      ));
+      // An "I" not next to the project is a word.
+      expect(
+        readShow('Blogothèque', 'Phoenix - I Wanna Be | A Take Away Show'),
+        ('Phoenix', 'I Wanna Be'),
+      );
+      // The project as the artist and a show in the title: who plays is the rest, playing the
+      // whole set — not a song "Phoenix".
+      expect(readShow('A Take Away Show', 'Phoenix | A Take Away Show'), (
+        'Phoenix',
+        'A Take Away Show',
+      ));
+      },
+  );
 }

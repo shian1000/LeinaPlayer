@@ -818,6 +818,48 @@ void main() {
       expect(found('Starless Night', 'Nana'), 50);
     });
 
+    test('the playlist "Parsisiųsti (2018.02)" tracks MusicDatabase found: '
+        'an anime\'s ending theme, a Take Away Show', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      await addProjects(
+        path,
+        {
+          1: (
+            'Take Away Show',
+            'A Take Away Show',
+            'Blogothèque, La Blogothèque',
+          ),
+        },
+        {251: ('A Take Away Show', 31, 1)},
+        artists: {30: 'SEATBELTS', 31: 'The Dø'},
+      );
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute(
+        'CREATE TABLE soundtrack_works (id INTEGER PRIMARY KEY NOT NULL, '
+        'name TEXT NOT NULL UNIQUE, aliases TEXT)',
+      );
+      await db.insert('soundtrack_works', {
+        'name': 'Cowboy Bebop',
+        'aliases': 'Cowboy Beebop',
+      });
+      await db.insert('songs', {
+        'id': 230,
+        'title': 'The Real Folk Blues',
+        'artist_id': 30,
+        'album': 'Cowboy Beebop OST',
+      });
+      await db.close();
+      await catalog.ensureLoaded();
+
+      int? found(String title, String artist) =>
+          catalog.findByName(title: title, artist: artist)?.id;
+      expect(found('The Real Folk Blues ending theme', 'Cowboy Bebop'), 230);
+      expect(found('The Dø I A Take Away Show', 'Blogothèque'), 251);
+      expect(found('The Real Folk Blues full song', 'SEATBELTS'), 230);
+      expect(found('Ending Theme', 'Cowboy Bebop'), isNull);
+    });
+
     test(
       'without soundtrack_works only the albums say what a work is',
       () async {

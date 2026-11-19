@@ -1294,8 +1294,16 @@ class SongCatalog extends ChangeNotifier {
   /// marked yet, and nothing in its names tells.
   /// Last, for an artist that is a film, game or anime ([_creditedToWork]): "Nana - Kuroi
   /// Namida" is Anna Tsuchiya's song on "Nana OST".
-  CatalogSong? findByName({required String title, required String artist}) =>
-      _byArtistName(title, artist) ?? _creditedToWork(title, artist);
+  /// A title ending in junk ("… ending theme", "… full song" — [stripTrailingJunkSuffix]) is
+  /// also tried without it, after the title as it is: a playlist track keeps the title it was
+  /// imported with.
+  CatalogSong? findByName({required String title, required String artist}) {
+    final cut = stripTrailingJunkSuffix(title);
+    return _byArtistName(title, artist) ??
+        (cut == title ? null : _byArtistName(cut, artist)) ??
+        _creditedToWork(title, artist) ??
+        (cut == title ? null : _creditedToWork(cut, artist));
+  }
 
   CatalogSong? _byArtistName(String title, String artist) {
     final reading = readProject(artist, title, _projects);

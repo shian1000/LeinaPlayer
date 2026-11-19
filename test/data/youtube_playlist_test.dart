@@ -19,7 +19,35 @@ void main() {
     expect(extractPlaylistId(''), isNull);
   });
 
+  test('trailing junk phrases are cut, a title of nothing else stays', () {
+    // MusicDatabase's test_an_anime_theme_named_by_its_place_in_the_show_is_junk.
+    expect(
+      stripTrailingJunkSuffix('The Real Folk Blues ending theme'),
+      'The Real Folk Blues',
+    );
+    expect(stripTrailingJunkSuffix('Tank! - Opening Theme'), 'Tank!');
+    expect(stripTrailingJunkSuffix('Song Music Video Official Audio'), 'Song');
+    expect(stripTrailingJunkSuffix('Lonely full song'), 'Lonely');
+    expect(stripTrailingJunkSuffix('Ending Theme'), 'Ending Theme');
+    expect(stripTrailingJunkSuffix('HD'), 'HD');
+    expect(stripTrailingJunkSuffix('Opening Night'), 'Opening Night');
+  });
+
   group('parseYouTubeTrack', () {
+    test('an anime theme named by its place in the show loses it', () {
+      expect(
+        parseYouTubeTrack(
+          'Cowboy Bebop - The Real Folk Blues ending theme',
+          'anime fan',
+        ),
+        (artist: 'Cowboy Bebop', title: 'The Real Folk Blues'),
+      );
+      expect(parseYouTubeTrack('SEATBELTS - Tank! (Opening Theme)', 'x'), (
+        artist: 'SEATBELTS',
+        title: 'Tank!',
+      ));
+    });
+
     ({String artist, String title}) p(String title, String channel) =>
         parseYouTubeTrack(title, channel);
 

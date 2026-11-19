@@ -50,12 +50,19 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   `read_project()`: whole dictionary spellings only, a bracket left with only numbers goes too —
   "(Męskie Granie 2018)"; an artist set apart from it, "Kaunas Acoustics : Liūdni slibinai",
   loses it; one only containing it, "Męskie Granie Orkiestra 2016", keeps it; a channel as the
-  artist, "NPR Music", leaves who plays in the title), cuts it out, and `_titled` takes only
+  artist, "NPR Music", leaves who plays in the title; a lone capital "I" right next to the
+  spelling is a "|" typed by hand — "The Dø I A Take Away Show" — and "show" names a whole set
+  like "concert" / "session"), cuts it out, and `_titled` takes only
   that project's rows — names naming none take only rows of no project (lite
   `songs_for_entry(..., project)`). Names that don't say it can't be told apart: folder playlist
   "14. Chersoń" (2026-11-12) has "Nosowska, Igo, Organek, Krzysztof Zalewski - Sobie i Wam" as
   #6585 (Męskie Granie), which by name is the studio #3822 — MusicDatabase asks the owner there,
   so don't guess; the stored `song_id` wins anyway. Before 0019 there are no projects.
+- A title ending in junk with no bracket ("… full song", "… ending theme", "… Music Video",
+  "HD" — MusicDatabase's `TITLE_JUNK_SUFFIXES`, `stripTrailingJunkSuffix` in
+  `youtube_playlist.dart`, port of `strip_trailing_junk_suffix()`; a title that is only such a
+  phrase stays) is cut by `parseYouTubeTrack`, and `findByName` tries a title without it after
+  the title as it is — playlist tracks keep the title they were imported with.
 - Soundtrack works (music.db's `soundtrack_works`, MusicDatabase's migration 0025, hand-off
   `soundtrack-works-for-musicdatabaseapp.md`): uploads and files credit a song to the film,
   game or anime ("Nana - Kuroi Namida" is 土屋アンナ's "黒い涙" on "Nana OST"). When nothing
