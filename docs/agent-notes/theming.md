@@ -28,8 +28,8 @@
 
 ## Themes
 
-Dummify's two variants are here; Lain, Cyberpunk and Redesign live in the
-`shian1000/LeinaThemes` repository, with the ids that were their saved names (a phone that had
+Dummify's two variants are here; Lain, Cyberpunk, Redesign and Tuba live in the
+`shian1000/LeinaThemes` repository, the first three with the ids that were their saved names (a phone that had
 one picked downloads it by itself on start, showing Dummify until then — `_restoreMissing`).
 
 - **Dummify** (dark) — modelled on the reference app (black/grey, green accent, rounded).
@@ -53,6 +53,10 @@ one picked downloads it by itself on start, showing Dummify until then — `_res
   (in the theme's folder of `LeinaThemes`, SIL OFL, its licence shown in Licencje bibliotek through
   `ThemeController.licenses`); it has Latin Extended but no Cyrillic, which falls back to the system font. The
   native "Otwórz w…" sheet only knows `monospace`, so there it uses the system font.
+- **Tuba** (dark) — modelled on YouTube Music's dark look: near-black page (`#030303`), the
+  `#212121` / `#272727` greys of its sheets and chips, `#AAAAAA` subtitles, red accent
+  (`#FF0033`) with white on it, a light snackbar; the platform font (Roboto), rounded. No light
+  variant, as the reference app has none.
 
 ## Adding a theme
 
