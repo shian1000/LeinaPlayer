@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/playlist_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
@@ -68,7 +69,7 @@ class _PlaylistEditScreenState extends State<PlaylistEditScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nie udało się zapisać zmian.')),
+        SnackBar(content: Text(l10n.playlistEditScreenSaveFailed)),
       );
     }
   }
@@ -79,18 +80,18 @@ class _PlaylistEditScreenState extends State<PlaylistEditScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.background,
-        title: const Text('Edytuj playlistę'),
+        title: Text(l10n.playlistEditScreenTitle),
         actions: [
           TextButton(
             onPressed: _changed && !_saving ? _save : null,
-            child: const Text('Zapisz'),
+            child: Text(l10n.commonSave),
           ),
         ],
       ),
       body: _tracks.isEmpty
           ? Center(
               child: Text(
-                'Playlista będzie pusta.',
+                l10n.playlistEditScreenEmpty,
                 style: TextStyle(color: palette.textSecondary),
               ),
             )
@@ -111,7 +112,7 @@ class _PlaylistEditScreenState extends State<PlaylistEditScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        tooltip: 'Usuń z playlisty',
+                        tooltip: l10n.playlistEditScreenRemove,
                         icon: Icon(
                           Icons.remove_circle_outline,
                           color: palette.textSecondary,

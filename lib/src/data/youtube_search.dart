@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import '../l10n.dart';
 import 'network_errors.dart';
 import 'newpipe.dart';
 import 'playlist_library.dart';
@@ -117,9 +118,7 @@ class YouTubeSearch {
           m,
     ];
     if (methods.isEmpty) {
-      throw const YouTubeSearchException(
-        'Nie wybrano sposobu wyszukiwania w Ustawienia › YouTube.',
-      );
+      throw YouTubeSearchException(l10n.youtubeSearchNoMethod);
     }
     final errors = <String>[];
     var networkFailures = 0;
@@ -133,13 +132,15 @@ class YouTubeSearch {
             return await explode();
           case YouTubeMethod.ytDlpServer:
             // Needs a search endpoint on MusicDatabase's server, which doesn't exist yet.
-            errors.add('yt-dlp przez serwer: jeszcze niedostępne');
+            errors.add(
+              '${_methodName(method)}: ${l10n.youtubeSearchNotYetAvailable}',
+            );
             // Not available isn't "offline": leave that to the methods that tried.
             continue;
           case YouTubeMethod.api:
             final key = settings.apiKey;
             if (key == null) {
-              errors.add('API: brak kodu YouTube API');
+              errors.add('API: ${l10n.youtubeSearchNoApiKey}');
               continue;
             } else {
               return await api(key);
@@ -152,7 +153,7 @@ class YouTubeSearch {
       }
     }
     throw YouTubeSearchException(
-      'Nie udało się wyszukać na YouTube (${errors.join('; ')}).',
+      l10n.youtubeSearchFailed(errors.join('; ')),
       offline: networkFailures > 0 && otherFailures == 0,
     );
   }
@@ -174,8 +175,9 @@ class YouTubeSearch {
       }
     }
     throw YouTubeSearchException(
-      'Nie udało się odczytać filmu z YouTube'
-      '${errors.isEmpty ? '' : ' (${errors.join('; ')})'}.',
+      errors.isEmpty
+          ? l10n.youtubeSearchVideoFailed
+          : l10n.youtubeSearchVideoFailedWithErrors(errors.join('; ')),
     );
   }
 
@@ -223,16 +225,16 @@ class YouTubeSearch {
   static String _methodName(YouTubeMethod m) => switch (m) {
     YouTubeMethod.newPipe => 'NewPipe',
     YouTubeMethod.explode => 'youtube_explode',
-    YouTubeMethod.ytDlpServer => 'yt-dlp przez serwer',
+    YouTubeMethod.ytDlpServer => l10n.youtubeSearchMethodYtDlpServer,
     YouTubeMethod.api => 'API',
   };
 
   static String _describe(Object e) => switch (e) {
-    SocketException() || HttpException() => 'brak połączenia',
+    SocketException() || HttpException() => l10n.youtubeSearchNoConnection,
     YouTubeSearchException(:final message) => message,
     // youtube_explode wraps network errors in package:http's ClientException.
-    _ when '$e'.contains('SocketException') => 'brak połączenia',
-    _ => 'błąd',
+    _ when '$e'.contains('SocketException') => l10n.youtubeSearchNoConnection,
+    _ => l10n.youtubeSearchError,
   };
 
   static Future<List<YouTubeVideo>> _searchWithExplode(String query) async {
@@ -360,8 +362,8 @@ class YouTubeSearch {
         throw YouTubeSearchException(
           response.statusCode == HttpStatus.forbidden ||
                   response.statusCode == HttpStatus.badRequest
-              ? 'odrzucony kod API albo wyczerpany limit'
-              : 'odpowiedź HTTP ${response.statusCode}',
+              ? l10n.youtubeSearchApiRejected
+              : l10n.youtubeSearchHttpStatus(response.statusCode),
         );
       }
       final items = (jsonDecode(body) as Map<String, Object?>)['items'];
@@ -414,7 +416,9 @@ class YouTubePlaylists {
             : _explode)(playlistId);
         // youtube_explode has been seen to report a playlist's size but return no videos.
         if (data.videos.isNotEmpty) return data;
-        errors.add('${YouTubeSearch._methodName(method)}: brak filmów');
+        errors.add(
+          '${YouTubeSearch._methodName(method)}: ${l10n.youtubeSearchNoVideos}',
+        );
       } catch (e) {
         debugPrint('YouTube playlist (${method.name}) failed: $e');
         errors.add(
@@ -424,10 +428,8 @@ class YouTubePlaylists {
     }
     throw YouTubeSearchException(
       errors.isEmpty
-          ? 'Włącz NewPipeExtractor albo youtube_explode w Ustawienia › YouTube, '
-                'żeby importować playlisty.'
-          : 'Nie udało się odczytać playlisty (${errors.join('; ')}). Sprawdź, czy jest '
-                'publiczna lub niepubliczna (nie prywatna) i czy nie jest pusta.',
+          ? l10n.youtubeSearchPlaylistNoMethod
+          : l10n.youtubeSearchPlaylistFailed(errors.join('; ')),
     );
   }
 

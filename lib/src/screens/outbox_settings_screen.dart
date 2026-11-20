@@ -5,6 +5,7 @@ import '../data/account.dart';
 import '../data/database_sync.dart';
 import '../data/outbox.dart';
 import '../data/sync_sources.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'outbox_contents_screen.dart';
@@ -15,16 +16,15 @@ import 'outbox_contents_screen.dart';
 class OutboxSettingsScreen extends StatelessWidget {
   const OutboxSettingsScreen({super.key});
 
-  static String requestsLabel(int n) =>
-      '$n ${pluralWord(n, 'zgłoszenie', 'zgłoszenia', 'zgłoszeń')}';
+  static String requestsLabel(int n) => l10n.outboxSettingsScreenRequests(n);
 
   /// Asks for the name packages are signed with; `false` when the user cancelled.
   static Future<bool> _askForSender(BuildContext context, Outbox outbox) async {
     final typed = await showDialog<String>(
       context: context,
       builder: (_) => TextInputDialog(
-        title: 'Podpis paczek ze zgłoszeniami',
-        hint: 'Imię lub pseudonim (puste — bez podpisu)',
+        title: l10n.outboxSettingsScreenSenderDialogTitle,
+        hint: l10n.outboxSettingsScreenSenderDialogHint,
         initial: outbox.typedSender ?? '',
       ),
     );
@@ -39,7 +39,7 @@ class OutboxSettingsScreen extends StatelessWidget {
     final package = await outbox.exportPackage();
     if (package == null) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nie ma zgłoszeń do wysłania')),
+        SnackBar(content: Text(l10n.outboxSettingsScreenNothingToSend)),
       );
       return;
     }
@@ -52,11 +52,11 @@ class OutboxSettingsScreen extends StatelessWidget {
       SnackBar(
         content: Text(
           [
-            'Wyeksportowano ${requestsLabel(package.names.length)}',
+            l10n.outboxSettingsScreenExported(package.names.length),
             if (package.leftOut > 0)
-              '${requestsLabel(package.leftOut)} nie zmieściło się — w następnej paczce',
+              l10n.outboxSettingsScreenLeftOut(package.leftOut),
             if (package.refused > 0)
-              'za duże dla MusicDatabase: ${package.refused}',
+              l10n.outboxSettingsScreenTooLarge(package.refused),
           ].join(' · '),
         ),
       ),
@@ -68,9 +68,7 @@ class OutboxSettingsScreen extends StatelessWidget {
     final package = await outbox.rebuildLastPackage();
     if (package == null) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Ostatniej paczki nie ma już na telefonie'),
-        ),
+        SnackBar(content: Text(l10n.outboxSettingsScreenLastPackageGone)),
       );
       return;
     }
@@ -81,7 +79,7 @@ class OutboxSettingsScreen extends StatelessWidget {
       SharePlus.instance.share(
         ShareParams(
           files: [XFile(package.file.path, mimeType: 'application/zip')],
-          subject: 'Zgłoszenia dla MusicDatabase',
+          subject: l10n.outboxSettingsScreenShareSubject,
         ),
       );
 
@@ -93,18 +91,18 @@ class OutboxSettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Zgłoszenia poprawek'),
+        title: Text(l10n.outboxSettingsScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 12, bottom: 24),
         children: [
           SwitchListTile(
             secondary: const Icon(Icons.forward_to_inbox_outlined),
-            title: const Text('Wysyłaj zgłoszenia poprawek automatycznie'),
+            title: Text(l10n.outboxSettingsScreenAutoSend),
             subtitle: Text(
               outbox.autoSend
-                  ? 'Gdy serwer MusicDatabase jest osiągalny'
-                  : 'Zgłoszenia czekają na telefonie na „Wyślij teraz”',
+                  ? l10n.outboxSettingsScreenAutoSendOn
+                  : l10n.outboxSettingsScreenAutoSendOff,
             ),
             value: outbox.autoSend,
             onChanged: outbox.setAutoSend,
@@ -112,11 +110,13 @@ class OutboxSettingsScreen extends StatelessWidget {
           const OutboxSendTiles(),
           ListTile(
             leading: const Icon(Icons.badge_outlined),
-            title: const Text('Podpis paczek'),
+            title: Text(l10n.outboxSettingsScreenSender),
             subtitle: Text(switch (outbox.typedSender) {
-              _ when account != null => '$account (nazwa konta)',
-              null => 'Zapytam przy pierwszej paczce',
-              '' => 'Bez podpisu',
+              _ when account != null => l10n.outboxSettingsScreenSenderAccount(
+                account,
+              ),
+              null => l10n.outboxSettingsScreenSenderAsk,
+              '' => l10n.outboxSettingsScreenSenderNone,
               final name => name,
             }),
             onTap: account != null
@@ -126,11 +126,7 @@ class OutboxSettingsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Text(
-              'Telefon zgłasza m.in. linki z bazy, których YouTube już nie '
-              'odtwarza, razem z filmem znalezionym w zamian. Wysyłka automatyczna następuje przy '
-              'uruchomieniu i powrocie do aplikacji, pod te same adresy co pobieranie bazy. Gdy '
-              'serwer odmówi, zgłoszenia czekają do '
-              'następnego dnia. Bez serwera zgłoszenia można wysłać paczką (plik .zip).',
+              l10n.outboxSettingsScreenExplanation,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -163,12 +159,12 @@ class OutboxSendTiles extends StatelessWidget {
       children: [
         ListTile(
           leading: const Icon(Icons.outbox_outlined),
-          title: const Text('Czeka na wysłanie'),
+          title: Text(l10n.outboxSettingsScreenWaiting),
           subtitle: Text(
             outbox.sending
-                ? 'Wysyłanie…'
+                ? l10n.outboxSettingsScreenSending
                 : outbox.waiting == 0
-                ? 'Nic'
+                ? l10n.outboxSettingsScreenNothing
                 : OutboxSettingsScreen.requestsLabel(outbox.waiting),
           ),
           trailing: outbox.sending
@@ -195,15 +191,15 @@ class OutboxSendTiles extends StatelessWidget {
                   ? palette.accent
                   : Theme.of(context).colorScheme.error,
             ),
-            title: const Text('Ostatnie wysyłanie'),
+            title: Text(l10n.outboxSettingsScreenLastSend),
             subtitle: Text(
               [
-                'Wysłano: ${result.sent}',
+                l10n.outboxSettingsScreenSent(result.sent),
                 if (result.refused > 0)
-                  'odrzucone przez serwer: ${result.refused}',
+                  l10n.outboxSettingsScreenRefused(result.refused),
                 ?result.problem,
                 if (outbox.heldForToday && outbox.autoSend)
-                  'kolejna próba jutro albo przez „Wyślij teraz”',
+                  l10n.outboxSettingsScreenRetryTomorrow,
               ].join(' · '),
             ),
           ),
@@ -214,7 +210,7 @@ class OutboxSendTiles extends StatelessWidget {
             color: canSend ? palette.accent : palette.textSecondary,
           ),
           title: Text(
-            'Wyślij teraz',
+            l10n.outboxSettingsScreenSendNow,
             style: TextStyle(
               color: canSend ? palette.accent : palette.textSecondary,
             ),
@@ -229,23 +225,22 @@ class OutboxSendTiles extends StatelessWidget {
             color: canExport ? palette.accent : palette.textSecondary,
           ),
           title: Text(
-            'Wyślij paczkę…',
+            l10n.outboxSettingsScreenSendPackage,
             style: TextStyle(
               color: canExport ? palette.accent : palette.textSecondary,
             ),
           ),
           subtitle: Text(
             outbox.waiting == 0
-                ? 'Plik .zip przez komunikator, e-mail…'
-                : '${OutboxSettingsScreen.requestsLabel(outbox.waiting)} jako plik .zip przez '
-                      'komunikator, e-mail…',
+                ? l10n.outboxSettingsScreenPackageHint
+                : l10n.outboxSettingsScreenPackageHintCount(outbox.waiting),
           ),
           onTap: () => OutboxSettingsScreen._sendPackage(context, outbox),
         ),
         if (outbox.lastPackage.isNotEmpty)
           ListTile(
             leading: const Icon(Icons.replay),
-            title: const Text('Wyeksportuj ponownie ostatnią paczkę'),
+            title: Text(l10n.outboxSettingsScreenExportAgain),
             subtitle: Text(
               OutboxSettingsScreen.requestsLabel(outbox.lastPackage.length),
             ),

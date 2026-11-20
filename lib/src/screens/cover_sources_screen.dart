@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
+import '../l10n.dart';
 import '../theme.dart';
 
 /// "Ustawienia › Okładki albumów": where album covers come from and in what order (drag to
@@ -14,12 +15,11 @@ class CoverSourcesScreen extends StatefulWidget {
 
 class _CoverSourcesScreenState extends State<CoverSourcesScreen> {
   String _note(CoverSource s) => switch (s) {
-    CoverSource.server =>
-      'Okładka zapisana w pliku z biblioteki muzyki na serwerze bazy danych',
-    CoverSource.file => 'Okładka zapisana w pliku muzycznym na telefonie',
-    CoverSource.itunes => 'Wyszukiwanie albumu w iTunes',
-    CoverSource.deezer => 'Wyszukiwanie albumu w serwisie Deezer',
-    CoverSource.youtube => 'Miniatura filmu, przycięta do kwadratu — przy teledyskach to kadr z filmu. Utworu z bazy bez linku i okładki szuka na YouTube',
+    CoverSource.server => l10n.coverSourcesScreenServerNote,
+    CoverSource.file => l10n.coverSourcesScreenFileNote,
+    CoverSource.itunes => l10n.coverSourcesScreenItunesNote,
+    CoverSource.deezer => l10n.coverSourcesScreenDeezerNote,
+    CoverSource.youtube => l10n.coverSourcesScreenYouTubeNote,
   };
 
   IconData _icon(CoverSource s) => switch (s) {
@@ -39,16 +39,14 @@ class _CoverSourcesScreenState extends State<CoverSourcesScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Okładki albumów'),
+        title: Text(l10n.coverSourcesScreenTitle),
       ),
       body: ReorderableListView(
         buildDefaultDragHandles: false,
         header: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            'Okładka albumu jest pobierana z pierwszego dostępnego źródła. '
-            'Przeciągnij, aby zmienić kolejność. Pobrane okładki: Oszczędzanie danych i tryb '
-            'offline › Pamięć podręczna.',
+            l10n.coverSourcesScreenIntro,
             style: TextStyle(
               fontSize: AppFontSize.listSubtitle,
               color: palette.textSecondary,

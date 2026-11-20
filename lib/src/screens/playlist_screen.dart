@@ -18,6 +18,7 @@ import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_playlist.dart';
 import '../data/youtube_search.dart';
+import '../l10n.dart';
 import '../playback/downloads.dart';
 import '../playback/playback_queue.dart';
 import '../app_name.dart';
@@ -71,14 +72,17 @@ class PlaylistScreen extends StatefulWidget {
 /// each playlist. "Ostatnio dodane" only for one made on the phone — an imported one's order is
 /// its source's.
 enum _TrackSort {
-  own('Własna kolejność'),
-  recent('Ostatnio dodane'),
-  title('Tytuł'),
-  artist('Wykonawca');
+  own,
+  recent,
+  title,
+  artist;
 
-  const _TrackSort(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    _TrackSort.own => l10n.playlistScreenSortOwn,
+    _TrackSort.recent => l10n.playlistScreenSortRecent,
+    _TrackSort.title => l10n.playlistScreenSortTitle,
+    _TrackSort.artist => l10n.playlistScreenSortArtist,
+  };
 }
 
 class _PlaylistScreenState extends State<PlaylistScreen> {
@@ -210,12 +214,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     showMenuSheet(
       context,
       idPrefix: '$_id › Sortuj',
-      header: const Padding(
-        padding: EdgeInsets.only(bottom: 8),
+      header: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
         child: Center(
           child: Text(
-            'Sortuj wg',
-            style: TextStyle(
+            l10n.playlistScreenSortBy,
+            style: const TextStyle(
               fontSize: AppFontSize.listTitle,
               fontWeight: FontWeight.bold,
             ),
@@ -321,7 +325,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     } catch (e) {
       debugPrint('Previewing playlist ${found.id} failed: $e');
       if (mounted) {
-        setState(() => _fetchError = 'Nie udało się wczytać playlisty.');
+        setState(() => _fetchError = l10n.playlistScreenLoadFailed);
       }
     }
   }
@@ -353,8 +357,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '${result.updated ? 'Zaktualizowano' : 'Zapisano'} „${result.playlist.name}” '
-            'w Bibliotece.',
+            result.updated
+                ? l10n.playlistScreenUpdatedInLibrary(result.playlist.name)
+                : l10n.playlistScreenSavedInLibrary(result.playlist.name),
           ),
         ),
       );
@@ -362,7 +367,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     } catch (e) {
       debugPrint('Saving playlist failed: $e');
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nie udało się zapisać playlisty.')),
+        SnackBar(content: Text(l10n.playlistScreenSaveFailed)),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -479,13 +484,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     final found = widget.found!;
     return PlaylistLibraryScope.of(context).saved(found.source, found.id) ==
             null
-        ? 'Zapisz w Bibliotece'
-        : 'Zaktualizuj w Bibliotece';
+        ? l10n.playlistScreenSaveToLibrary
+        : l10n.playlistScreenUpdateInLibrary;
   }
 
   bool get _fromSpotify => _playlist.source?.isSpotify ?? false;
-  String get _kind =>
-      _playlist.source == PlaylistSource.spotifyAlbum ? 'Album' : 'Playlista';
+  String get _kind => _playlist.source == PlaylistSource.spotifyAlbum
+      ? l10n.playlistScreenKindAlbum
+      : l10n.playlistScreenKindPlaylist;
   String get _owner =>
       _playlist.owner ??
       switch (_playlist.source) {
@@ -552,8 +558,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (_) => TextInputDialog(
-        title: 'Zmień nazwę playlisty',
-        hint: 'Nazwa',
+        title: l10n.playlistScreenRenameTitle,
+        hint: l10n.playlistScreenNameHint,
         initial: saved.name,
       ),
     );
@@ -570,23 +576,23 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Usunąć playlistę?'),
+        title: Text(l10n.playlistScreenDeleteTitle),
         content: Text(
           _playlist.account == null
-              ? '„${_playlist.name}” zniknie z Biblioteki. Utwory w bazie danych i na '
-                    'telefonie zostają.'
-              : '„${_playlist.name}” zniknie z Biblioteki na wszystkich urządzeniach konta '
-                    '${_playlist.account} i z MusicDatabase (zostanie tam kopia w archiwum). '
-                    'Utwory w bazie danych i na telefonie zostają.',
+              ? l10n.playlistScreenDeleteLocal(_playlist.name)
+              : l10n.playlistScreenDeleteSynced(
+                  _playlist.name,
+                  '${_playlist.account}',
+                ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Anuluj'),
+            child: Text(l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Usuń'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -623,12 +629,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     return [
       MenuSheetEntry(
         Icons.queue_music,
-        'Dodaj do kolejki',
+        l10n.playlistScreenAddToQueue,
         onTap: () => queueSongs(context, hits, next: false, origin: origin()),
       ),
       MenuSheetEntry(
         Icons.playlist_play,
-        'Odtwórz jako następną',
+        l10n.playlistScreenPlayNext,
         onTap: () => queueSongs(context, hits, next: true, origin: origin()),
       ),
     ];
@@ -647,7 +653,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           ? [
               MenuSheetEntry(
                 Icons.share_outlined,
-                'Udostępnij',
+                l10n.playlistScreenShare,
                 onTap: () => _share(hits),
               ),
               ..._queueEntries(hits),
@@ -661,37 +667,37 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               if (_tracks != null)
                 MenuSheetEntry(
                   Icons.rule,
-                  'Wyświetl utwory, których nie ma w bazie danych',
+                  l10n.playlistScreenShowMissing,
                   onTap: _showMissing,
                 ),
             ]
           : [
               MenuSheetEntry(
                 Icons.share_outlined,
-                'Udostępnij',
+                l10n.playlistScreenShare,
                 onTap: () => _share(hits),
               ),
               ..._queueEntries(hits),
               ?moodForAllEntry(context, hits, title: _playlist.name),
               MenuSheetEntry(
                 Icons.check_circle,
-                'Usuń z Biblioteki',
+                l10n.playlistScreenRemoveFromLibrary,
                 onTap: _delete,
               ),
               MenuSheetEntry(
                 Icons.drive_file_rename_outline,
-                'Zmień nazwę',
+                l10n.playlistScreenRename,
                 onTap: _rename,
               ),
               MenuSheetEntry(
                 Icons.add,
-                'Dodaj do tej playlisty',
+                l10n.playlistScreenAddToThis,
                 onTap: () => _openAdd(hits),
               ),
               if (_editable)
                 MenuSheetEntry(
                   Icons.edit_outlined,
-                  'Edytuj playlistę',
+                  l10n.playlistScreenEdit,
                   onTap: _openEdit,
                 ),
               ...customCoverEntries(
@@ -704,13 +710,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ),
               MenuSheetEntry(
                 Icons.rule,
-                'Wyświetl utwory, których nie ma w bazie danych',
+                l10n.playlistScreenShowMissing,
                 onTap: _showMissing,
               ),
               ?playlistMenuEntry(
                 context,
                 hits,
-                label: 'Dodaj do innej playlisty',
+                label: l10n.playlistScreenAddToOther,
               ),
               ?moveToFolderEntry(
                 context,
@@ -740,7 +746,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         if (!_preview)
           MenuSheetEntry(
             Icons.remove_circle_outline,
-            'Usuń z tej playlisty',
+            l10n.playlistScreenRemoveFromThis,
             onTap: () => _removeTrack(index),
           ),
       ],
@@ -750,7 +756,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   PreferredSizeWidget _searchBar(AppPalette palette, Color tint) => AppBar(
     backgroundColor: Color.lerp(tint, palette.background, 0.4),
     leading: IconButton(
-      tooltip: 'Zamknij wyszukiwanie',
+      tooltip: l10n.playlistScreenCloseSearch,
       icon: const Icon(Icons.arrow_back),
       onPressed: () => Navigator.of(context).pop(),
     ),
@@ -760,8 +766,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       autofocus: true,
       textInputAction: TextInputAction.search,
       onChanged: (_) => setState(() {}),
-      decoration: const InputDecoration(
-        hintText: 'Szukaj w playliście',
+      decoration: InputDecoration(
+        hintText: l10n.playlistScreenSearch,
         border: InputBorder.none,
       ),
     ),
@@ -770,7 +776,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         SearchEverywhereButton(query: _query.text),
       if (_query.text.isNotEmpty)
         IconButton(
-          tooltip: 'Wyczyść',
+          tooltip: l10n.playlistScreenClear,
           icon: const Icon(Icons.close),
           onPressed: () => setState(_query.clear),
         ),
@@ -799,7 +805,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Text(
-            'Brak wyników dla „${_query.text.trim()}”',
+            l10n.playlistScreenNoResults(_query.text.trim()),
             textAlign: TextAlign.center,
             style: TextStyle(color: palette.textSecondary),
           ),
@@ -839,13 +845,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     // Like the reference app's playlists: just the artist.
     subtitle: hit.shownArtist(context),
     trailing: IconButton(
-      tooltip: 'Menu utworu (⋮)',
+      tooltip: l10n.playlistScreenSongMenu,
       icon: Icon(Icons.more_vert, color: context.palette.textSecondary),
       onPressed: () => _showTrackMenu(hit, i),
     ),
     onLongPress: () => _showTrackMenu(hit, i),
     onSwipeRemove: _preview ? null : () => _swipeRemove(hit, i),
-    swipeRemoveLabel: 'Usuń z tej playlisty',
+    swipeRemoveLabel: l10n.playlistScreenRemoveFromThis,
   );
 
   /// Dragged left: like "Usuń z tej playlisty", saying so.
@@ -855,7 +861,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     messenger
       ..clearSnackBars()
       ..showSnackBar(
-        SnackBar(content: Text('Usunięto z playlisty: „${hit.title}”')),
+        SnackBar(content: Text(l10n.playlistScreenRemoved(hit.title))),
       );
   }
 
@@ -888,18 +894,18 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                     )
                   : null,
               leading: IconButton(
-                tooltip: 'Wstecz',
+                tooltip: l10n.playlistScreenBack,
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               actions: [
                 IconButton(
-                  tooltip: 'Szukaj w playliście',
+                  tooltip: l10n.playlistScreenSearch,
                   icon: const Icon(Icons.search),
                   onPressed: tracks == null ? null : _startSearch,
                 ),
                 IconButton(
-                  tooltip: 'Menu playlisty (⋮)',
+                  tooltip: l10n.playlistScreenPlaylistMenu,
                   icon: const Icon(Icons.more_vert),
                   onPressed: () => _showPlaylistMenu(hits),
                 ),
@@ -1002,13 +1008,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             if (!_preview && tracks != null)
                               _DownloadButton(hits: hits, name: _playlist.name),
                             IconButton(
-                              tooltip: 'Udostępnij',
+                              tooltip: l10n.playlistScreenShare,
                               icon: const Icon(Icons.share_outlined, size: 28),
                               onPressed: () => _share(hits),
                             ),
                             const Spacer(),
                             IconButton(
-                              tooltip: 'Odtwarzanie losowe',
+                              tooltip: l10n.playlistScreenShuffle,
                               icon: Icon(
                                 Icons.shuffle,
                                 color: palette.accent,
@@ -1033,7 +1039,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                             const SizedBox(width: 4),
                             FloatingActionButton(
                               heroTag: null,
-                              tooltip: 'Odtwórz playlistę',
+                              tooltip: l10n.playlistScreenPlay,
                               backgroundColor: palette.accent,
                               foregroundColor: palette.onAccent,
                               shape: palette.buttonShape,
@@ -1066,7 +1072,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                   _ActionChip(
                                     icon: Icons.add,
                                     label: _saving
-                                        ? 'Zapisuję…'
+                                        ? l10n.playlistScreenSaving
                                         : _saveLabel(context),
                                     onTap: _fetched == null || _saving
                                         ? null
@@ -1076,19 +1082,19 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                               : [
                                   _ActionChip(
                                     icon: Icons.add,
-                                    label: 'Dodaj',
+                                    label: l10n.commonAdd,
                                     onTap: () => _openAdd(hits),
                                   ),
                                   if (_editable)
                                     _ActionChip(
                                       icon: Icons.menu,
-                                      label: 'Edytuj',
+                                      label: l10n.playlistScreenEditChip,
                                       onTap: tracks == null ? null : _openEdit,
                                     ),
                                   _ActionChip(
                                     icon: Icons.swap_vert,
                                     label: _sort == _TrackSort.own
-                                        ? 'Sortuj'
+                                        ? l10n.playlistScreenSort
                                         : _sort.label,
                                     onTap: tracks == null
                                         ? null
@@ -1114,7 +1120,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                   shape: palette.pillShape,
                                 ),
                                 onPressed: _fetch,
-                                child: const Text('Spróbuj ponownie'),
+                                child: Text(l10n.commonRetry),
                               ),
                             ],
                           ),
@@ -1153,23 +1159,17 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 }
 
 /// "1 utwór", "3 utwory", "12 utworów".
-String trackCountLabel(int n) {
-  final tens = n % 100;
-  final word = n == 1
-      ? 'utwór'
-      : n % 10 >= 2 && n % 10 <= 4 && (tens < 12 || tens > 14)
-      ? 'utwory'
-      : 'utworów';
-  return '$n $word';
-}
+String trackCountLabel(int n) => l10n.songsCount(n);
 
 /// "3 godz. 12 min" / "45 min"; "ponad 3 godz. 12 min" when some tracks' lengths are unknown.
 String playlistLengthLabel(PlaylistSummary playlist) {
   final d = playlist.duration;
   final length = d.inHours > 0
-      ? '${d.inHours} godz. ${d.inMinutes % 60} min'
-      : '${d.inMinutes} min';
-  return playlist.unknownLengths > 0 ? 'ponad $length' : length;
+      ? l10n.playlistScreenLengthHours(d.inHours, d.inMinutes % 60)
+      : l10n.playlistScreenLengthMinutes(d.inMinutes);
+  return playlist.unknownLengths > 0
+      ? l10n.playlistScreenLengthAtLeast(length)
+      : length;
 }
 
 /// "Pobierz" for the whole playlist: ⬇ downloads every song not on the phone yet, a spinner
@@ -1186,9 +1186,7 @@ class _DownloadButton extends StatelessWidget {
     messenger
       ..clearSnackBars()
       ..showSnackBar(
-        SnackBar(
-          content: Text('Pobieram ${trackCountLabel(missing)} z „$name”…'),
-        ),
+        SnackBar(content: Text(l10n.playlistScreenDownloading(missing, name))),
       );
     final failed = await downloads.download(hits);
     messenger
@@ -1197,8 +1195,8 @@ class _DownloadButton extends StatelessWidget {
         SnackBar(
           content: Text(
             failed == 0
-                ? 'Pobrano „$name” — zagra też bez internetu.'
-                : 'Nie udało się pobrać: ${trackCountLabel(failed)}.',
+                ? l10n.playlistScreenDownloaded(name)
+                : l10n.playlistScreenDownloadFailed(failed),
           ),
         ),
       );
@@ -1208,19 +1206,16 @@ class _DownloadButton extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Usunąć pobrane?'),
-        content: Text(
-          'Utwory z „$name” przestaną być dostępne bez internetu (muzyka z telefonu '
-          'zostaje).',
-        ),
+        title: Text(l10n.playlistScreenRemoveDownloadsTitle),
+        content: Text(l10n.playlistScreenRemoveDownloadsText(name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Anuluj'),
+            child: Text(l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Usuń'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -1234,10 +1229,10 @@ class _DownloadButton extends StatelessWidget {
     if (downloads == null) return const SizedBox.shrink();
     final palette = context.palette;
     if (downloads.isDownloadingAny(hits)) {
-      return const IconButton(
-        tooltip: 'Pobieram…',
+      return IconButton(
+        tooltip: l10n.playlistScreenDownloadingTooltip,
         onPressed: null,
-        icon: SizedBox.square(
+        icon: const SizedBox.square(
           dimension: 26,
           child: CircularProgressIndicator(strokeWidth: 2.5),
         ),
@@ -1246,9 +1241,9 @@ class _DownloadButton extends StatelessWidget {
     final state = downloads.stateOf(hits);
     return IconButton(
       tooltip: switch (state) {
-        DownloadState.all => 'Pobrano — usuń z pobranych',
-        DownloadState.some => 'Pobierz resztę',
-        DownloadState.none => 'Pobierz',
+        DownloadState.all => l10n.playlistScreenDownloadedRemove,
+        DownloadState.some => l10n.playlistScreenDownloadRest,
+        DownloadState.none => l10n.playlistScreenDownload,
       },
       icon: Icon(
         state == DownloadState.all

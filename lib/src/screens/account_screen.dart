@@ -10,6 +10,7 @@ import '../widgets/feature_info.dart';
 import 'feature_infos.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../l10n.dart';
 
 /// "Ustawienia › Konto" (also the profile card in "Ja"): logging in with a MusicDatabase
 /// user, or who is logged in and "Wyloguj" ([ADR 0006](../../../docs/decisions/0006-musicdatabase-login.md)),
@@ -49,7 +50,7 @@ class _AccountScreenState extends State<AccountScreen> {
     final account = AccountScope.of(context);
     final sync = DatabaseSyncScope.of(context);
     if (_user.text.trim().isEmpty || _password.text.isEmpty) {
-      setState(() => _error = 'Wpisz nazwę użytkownika i hasło');
+      setState(() => _error = l10n.accountScreenEnterCredentials);
       return;
     }
     setState(() => _error = null);
@@ -82,36 +83,38 @@ class _AccountScreenState extends State<AccountScreen> {
       return;
     }
     final kinds = [
-      if (playlistCount > 0) 'playlisty',
-      if (moodCount > 0) 'nastroje',
-      if (folderCount > 0) 'foldery',
+      if (playlistCount > 0) l10n.accountScreenKindPlaylists,
+      if (moodCount > 0) l10n.accountScreenKindMoods,
+      if (folderCount > 0) l10n.accountScreenKindFolders,
     ];
     final what = kinds.length == 1
         ? kinds.single
-        : '${kinds.sublist(0, kinds.length - 1).join(', ')} i ${kinds.last}';
+        : l10n.accountScreenListAnd(
+            kinds.sublist(0, kinds.length - 1).join(', '),
+            kinds.last,
+          );
     final add = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Dodać $what z telefonu do konta?'),
+        title: Text(l10n.accountScreenAddToAccountTitle(what)),
         content: Text(
           [
             if (playlistCount > 0)
-              'Playlisty tylko na tym telefonie: $playlistCount.',
-            if (moodCount > 0) 'Nastroje tylko na tym telefonie: $moodCount.',
+              l10n.accountScreenPhoneOnlyPlaylists(playlistCount),
+            if (moodCount > 0) l10n.accountScreenPhoneOnlyMoods(moodCount),
             if (folderCount > 0)
-              'Foldery tylko na tym telefonie: $folderCount.',
-            'Dodane do konta $user będą też w MusicDatabase i na innych telefonach tego '
-                'konta. Bez dodania zostaną tylko tutaj.',
+              l10n.accountScreenPhoneOnlyFolders(folderCount),
+            l10n.accountScreenAddToAccountText(user),
           ].join(' '),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Nie teraz'),
+            child: Text(l10n.accountScreenNotNow),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Dodaj'),
+            child: Text(l10n.commonAdd),
           ),
         ],
       ),
@@ -134,18 +137,18 @@ class _AccountScreenState extends State<AccountScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Konto'),
+        title: Text(l10n.accountScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           ...account.loggedIn
               ? [
-                  const SectionTitle('Konto MusicDatabase'),
+                  SectionTitle(l10n.accountScreenMusicDatabaseAccount),
                   ListTile(
                     leading: const ProfileAvatar(radius: 20),
                     title: Text(account.userName!),
-                    subtitle: const Text('Zalogowano'),
+                    subtitle: Text(l10n.accountScreenSignedIn),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -153,28 +156,20 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: Text(
-                      'Playlisty z Biblioteki są zapisywane na tym koncie w MusicDatabase i '
-                      'widoczne na każdym telefonie, na którym się na nie zalogujesz. '
-                      'Zgłoszenia poprawek wysyłane do MusicDatabase są podpisane tym kontem. '
-                      'Co i kiedy się synchronizuje: Ustawienia › Synchronizacja.',
-                      style: hint,
-                    ),
+                    child: Text(l10n.accountScreenSignedInText, style: hint),
                   ),
                   const _YouTubeAccountSection(),
                 ]
               : [
-                  const SectionTitle('Zaloguj się do MusicDatabase'),
+                  SectionTitle(l10n.accountScreenSignInTitle),
                   if (account.needsLogin)
                     ListTile(
                       leading: Icon(
                         Icons.error_outline,
                         color: Theme.of(context).colorScheme.error,
                       ),
-                      title: const Text(
-                        'Serwer nie przyjął zapisanego logowania',
-                      ),
-                      subtitle: const Text('Wpisz hasło jeszcze raz.'),
+                      title: Text(l10n.accountScreenLoginRejected),
+                      subtitle: Text(l10n.accountScreenEnterPasswordAgain),
                     ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -185,8 +180,8 @@ class _AccountScreenState extends State<AccountScreen> {
                       enableSuggestions: false,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.username],
-                      decoration: const InputDecoration(
-                        labelText: 'Nazwa użytkownika',
+                      decoration: InputDecoration(
+                        labelText: l10n.accountScreenUserName,
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -204,7 +199,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       autofillHints: const [AutofillHints.password],
                       onSubmitted: (_) => _logIn(),
                       decoration: InputDecoration(
-                        labelText: 'Hasło',
+                        labelText: l10n.accountScreenPassword,
                         errorText: _error,
                         errorMaxLines: 3,
                         border: const OutlineInputBorder(),
@@ -229,20 +224,15 @@ class _AccountScreenState extends State<AccountScreen> {
                                 color: palette.onAccent,
                               ),
                             )
-                          : const Text(
-                              'Zaloguj',
+                          : Text(
+                              l10n.accountScreenSignIn,
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: Text(
-                      'Konta zakłada się w MusicDatabase (Main menu › Users). Logowanie '
-                      'wymaga połączenia z serwerem bazy danych; telefon zapamiętuje nazwę '
-                      'użytkownika i znak logowania, nie hasło.',
-                      style: hint,
-                    ),
+                    child: Text(l10n.accountScreenSignInHelp, style: hint),
                   ),
                   const _YouTubeAccountSection(),
                 ],
@@ -268,8 +258,8 @@ class LogOutButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
         ),
         onPressed: () => _confirm(context),
-        child: const Text(
-          'Wyloguj',
+        child: Text(
+          l10n.accountScreenSignOut,
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
@@ -282,20 +272,16 @@ class LogOutButton extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Wylogować?'),
-        content: Text(
-          'Telefon zapomni logowanie konta ${account.userName}. Playlisty konta znikną '
-          'z Biblioteki do ponownego zalogowania (zmiany jeszcze niewysłane poczekają). '
-          'Zgłoszenia, które czekają na wysłanie, zostaną.',
-        ),
+        title: Text(l10n.accountScreenSignOutTitle),
+        content: Text(l10n.accountScreenSignOutText(account.userName ?? '')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Anuluj'),
+            child: Text(l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Wyloguj'),
+            child: Text(l10n.accountScreenSignOut),
           ),
         ],
       ),
@@ -319,7 +305,7 @@ class _YouTubeAccountSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 16),
-        const SectionTitle('Konto Google (playlisty na YouTube)'),
+        SectionTitle(l10n.accountScreenGoogleAccount),
         ListTile(
           leading: const Icon(Icons.smart_display_outlined),
           title: Text(email),
@@ -327,7 +313,7 @@ class _YouTubeAccountSection extends StatelessWidget {
               showFeatureInfo(context, FeatureInfos.googleAccount),
           trailing: TextButton(
             onPressed: account.signOut,
-            child: const Text('Wyloguj'),
+            child: Text(l10n.accountScreenSignOut),
           ),
         ),
       ],

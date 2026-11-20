@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n.dart';
 import 'playlist_sync.dart';
 import 'problem_report.dart';
 import 'server_trust.dart';
@@ -85,9 +86,9 @@ class Account extends ChangeNotifier {
     String userName,
     String password,
   ) async {
-    if (_busy) return 'Logowanie już trwa';
+    if (_busy) return l10n.accountLoginInProgress;
     if (servers.isEmpty) {
-      return 'Najpierw ustaw adres serwera (Ustawienia › Synchronizacja › Prywatny serwer)';
+      return l10n.accountNoServer;
     }
     _busy = true;
     notifyListeners();
@@ -123,25 +124,24 @@ class Account extends ChangeNotifier {
               );
               return null;
             case HttpStatus.unauthorized:
-              return 'Nieprawidłowa nazwa użytkownika lub hasło';
+              return l10n.accountWrongPassword;
             case HttpStatus.tooManyRequests:
               final seconds =
                   int.tryParse(
                     response.headers.value(HttpHeaders.retryAfterHeader) ?? '',
                   ) ??
                   300;
-              return 'Za dużo nieudanych prób logowania — spróbuj ponownie za '
-                  '${(seconds / 60).ceil()} min';
+              return l10n.accountTooManyAttempts((seconds / 60).ceil());
             case HttpStatus.serviceUnavailable:
-              return 'Dysk serwera MusicDatabase nie jest podłączony';
+              return l10n.accountServerDiskMissing;
             case HttpStatus.notFound:
-              problem = 'Serwer MusicDatabase nie obsługuje jeszcze logowania';
+              problem = l10n.accountLoginUnsupported;
             default:
-              problem = 'Serwer odpowiedział: HTTP ${response.statusCode}';
+              problem = l10n.accountHttpError(response.statusCode);
           }
         } catch (e) {
           debugPrint('Login on $server failed: $e');
-          problem = 'Brak połączenia z serwerem MusicDatabase';
+          problem = l10n.accountNoConnection;
         }
       }
       return problem;

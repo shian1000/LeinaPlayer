@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n.dart';
 import 'youtube_api.dart';
 
 /// Managing the user's YouTube playlists (YouTube Data API).
@@ -71,16 +72,14 @@ class _PluginGoogleAuth implements GoogleAuth {
     } on GoogleSignInException catch (e) {
       debugPrint('Google sign-in failed: ${e.code} ${e.description}');
       throw switch (e.code) {
-        GoogleSignInExceptionCode.canceled => const GoogleSignInFailed(
-          'Logowanie do Google przerwane',
+        GoogleSignInExceptionCode.canceled => GoogleSignInFailed(
+          l10n.youtubeAccountSignInCancelled,
           cancelled: true,
         ),
         GoogleSignInExceptionCode.clientConfigurationError =>
-          const GoogleSignInFailed(
-            'Aplikacja nie jest poprawnie zarejestrowana w Google Cloud',
-          ),
+          GoogleSignInFailed(l10n.youtubeAccountNotRegistered),
         _ => GoogleSignInFailed(
-          'Nie udało się zalogować do Google (${e.code.name})',
+          l10n.youtubeAccountSignInFailedCode(e.code.name),
         ),
       };
     }
@@ -137,13 +136,11 @@ class YouTubeAccount extends ChangeNotifier {
   /// Throws [GoogleSignInFailed].
   Future<String> token() async {
     if (!supported) {
-      throw const GoogleSignInFailed(
-        'Tworzenie playlist na YouTube działa na razie tylko na Androidzie',
-      );
+      throw GoogleSignInFailed(l10n.youtubeAccountAndroidOnly);
     }
     final result = await _auth.signIn(const [youTubeScope], interactive: true);
     if (result == null) {
-      throw const GoogleSignInFailed('Nie udało się zalogować do Google');
+      throw GoogleSignInFailed(l10n.youtubeAccountSignInFailed);
     }
     if (result.email != _email) {
       _email = result.email;

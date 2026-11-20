@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../l10n.dart';
 import 'playlist_sync.dart';
 
 /// Where a listened song played from.
@@ -357,7 +358,7 @@ class ListeningLog extends ChangeNotifier {
         return e.problem;
       } catch (e) {
         debugPrint('Listening stats sync on $server failed: $e');
-        problem = 'Brak połączenia z serwerem MusicDatabase';
+        problem = l10n.listeningLogNoConnection;
       } finally {
         client.close();
       }
@@ -471,20 +472,13 @@ class ListeningLog extends ChangeNotifier {
         return body;
       case HttpStatus.unauthorized:
         onUnauthorized?.call();
-        throw const _SyncStopped(
-          'Serwer nie przyjął logowania — zaloguj się ponownie (Ustawienia › Konto)',
-        );
+        throw _SyncStopped(l10n.listeningLogUnauthorized);
       case HttpStatus.serviceUnavailable:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie może teraz zapisać statystyk (dysk niepodłączony lub '
-          'baza użytkownika jeszcze nieprzygotowana)',
-        );
+        throw _SyncStopped(l10n.listeningLogServerUnavailable);
       case HttpStatus.notFound:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie obsługuje jeszcze statystyk słuchania',
-        );
+        throw _SyncStopped(l10n.listeningLogNotSupported);
     }
-    throw _SyncStopped('Serwer odrzucił statystyki (HTTP ${answer.status})');
+    throw _SyncStopped(l10n.listeningLogRejected(answer.status));
   }
 }
 

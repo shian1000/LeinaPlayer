@@ -9,6 +9,7 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/downloads.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
@@ -137,8 +138,7 @@ Future<void> showLinkShareSheet(
   bool unfinished = false,
 }) {
   final messenger = ScaffoldMessenger.of(context);
-  const noLink =
-      'Ta playlista nie ma jeszcze linku — najpierw utwórz ją na YouTube.';
+  final noLink = l10n.shareSheetNoLink;
   return showShareSheet(
     context,
     title: title,
@@ -148,13 +148,13 @@ Future<void> showLinkShareSheet(
     options: [
       ShareOption(
         icon: Icons.link,
-        label: 'Kopiuj link',
+        label: l10n.shareSheetCopyLink,
         onTap: link == null
             ? null
             : () async {
                 await Clipboard.setData(ClipboardData(text: link.toString()));
                 messenger.showSnackBar(
-                  const SnackBar(content: Text('Skopiowano link')),
+                  SnackBar(content: Text(l10n.shareSheetLinkCopied)),
                 );
               },
         unavailable: noLink,
@@ -162,7 +162,9 @@ Future<void> showLinkShareSheet(
       if (makeOnYouTube != null)
         ShareOption(
           icon: Icons.playlist_add,
-          label: unfinished ? 'Dokończ na YouTube' : 'Utwórz na YouTube',
+          label: unfinished
+              ? l10n.shareSheetFinishOnYouTube
+              : l10n.shareSheetMakeOnYouTube,
           onTap: makeOnYouTube,
         )
       else if (link != null)
@@ -171,22 +173,22 @@ Future<void> showLinkShareSheet(
               ? Icons.smart_display_outlined
               : Icons.graphic_eq,
           label: target == ShareTarget.youtube
-              ? 'Otwórz w YouTube'
-              : 'Otwórz w Spotify',
+              ? l10n.shareSheetOpenInYouTube
+              : l10n.shareSheetOpenInSpotify,
           onTap: () async {
             final opened = target == ShareTarget.youtube
                 ? await openInYouTube(link)
                 : await _openSpotify(link);
             if (!opened) {
               messenger.showSnackBar(
-                const SnackBar(content: Text('Nie udało się otworzyć linku.')),
+                SnackBar(content: Text(l10n.shareSheetOpenFailed)),
               );
             }
           },
         ),
       ShareOption(
         icon: Icons.more_horiz,
-        label: 'Więcej',
+        label: l10n.shareSheetMore,
         onTap: link == null ? null : () => _shareLink(link, title),
         unavailable: noLink,
       ),
@@ -224,27 +226,24 @@ Future<void> showSongShareSheet(
             ? null
             : () => _shareLink(youTubeWatchUri(videoId), subject),
         unavailable: song.youTube == YouTubeLink.unknown
-            ? 'Nie znamy jeszcze filmu z tym utworem — odtwórz go, a telefon '
-                  'poszuka go na YouTube.'
-            : 'Tego utworu nie ma na YouTube.',
+            ? l10n.shareSheetNoVideoYet
+            : l10n.shareSheetNotOnYouTube,
       ),
       ShareOption(
         icon: Icons.graphic_eq,
         label: 'Spotify',
         onTap: spotify == null ? null : () => _shareLink(spotify, subject),
-        unavailable: 'Brak linku do tego utworu na Spotify.',
+        unavailable: l10n.shareSheetNoSpotifyLink,
       ),
       ShareOption(
         icon: Icons.audio_file_outlined,
-        label: 'Plik',
+        label: l10n.shareSheetFile,
         onTap: file == null
             ? null
             : () => SharePlus.instance.share(
                 ShareParams(files: [XFile(file.path)], subject: subject),
               ),
-        unavailable:
-            'Telefon nie ma pliku tego utworu — pobierz go („Pobierz utwór”) '
-            'albo odtwórz, żeby trafił do pamięci podręcznej.',
+        unavailable: l10n.shareSheetNoFile,
       ),
     ],
   );

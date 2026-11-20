@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import 'cache_settings_screen.dart';
 import 'download_folder.dart';
@@ -16,39 +17,29 @@ class DataSaverScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: context.palette.surface,
-        title: const Text('Oszczędzanie danych i tryb offline'),
+        title: Text(l10n.dataSaverScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 12),
         children: [
           SwitchListTile(
             secondary: const Icon(Icons.wifi),
-            title: const Text(
-              'Zapisuj następne utwory z kolejki tylko przez Wi-Fi',
-            ),
-            subtitle: const Text(
-              'Przez sieć komórkową utwory z kolejki nie są pobierane z wyprzedzeniem',
-            ),
+            title: Text(l10n.dataSaverScreenQueueWifiOnly),
+            subtitle: Text(l10n.dataSaverScreenQueueWifiOnlySubtitle),
             value: settings.queuePrefetchWifiOnly,
             onChanged: settings.setQueuePrefetchWifiOnly,
           ),
           SwitchListTile(
             secondary: const Icon(Icons.album_outlined),
-            title: const Text('Pobieraj okładki tylko przez Wi-Fi'),
-            subtitle: const Text(
-              'Przez sieć komórkową widać tylko okładki zapisane już na telefonie i te z '
-              'plików muzycznych',
-            ),
+            title: Text(l10n.dataSaverScreenCoversWifiOnly),
+            subtitle: Text(l10n.dataSaverScreenCoversWifiOnlySubtitle),
             value: settings.coverWifiOnly,
             onChanged: settings.setCoverWifiOnly,
           ),
           SwitchListTile(
             secondary: const Icon(Icons.lyrics_outlined),
-            title: const Text('Pobieraj teksty piosenek'),
-            subtitle: const Text(
-              'Z serwera MusicDatabase, a gdy go nie zna — z serwisu LRCLIB, gdy otwarty jest '
-              'odtwarzacz. Wyłączone: bez karty z tekstem i bez tych połączeń',
-            ),
+            title: Text(l10n.dataSaverScreenLyrics),
+            subtitle: Text(l10n.dataSaverScreenLyricsSubtitle),
             value: settings.lyrics,
             onChanged: settings.setLyrics,
           ),
@@ -56,21 +47,18 @@ class DataSaverScreen extends StatelessWidget {
           const DownloadFolderTile(),
           SwitchListTile(
             secondary: const Icon(Icons.audio_file_outlined),
-            title: const Text('Pobieraj jako MP3'),
-            subtitle: const Text(
-              'Utwory pobrane przyciskiem „Pobierz” są zapisywane jako MP3 256 kbps, z tytułem, '
-              'wykonawcą, albumem, rokiem, gatunkiem i okładką — inne aplikacje i sprzęty je '
-              'odtworzą. Już pobrane zostają bez zmian',
-            ),
+            title: Text(l10n.dataSaverScreenMp3),
+            subtitle: Text(l10n.dataSaverScreenMp3Subtitle),
             value: settings.downloadsAsMp3,
             onChanged: settings.setDownloadsAsMp3,
           ),
           ListTile(
             leading: const Icon(Icons.sd_storage_outlined),
-            title: const Text('Pamięć podręczna'),
+            title: Text(l10n.dataSaverScreenCache),
             subtitle: Text(
-              'Utwory z YouTube, kolejka, okładki • zajęte '
-              '${(cacheBytesOf(context) / (1024 * 1024)).toStringAsFixed(1)} MB',
+              l10n.dataSaverScreenCacheSubtitle(
+                (cacheBytesOf(context) / (1024 * 1024)).toStringAsFixed(1),
+              ),
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(

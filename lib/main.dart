@@ -43,6 +43,7 @@ import 'src/data/youtube_account.dart';
 import 'src/data/youtube_audio.dart';
 import 'src/data/youtube_library.dart';
 import 'src/data/youtube_search.dart';
+import 'src/l10n.dart';
 import 'src/playback/downloads.dart';
 import 'src/playback/listening_tracker.dart';
 import 'src/playback/playback_queue.dart';
@@ -70,12 +71,13 @@ Future<void> main() async {
   // service behind them keeps Android from killing the app.
   MediaSession? mediaSession;
   try {
+    await ThemeController.applySavedLanguage();
     mediaSession = await AudioService.init(
       builder: MediaSession.new,
-      config: const AudioServiceConfig(
+      config: AudioServiceConfig(
         androidNotificationChannelId:
             'com.shian1000.music_database_app.playback',
-        androidNotificationChannelName: 'Odtwarzanie',
+        androidNotificationChannelName: l10n.mainPlaybackChannel,
         // A paused service leaving the foreground can't come back to it from the background
         // (Android 12+): music resumed there played unprotected and the phone froze the app
         // (local-library.md). So the notification can't be swiped away while paused.
@@ -1152,17 +1154,34 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
                                                                         ),
                                                                         themeMode:
                                                                             _themeController.themeMode,
+                                                                        locale:
+                                                                            _themeController.locale,
+                                                                        supportedLocales:
+                                                                            AppLocalizations.supportedLocales,
+                                                                        localizationsDelegates:
+                                                                            AppLocalizations.localizationsDelegates,
+                                                                        localeListResolutionCallback: (
+                                                                          locales,
+                                                                          _,
+                                                                        ) => resolveSystemLocale(locales),
                                                                         // Tab screens have no AppBar to set the status-bar icon colour, so
                                                                         // match it to the active theme here (dark icons on light themes and
                                                                         // vice versa).
-                                                                        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-                                                                          value:
-                                                                              Theme.of(context).brightness == Brightness.light
-                                                                              ? SystemUiOverlayStyle.dark
-                                                                              : SystemUiOverlayStyle.light,
-                                                                          child:
-                                                                              child!,
-                                                                        ),
+                                                                        builder: (context, child) {
+                                                                          syncAppLocale(
+                                                                            context,
+                                                                          );
+                                                                          return AnnotatedRegion<
+                                                                            SystemUiOverlayStyle
+                                                                          >(
+                                                                            value:
+                                                                                Theme.of(context).brightness == Brightness.light
+                                                                                ? SystemUiOverlayStyle.dark
+                                                                                : SystemUiOverlayStyle.light,
+                                                                            child:
+                                                                                child!,
+                                                                          );
+                                                                        },
                                                                         home: AppShell(
                                                                           links:
                                                                               _incomingLinks.links,

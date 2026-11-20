@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app_name.dart';
 import '../data/local_library.dart';
 import '../data/user_backup.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -34,13 +35,13 @@ class BackupScreen extends StatelessWidget {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: 'application/zip')],
-          subject: 'Kopia zapasowa $appName',
+          subject: l10n.backupScreenShareSubject(appName),
         ),
       );
     } catch (e) {
       debugPrint('Making a backup failed: $e');
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nie udało się zrobić kopii zapasowej.')),
+        SnackBar(content: Text(l10n.backupScreenExportFailed)),
       );
     }
   }
@@ -54,7 +55,7 @@ class BackupScreen extends StatelessWidget {
     final BackupInfo info;
     try {
       final picked = await FilePicker.pickFiles(
-        dialogTitle: 'Wybierz plik kopii zapasowej',
+        dialogTitle: l10n.backupScreenPickFile,
       );
       final file = picked.firstOrNull;
       if (file == null) return;
@@ -65,7 +66,7 @@ class BackupScreen extends StatelessWidget {
       return;
     } catch (e) {
       debugPrint('Opening a backup failed: $e');
-      fail('Nie udało się otworzyć tego pliku.');
+      fail(l10n.backupScreenOpenFailed);
       return;
     }
     if (!context.mounted) return;
@@ -73,21 +74,16 @@ class BackupScreen extends StatelessWidget {
         await showDialog<bool>(
           context: context,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Przywrócić kopię zapasową?'),
-            content: Text(
-              'Kopia z ${_when(info.createdAt)}. Playlisty, nastroje, statystyki, '
-              'polubione, „Na później”, historia i ustawienia z tego telefonu '
-              'zostaną zastąpione tymi z kopii.\n\n'
-              'Aplikacja się zamknie — otwórz ją ponownie, żeby dokończyć.',
-            ),
+            title: Text(l10n.backupScreenRestoreTitle),
+            content: Text(l10n.backupScreenRestoreBody(_when(info.createdAt))),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Anuluj'),
+                child: Text(l10n.commonCancel),
               ),
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('Przywróć'),
+                child: Text(l10n.backupScreenRestore),
               ),
             ],
           ),
@@ -101,7 +97,7 @@ class BackupScreen extends StatelessWidget {
       return;
     } catch (e) {
       debugPrint('Restoring a backup failed: $e');
-      fail('Nie udało się przywrócić kopii zapasowej.');
+      fail(l10n.backupScreenRestoreFailed);
       return;
     }
     closeApp();
@@ -116,7 +112,7 @@ class BackupScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Kopia zapasowa'),
+        title: Text(l10n.backupScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 12, bottom: 24),
@@ -125,12 +121,10 @@ class BackupScreen extends StatelessWidget {
             enabled: !backup.busy,
             leading: Icon(Icons.save_alt, color: palette.accent),
             title: Text(
-              'Zrób kopię zapasową…',
+              l10n.backupScreenExport,
               style: TextStyle(color: palette.accent),
             ),
-            subtitle: const Text(
-              'Plik .zip na Dysk Google, do e-maila, na komputer…',
-            ),
+            subtitle: Text(l10n.backupScreenExportSubtitle),
             trailing: backup.busy
                 ? const SizedBox.square(
                     dimension: 20,
@@ -141,34 +135,28 @@ class BackupScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.history),
-            title: const Text('Ostatnia kopia'),
+            title: Text(l10n.backupScreenLastExport),
             subtitle: Text(
-              lastExport == null ? 'Jeszcze nie zrobiona' : _when(lastExport),
+              lastExport == null
+                  ? l10n.backupScreenNoExportYet
+                  : _when(lastExport),
             ),
           ),
           ListTile(
             enabled: !backup.busy,
             leading: const Icon(Icons.settings_backup_restore),
-            title: const Text('Przywróć z pliku…'),
+            title: Text(l10n.backupScreenRestoreFromFile),
             subtitle: Text(
               restoredFrom == null
-                  ? 'Zastępuje dane na tym telefonie danymi z kopii'
-                  : 'Ostatnio przywrócona: kopia z ${_when(restoredFrom)}',
+                  ? l10n.backupScreenRestoreSubtitle
+                  : l10n.backupScreenLastRestored(_when(restoredFrom)),
             ),
             onTap: () => _restore(context),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Text(
-              'W kopii: playlisty i foldery, nastroje, statystyki słuchania, historia, '
-              'polubione i „Na później” (utwory i linki), wybrane okładki, filmy dopasowane '
-              'przez telefon, czekające zgłoszenia poprawek i ustawienia.\n\n'
-              'Bez: logowania do MusicDatabase i Google, kodów API YouTube i Spotify, '
-              'pobranych utworów i pamięci podręcznej (pobierają się ponownie) oraz bazy '
-              'muzyki (pobiera się z serwera albo GitHuba).\n\n'
-              'Aplikacja niczego sama nie wysyła — plik trafia tylko tam, gdzie go '
-              'udostępnisz. Z kontem MusicDatabase playlisty, nastroje i polubione '
-              'synchronizują się też z serwerem.',
+              l10n.backupScreenWhatsIn,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_name.dart';
 import '../data/incoming_links.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -31,7 +32,7 @@ class _LinkSettingsScreenState extends State<LinkSettingsScreen> {
     final picked = await showDialog<LinkChoice>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
-        title: Text('Linki ${_from(service)}'),
+        title: Text(_linksFrom(service)),
         children: [
           for (final choice in LinkChoice.values)
             ListTile(
@@ -67,7 +68,7 @@ class _LinkSettingsScreenState extends State<LinkSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Otwieranie linków'),
+        title: Text(l10n.linkSettingsScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 12, bottom: 24),
@@ -80,36 +81,25 @@ class _LinkSettingsScreenState extends State<LinkSettingsScreen> {
                     ? Icons.smart_display_outlined
                     : Icons.graphic_eq,
               ),
-              title: Text('Linki ${_from(service)}'),
+              title: Text(_linksFrom(service)),
               subtitle: Text(
                 linkChoiceLabel(service, choices?[service] ?? LinkChoice.ask),
               ),
               onTap: () => _pick(service),
             ),
-          paragraph(
-            'Po kliknięciu linku z YouTube albo Spotify $appName pyta, czym go otworzyć: '
-            '$appName, aplikacją YouTube lub Spotify albo przeglądarką. Film lub utwór '
-            'otwarty w $appName można odtworzyć od razu, jako następny albo dodać na koniec '
-            'kolejki; zapamiętany wybór $appName odtwarza od razu.',
-          ),
-          const SectionTitle('Ustawienia telefonu'),
-          paragraph(
-            'Żeby linki w ogóle trafiały do $appName, w ustawieniach telefonu: Aplikacje › '
-            'YouTube (i Spotify) › Otwieraj domyślnie — wyłącz „Otwieraj obsługiwane linki”; '
-            'potem Aplikacje › $appName › Otwieraj domyślnie — włącz je i zaznacz wszystkie '
-            'linki. Na starszych telefonach system sam zapyta, czym otworzyć link. Gdy '
-            '$appName odsyła link do YouTube lub Spotify, zawsze otwiera ich aplikację.',
-          ),
+          paragraph(l10n.linkSettingsScreenIntro(appName)),
+          SectionTitle(l10n.linkSettingsScreenPhoneSettings),
+          paragraph(l10n.linkSettingsScreenPhoneSettingsHowTo(appName)),
           ListTile(
             leading: const Icon(Icons.open_in_new),
-            title: Text('Otwieraj linki w $appName'),
-            subtitle: const Text('Ustawienia telefonu › Otwieraj domyślnie'),
+            title: Text(l10n.linkSettingsScreenOpenLinksIn(appName)),
+            subtitle: Text(l10n.linkSettingsScreenOpenByDefaultPath),
             onTap: () async {
               final messenger = ScaffoldMessenger.of(context);
               if (!await openLinkSettings()) {
                 messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Nie udało się otworzyć ustawień telefonu.'),
+                  SnackBar(
+                    content: Text(l10n.linkSettingsScreenSettingsFailed),
                   ),
                 );
               }
@@ -121,14 +111,15 @@ class _LinkSettingsScreenState extends State<LinkSettingsScreen> {
   }
 }
 
-String _from(LinkService service) =>
-    service == LinkService.youtube ? 'z YouTube' : 'ze Spotify';
+String _linksFrom(LinkService service) => service == LinkService.youtube
+    ? l10n.linkSettingsScreenYouTubeLinks
+    : l10n.linkSettingsScreenSpotifyLinks;
 
 /// "Pytaj za każdym razem", "Aplikacja Spotify"…
 String linkChoiceLabel(LinkService service, LinkChoice choice) =>
     switch (choice) {
-      LinkChoice.ask => 'Pytaj za każdym razem',
+      LinkChoice.ask => l10n.linkSettingsScreenAskEveryTime,
       LinkChoice.leina => appName,
-      LinkChoice.app => 'Aplikacja ${service.label}',
-      LinkChoice.browser => 'Przeglądarka',
+      LinkChoice.app => l10n.linkSettingsScreenServiceApp(service.label),
+      LinkChoice.browser => l10n.linkSettingsScreenBrowser,
     };

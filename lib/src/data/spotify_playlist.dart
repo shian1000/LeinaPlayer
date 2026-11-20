@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'network_errors.dart';
 import 'playlist_library.dart';
 import 'playlist_search.dart';
+import '../l10n.dart';
 
 /// One track of a Spotify playlist, as the public embed page lists it.
 class SpotifyTrack {
@@ -117,9 +118,7 @@ Map<String, Object?> _embedEntity(String html) {
     dotAll: true,
   ).firstMatch(html)?.group(1);
   if (json == null) {
-    throw const SpotifyException(
-      'Spotify zmienił swoją stronę — aplikacja nie umie jej już odczytać.',
-    );
+    throw SpotifyException(l10n.spotifyPlaylistPageChanged);
   }
   return switch (jsonDecode(json)) {
     {
@@ -130,9 +129,7 @@ Map<String, Object?> _embedEntity(String html) {
       },
     } =>
       entity,
-    _ => throw const SpotifyException(
-      'Nie ma tego na Spotify albo nie jest publiczne.',
-    ),
+    _ => throw SpotifyException(l10n.spotifyPlaylistNotFound),
   };
 }
 
@@ -153,7 +150,9 @@ SpotifyPlaylistData parseSpotifyEmbed(
     album: album,
     name:
         (entity['name'] ?? entity['title']) as String? ??
-        (album ? 'Album ze Spotify' : 'Playlista ze Spotify'),
+        (album
+            ? l10n.spotifyPlaylistDefaultAlbumName
+            : l10n.spotifyPlaylistDefaultPlaylistName),
     owner: owner == null || owner.isEmpty ? null : owner,
     tracks: [
       for (final item in (entity['trackList'] as List?) ?? const [])
@@ -189,7 +188,7 @@ SpotifyTrack parseSpotifyTrackEmbed(String html, String trackId) {
   final entity = _embedEntity(html);
   final title = (entity['name'] ?? entity['title']) as String?;
   if (title == null || title.isEmpty) {
-    throw const SpotifyException('Nie ma takiego utworu na Spotify.');
+    throw SpotifyException(l10n.spotifyPlaylistNoSuchTrack);
   }
   return SpotifyTrack(
     id: trackId,
@@ -270,11 +269,11 @@ class SpotifyPlaylists {
   /// Throws [SpotifyException] when the playlist couldn't be read.
   Future<SpotifyPlaylistData> fetch(String playlistId) async {
     final data = parseSpotifyEmbed(
-      await _embed('playlist', playlistId, 'playlisty'),
+      await _embed('playlist', playlistId),
       playlistId,
     );
     if (data.tracks.isEmpty) {
-      throw const SpotifyException('Ta playlista na Spotify jest pusta.');
+      throw SpotifyException(l10n.spotifyPlaylistEmptyPlaylist);
     }
     if (data.tracks.length < embedLimit) return data;
     // Only a full embed page may hide more tracks; the real count is on the playlist's page.
@@ -296,22 +295,22 @@ class SpotifyPlaylists {
   /// An album, read like a playlist ([fetch]). Throws [SpotifyException].
   Future<SpotifyPlaylistData> fetchAlbum(String albumId) async {
     final data = parseSpotifyEmbed(
-      await _embed('album', albumId, 'albumu'),
+      await _embed('album', albumId),
       albumId,
       album: true,
     );
     if (data.tracks.isEmpty) {
-      throw const SpotifyException('Ten album na Spotify nie ma utworów.');
+      throw SpotifyException(l10n.spotifyPlaylistEmptyAlbum);
     }
     return data;
   }
 
   /// One track: its title, artists and length. Throws [SpotifyException].
   Future<SpotifyTrack> fetchTrack(String trackId) async =>
-      parseSpotifyTrackEmbed(await _embed('track', trackId, 'utworu'), trackId);
+      parseSpotifyTrackEmbed(await _embed('track', trackId), trackId);
 
-  /// The embed page of [kind] [id]; [what] names it in an error ("playlisty").
-  Future<String> _embed(String kind, String id, String what) async {
+  /// The embed page of [kind] [id].
+  Future<String> _embed(String kind, String id) async {
     try {
       return await _get(Uri.https('open.spotify.com', '/embed/$kind/$id'));
     } on SpotifyException {
@@ -320,8 +319,12 @@ class SpotifyPlaylists {
       debugPrint('Spotify $kind $id failed: $e');
       throw SpotifyException(
         isNetworkError(e)
-            ? 'Brak połączenia ze Spotify.'
-            : 'Nie udało się odczytać $what ze Spotify.',
+            ? l10n.spotifyPlaylistNoConnection
+            : switch (kind) {
+                'playlist' => l10n.spotifyPlaylistReadPlaylistFailed,
+                'album' => l10n.spotifyPlaylistReadAlbumFailed,
+                _ => l10n.spotifyPlaylistReadTrackFailed,
+              },
       );
     }
   }
@@ -359,20 +362,24 @@ class SpotifyPlaylists {
       return await _searchAnonymously(query);
     } catch (e) {
       debugPrint('Spotify search without a key failed: $e');
-      errors.add('${apiKey == null ? '' : 'bez klucza: '}${_describe(e)}');
+      errors.add(
+        apiKey == null
+            ? _describe(e)
+            : l10n.spotifyPlaylistWithoutKey(_describe(e)),
+      );
       offline &= isNetworkError(e);
     }
     throw SpotifyException(
       offline
-          ? 'Brak połączenia ze Spotify.'
-          : 'Nie udało się wyszukać na Spotify (${errors.join('; ')}).',
+          ? l10n.spotifyPlaylistNoConnection
+          : l10n.spotifyPlaylistSearchFailed(errors.join('; ')),
     );
   }
 
   static String _describe(Object e) => switch (e) {
     SpotifyException(:final message) => message,
-    _ when isNetworkError(e) => 'brak połączenia',
-    _ => 'błąd',
+    _ when isNetworkError(e) => l10n.spotifyPlaylistErrorNoConnection,
+    _ => l10n.spotifyPlaylistErrorGeneric,
   };
 
   ({String key, String token, DateTime expires})? _apiToken;
@@ -392,7 +399,7 @@ class SpotifyPlaylists {
     );
     if (reply.status == HttpStatus.unauthorized) _apiToken = null;
     if (reply.status != HttpStatus.ok) {
-      throw SpotifyException('odpowiedź HTTP ${reply.status}');
+      throw SpotifyException(l10n.spotifyPlaylistHttpResponse(reply.status));
     }
     return parseSpotifyApiSearch(reply.body);
   }
@@ -417,8 +424,8 @@ class SpotifyPlaylists {
       throw SpotifyException(
         reply.status == HttpStatus.badRequest ||
                 reply.status == HttpStatus.unauthorized
-            ? 'odrzucony klucz Spotify API'
-            : 'odpowiedź HTTP ${reply.status}',
+            ? l10n.spotifyPlaylistKeyRejected
+            : l10n.spotifyPlaylistHttpResponse(reply.status),
       );
     }
     final json = jsonDecode(reply.body) as Map<String, Object?>;
@@ -490,8 +497,8 @@ class SpotifyPlaylists {
       }
       throw SpotifyException(
         reply.status == HttpStatus.tooManyRequests
-            ? 'Spotify chwilowo ogranicza wyszukiwanie bez klucza'
-            : 'odpowiedź HTTP ${reply.status}',
+            ? l10n.spotifyPlaylistRateLimited
+            : l10n.spotifyPlaylistHttpResponse(reply.status),
       );
     }
   }
@@ -510,7 +517,7 @@ class SpotifyPlaylists {
     );
     final token = RegExp(r'"accessToken":"([^"]+)"').firstMatch(html)?.group(1);
     if (token == null) {
-      throw const SpotifyException('brak tokenu na stronie Spotify');
+      throw SpotifyException(l10n.spotifyPlaylistNoToken);
     }
     final expiresMs = int.tryParse(
       RegExp(r'"accessTokenExpirationTimestampMs":(\d+)')
@@ -617,7 +624,7 @@ List<FoundPlaylist> parseSpotifyApiSearch(String body) {
 List<FoundPlaylist> parseSpotifyWebSearch(String body) {
   final items = switch (jsonDecode(body)) {
     {'data': {'searchV2': {'playlists': {'items': final List items}}}} => items,
-    _ => throw const SpotifyException('Spotify zmienił odpowiedź wyszukiwania'),
+    _ => throw SpotifyException(l10n.spotifyPlaylistSearchChanged),
   };
   return [
     for (final item in items)
@@ -661,13 +668,11 @@ Future<String> _httpGetText(Uri uri) async {
     final request = await client.getUrl(uri);
     final response = await request.close().timeout(const Duration(seconds: 15));
     if (response.statusCode == HttpStatus.notFound) {
-      throw const SpotifyException(
-        'Nie ma tego na Spotify albo nie jest publiczne.',
-      );
+      throw SpotifyException(l10n.spotifyPlaylistNotFound);
     }
     if (response.statusCode != HttpStatus.ok) {
       throw SpotifyException(
-        'Spotify odpowiedział błędem (HTTP ${response.statusCode}).',
+        l10n.spotifyPlaylistHttpError(response.statusCode),
       );
     }
     final finalUri = response.redirects.isEmpty

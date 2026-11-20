@@ -5,11 +5,11 @@ import '../data/combined_search.dart';
 import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../theme.dart';
-import 'common.dart';
 import 'mood_sheet.dart';
 import 'playlist_picker.dart';
 import 'scrolling_text.dart';
 import 'song_tile.dart';
+import '../l10n.dart';
 
 /// Songs ticked in a list after a long press on one of them, for doing the same to all of them.
 /// Keys tell rows apart ([SongSelection.keyOf], or a row's position where one song may be listed
@@ -198,13 +198,13 @@ class _SelectionBar extends StatelessWidget {
             Row(
               children: [
                 IconButton(
-                  tooltip: 'Anuluj zaznaczanie',
+                  tooltip: l10n.songSelectionCancelSelection,
                   icon: const Icon(Icons.close),
                   onPressed: selection.clear,
                 ),
                 Expanded(
                   child: Text(
-                    'Zaznaczono: $count',
+                    l10n.songSelectionSelected(count),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -213,7 +213,11 @@ class _SelectionBar extends StatelessWidget {
                     onPressed: allTicked
                         ? selection.clear
                         : () => selection.selectAll(all),
-                    child: Text(allTicked ? 'Odznacz' : 'Wszystkie'),
+                    child: Text(
+                      allTicked
+                          ? l10n.songSelectionUntick
+                          : l10n.songSelectionTickAll,
+                    ),
                   ),
               ],
             ),
@@ -221,14 +225,14 @@ class _SelectionBar extends StatelessWidget {
               children: [
                 action(
                   Icons.queue_music,
-                  'Do kolejki',
+                  l10n.songSelectionToQueue,
                   _forAll(
                     (hits) => queueSongs(actionContext, hits, next: false),
                   ),
                 ),
                 action(
                   Icons.playlist_play,
-                  'Jako następne',
+                  l10n.songSelectionPlayNext,
                   _forAll(
                     (hits) => queueSongs(actionContext, hits, next: true),
                   ),
@@ -236,7 +240,7 @@ class _SelectionBar extends StatelessWidget {
                 if (PlaylistLibraryScope.maybeOf(context) != null)
                   action(
                     Icons.playlist_add,
-                    'Do playlisty',
+                    l10n.songSelectionToPlaylist,
                     _forAll(
                       (hits) => showAddToPlaylistSheet(actionContext, hits),
                     ),
@@ -244,12 +248,12 @@ class _SelectionBar extends StatelessWidget {
                 if (MoodLibraryScope.maybeOf(context) != null)
                   action(
                     moodIcon,
-                    'Do nastroju',
+                    l10n.songSelectionToMood,
                     _forAll(
                       (hits) => showMoodPickerForAll(
                         actionContext,
                         hits,
-                        title: '${hits.length} ${songsWord(hits.length)}',
+                        title: l10n.songsCount(hits.length),
                       ),
                     ),
                   ),

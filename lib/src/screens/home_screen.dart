@@ -24,6 +24,7 @@ import '../data/song_catalog.dart';
 import '../data/startup_covers.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
@@ -45,33 +46,36 @@ const _id = 'Home';
 
 /// Home's recommendation rows (Dostosuj stronę główną › Rekomendacje): made on the phone from the
 /// listening stats and music.db ([HomeRecommendations]).
-const _recommendations = {
-  'rec:artists': 'Twoi najczęściej słuchani wykonawcy',
-  'rec:albums': 'Albumy, do których wracasz',
-  'rec:newest': 'Nowe w bazie',
-  'rec:genres': 'Twoje gatunki',
-  'rec:forgotten': 'Zapomniane',
+Map<String, String> get _recommendations => {
+  'rec:artists': l10n.homeScreenRecArtists,
+  'rec:albums': l10n.homeScreenRecAlbums,
+  'rec:newest': l10n.homeScreenRecNewest,
+  'rec:genres': l10n.homeScreenRecGenres,
+  'rec:forgotten': l10n.homeScreenRecForgotten,
 };
 
 /// Home's rows made from what's on the phone.
-const _librarySections = {
-  'lib:recent': 'Ostatnio odtwarzane',
-  'lib:liked': 'Polubione utwory',
-  'lib:playlists': 'Twoje playlisty',
-  'lib:moods': 'Twoje nastroje',
-  'lib:saved': 'Na później',
+Map<String, String> get _librarySections => {
+  'lib:recent': l10n.homeScreenLibRecent,
+  'lib:liked': l10n.homeScreenLibLiked,
+  'lib:playlists': l10n.homeScreenLibPlaylists,
+  'lib:moods': l10n.homeScreenLibMoods,
+  'lib:saved': l10n.homeScreenLibSaved,
 };
 
 /// The chips over Home: which rows show.
 enum _HomeFilter {
-  all('Wszystko'),
-  songs('Utwory'),
-  playlists('Playlisty'),
-  moods('Nastroje');
+  all,
+  songs,
+  playlists,
+  moods;
 
-  const _HomeFilter(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    all => l10n.homeScreenFilterAll,
+    songs => l10n.homeScreenFilterSongs,
+    playlists => l10n.homeScreenFilterPlaylists,
+    moods => l10n.homeScreenFilterMoods,
+  };
 
   /// Rows of artists, albums and genres show only with "Wszystko".
   bool shows(String id) => switch (this) {
@@ -204,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 actions: [
                   IconButton(
-                    tooltip: 'Dostosuj stronę główną',
+                    tooltip: l10n.homeScreenCustomize,
                     icon: const Icon(Icons.tune),
                     onPressed: () => CustomizeHomeScreen.open(context, layout),
                   ),
@@ -479,7 +483,7 @@ class _HomeSection {
                   icon: Icons.tag,
                 ),
                 title: genre,
-                subtitle: 'Gatunek',
+                subtitle: l10n.homeScreenGenre,
                 onTap: () => openGenreSongs(context, genre),
               ),
           ],
@@ -496,7 +500,7 @@ class _HomeSection {
       return PlaylistLibraryScope.maybeOf(context)
               ?.byId(int.tryParse(id.substring(9)) ?? -1)
               ?.name ??
-          'Usunięta playlista';
+          l10n.homeScreenDeletedPlaylist;
     }
     if (id.startsWith('mood:')) {
       final moods = MoodLibraryScope.maybeOf(context);
@@ -504,7 +508,7 @@ class _HomeSection {
             ...?moods?.userMoods,
             ...?moods?.globalMoods,
           ].where((m) => m.key == id.substring(5)).firstOrNull?.name ??
-          'Usunięty nastrój';
+          l10n.homeScreenDeletedMood;
     }
     return id;
   }
@@ -575,7 +579,7 @@ class _SectionRow extends StatelessWidget {
               padding: const EdgeInsets.all(6),
               child: Icon(
                 Icons.more_horiz,
-                semanticLabel: 'Menu sekcji (⋯)',
+                semanticLabel: l10n.homeScreenSectionMenu,
                 color: context.palette.textSecondary,
               ),
             ),
@@ -611,40 +615,40 @@ Future<void> _showSectionMenu(
     header: MenuSheetHeader(
       cover: const Icon(Icons.view_agenda_outlined, size: 40),
       title: section.title,
-      subtitle: 'Sekcja strony głównej',
+      subtitle: l10n.homeScreenSectionSubtitle,
     ),
     entries: [
       MenuSheetEntry(
         pinned ? Icons.push_pin : Icons.push_pin_outlined,
-        pinned ? 'Odepnij' : 'Przypnij na górze',
+        pinned ? l10n.homeScreenUnpin : l10n.homeScreenPin,
         onTap: () => layout.setPinned(section.id, !pinned),
       ),
       MenuSheetEntry(
         Icons.arrow_upward,
-        'Przenieś wyżej',
+        l10n.homeScreenMoveUp,
         onTap: () => layout.move(section.id, -1),
       ),
       MenuSheetEntry(
         Icons.arrow_downward,
-        'Przenieś niżej',
+        l10n.homeScreenMoveDown,
         onTap: () => layout.move(section.id, 1),
       ),
       if (layout.isAdded(section.id))
         MenuSheetEntry(
           Icons.remove_circle_outline,
-          'Usuń sekcję',
+          l10n.homeScreenRemoveSection,
           onTap: () => layout.remove(section.id),
         )
       else
         MenuSheetEntry(
           Icons.visibility_off_outlined,
-          'Ukryj sekcję',
-          subtitle: 'Wróci w „Dostosuj stronę główną”',
+          l10n.homeScreenHideSection,
+          subtitle: l10n.homeScreenHideSectionSubtitle,
           onTap: () => layout.setHidden(section.id, true),
         ),
       MenuSheetEntry(
         Icons.tune,
-        'Dostosuj stronę główną',
+        l10n.homeScreenCustomize,
         onTap: () => CustomizeHomeScreen.open(context, layout),
       ),
     ],
@@ -664,14 +668,14 @@ class _NothingShown extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Strona główna jest pusta.',
+            l10n.homeScreenEmpty,
             textAlign: TextAlign.center,
             style: TextStyle(color: context.palette.textSecondary),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
             icon: const Icon(Icons.tune),
-            label: const Text('Dostosuj stronę główną'),
+            label: Text(l10n.homeScreenCustomize),
             onPressed: () => CustomizeHomeScreen.open(context, layout),
           ),
         ],
@@ -744,8 +748,8 @@ class _PlaylistCard extends StatelessWidget {
         '${playlist.updatedAt.millisecondsSinceEpoch}:${playlist.cover}',
     title: playlist.name,
     subtitle: playlist.source == PlaylistSource.spotifyAlbum
-        ? 'Album'
-        : 'Playlista',
+        ? l10n.homeScreenAlbum
+        : l10n.homeScreenPlaylist,
     onTap: () => Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PlaylistScreen(playlist: playlist),
@@ -755,7 +759,9 @@ class _PlaylistCard extends StatelessWidget {
       context,
       PlaylistEntry(playlist),
       PlaylistCover(playlist: playlist, size: 56),
-      playlist.source == PlaylistSource.spotifyAlbum ? 'Album' : 'Playlista',
+      playlist.source == PlaylistSource.spotifyAlbum
+          ? l10n.homeScreenAlbum
+          : l10n.homeScreenPlaylist,
     ),
   );
 }
@@ -772,13 +778,13 @@ class _MoodCard extends StatelessWidget {
         'mood:${mood.key}:${mood.cover}:'
         '${mood.songIds.length}+${mood.tracks.length}',
     title: mood.name,
-    subtitle: mood.global ? 'Nastrój globalny' : 'Twój nastrój',
+    subtitle: mood.global ? l10n.homeScreenGlobalMood : l10n.homeScreenOwnMood,
     onTap: () => MoodScreen.open(context, mood),
     onLongPress: () => showLibraryEntryMenu(
       context,
       MoodEntry(mood),
       MoodCover(mood: mood, size: 56),
-      mood.global ? 'Nastrój globalny' : 'Twój nastrój',
+      mood.global ? l10n.homeScreenGlobalMood : l10n.homeScreenOwnMood,
     ),
   );
 }
@@ -806,7 +812,7 @@ class _PlaylistSongs extends StatelessWidget {
           return SizedBox(
             width: _cardWidth * 2,
             child: Text(
-              snapshot.hasData ? 'Pusta playlista' : '',
+              snapshot.hasData ? l10n.homeScreenEmptyPlaylist : '',
               style: TextStyle(color: context.palette.textSecondary),
             ),
           );
@@ -1088,7 +1094,7 @@ class _ArtistCard extends StatelessWidget {
         context,
         cover: CoverArt(seed: artist.name, size: 56, icon: Icons.person),
         title: name,
-        subtitle: 'Wykonawca',
+        subtitle: l10n.homeScreenArtist,
         hits: artistSongs(context, artist.name),
       ),
       child: SizedBox(
@@ -1135,13 +1141,13 @@ class _AlbumCard extends StatelessWidget {
             ),
       snapshotOf: 'album:${album.name}:${song?.songId}:${song?.title}',
       title: album.name,
-      subtitle: album.detail ?? 'Album',
+      subtitle: album.detail ?? l10n.homeScreenAlbum,
       onTap: () => openAlbumSongs(context, album.name),
       onLongPress: () => showSongsMenu(
         context,
         cover: CoverArt(seed: album.name, size: 56, icon: Icons.album),
         title: album.name,
-        subtitle: album.detail ?? 'Album',
+        subtitle: album.detail ?? l10n.homeScreenAlbum,
         hits: albumSongs(context, album.name),
       ),
     );
@@ -1171,33 +1177,27 @@ class CustomizeHomeScreen extends StatelessWidget {
       builder: (context, _) {
         final all = layout.all;
         return Scaffold(
-          appBar: AppBar(title: const Text('Dostosuj stronę główną')),
+          appBar: AppBar(title: Text(l10n.homeScreenCustomize)),
           body: CustomScrollView(
             slivers: [
               SliverList.list(
                 children: [
                   SwitchListTile(
-                    title: const Text('Rekomendacje'),
-                    subtitle: const Text(
-                      'Wykonawcy, albumy, gatunki, nowe i zapomniane utwory — '
-                      'z tego, czego słuchasz',
-                    ),
+                    title: Text(l10n.homeScreenRecommendations),
+                    subtitle: Text(l10n.homeScreenRecommendationsSubtitle),
                     value: layout.recommendations,
                     onChanged: layout.setRecommendations,
                   ),
                   ListTile(
                     leading: const Icon(Icons.add),
-                    title: const Text('Dodaj sekcję z Biblioteki'),
-                    subtitle: const Text(
-                      'Utwory wybranej playlisty albo nastroju',
-                    ),
+                    title: Text(l10n.homeScreenAddFromLibrary),
+                    subtitle: Text(l10n.homeScreenAddFromLibrarySubtitle),
                     onTap: () => _addFromLibrary(context),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                     child: Text(
-                      'Przytrzymaj ≡ i przeciągnij, żeby zmienić kolejność. '
-                      'Przypięte są zawsze na górze.',
+                      l10n.homeScreenReorderNote,
                       style: TextStyle(
                         color: palette.textSecondary,
                         fontSize: AppFontSize.small,
@@ -1230,17 +1230,17 @@ class CustomizeHomeScreen extends StatelessWidget {
                         ),
                       ),
                       subtitle: recommended
-                          ? const Text('Rekomendacja')
+                          ? Text(l10n.homeScreenRecommendation)
                           : layout.isAdded(id)
-                          ? const Text('Z Biblioteki')
+                          ? Text(l10n.homeScreenFromLibrary)
                           : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             tooltip: layout.isPinned(id)
-                                ? 'Odepnij'
-                                : 'Przypnij na górze',
+                                ? l10n.homeScreenUnpin
+                                : l10n.homeScreenPin,
                             icon: Icon(
                               layout.isPinned(id)
                                   ? Icons.push_pin
@@ -1254,7 +1254,7 @@ class CustomizeHomeScreen extends StatelessWidget {
                           ),
                           if (layout.isAdded(id))
                             IconButton(
-                              tooltip: 'Usuń sekcję',
+                              tooltip: l10n.homeScreenRemoveSection,
                               icon: const Icon(Icons.remove_circle_outline),
                               onPressed: () => layout.remove(id),
                             ),
@@ -1285,10 +1285,10 @@ class CustomizeHomeScreen extends StatelessWidget {
     return showMenuSheet(
       context,
       idPrefix: 'Dostosuj stronę główną › Dodaj sekcję',
-      header: const ListTile(
+      header: ListTile(
         title: Text(
-          'Dodaj sekcję z Biblioteki',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          l10n.homeScreenAddFromLibrary,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       entries: [

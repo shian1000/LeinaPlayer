@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import '../l10n.dart';
 import 'network_errors.dart';
 import 'newpipe.dart';
 import 'source_settings.dart';
@@ -111,9 +112,8 @@ class YouTubeAudio {
     }
     throw YouTubeAudioException(
       errors.isEmpty
-          ? 'Brak włączonego sposobu odtwarzania z YouTube na tym urządzeniu '
-                '(Ustawienia › Odtwarzanie › Źródła › YouTube).'
-          : 'Nie udało się pobrać dźwięku z YouTube (${errors.join('; ')}).',
+          ? l10n.youtubeAudioNoMethod
+          : l10n.youtubeAudioFailed(errors.join('; ')),
     );
   }
 
@@ -128,29 +128,31 @@ class YouTubeAudio {
     switch (method) {
       case YouTubePlaybackMethod.newPipe:
         if (!newPipeAvailable) {
-          throw YouTubeAudioException('$name: tylko Android');
+          throw YouTubeAudioException('$name: ${l10n.youtubeAudioAndroidOnly}');
         }
         fetch = _newPipe;
       case YouTubePlaybackMethod.explode:
         fetch = _explode;
       case YouTubePlaybackMethod.ytDlpServer:
         // Needs an endpoint on MusicDatabase's server, which doesn't exist yet.
-        throw YouTubeAudioException('$name: jeszcze niedostępne');
+        throw YouTubeAudioException(
+          '$name: ${l10n.youtubeAudioNotYetAvailable}',
+        );
       case YouTubePlaybackMethod.cache || YouTubePlaybackMethod.youtubeApp:
         throw ArgumentError.value(method, 'method', 'gives no stream');
     }
     try {
       final streams = await fetch(videoId);
       if (streams.isNotEmpty) return _best(streams);
-      throw YouTubeAudioException('$name: brak ścieżki dźwiękowej');
+      throw YouTubeAudioException('$name: ${l10n.youtubeAudioNoAudioTrack}');
     } on YouTubeAudioException {
       rethrow;
     } catch (e) {
       debugPrint('YouTube audio (${method.name}) failed for $videoId: $e');
       throw YouTubeAudioException(
         isVideoGone(e)
-            ? '$name: filmu nie ma już na YouTube'
-            : '$name: ${e is PlatformException ? e.code : 'błąd'}',
+            ? '$name: ${l10n.youtubeAudioVideoGone}'
+            : '$name: ${e is PlatformException ? e.code : l10n.youtubeAudioError}',
         offline: isNetworkError(e),
         gone: isVideoGone(e),
       );
@@ -158,11 +160,11 @@ class YouTubeAudio {
   }
 
   static String _shortName(YouTubePlaybackMethod m) => switch (m) {
-    YouTubePlaybackMethod.cache => 'pamięć podręczna',
+    YouTubePlaybackMethod.cache => l10n.youtubeAudioMethodCache,
     YouTubePlaybackMethod.newPipe => 'NewPipe',
     YouTubePlaybackMethod.explode => 'youtube_explode',
     YouTubePlaybackMethod.ytDlpServer => 'yt-dlp',
-    YouTubePlaybackMethod.youtubeApp => 'aplikacja YouTube',
+    YouTubePlaybackMethod.youtubeApp => l10n.youtubeAudioMethodYouTubeApp,
   };
 
   static YouTubeAudioStream _best(List<YouTubeAudioStream> streams) {

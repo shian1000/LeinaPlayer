@@ -6,6 +6,7 @@ import '../data/server_downloads.dart';
 import '../data/song_catalog.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/downloads.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
@@ -98,7 +99,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen> {
     String mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 
     Widget removeButton(VoidCallback onPressed) => IconButton(
-      tooltip: 'Usuń z pobranych',
+      tooltip: l10n.downloadedSongsScreenRemove,
       icon: Icon(Icons.remove_circle_outline, color: palette.textSecondary),
       onPressed: onPressed,
     );
@@ -106,7 +107,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Pobrane utwory'),
+        title: Text(l10n.downloadedSongsScreenTitle),
       ),
       body: SongSelectionArea(
         child: ListView(
@@ -116,8 +117,11 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
                 downloads.count == 0
-                    ? 'Nie ma pobranych utworów.'
-                    : 'Utwory: ${downloads.count}, ${mb(downloads.bytes)} MB',
+                    ? l10n.downloadedSongsScreenEmpty
+                    : l10n.downloadedSongsScreenSummary(
+                        downloads.count,
+                        mb(downloads.bytes),
+                      ),
                 style: TextStyle(
                   color: palette.textSecondary,
                   fontSize: AppFontSize.small,
@@ -134,7 +138,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen> {
                     '${song.hit.shownArtist(context)} • ${mb(song.sizeBytes)} MB',
                 trailing: removeButton(song.remove),
                 onSwipeRemove: song.remove,
-                swipeRemoveLabel: 'Usuń z pobranych',
+                swipeRemoveLabel: l10n.downloadedSongsScreenRemove,
               ),
             for (final download in orphans)
               ListTile(
@@ -142,7 +146,9 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen> {
                 leading: const Icon(Icons.audio_file_outlined),
                 title: ScrollingText(download.file.uri.pathSegments.last),
                 subtitle: Text(
-                  'Nie ma go już w bazie • ${mb(download.sizeBytes)} MB',
+                  l10n.downloadedSongsScreenNotInDatabase(
+                    mb(download.sizeBytes),
+                  ),
                 ),
                 trailing: removeButton(
                   () => downloads.removeServerFile(download.fileId),

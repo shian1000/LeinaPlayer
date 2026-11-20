@@ -485,6 +485,9 @@ import, Wyświetlanie, Dane, Aplikacja.
 
 - Wygląd **→ Wygląd** (`appearance_screen.dart`) — **implemented**, everything applies at once
   and is remembered after restart:
+  - Język **→ Język** (`language_screen.dart`) — "Język telefonu" (the default; Polish when the
+    phone's language isn't translated) or one language for good, each named in itself; the
+    whole app switches at once, the link sheet and notifications too (`localization.md`).
   - Motyw jasny **→ list of light themes** (Dummify and downloaded ones) — used while dark mode is off.
   - Motyw ciemny **→ list of dark themes** (Dummify — the default — and downloaded ones) — used while dark mode
     is on.

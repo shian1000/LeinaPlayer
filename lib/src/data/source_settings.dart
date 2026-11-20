@@ -3,49 +3,59 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n.dart';
 import 'spotify_playlist.dart';
 
 /// Where a song can be played from; the user orders them in "Ustawienia › Odtwarzanie ›
 /// Źródła".
 enum PlaybackSource {
-  phone('Telefon'),
+  phone,
 
   /// The song's file in the music library on MusicDatabase's server (`files.db`), streamed.
-  server('Prywatny serwer'),
-  youtube('YouTube');
+  server,
+  youtube;
 
-  const PlaybackSource(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    phone => l10n.sourceSettingsSourcePhone,
+    server => l10n.sourceSettingsSourceServer,
+    youtube => 'YouTube',
+  };
 }
 
 /// Ways of searching YouTube, tried in this order when several are switched on.
 enum YouTubeMethod {
-  newPipe('Korzystaj z NewPipeExtractor'),
-  explode('Korzystaj z pakietu youtube_explode'),
-  ytDlpServer('Korzystaj z yt-dlp przez serwer'),
-  api('Korzystaj z API');
+  newPipe,
+  explode,
+  ytDlpServer,
+  api;
 
-  const YouTubeMethod(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    newPipe => l10n.sourceSettingsUseNewPipe,
+    explode => l10n.sourceSettingsUseExplode,
+    ytDlpServer => l10n.sourceSettingsUseYtDlp,
+    api => l10n.sourceSettingsUseApi,
+  };
 }
 
 /// Ways of playing a YouTube video. The user switches them on and orders them; the first one that
 /// works is used.
 enum YouTubePlaybackMethod {
   /// Audio already on the phone from an earlier play.
-  cache('Pamięć podręczna'),
-  newPipe('Korzystaj z NewPipeExtractor'),
-  explode('Korzystaj z pakietu youtube_explode'),
-  ytDlpServer('Korzystaj z yt-dlp przez serwer'),
+  cache,
+  newPipe,
+  explode,
+  ytDlpServer,
 
   /// Hands the video to the YouTube app (or the browser) — plays outside this app.
-  youtubeApp('Otwórz w aplikacji YouTube');
+  youtubeApp;
 
-  const YouTubePlaybackMethod(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    cache => l10n.sourceSettingsCache,
+    newPipe => l10n.sourceSettingsUseNewPipe,
+    explode => l10n.sourceSettingsUseExplode,
+    ytDlpServer => l10n.sourceSettingsUseYtDlp,
+    youtubeApp => l10n.sourceSettingsOpenYouTubeApp,
+  };
 
   static const defaults = {cache, newPipe, youtubeApp};
 
@@ -58,19 +68,23 @@ enum YouTubePlaybackMethod {
 enum CoverSource {
   /// The cover inside the song's file in MusicDatabase's music library on the server (or its
   /// copy kept with "Pobierz") — MusicDatabase serves no covers of its own yet.
-  server('Serwer'),
+  server,
 
   /// The cover inside the music file on the phone.
-  file('Plik na telefonie'),
-  itunes('iTunes'),
-  deezer('Deezer'),
+  file,
+  itunes,
+  deezer,
 
   /// The YouTube video's thumbnail, cropped to a square.
-  youtube('Miniatura z YouTube');
+  youtube;
 
-  const CoverSource(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    server => l10n.sourceSettingsCoverServer,
+    file => l10n.sourceSettingsCoverFile,
+    itunes => 'iTunes',
+    deezer => 'Deezer',
+    youtube => l10n.sourceSettingsCoverYouTube,
+  };
 
   static const defaults = {server, file, itunes, deezer, youtube};
 }

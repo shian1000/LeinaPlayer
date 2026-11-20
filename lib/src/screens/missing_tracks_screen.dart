@@ -8,6 +8,7 @@ import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/song_requests.dart';
 import '../data/sync_sources.dart';
+import '../l10n.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
@@ -52,16 +53,14 @@ class MissingTracksScreen extends StatelessWidget {
     switch (catalog.status) {
       case CatalogStatus.ready:
         summary = missing.isEmpty
-            ? 'Wszystkie utwory tej playlisty są w bazie danych.'
-            : 'Poza bazą danych: ${missing.length} z ${hits.length}';
+            ? l10n.missingTracksScreenAllInDatabase
+            : l10n.missingTracksScreenOutside(missing.length, hits.length);
       case CatalogStatus.noDatabase:
-        summary =
-            'Baza danych nie jest jeszcze pobrana (Ustawienia › '
-            'Synchronizacja › Baza danych), więc żaden utwór nie został rozpoznany.';
+        summary = l10n.missingTracksScreenNoDatabase;
       case CatalogStatus.error:
-        summary = 'Nie udało się wczytać bazy danych.';
+        summary = l10n.missingTracksScreenLoadFailed;
       case CatalogStatus.notLoaded || CatalogStatus.loading:
-        summary = 'Wczytuję bazę danych…';
+        summary = l10n.missingTracksScreenLoading;
     }
 
     return Scaffold(
@@ -70,7 +69,7 @@ class MissingTracksScreen extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Utwory spoza bazy danych'),
+            Text(l10n.missingTracksScreenTitle),
             ScrollingText(
               playlist.name,
               style: TextStyle(
@@ -157,26 +156,26 @@ class _RequestMissingButtonState extends State<_RequestMissingButton> {
         }
       }
       if (sync == null || !sync.usesServer(SyncFeature.requests)) {
-        sent = 'Wyślą się, gdy telefon połączy się z serwerem.';
+        sent = l10n.missingTracksScreenSendLater;
       } else {
         final result = await outbox.send(
           await sync.serverAddresses(),
           manual: true,
         );
         sent = result.problem == null
-            ? 'Wysłano do MusicDatabase.'
-            : 'Nie wysłano: ${result.problem} Wyślą się przy następnej próbie.';
+            ? l10n.missingTracksScreenSent
+            : l10n.missingTracksScreenNotSent(result.problem!);
       }
     } catch (e) {
-      sent = 'Nie udało się zapisać próśb: $e';
+      sent = l10n.missingTracksScreenSaveFailed('$e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
     final counts = [
-      'Nowe prośby o dodanie: $added',
-      if (asked > 0) 'zgłoszone już wcześniej: $asked',
-      if (rejected > 0) 'odrzucone przez MusicDatabase: $rejected',
-      if (unnamed > 0) 'bez tytułu: $unnamed',
+      l10n.missingTracksScreenNewRequests(added),
+      if (asked > 0) l10n.missingTracksScreenAskedBefore(asked),
+      if (rejected > 0) l10n.missingTracksScreenRejected(rejected),
+      if (unnamed > 0) l10n.missingTracksScreenUntitled(unnamed),
     ].join(' · ');
     messenger
       ..clearSnackBars()
@@ -195,7 +194,7 @@ class _RequestMissingButtonState extends State<_RequestMissingButton> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Icon(Icons.playlist_add_check),
-        label: const Text('Poproś MusicDatabase o dodanie'),
+        label: Text(l10n.missingTracksScreenRequestButton),
         onPressed: _busy ? null : _request,
       ),
     ),

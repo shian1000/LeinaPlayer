@@ -12,6 +12,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'server_trust.dart';
 import 'sync_sources.dart';
+import '../l10n.dart';
 
 /// Where a download came from: one of the two server addresses, or the public copy on GitHub.
 enum DatabaseSource { remote, local, github }
@@ -237,9 +238,7 @@ class DatabaseSync extends ChangeNotifier {
     }
     final match = _repoPattern.firstMatch(parts.join('/'));
     if (match == null || match.group(2) == '.' || match.group(2) == '..') {
-      throw const FormatException(
-        'Podaj repozytorium jako właściciel/nazwa (np. $defaultGitHubRepo)',
-      );
+      throw FormatException(l10n.databaseSyncInvalidRepo(defaultGitHubRepo));
     }
     return match.group(0);
   }
@@ -340,9 +339,7 @@ class DatabaseSync extends ChangeNotifier {
     if (uri == null ||
         !(uri.scheme == 'http' || uri.scheme == 'https') ||
         uri.host.isEmpty) {
-      throw const FormatException(
-        'Nieprawidłowy adres (np. https://serwer:8002/)',
-      );
+      throw FormatException(l10n.databaseSyncInvalidAddress);
     }
     final segments = [...uri.pathSegments.where((s) => s.isNotEmpty)];
     if (segments.isNotEmpty && segments.last.endsWith('.db')) {
@@ -425,9 +422,7 @@ class DatabaseSync extends ChangeNotifier {
       if (serverFailure == null && gitHubFailure == null) {
         // The phone keeps its copy on purpose; the screen explains it through [serverEmpty].
         if (_serverEmpty || !noAddressNow) return false;
-        throw const _SyncFailure(
-          'Telefon nie jest w sieci lokalnej, a adres zdalny nie jest ustawiony',
-        );
+        throw _SyncFailure(l10n.databaseSyncNotInLocalNetwork);
       }
       _lastError = [
         if (serverFailure != null) _describe(serverFailure),
@@ -593,12 +588,10 @@ class DatabaseSync extends ChangeNotifier {
         parts[name] = part;
         await _fetchTo(client, base.resolve(name), part, name);
         if (await part.length() != size || await _sha256Of(part) != hash) {
-          throw _SyncFailure(
-            '$name nie zgadza się z version.json (trwa publikacja?)',
-          );
+          throw _SyncFailure(l10n.databaseSyncFileMismatch(name));
         }
         if (!await _looksLikeSqlite(part)) {
-          throw _SyncFailure('$name nie jest bazą SQLite');
+          throw _SyncFailure(l10n.databaseSyncNotSqlite(name));
         }
       }
       for (final MapEntry(key: name, value: part) in parts.entries) {
@@ -625,12 +618,10 @@ class DatabaseSync extends ChangeNotifier {
     try {
       json = jsonDecode(utf8.decode(bytes));
     } on FormatException {
-      throw const _SyncFailure('version.json jest nieczytelny');
+      throw _SyncFailure(l10n.databaseSyncVersionUnreadable);
     }
     if (json is! Map || json['format'] != 1) {
-      throw const _SyncFailure(
-        'nieznany format bazy — zostaje obecna kopia (zaktualizuj aplikację)',
-      );
+      throw _SyncFailure(l10n.databaseSyncUnknownFormat);
     }
     final listed = json['files'];
     final published = json['published_at'];
@@ -640,7 +631,7 @@ class DatabaseSync extends ChangeNotifier {
           {'size': final int size, 'sha256': final String hash}
               when RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hash) =>
             (size, hash.toLowerCase()),
-          _ => throw _SyncFailure('version.json nie opisuje $name'),
+          _ => throw _SyncFailure(l10n.databaseSyncVersionMissingFile(name)),
         },
     };
     return (
@@ -662,7 +653,7 @@ class DatabaseSync extends ChangeNotifier {
     await for (final chunk in response.timeout(const Duration(seconds: 30))) {
       bytes.addAll(chunk);
       if (bytes.length > 1 << 20) {
-        throw _SyncFailure('$name jest za duży');
+        throw _SyncFailure(l10n.databaseSyncFileTooBig(name));
       }
     }
     return bytes;
@@ -695,8 +686,8 @@ class DatabaseSync extends ChangeNotifier {
       await response.drain<void>().catchError((_) {});
       throw _SyncFailure(
         response.statusCode == HttpStatus.notFound
-            ? 'brak pliku $name (repozytorium bez wydania „database” albo trwa publikacja)'
-            : 'błąd ${response.statusCode} dla $name',
+            ? l10n.databaseSyncGitHubFileMissing(name)
+            : l10n.databaseSyncGitHubError(response.statusCode, name),
       );
     }
     return response;
@@ -728,7 +719,7 @@ class DatabaseSync extends ChangeNotifier {
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>();
       throw _SyncFailure(
-        'Serwer zwrócił błąd ${response.statusCode} dla $name',
+        l10n.databaseSyncServerError(response.statusCode, name),
       );
     }
     final sink = target.openWrite();
@@ -738,7 +729,7 @@ class DatabaseSync extends ChangeNotifier {
       await sink.close();
     }
     if (!await _looksLikeSqlite(target)) {
-      throw _SyncFailure('$name z serwera nie jest bazą SQLite');
+      throw _SyncFailure(l10n.databaseSyncServerNotSqlite(name));
     }
     return true;
   }
@@ -758,19 +749,19 @@ class DatabaseSync extends ChangeNotifier {
   static String _describe(Object e) => switch (e) {
     _SyncFailure(:final message) => message,
     // A certificate the phone doesn't trust (yet): ServerTrust, confirmed on Prywatny serwer.
-    HandshakeException() => 'Nieznany certyfikat serwera — potwierdź go w Synchronizacja › Prywatny serwer („Zapisz adresy”)',
-    SocketException() => 'Nie można połączyć się z serwerem',
-    TimeoutException() => 'Serwer nie odpowiada',
-    HttpException() => 'Przerwane połączenie z serwerem',
-    _ => 'Nie udało się pobrać bazy ($e)',
+    HandshakeException() => l10n.databaseSyncUnknownCertificate,
+    SocketException() => l10n.databaseSyncCannotConnect,
+    TimeoutException() => l10n.databaseSyncServerNotResponding,
+    HttpException() => l10n.databaseSyncConnectionInterrupted,
+    _ => l10n.databaseSyncDownloadFailed(e.toString()),
   };
 
   static String _describeGitHub(Object e) => switch (e) {
     _SyncFailure(:final message) => message,
-    SocketException() => 'brak połączenia',
-    TimeoutException() => 'nie odpowiada',
-    HttpException() => 'przerwane połączenie',
-    _ => 'nie udało się pobrać bazy ($e)',
+    SocketException() => l10n.databaseSyncGitHubNoConnection,
+    TimeoutException() => l10n.databaseSyncGitHubNotResponding,
+    HttpException() => l10n.databaseSyncGitHubInterrupted,
+    _ => l10n.databaseSyncGitHubDownloadFailed(e.toString()),
   };
 }
 

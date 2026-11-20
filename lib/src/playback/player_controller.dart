@@ -10,6 +10,7 @@ import '../data/album_covers.dart';
 import '../data/cover_credit.dart';
 import '../data/latin_names.dart';
 import '../data/version_names.dart';
+import '../l10n.dart';
 import 'interrupted_players.dart';
 import 'server_audio_source.dart';
 
@@ -287,7 +288,9 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
             androidIcon: liked
                 ? 'drawable/ic_favorite'
                 : 'drawable/ic_favorite_border',
-            label: liked ? 'Usuń z polubionych' : 'Polub',
+            label: liked
+                ? l10n.playerControllerUnlike
+                : l10n.playerControllerLike,
             name: _likeAction,
           ),
       ],
@@ -768,10 +771,10 @@ class PlayerController extends ChangeNotifier {
           : track.source.split('/').last;
       debugPrint('Playing $shown failed: $e');
       _lastError = track.serverFileId != null
-          ? 'Nie udało się odtworzyć utworu „${track.title}” z serwera'
+          ? l10n.playerControllerServerFailed(track.title)
           : track.isStream
-          ? 'Nie udało się odtworzyć utworu „${track.title}” z YouTube'
-          : 'Nie udało się odtworzyć pliku ${track.source.split('/').last}';
+          ? l10n.playerControllerYouTubeFailed(track.title)
+          : l10n.playerControllerFileFailed(track.source.split('/').last);
       if (fade) {
         // The song before plays on to its end.
         _current = before.current;

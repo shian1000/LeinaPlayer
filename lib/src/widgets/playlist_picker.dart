@@ -5,6 +5,7 @@ import '../data/library_folders.dart';
 import '../data/playlist_library.dart';
 import '../data/saved_songs.dart';
 import '../data/track_ref.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import 'collection_cover.dart';
 import 'common.dart';
@@ -15,14 +16,14 @@ import 'scrolling_text.dart';
 MenuSheetEntry? playlistMenuEntry(
   BuildContext context,
   List<SearchHit> hits, {
-  String label = 'Dodaj do playlisty',
+  String? label,
 }) {
   if (PlaylistLibraryScope.maybeOf(context) == null || hits.isEmpty) {
     return null;
   }
   return MenuSheetEntry(
     Icons.playlist_add,
-    label,
+    label ?? l10n.playlistPickerAddToPlaylist,
     onTap: () => showAddToPlaylistSheet(context, hits),
   );
 }
@@ -44,7 +45,7 @@ MenuSheetEntry? playlistSubmenuEntry(
     ..showSnackBar(SnackBar(content: Text(text)));
   return MenuSheetEntry(
     Icons.playlist_add,
-    'Dodaj do playlisty',
+    l10n.playlistPickerAddToPlaylist,
     submenu: () {
       final held = _heldCounts(library, hits);
       MenuSheetEntry playlistEntry(PlaylistSummary playlist) => MenuSheetEntry(
@@ -61,23 +62,23 @@ MenuSheetEntry? playlistSubmenuEntry(
           liked.containsAll(hits)
               ? MenuSheetEntry(
                   Icons.favorite,
-                  'Usuń z polubionych',
+                  l10n.playlistPickerUnlike,
                   onTap: () async => said(await toggleLiked(liked, hits)),
                 )
               : MenuSheetEntry(
                   Icons.favorite_border,
-                  'Polub',
+                  l10n.playlistPickerLike,
                   subtitle: likedSongsLabel,
                   onTap: () async => said(await toggleLiked(liked, hits)),
                 ),
         MenuSheetEntry(
           Icons.add,
-          'Nowa playlista',
+          l10n.playlistPickerNewPlaylist,
           onTap: () async {
             final name = await askPlaylistName(context);
             if (name == null) return;
             await library.create(name, hits);
-            said('Utworzono playlistę „$name”');
+            said(l10n.playlistPickerCreated(name));
           },
         ),
         for (final (:folder, :playlists) in _grouped(library, folders))
@@ -127,10 +128,9 @@ String _folderLine(
   int songs,
 ) {
   final n = playlists.length;
-  final size =
-      'Folder • $n ${pluralWord(n, 'playlista', 'playlisty', 'playlist')}';
+  final size = l10n.playlistPickerFolderSize(n);
   final holding = playlists.where((p) => held[p.id] == songs).length;
-  return holding == 0 ? size : '$size · już w $holding';
+  return holding == 0 ? size : l10n.playlistPickerAlreadyIn(size, holding);
 }
 
 /// How many of [hits] each playlist already has, by its id.
@@ -146,8 +146,10 @@ Map<int, int> _heldCounts(PlaylistLibrary library, List<SearchHit> hits) {
 
 /// A playlist's size and, while choosing for several songs, how many of them it already has.
 String _playlistLine(PlaylistSummary playlist, int held, int songs) {
-  final size = '${playlist.trackCount} ${songsWord(playlist.trackCount)}';
-  return held == 0 || held == songs ? size : '$size · już tu: $held z $songs';
+  final size = l10n.songsCount(playlist.trackCount);
+  return held == 0 || held == songs
+      ? size
+      : l10n.playlistPickerAlreadyHere(size, held, songs);
 }
 
 /// Adds those of [hits] the playlist doesn't have yet, or takes them out when it has them all;
@@ -166,20 +168,20 @@ Future<String> togglePlaylist(
   ];
   if (missing.isEmpty) {
     await library.removeSongs(playlist.id, hits);
-    return 'Usunięto z playlisty „${playlist.name}”';
+    return l10n.playlistPickerRemovedFrom(playlist.name);
   }
   await library.addSongs(playlist.id, missing);
-  return 'Dodano do playlisty „${playlist.name}”';
+  return l10n.playlistPickerAddedTo(playlist.name);
 }
 
-const likedSongsLabel = 'Polubione utwory';
+String get likedSongsLabel => l10n.playlistPickerLikedSongs;
 
 /// Likes [hits], or takes them out of the liked songs when all of them are liked already;
 /// returns what to tell the user.
 Future<String> toggleLiked(LikedSongs liked, List<SearchHit> hits) async {
   final like = !liked.containsAll(hits);
   await liked.setAll(hits, like);
-  return like ? 'Dodano do polubionych' : 'Usunięto z polubionych';
+  return like ? l10n.playlistPickerLiked : l10n.playlistPickerUnliked;
 }
 
 /// The liked songs' cover: a heart on the accent colour, like Spotify's.
@@ -208,9 +210,9 @@ class LikedSongsCover extends StatelessWidget {
 Future<String?> askPlaylistName(BuildContext context) async {
   final name = await showDialog<String>(
     context: context,
-    builder: (_) => const TextInputDialog(
-      title: 'Nowa playlista',
-      hint: 'Nazwa playlisty',
+    builder: (_) => TextInputDialog(
+      title: l10n.playlistPickerNewPlaylist,
+      hint: l10n.playlistPickerNameHint,
       initial: '',
     ),
   );
@@ -231,7 +233,7 @@ Future<void> showAddToPlaylistSheet(
   final messenger = ScaffoldMessenger.of(context);
   final what = hits.length == 1
       ? hits.single.title
-      : '${hits.length} ${songsWord(hits.length)}';
+      : l10n.songsCount(hits.length);
   void said(String text) => messenger
     ..clearSnackBars()
     ..showSnackBar(SnackBar(content: Text(text)));
@@ -273,7 +275,7 @@ Future<void> showAddToPlaylistSheet(
             children: [
               MenuSheetHeader(
                 cover: const Icon(Icons.playlist_add, size: 40),
-                title: 'Dodaj do playlisty',
+                title: l10n.playlistPickerAddToPlaylist,
                 subtitle: what,
               ),
               const Divider(),
@@ -287,10 +289,8 @@ Future<void> showAddToPlaylistSheet(
                         horizontal: 20,
                       ),
                       leading: const LikedSongsCover(),
-                      title: const Text(likedSongsLabel),
-                      subtitle: Text(
-                        '${liked.songs.length} ${songsWord(liked.songs.length)}',
-                      ),
+                      title: Text(likedSongsLabel),
+                      subtitle: Text(l10n.songsCount(liked.songs.length)),
                       trailing: Icon(
                         all ? Icons.favorite : Icons.favorite_border,
                         color: all ? palette.accent : palette.textSecondary,
@@ -305,14 +305,14 @@ Future<void> showAddToPlaylistSheet(
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 leading: Icon(Icons.add, color: palette.textSecondary),
-                title: const Text('Nowa playlista'),
+                title: Text(l10n.playlistPickerNewPlaylist),
                 onTap: () async {
                   final navigator = Navigator.of(sheetContext);
                   final name = await askPlaylistName(sheetContext);
                   if (name == null) return;
                   navigator.pop();
                   await library.create(name, hits);
-                  said('Utworzono playlistę „$name”');
+                  said(l10n.playlistPickerCreated(name));
                 },
               ),
               for (final (:folder, :playlists) in groups)

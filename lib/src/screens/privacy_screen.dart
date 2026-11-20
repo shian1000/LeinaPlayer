@@ -18,6 +18,7 @@ import 'sync_settings_screen.dart';
 import 'playback_sources_screen.dart';
 import 'spotify_source_screen.dart';
 import 'youtube_source_screen.dart';
+import '../l10n.dart';
 
 /// "Ustawienia › Prywatność i połączenia": who the app talks to, why, when and what they get,
 /// each with a way to the switch that stops it — or a note that it only happens when the user
@@ -49,7 +50,7 @@ class PrivacyScreen extends StatelessWidget {
     Widget status(bool connects, String value) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: Text(
-        'Teraz: $value',
+        l10n.privacyScreenNow(value),
         style: TextStyle(
           fontSize: AppFontSize.small,
           color: connects
@@ -59,8 +60,8 @@ class PrivacyScreen extends StatelessWidget {
       ),
     );
     Widget statusOf(List<String> what) => what.isEmpty
-        ? status(false, 'nie łączy się')
-        : status(true, 'łączy się z internetem (${what.join(', ')})');
+        ? status(false, l10n.privacyScreenNotConnecting)
+        : status(true, l10n.privacyScreenConnectsInternet(what.join(', ')));
     Widget onlyWhenUsed([String? what]) => Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(
@@ -73,7 +74,7 @@ class PrivacyScreen extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              what ?? 'Tylko gdy sam tego użyjesz — nie ma czego wyłączać.',
+              what ?? l10n.privacyScreenOnlyWhenUsed,
               style: TextStyle(
                 fontSize: AppFontSize.small,
                 color: palette.textSecondary,
@@ -96,151 +97,89 @@ class PrivacyScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Prywatność i połączenia'),
+        title: Text(l10n.privacyScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 12, bottom: 24),
         children: [
-          text(
-            'Aplikacja nie ma reklam, analityki ani raportów o awariach. Łączy się z siecią '
-            'tylko wtedy, gdy wymaga tego funkcja, której używasz albo którą masz włączoną.',
-            strong: true,
-          ),
-          text(
-            'Biblioteka (playlisty, nastroje, polubione, „Na później”), statystyki słuchania, '
-            'historia i ustawienia zostają tylko na telefonie — dopóki nie zalogujesz się na '
-            'serwer MusicDatabase.',
-          ),
+          text(l10n.privacyScreenIntro, strong: true),
+          text(l10n.privacyScreenLocalOnly),
 
-          const SectionTitle('Serwer MusicDatabase'),
-          text(
-            'Baza utworów, Twoje pliki muzyczne (źródło „Prywatny serwer”; też okładki zapisane w tych '
-            'plikach — sam początek pliku, bez muzyki), teksty piosenek (dostaje id utworu, '
-            'gdy otwarty jest pełny odtwarzacz) i zgłoszenia poprawek. Po '
-            'zalogowaniu także synchronizacja konta: playlisty, nastroje, foldery, okładki, '
-            'polubione, „Na później”, linki na później (z imieniem nadawcy) i każde '
-            'odtworzenie — co, kiedy, jak długo i skąd. Przy logowaniu wysyła też model '
-            'telefonu (np. „Google Pixel 7a”), żeby właściciel serwera wiedział, który '
-            'telefon trzyma które logowanie.',
-          ),
+          SectionTitle(l10n.privacyScreenServerSection),
+          text(l10n.privacyScreenServerText),
           if (sync != null)
             sync.hasServer
                 ? status(
                     true,
-                    'łączy się z serwerem, '
-                    '${userName != null ? 'zalogowano jako $userName' : 'bez logowania'}',
+                    userName != null
+                        ? l10n.privacyScreenServerSignedIn(userName)
+                        : l10n.privacyScreenServerAnonymous,
                   )
-                : status(
-                    false,
-                    'nie łączy się — żaden serwer nie jest ustawiony',
-                  ),
+                : status(false, l10n.privacyScreenServerNone),
           goTo(
-            'Synchronizacja › Prywatny serwer: adresy',
+            l10n.privacyScreenGoServerAddresses,
             () => const PrivateServerScreen(),
           ),
-          goTo(
-            'Synchronizacja: co łączy się z serwerem',
-            () => const SyncSettingsScreen(),
-          ),
-          goTo('Konto: logowanie i wylogowanie', () => const AccountScreen()),
+          goTo(l10n.privacyScreenGoSync, () => const SyncSettingsScreen()),
+          goTo(l10n.privacyScreenGoAccount, () => const AccountScreen()),
 
           const SectionTitle('GitHub'),
-          text(
-            'Publiczna kopia bazy utworów (gdy żaden serwer nie odpowiada) i sprawdzanie, czy '
-            'jest nowa wersja aplikacji. Raz dziennie przy otwarciu. Motywy: lista i pliki tylko '
-            'w Wygląd › Pobierz motyw, oraz jednorazowo motyw wybrany, zanim stał się '
-            'pobieranym.',
-          ),
+          text(l10n.privacyScreenGitHubText),
           if (sync != null)
             statusOf([
-              if (sync.gitHubOn) 'baza',
+              if (sync.gitHubOn) l10n.privacyScreenStatusDatabase,
               if (updates != null && updates.configured && updates.autoCheck)
-                'aktualizacje',
+                l10n.privacyScreenStatusUpdates,
             ]),
           goTo(
-            'Synchronizacja › Baza danych › GitHub',
+            l10n.privacyScreenGoGitHub,
             () => const SyncSourcesScreen(feature: SyncFeature.database),
           ),
           if (updates != null && updates.configured)
-            goTo(
-              'Informacje i pomoc › Sprawdzaj aktualizacje',
-              () => const AboutScreen(),
-            ),
+            goTo(l10n.privacyScreenGoUpdates, () => const AboutScreen()),
 
           const SectionTitle('YouTube'),
-          text(
-            'Odtwarzanie dźwięku z filmów, wyszukiwanie, dopasowywanie utworów do filmów i '
-            'import playlist. Aplikacja łączy się z YouTube jak anonimowa przeglądarka (biblioteka '
-            'NewPipe): bez konta i bez klucza. YouTube dostaje identyfikatory filmów i to, '
-            'czego szukasz (tytuł i wykonawcę). Odtworzone utwory zostają w pamięci '
-            'podręcznej; kolejne z kolejki mogą być pobierane z wyprzedzeniem.',
-          ),
+          text(l10n.privacyScreenYouTubeText),
           if (settings != null)
             statusOf([
               if (settings.enabledSources.contains(PlaybackSource.youtube))
-                'odtwarzanie',
-              if (settings.youTubeSearchEnabled) 'wyszukiwanie',
+                l10n.privacyScreenStatusPlayback,
+              if (settings.youTubeSearchEnabled) l10n.privacyScreenStatusSearch,
             ]),
           goTo(
-            'Odtwarzanie › Źródła, w tym YouTube',
+            l10n.privacyScreenGoPlaybackSources,
             () => const PlaybackSourcesScreen(),
           ),
-          goTo(
-            'YouTube: wyszukiwanie i klucz API',
-            () => const YouTubeSourceScreen(),
-          ),
-          goTo(
-            'Pamięć podręczna: pobieranie z wyprzedzeniem',
-            () => const CacheSettingsScreen(),
-          ),
+          goTo(l10n.privacyScreenGoYouTube, () => const YouTubeSourceScreen()),
+          goTo(l10n.privacyScreenGoCache, () => const CacheSettingsScreen()),
 
-          const SectionTitle('Konto Google'),
-          text(
-            '„Utwórz na YouTube” tworzy playlistę na Twoim koncie YouTube: logowanie w oknie '
-            'Google, potem nazwa playlisty i jej filmy idą do YouTube Data API. Aplikacja '
-            'zapamiętuje tylko adres e-mail konta.',
-          ),
+          SectionTitle(l10n.privacyScreenGoogleSection),
+          text(l10n.privacyScreenGoogleText),
           if (google?.email case final email?) ...[
-            status(
-              true,
-              'łączy się z internetem przy „Utwórz na YouTube”, zalogowano jako $email',
+            status(true, l10n.privacyScreenGoogleSignedIn(email)),
+            goTo(
+              l10n.privacyScreenGoGoogleSignOut,
+              () => const AccountScreen(),
             ),
-            goTo('Konto › Wyloguj z Google', () => const AccountScreen()),
           ] else if (google != null && !google.supported)
-            status(
-              false,
-              'nie łączy się — ta wersja aplikacji nie ma tej funkcji',
-            )
+            status(false, l10n.privacyScreenGoogleUnsupported)
           else ...[
-            status(false, 'nie łączy się — nie jesteś zalogowany'),
-            onlyWhenUsed('Tylko gdy sam stukniesz „Utwórz na YouTube”.'),
+            status(false, l10n.privacyScreenGoogleSignedOut),
+            onlyWhenUsed(l10n.privacyScreenGoogleOnlyWhenUsed),
           ],
 
           const SectionTitle('Spotify'),
-          text(
-            'Import playlist, albumów i utworów z linków Spotify oraz wyszukiwanie playlist '
-            'Spotify. Spotify dostaje identyfikator playlisty / albumu / utworu albo to, czego '
-            'szukasz. Bez konta (z kluczem API tylko, jeśli go wpiszesz).',
-          ),
+          text(l10n.privacyScreenSpotifyText),
           if (settings != null)
             statusOf([
-              if (settings.spotifyPlaylistSearch) 'wyszukiwanie playlist',
+              if (settings.spotifyPlaylistSearch)
+                l10n.privacyScreenStatusPlaylistSearch,
             ]),
-          goTo(
-            'Spotify: wyszukiwanie playlist i klucz API',
-            () => const SpotifySourceScreen(),
-          ),
-          onlyWhenUsed(
-            'Import z linku — tylko gdy sam otworzysz link Spotify.',
-          ),
+          goTo(l10n.privacyScreenGoSpotify, () => const SpotifySourceScreen()),
+          onlyWhenUsed(l10n.privacyScreenSpotifyOnlyWhenUsed),
 
-          const SectionTitle('Okładki: iTunes, Deezer, miniatury YouTube'),
-          text(
-            'Okładki albumów, których nie ma w pliku na telefonie. Serwisy dostają wykonawcę '
-            'i album (albo tytuł) lub identyfikator filmu; utwór z bazy bez linku i bez okładki '
-            'jest też szukany na YouTube po wykonawcy i tytule. Znaleziona okładka zostaje w '
-            'pamięci podręcznej.',
-          ),
+          SectionTitle(l10n.privacyScreenCoversSection),
+          text(l10n.privacyScreenCoversText),
           if (settings != null)
             statusOf([
               for (final source in settings.activeCoverSources)
@@ -252,46 +191,26 @@ class PrivacyScreen extends StatelessWidget {
                   settings.activeCoverSources.any(
                     (s) => s != CoverSource.file && s != CoverSource.server,
                   ))
-                'tylko przez Wi-Fi',
+                l10n.privacyScreenStatusWifiOnly,
             ]),
           goTo(
-            'Źródła okładek (każde osobno)',
+            l10n.privacyScreenGoCoverSources,
             () => const CoverSourcesScreen(),
           ),
-          goTo(
-            'Oszczędzanie danych › Okładki tylko przez Wi-Fi',
-            () => const DataSaverScreen(),
-          ),
+          goTo(l10n.privacyScreenGoCoversWifi, () => const DataSaverScreen()),
 
-          const SectionTitle('LRCLIB: teksty piosenek'),
-          text(
-            'Tekst utworu na karcie pod odtwarzaczem, gdy otwarty jest pełny odtwarzacz, a '
-            'serwer MusicDatabase nie ma tekstu tego utworu (albo nie odpowiada). LRCLIB '
-            '(projekt społecznościowy) dostaje tytuł, wykonawcę, album i długość utworu. Teksty '
-            'nie są zapisywane na telefonie.',
-          ),
+          SectionTitle(l10n.privacyScreenLyricsSection),
+          text(l10n.privacyScreenLyricsText),
           if (settings != null) statusOf([if (settings.lyrics) 'LRCLIB']),
-          goTo(
-            'Oszczędzanie danych › Pobieraj teksty piosenek',
-            () => const DataSaverScreen(),
-          ),
+          goTo(l10n.privacyScreenGoLyrics, () => const DataSaverScreen()),
 
-          const SectionTitle('Przeglądarka i „Udostępnij”'),
-          text(
-            'Linki w Informacjach o utworze (MusicBrainz, Apple Music, Deezer, Spotify), kod '
-            'źródłowy i pobranie nowej wersji otwierają się w przeglądarce. Paczka zgłoszeń, '
-            'raport problemu (wersja aplikacji, model telefonu, Twój opis i dziennik błędów), '
-            'kopia zapasowa (Twoje dane bez logowania i kodów API), '
-            'linki i podsumowania trafiają do aplikacji, którą wybierzesz w „Udostępnij”. '
-            'Dziennik błędów jest zapisywany tylko na telefonie (ostatnie 14 dni).',
-          ),
-          status(false, 'nie łączy się sama'),
+          SectionTitle(l10n.privacyScreenBrowserSection),
+          text(l10n.privacyScreenBrowserText),
+          status(false, l10n.privacyScreenBrowserNotConnecting),
           onlyWhenUsed(),
 
-          const SectionTitle('Synchronizacja danych'),
-          text(
-            '• Możesz synchronizować dane z MusicDatabase, a także wysyłać zgłoszenia o utworach.',
-          ),
+          SectionTitle(l10n.privacyScreenSyncSection),
+          text(l10n.privacyScreenSyncText),
         ],
       ),
     );

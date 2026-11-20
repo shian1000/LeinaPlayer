@@ -11,6 +11,7 @@ import '../data/album_covers.dart';
 import '../data/latin_names.dart';
 import '../data/listening_stats.dart';
 import '../data/listening_summary.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/listening_charts.dart';
@@ -110,9 +111,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
       debugPrint('Sharing the summary failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Nie udało się udostępnić podsumowania'),
-          ),
+          SnackBar(content: Text(l10n.listeningSummaryScreenShareFailed)),
         );
       }
     } finally {
@@ -164,7 +163,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
                       ),
                     ),
                   IconButton(
-                    tooltip: 'Zamknij',
+                    tooltip: l10n.commonClose,
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -180,7 +179,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
                   child: FilledButton.icon(
                     onPressed: _sharing ? null : _share,
                     icon: const Icon(Icons.share),
-                    label: const Text('Udostępnij'),
+                    label: Text(l10n.listeningSummaryScreenShare),
                   ),
                 ),
               ),
@@ -200,9 +199,12 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
     final albums = stats.albums.where((a) => a.plays > 0).take(5).toList();
     final newArtists = summary.newArtists;
     final sound = [
-      if (stats.decades.firstOrNull case final d?) ('Dekada', d),
-      if (stats.languages.firstOrNull case final l?) ('Język', l),
-      if (stats.countries.firstOrNull case final c?) ('Kraj wykonawców', c),
+      if (stats.decades.firstOrNull case final d?)
+        (l10n.listeningSummaryScreenDecade, d),
+      if (stats.languages.firstOrNull case final l?)
+        (l10n.listeningSummaryScreenLanguage, l),
+      if (stats.countries.firstOrNull case final c?)
+        (l10n.listeningSummaryScreenCountry, c),
     ];
     final last = period.to.subtract(const Duration(days: 1));
     final spanDays =
@@ -211,13 +213,13 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
             .inDays +
         1;
     final minutes = (stats.listened.inSeconds / 60).round();
-    final word = period.isYear ? 'roku' : 'sezonu';
+    final kind = period.isYear ? 'year' : 'season';
 
     return [
       _Card(
         seed: '${period.title} intro',
         children: [
-          _Label(period.isYear ? 'Podsumowanie roku' : 'Podsumowanie sezonu'),
+          _Label(l10n.listeningSummaryScreenSummaryOf(kind)),
           _Big(period.yourTitle),
           const SizedBox(height: 12),
           Text(
@@ -226,27 +228,27 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
           if (period.inProgress(now)) ...[
             const SizedBox(height: 24),
             Text(
-              period.isYear
-                  ? 'Rok jeszcze trwa — to podsumowanie do dziś.'
-                  : 'Sezon jeszcze trwa — to podsumowanie do dziś.',
+              l10n.listeningSummaryScreenStillGoing(kind),
               textAlign: TextAlign.center,
             ),
           ],
           const SizedBox(height: 48),
-          _Hint('Dotknij, aby przejść dalej'),
+          _Hint(l10n.listeningSummaryScreenTapToContinue),
         ],
       ),
       _Card(
         seed: '${period.title} minutes',
         children: [
-          const _Label('Czas słuchania'),
-          _Big('$minutes ${pluralWord(minutes, 'minuta', 'minuty', 'minut')}'),
+          _Label(l10n.listeningSummaryScreenListeningTime),
+          _Big(l10n.listeningSummaryScreenMinutes(minutes)),
           const SizedBox(height: 12),
           Text(
             [
               ?_hoursText(stats.listened),
-              'średnio ${minutesLabel(stats.listened ~/ spanDays)} dziennie',
-              '${stats.plays} ${pluralWord(stats.plays, 'odtworzenie', 'odtworzenia', 'odtworzeń')}',
+              l10n.listeningSummaryScreenPerDay(
+                minutesLabel(stats.listened ~/ spanDays),
+              ),
+              l10n.listeningSummaryScreenPlays(stats.plays),
             ].join('\n'),
             textAlign: TextAlign.center,
           ),
@@ -258,7 +260,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
         _Card(
           seed: '${period.title} song',
           children: [
-            _Label('Utwór $word'),
+            _Label(l10n.listeningSummaryScreenTopSong(kind)),
             _SongCover(song: songs.first, size: 220),
             const SizedBox(height: 16),
             _SongNames(song: songs.first, big: true),
@@ -270,7 +272,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
         _Card(
           seed: '${period.title} songs',
           children: [
-            const _Label('Najczęściej słuchane utwory'),
+            _Label(l10n.listeningSummaryScreenTopSongs),
             const SizedBox(height: 8),
             for (final (i, song) in songs.indexed)
               _Row(
@@ -285,7 +287,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
         _Card(
           seed: '${period.title} artist',
           children: [
-            _Label('Wykonawca $word'),
+            _Label(l10n.listeningSummaryScreenTopArtist(kind)),
             ClipOval(child: _EntryCover(entry: artists.first, size: 220)),
             const SizedBox(height: 16),
             _Big(_name(context, artists.first)),
@@ -297,7 +299,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
         _Card(
           seed: '${period.title} artists',
           children: [
-            const _Label('Najczęściej słuchani wykonawcy'),
+            _Label(l10n.listeningSummaryScreenTopArtists),
             const SizedBox(height: 8),
             for (final (i, a) in artists.indexed)
               _Row(
@@ -319,7 +321,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
         _Card(
           seed: '${period.title} albums',
           children: [
-            _Label('Album $word'),
+            _Label(l10n.listeningSummaryScreenTopAlbum(kind)),
             _EntryCover(entry: albums.first, size: 180),
             const SizedBox(height: 12),
             _Big(_name(context, albums.first), small: true),
@@ -338,14 +340,18 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
         _Card(
           seed: '${period.title} sound',
           children: [
-            const _Label('Twoje brzmienie'),
+            _Label(l10n.listeningSummaryScreenYourSound),
             for (final (label, entry) in sound) ...[
               const SizedBox(height: 16),
               Text(label),
               _Big(entry.name, small: true),
               Text(
-                '${(entry.listened.inMilliseconds * 100 / stats.listened.inMilliseconds).round()}% '
-                'czasu słuchania',
+                l10n.listeningSummaryScreenShareOfTime(
+                  (entry.listened.inMilliseconds *
+                          100 /
+                          stats.listened.inMilliseconds)
+                      .round(),
+                ),
               ),
             ],
           ],
@@ -353,7 +359,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
       _Card(
         seed: '${period.title} hours',
         children: [
-          const _Label('Pory dnia'),
+          _Label(l10n.listeningSummaryScreenTimesOfDay),
           const SizedBox(height: 16),
           HourChart(hours: stats.hours),
         ],
@@ -362,14 +368,14 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
         _Card(
           seed: '${period.title} new',
           children: [
-            _Label('Odkrycia $word'),
+            _Label(l10n.listeningSummaryScreenDiscoveries(kind)),
             _Big(
-              '${newArtists.length} ${pluralWord(newArtists.length, 'nowy wykonawca', 'nowych wykonawców', 'nowych wykonawców')}',
+              l10n.listeningSummaryScreenNewArtists(newArtists.length),
               small: true,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Słuchani pierwszy raz w statystykach',
+            Text(
+              l10n.listeningSummaryScreenNewArtistsNote,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -395,23 +401,21 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
             ],
             _Big(period.yourTitle, small: true),
             const SizedBox(height: 4),
-            Text(
-              '$minutes ${pluralWord(minutes, 'minuta', 'minuty', 'minut')} słuchania',
-            ),
+            Text(l10n.listeningSummaryScreenMinutesListened(minutes)),
             const SizedBox(height: 24),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: _TopList(
-                    title: 'Wykonawcy',
+                    title: l10n.listeningSummaryScreenArtists,
                     names: [for (final a in artists) _name(context, a)],
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: _TopList(
-                    title: 'Utwory',
+                    title: l10n.listeningSummaryScreenSongs,
                     names: [
                       for (final s in songs)
                         hitOfStatsSong(context, s).shownTitle(context),
@@ -432,18 +436,21 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
       showsLatinNames(context) ? withLatin(e.name, e.latin) : e.name;
 
   static String _playsLine(int plays, Duration listened) =>
-      '$plays ${pluralWord(plays, 'odtworzenie', 'odtworzenia', 'odtworzeń')} • '
-      '${minutesLabel(listened)}';
+      l10n.listeningSummaryScreenPlaysAndTime(plays, minutesLabel(listened));
 
   /// "To 2 dni i 5 godz." / "To 3 godz. 20 min"; `null` under an hour (the minutes say it).
   static String? _hoursText(Duration d) {
     if (d.inDays >= 1) {
       final hours = d.inHours % 24;
-      return 'To ${d.inDays} ${pluralWord(d.inDays, 'dzień', 'dni', 'dni')}'
-          '${hours > 0 ? ' i $hours godz.' : ''}';
+      return hours > 0
+          ? l10n.listeningSummaryScreenDaysAndHours(d.inDays, hours)
+          : l10n.listeningSummaryScreenDays(d.inDays);
     }
     if (d.inHours == 0) return null;
-    return 'To ${d.inHours} godz. ${d.inMinutes % 60} min';
+    return l10n.listeningSummaryScreenHoursAndMinutes(
+      d.inHours,
+      d.inMinutes % 60,
+    );
   }
 }
 

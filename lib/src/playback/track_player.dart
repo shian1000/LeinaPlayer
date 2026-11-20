@@ -19,6 +19,7 @@ import '../data/youtube_audio.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_matcher.dart';
 import '../data/youtube_search.dart';
+import '../l10n.dart';
 import 'player_controller.dart';
 import 'youtube_playback.dart';
 import '../data/album_covers.dart';
@@ -263,8 +264,8 @@ class TrackPlayer {
     await _reportIfMainLink(hit, gone);
     onStatus?.call(
       hit.mainSong?.fromMusicDb.youtubeVideoId == gone
-          ? 'Link z MusicDatabase wygasł — szukam innego filmu…'
-          : 'Tego filmu nie ma już na YouTube — szukam innego…',
+          ? l10n.trackPlayerLinkExpired
+          : l10n.trackPlayerVideoGoneSearching,
     );
     return play(
       hit,
@@ -316,7 +317,7 @@ class TrackPlayer {
         final file = hit.phoneFiles.first.filePath;
         final String? failure;
         if (await _phoneFileGone(file)) {
-          failure = 'Pliku ${file.split('/').last} nie ma już na telefonie.';
+          failure = l10n.trackPlayerPhoneFileGone(file.split('/').last);
         } else if (await player.play(
           NowPlaying(
             title: hit.title,
@@ -368,22 +369,15 @@ class TrackPlayer {
         );
       case null:
         if (!settings.enabledSources.contains(PlaybackSource.youtube)) {
-          return const PlayOutcome.failed(
-            'Tego utworu nie ma w żadnym włączonym źródle '
-            '(Ustawienia › Odtwarzanie › Źródła).',
-          );
+          return PlayOutcome.failed(l10n.trackPlayerNoEnabledSource);
         }
         // Not found lately: the queue moves on, but a tap (allowExternal) searches again.
         if (hit.youTube == YouTubeLink.notFound && !allowExternal) {
-          return const PlayOutcome.failed(
-            'Tego utworu nie znaleziono na YouTube — dotknij go, żeby poszukać jeszcze raz.',
-          );
+          return PlayOutcome.failed(l10n.trackPlayerNotFoundTapToRetry);
         }
         if (hit.youTube != YouTubeLink.unknown &&
             hit.youTube != YouTubeLink.notFound) {
-          return const PlayOutcome.failed(
-            'Ten utwór jest niedostępny — nie ma go na telefonie ani na YouTube.',
-          );
+          return PlayOutcome.failed(l10n.trackPlayerUnavailable);
         }
         return _findOnYouTube(
           hit,
@@ -443,12 +437,9 @@ class TrackPlayer {
     }
     final addresses = await _serverAddresses();
     if (addresses.isEmpty) {
-      return const PlayOutcome.failed(
-        'Utwór jest na serwerze, ale telefon nie jest w sieci domowej, a adres zdalny serwera '
-        'nie jest ustawiony.',
-      );
+      return PlayOutcome.failed(l10n.trackPlayerServerUnreachableNoRemote);
     }
-    onStatus?.call('Łączę z serwerem…');
+    onStatus?.call(l10n.trackPlayerConnectingServer);
     int? refused;
     for (final base in addresses) {
       final uri = serverFileUri(base, file);
@@ -464,17 +455,19 @@ class TrackPlayer {
           : PlayOutcome.failed(player.lastError);
     }
     return switch (refused) {
-      null => const PlayOutcome.failed(
-        'Nie można połączyć się z serwerem MusicDatabase.',
+      null => PlayOutcome.failed(
+        l10n.trackPlayerServerConnectionFailed,
         offline: true,
       ),
-      HttpStatus.serviceUnavailable => const PlayOutcome.failed(
-        'Biblioteka muzyki na serwerze jest niedostępna (dysk nie jest podłączony?).',
+      HttpStatus.serviceUnavailable => PlayOutcome.failed(
+        l10n.trackPlayerServerLibraryUnavailable,
       ),
       HttpStatus.notFound => PlayOutcome.failed(
-        'Pliku „${file.fileName}” nie ma już na serwerze.',
+        l10n.trackPlayerServerFileGone(file.fileName),
       ),
-      _ => PlayOutcome.failed('Serwer zwrócił błąd $refused dla utworu.'),
+      final int status => PlayOutcome.failed(
+        l10n.trackPlayerServerError(status),
+      ),
     };
   }
 
@@ -486,12 +479,9 @@ class TrackPlayer {
     void Function(String status)? onStatus,
   }) async {
     if (!settings.youTubeSearchEnabled) {
-      return const PlayOutcome.failed(
-        'Utworu nie ma na telefonie, a szukanie w serwisie YouTube jest wyłączone '
-        '(Ustawienia › YouTube).',
-      );
+      return PlayOutcome.failed(l10n.trackPlayerYouTubeSearchOff);
     }
-    onStatus?.call('Szukam na YouTube…');
+    onStatus?.call(l10n.trackPlayerSearchingYouTube);
     final YouTubeVideo? video;
     try {
       video = await findVideo(hit);
@@ -499,9 +489,7 @@ class TrackPlayer {
       return PlayOutcome.failed(e.message, offline: e.offline);
     }
     if (video == null) {
-      return const PlayOutcome.failed(
-        'Nie znaleziono na YouTube pewnego dopasowania tego utworu.',
-      );
+      return PlayOutcome.failed(l10n.trackPlayerNoConfidentMatch);
     }
     return playVideo(
       videoId: video.id,
@@ -812,18 +800,18 @@ class TrackPlayer {
           youtubeVideoId: videoId,
           streamQuality: streamQuality,
         ),
-        onConnecting: () => onStatus?.call('Łączę z YouTube…'),
+        onConnecting: () => onStatus?.call(l10n.trackPlayerConnectingYouTube),
         allowExternal: allowExternal,
         externalUri: externalUri,
       );
       if (via == YouTubePlayedVia.youtubeApp) {
-        return const PlayOutcome.external('Otwarto w aplikacji YouTube.');
+        return PlayOutcome.external(l10n.trackPlayerOpenedInYouTubeApp);
       }
       // The phone picked this video itself, so say which one it is.
       return PlayOutcome.played(
         foundVideo == null
             ? null
-            : 'Z YouTube: „${foundVideo.title}” (${foundVideo.channel})',
+            : l10n.trackPlayerFromYouTube(foundVideo.title, foundVideo.channel),
       );
     } on YouTubePlaybackException catch (e) {
       return PlayOutcome.failed(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_name.dart';
 import '../data/database_sync.dart';
+import '../l10n.dart';
 import '../theme.dart';
 
 /// The first start's question: may the music catalog come from GitHub? "Tak" leaves
@@ -47,7 +48,7 @@ class FirstRunScreen extends StatelessWidget {
               Icon(Icons.library_music, size: 56, color: palette.accent),
               const SizedBox(height: 24),
               Text(
-                'Witaj w $appName',
+                l10n.firstRunScreenWelcome(appName),
                 style: TextStyle(
                   fontSize: AppFontSize.hero,
                   fontWeight: FontWeight.w700,
@@ -56,7 +57,7 @@ class FirstRunScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Pobierać bazę danych muzyki z GitHuba?',
+                l10n.firstRunScreenQuestion,
                 style: TextStyle(
                   fontSize: AppFontSize.section,
                   fontWeight: FontWeight.w700,
@@ -65,17 +66,12 @@ class FirstRunScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'To publiczny katalog utworów (tytuły, wykonawcy, albumy, nastroje) z '
-                'repozytorium ${sync.gitHubRepo}, pobierany raz dziennie. Dzięki niemu działa '
-                'wyszukiwanie, radio, Odkrywaj i rekomendacje — także bez własnego serwera '
-                'MusicDatabase.',
+                l10n.firstRunScreenAbout(sync.gitHubRepo),
                 style: body(palette.textPrimary),
               ),
               const SizedBox(height: 12),
               Text(
-                'Bez niego aplikacja odtwarza muzykę z telefonu i z YouTube, a bazę może pobrać '
-                'z Twojego serwera. Zmienisz to później w Ustawienia › Synchronizacja › Baza '
-                'danych › GitHub.',
+                l10n.firstRunScreenWithout,
                 style: body(palette.textSecondary),
               ),
               const SizedBox(height: 32),
@@ -87,7 +83,7 @@ class FirstRunScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () => _answer(context, true),
-                child: const Text('Tak, pobieraj z GitHuba'),
+                child: Text(l10n.firstRunScreenYes),
               ),
               const SizedBox(height: 8),
               TextButton(
@@ -97,7 +93,7 @@ class FirstRunScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () => _answer(context, false),
-                child: const Text('Nie, bez GitHuba'),
+                child: Text(l10n.firstRunScreenNo),
               ),
             ],
           ),

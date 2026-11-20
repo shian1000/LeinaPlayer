@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../app_name.dart';
+import '../l10n.dart';
 import 'local_library.dart';
 
 /// "Kopia zapasowa" (sharing checklist 4.1): everything the user made on the phone in one `.zip`
@@ -220,15 +221,13 @@ class UserBackup extends ChangeNotifier {
   };
 
   /// What the backup in [bytes] is, before asking whether to restore it; throws
-  /// [BackupException] (with a Polish message) when it isn't one this version can restore.
+  /// [BackupException] (with a message to show) when it isn't one this version can restore.
   static BackupInfo inspect(List<int> bytes) => _read(bytes).info;
 
   static ({Archive archive, Map<String, Object?> json, BackupInfo info}) _read(
     List<int> bytes,
   ) {
-    const notBackup = BackupException(
-      'To nie jest plik kopii zapasowej $appName.',
-    );
+    final notBackup = BackupException(l10n.userBackupNotBackup(appName));
     final Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes);
@@ -245,15 +244,12 @@ class UserBackup extends ChangeNotifier {
       json = jsonDecode(utf8.decode(manifest.content)) as Map<String, Object?>;
     } catch (e) {
       debugPrint('Reading the manifest of a backup failed: $e');
-      throw const BackupException('Plik kopii zapasowej jest uszkodzony.');
+      throw BackupException(l10n.userBackupDamaged);
     }
     if (json['format'] != format) throw notBackup;
     if ((json['version'] as int? ?? 0) > formatVersion ||
         (json['local_db_version'] as int? ?? 0) > LocalLibrary.schemaVersion) {
-      throw const BackupException(
-        'Kopia pochodzi z nowszej wersji aplikacji. Zaktualizuj $appName '
-        'i spróbuj ponownie.',
-      );
+      throw BackupException(l10n.userBackupTooNew(appName));
     }
     return (archive: archive, json: json, info: BackupInfo.of(json));
   }

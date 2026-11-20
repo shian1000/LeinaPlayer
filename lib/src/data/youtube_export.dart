@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../app_name.dart';
+import '../l10n.dart';
 import 'combined_search.dart';
 import 'playlist_library.dart';
 import 'song_catalog.dart';
@@ -56,7 +57,7 @@ Future<YouTubeExportResult> exportToYouTube({
       (t) => api.createPlaylist(
         t,
         title: playlist.name,
-        description: 'Z aplikacji $appName',
+        description: l10n.youtubeExportDescription(appName),
       ),
     );
     await library.setYouTubeCopy(playlist.id, id, done: 0, reload: false);
@@ -75,7 +76,7 @@ Future<YouTubeExportResult> exportToYouTube({
   try {
     while (done < tracks.length) {
       if (cancelled?.call() ?? false) {
-        stopped = const YouTubeApiException('Przerwano');
+        stopped = YouTubeApiException(l10n.youtubeExportCancelled);
         break;
       }
       final track = tracks[done];

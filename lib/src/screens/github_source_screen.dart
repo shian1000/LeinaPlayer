@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/database_sync.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -65,8 +66,8 @@ class _GitHubSourceScreenState extends State<GitHubSourceScreen> {
           SnackBar(
             content: Text(
               valid
-                  ? 'Zapisano repozytorium GitHuba'
-                  : 'Nie zapisano repozytorium: jest nieprawidłowe',
+                  ? l10n.githubSourceScreenSaved
+                  : l10n.githubSourceScreenNotSaved,
             ),
           ),
         );
@@ -94,7 +95,7 @@ class _GitHubSourceScreenState extends State<GitHubSourceScreen> {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SectionTitle('Publiczna kopia bazy'),
+          SectionTitle(l10n.githubSourceScreenPublicCopy),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
@@ -107,9 +108,7 @@ class _GitHubSourceScreenState extends State<GitHubSourceScreen> {
               onSubmitted: (_) => _save(sync),
               decoration: InputDecoration(
                 hintText: DatabaseSync.defaultGitHubRepo,
-                helperText:
-                    'Repozytorium (właściciel/nazwa) albo link do niego. Jego wydanie '
-                    '„database” zawiera music.db i tag.db. Puste przywraca domyślne.',
+                helperText: l10n.githubSourceScreenRepoHelper,
                 helperMaxLines: 4,
                 errorText: _error,
                 border: const OutlineInputBorder(),
@@ -120,9 +119,8 @@ class _GitHubSourceScreenState extends State<GitHubSourceScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Text(
               sync.gitHubOn
-                  ? 'Włączony w Synchronizacja › Baza danych.'
-                  : 'Wyłączony w Synchronizacja › Baza danych — baza nie jest stąd '
-                        'pobierana.',
+                  ? l10n.githubSourceScreenOn
+                  : l10n.githubSourceScreenOff,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,

@@ -1,52 +1,65 @@
 import 'package:flutter/material.dart';
 
+import '../app_name.dart';
 import '../data/combined_search.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/scheduled_music.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_tile.dart';
 
-const _dayNames = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
-const _onDay = [
-  'w poniedziałek',
-  'we wtorek',
-  'w środę',
-  'w czwartek',
-  'w piątek',
-  'w sobotę',
-  'w niedzielę',
+List<String> get _dayNames => [
+  l10n.scheduledMusicScreenMon,
+  l10n.scheduledMusicScreenTue,
+  l10n.scheduledMusicScreenWed,
+  l10n.scheduledMusicScreenThu,
+  l10n.scheduledMusicScreenFri,
+  l10n.scheduledMusicScreenSat,
+  l10n.scheduledMusicScreenSun,
 ];
+List<String> get _onDay => [
+  l10n.scheduledMusicScreenOnMonday,
+  l10n.scheduledMusicScreenOnTuesday,
+  l10n.scheduledMusicScreenOnWednesday,
+  l10n.scheduledMusicScreenOnThursday,
+  l10n.scheduledMusicScreenOnFriday,
+  l10n.scheduledMusicScreenOnSaturday,
+  l10n.scheduledMusicScreenOnSunday,
+];
+
+String _capitalized(String text) =>
+    '${text[0].toUpperCase()}${text.substring(1)}';
 
 /// "Jutro o 07:00, jeden raz" / "Pn, Śr • następnie w środę o 07:00" / "Wyłączone".
 String scheduledLabel(ScheduledTime time) {
   final at = time.nextAt;
-  if (!time.enabled || at == null) return 'Wyłączone';
+  if (!time.enabled || at == null) return l10n.scheduledMusicScreenOff;
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final inDays =
       DateTime(at.year, at.month, at.day).difference(today).inHours.toDouble() /
       24;
   final day = switch (inDays.round()) {
-    0 => 'dzisiaj',
-    1 => 'jutro',
+    0 => l10n.scheduledMusicScreenToday,
+    1 => l10n.scheduledMusicScreenTomorrow,
     _ => _onDay[at.weekday - 1],
   };
   if (time.days.isEmpty) {
-    return '${day[0].toUpperCase()}${day.substring(1)} o ${time.label}, jeden raz';
+    return _capitalized(l10n.scheduledMusicScreenOnce(day, time.label));
   }
   final days = time.days.length == 7
-      ? 'Codziennie'
+      ? l10n.scheduledMusicScreenEveryDay
       : [
           for (final (i, name) in _dayNames.indexed)
             if (time.days.contains(i + 1)) name,
         ].join(', ');
-  return '$days • następnie $day o ${time.label}';
+  return l10n.scheduledMusicScreenRepeating(days, day, time.label);
 }
 
 /// Ja's "Zaplanowana muzyka" row: "Uruchomienie o 07:00 • wyłączenie o 23:00" / "Wyłączone".
@@ -55,12 +68,11 @@ String scheduledSummary(ScheduledMusic scheduled) {
   final start = scheduled.timeOf(ScheduleKind.start);
   final stop = scheduled.timeOf(ScheduleKind.stop);
   final parts = [
-    if (on(start)) 'uruchomienie o ${start.label}',
-    if (on(stop)) 'wyłączenie o ${stop.label}',
+    if (on(start)) l10n.scheduledMusicScreenStartAt(start.label),
+    if (on(stop)) l10n.scheduledMusicScreenStopAt(stop.label),
   ];
-  if (parts.isEmpty) return 'Wyłączone';
-  final text = parts.join(' • ');
-  return '${text[0].toUpperCase()}${text.substring(1)}';
+  if (parts.isEmpty) return l10n.scheduledMusicScreenOff;
+  return _capitalized(parts.join(' • '));
 }
 
 /// Ja › Zaplanowana muzyka: the scheduled start and stop.
@@ -74,12 +86,12 @@ class ScheduledMusicScreen extends StatelessWidget {
         Navigator.of(context)
             .push(MaterialPageRoute<void>(builder: (_) => screen));
     return Scaffold(
-      appBar: AppBar(title: const Text('Zaplanowana muzyka')),
+      appBar: AppBar(title: Text(l10n.scheduledMusicScreenTitle)),
       body: ListView(
         children: [
           ListTile(
             leading: const Icon(Icons.alarm, size: 26),
-            title: const Text('Zaplanowane uruchomienie'),
+            title: Text(l10n.scheduledMusicScreenStart),
             subtitle: Text(
               scheduledLabel(scheduled.timeOf(ScheduleKind.start)),
             ),
@@ -88,7 +100,7 @@ class ScheduledMusicScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.alarm_off, size: 26),
-            title: const Text('Zaplanowane wyłączenie'),
+            title: Text(l10n.scheduledMusicScreenStop),
             subtitle: Text(scheduledLabel(scheduled.timeOf(ScheduleKind.stop))),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => push(const ScheduledStopScreen()),
@@ -174,20 +186,16 @@ Future<void> _askToAllowStartingApp(
       await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Pozwól otwierać aplikację'),
-          content: const Text(
-            'Telefon nie pozwala Leina Player otworzyć się samemu, więc muzyka '
-            'nie włączy się o czasie — zostanie tylko powiadomienie.\n\n'
-            'Włącz „Powiadomienia pełnoekranowe” dla Leina Player.',
-          ),
+          title: Text(l10n.scheduledMusicScreenAllowTitle),
+          content: Text(l10n.scheduledMusicScreenAllowBody(appName)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Nie teraz'),
+              child: Text(l10n.scheduledMusicScreenNotNow),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Otwórz ustawienia'),
+              child: Text(l10n.scheduledMusicScreenOpenSettings),
             ),
           ],
         ),
@@ -218,7 +226,7 @@ class _TimeTile extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     if (!accepted) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Android nie pozwolił tego zaplanować.')),
+        SnackBar(content: Text(l10n.scheduledMusicScreenNotAllowed)),
       );
       return;
     }
@@ -231,11 +239,7 @@ class _TimeTile extends StatelessWidget {
     }
     if (!allowed) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Bez powiadomień telefon może nie uruchomić aplikacji sam.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.scheduledMusicScreenNoNotifications)),
       );
       return;
     }
@@ -249,12 +253,12 @@ class _TimeTile extends StatelessWidget {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: time.hour, minute: time.minute),
-      helpText: 'Godzina',
-      cancelText: 'Anuluj',
-      confirmText: 'Ustaw',
-      hourLabelText: 'Godzina',
-      minuteLabelText: 'Minuta',
-      errorInvalidText: 'Nieprawidłowa godzina',
+      helpText: l10n.scheduledMusicScreenHour,
+      cancelText: l10n.commonCancel,
+      confirmText: l10n.scheduledMusicScreenSet,
+      hourLabelText: l10n.scheduledMusicScreenHour,
+      minuteLabelText: l10n.scheduledMusicScreenMinute,
+      errorInvalidText: l10n.scheduledMusicScreenInvalidTime,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
         child: child!,
@@ -300,7 +304,7 @@ class ScheduledStopScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Zaplanowane wyłączenie')),
+    appBar: AppBar(title: Text(l10n.scheduledMusicScreenStop)),
     body: ListView(
       children: [
         const _TimeTile(kind: ScheduleKind.stop),
@@ -308,7 +312,7 @@ class ScheduledStopScreen extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Text(
-            'O tej godzinie muzyka ucichnie i się zatrzyma.',
+            l10n.scheduledMusicScreenStopNote,
             style: TextStyle(color: context.palette.textSecondary),
           ),
         ),
@@ -403,7 +407,7 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
     final source = scheduled.source;
     final volume = _draggedVolume ?? scheduled.volume;
     return Scaffold(
-      appBar: AppBar(title: const Text('Zaplanowane uruchomienie')),
+      appBar: AppBar(title: Text(l10n.scheduledMusicScreenStart)),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
@@ -414,17 +418,15 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
                 Icons.warning_amber_rounded,
                 color: Theme.of(context).colorScheme.error,
               ),
-              title: const Text('Muzyka nie włączy się sama'),
-              subtitle: const Text(
-                'Dotknij i włącz „Powiadomienia pełnoekranowe” dla Leina Player.',
-              ),
+              title: Text(l10n.scheduledMusicScreenWontStart),
+              subtitle: Text(l10n.scheduledMusicScreenWontStartHint(appName)),
               onTap: () => _openStartAppSettings(scheduled),
             ),
           const _DayPicker(kind: ScheduleKind.start),
           const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Text('Głośność: $volume%'),
+            child: Text(l10n.scheduledMusicScreenVolume(volume)),
           ),
           Slider(
             value: volume.toDouble(),
@@ -439,35 +441,35 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
             },
           ),
           const Divider(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Text(
-              'Co ma zagrać',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              l10n.scheduledMusicScreenWhatPlays,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
           _option(
             icon: Icons.music_note_outlined,
-            label: 'Utwór',
+            label: l10n.scheduledMusicScreenSong,
             subtitle: source is ScheduledSong
                 ? _songLabel(source.song)
-                : 'Wybierz utwór',
+                : l10n.scheduledMusicScreenPickSong,
             selected: source is ScheduledSong,
             onTap: () => _pickSong(scheduled),
           ),
           _option(
             icon: Icons.queue_music,
-            label: 'Playlista',
+            label: l10n.scheduledMusicScreenPlaylist,
             subtitle: source is ScheduledPlaylist
                 ? source.name
-                : 'Wybierz playlistę',
+                : l10n.scheduledMusicScreenPickPlaylist,
             selected: source is ScheduledPlaylist,
             onTap: () => _pickPlaylist(scheduled),
           ),
           _option(
             icon: Icons.replay,
-            label: 'Ostatnia kolejka',
-            subtitle: 'Gra dalej od miejsca, w którym została przerwana',
+            label: l10n.scheduledMusicScreenLastQueue,
+            subtitle: l10n.scheduledMusicScreenLastQueueSubtitle,
             selected: source is ScheduledLastQueue,
             onTap: () => scheduled.setSource(const ScheduledLastQueue()),
           ),
@@ -516,8 +518,8 @@ class _SongPickerState extends State<_SongPicker> {
           autofocus: true,
           textInputAction: TextInputAction.search,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            hintText: 'Wybierz utwór',
+          decoration: InputDecoration(
+            hintText: l10n.scheduledMusicScreenPickSong,
             border: InputBorder.none,
           ),
         ),
@@ -541,12 +543,12 @@ class _PlaylistPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final playlists = PlaylistLibraryScope.of(context).playlists;
     return Scaffold(
-      appBar: AppBar(title: const Text('Wybierz playlistę')),
+      appBar: AppBar(title: Text(l10n.scheduledMusicScreenPickPlaylist)),
       body: playlists.isEmpty
           ? Padding(
               padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
               child: Text(
-                'Nie masz jeszcze żadnej playlisty.',
+                l10n.scheduledMusicScreenNoPlaylists,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: context.palette.textSecondary),
               ),

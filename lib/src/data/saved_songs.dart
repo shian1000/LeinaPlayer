@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'combined_search.dart';
 import 'item_sync.dart';
 import 'track_ref.dart';
+import '../l10n.dart';
 
 /// One song of a [StoredSongList].
 class StoredSong {
@@ -251,7 +252,7 @@ class SavedSongsSync extends ItemSync {
        super(
          collection: 'saved-songs',
          field: 'songs',
-         problemNoun: 'polubionych i zapisanych utworów',
+         problemNoun: () => l10n.savedSongsProblemNoun,
        ) {
     for (final list in lists) {
       list.onChanged = () => onChanged?.call();

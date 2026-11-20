@@ -5,6 +5,7 @@ import '../data/saved_songs.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/menu_sheet.dart';
@@ -27,7 +28,7 @@ class SavedSongsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final StoredSongList? saved = LikedSongsScope.maybeOf(context);
-    const id = likedSongsLabel;
+    final id = likedSongsLabel;
     final catalog = SongCatalogScope.of(context);
     final library = LocalLibraryScope.of(context);
     final youTube = YouTubeLibraryScope.of(context);
@@ -41,7 +42,7 @@ class SavedSongsScreen extends StatelessWidget {
         actions: [
           if (hits.isNotEmpty)
             IconButton(
-              tooltip: 'Menu (⋮)',
+              tooltip: l10n.savedSongsScreenMenu,
               icon: const Icon(Icons.more_vert),
               onPressed: () => showMenuSheet(
                 context,
@@ -64,9 +65,7 @@ class SavedSongsScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Text(
-                  'Nic tu jeszcze nie ma. Polub utwór w „Dodaj do playlisty” '
-                  '— przyciskiem ⊕ przy tytule w odtwarzaczu albo z menu ⋮ '
-                  'utworu.',
+                  l10n.savedSongsScreenEmpty,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.textSecondary),
                 ),
@@ -78,7 +77,7 @@ class SavedSongsScreen extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: FilledButton.icon(
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('Odtwórz'),
+                    label: Text(l10n.commonPlay),
                     onPressed: () {
                       final queue = PlaybackQueueScope.of(context);
                       runQueueAction(
@@ -101,7 +100,7 @@ class SavedSongsScreen extends StatelessWidget {
                 queueIndex: i,
                 playlistName: id,
                 trailing: IconButton(
-                  tooltip: 'Menu utworu (⋮)',
+                  tooltip: l10n.savedSongsScreenSongMenu,
                   icon: const Icon(Icons.more_vert),
                   onPressed: () => showSongMenu(
                     context,
@@ -110,7 +109,7 @@ class SavedSongsScreen extends StatelessWidget {
                   ),
                 ),
                 onSwipeRemove: saved == null ? null : () => saved.toggle(hit),
-                swipeRemoveLabel: 'Usuń z „$id”',
+                swipeRemoveLabel: l10n.savedSongsScreenRemoveFrom(id),
               ),
           ],
         ),

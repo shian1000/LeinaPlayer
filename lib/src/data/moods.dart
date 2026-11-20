@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
+import '../l10n.dart';
 import 'combined_search.dart';
 import 'custom_covers.dart';
 import 'database_sync.dart';
@@ -648,7 +649,7 @@ class MoodLibrary extends ChangeNotifier {
 
   /// The user's own [mood] under another name; returns why not, like [create].
   Future<String?> rename(Mood mood, String name) async {
-    if (mood.global) return 'Nazwę nastroju globalnego zmienia MusicDatabase';
+    if (mood.global) return l10n.moodsGlobalRename;
     if (name.trim() == mood.name) return null;
     final problem = _nameProblem(name.trim());
     if (problem != null) return problem;
@@ -669,9 +670,9 @@ class MoodLibrary extends ChangeNotifier {
 
   /// Names are unique among the user's moods (MusicDatabase would merge two of a name).
   String? _nameProblem(String name) {
-    if (name.isEmpty) return 'Wpisz nazwę nastroju';
+    if (name.isEmpty) return l10n.moodsEnterName;
     if (_userMoods.any((m) => m.name == name)) {
-      return 'Nastrój „$name” już istnieje';
+      return l10n.moodsNameExists(name);
     }
     return null;
   }
@@ -933,7 +934,7 @@ class MoodLibrary extends ChangeNotifier {
         return e.problem;
       } catch (e) {
         debugPrint('Mood sync on $server failed: $e');
-        problem = 'Brak połączenia z serwerem MusicDatabase';
+        problem = l10n.moodsNoConnection;
       } finally {
         client.close();
       }
@@ -1196,14 +1197,9 @@ class MoodLibrary extends ChangeNotifier {
           );
         case HttpStatus.unauthorized:
           onUnauthorized?.call();
-          throw const _SyncStopped(
-            'Serwer nie przyjął logowania — zaloguj się ponownie (Ustawienia › Konto)',
-          );
+          throw _SyncStopped(l10n.moodsLoginRejected);
         case HttpStatus.serviceUnavailable:
-          throw const _SyncStopped(
-            'Serwer MusicDatabase nie może teraz przyjąć zmian w nastrojach '
-            '(dysk niepodłączony)',
-          );
+          throw _SyncStopped(l10n.moodsServerCantTakeChanges);
         case HttpStatus.forbidden ||
             HttpStatus.notFound ||
             HttpStatus.badRequest:
@@ -1215,11 +1211,10 @@ class MoodLibrary extends ChangeNotifier {
           );
           if (body is Map && body['error'] == 'permission') {
             onPermissionRevoked?.call(body['permission'] as String);
-            problem ??=
-                'Nie masz już uprawnień do zmieniania nastrojów globalnych';
+            problem ??= l10n.moodsNoPermission;
           }
         default:
-          problem ??= 'Serwer odrzucił zmianę nastroju (HTTP ${answer.status})';
+          problem ??= l10n.moodsChangeRejected(answer.status);
       }
     }
     return problem;
@@ -1233,20 +1228,13 @@ class MoodLibrary extends ChangeNotifier {
         return null;
       case HttpStatus.unauthorized:
         onUnauthorized?.call();
-        throw const _SyncStopped(
-          'Serwer nie przyjął logowania — zaloguj się ponownie (Ustawienia › Konto)',
-        );
+        throw _SyncStopped(l10n.moodsLoginRejected);
       case HttpStatus.serviceUnavailable:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie może teraz zapisać nastrojów (dysk niepodłączony lub '
-          'baza użytkownika jeszcze nieprzygotowana)',
-        );
+        throw _SyncStopped(l10n.moodsServerCantSave);
       case HttpStatus.notFound when !keepGoing:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie obsługuje jeszcze nastrojów',
-        );
+        throw _SyncStopped(l10n.moodsNotSupported);
     }
-    final problem = 'Serwer odrzucił nastrój (HTTP ${answer.status})';
+    final problem = l10n.moodsRejected(answer.status);
     if (keepGoing) return problem;
     throw _SyncStopped(problem);
   }

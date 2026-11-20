@@ -6,6 +6,7 @@ import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../data/listening_log.dart';
 import '../data/listening_summary.dart';
+import '../l10n.dart';
 import '../data/song_catalog.dart';
 import '../playback/scheduled_music.dart';
 import '../theme.dart';
@@ -39,11 +40,7 @@ class ProfileScreen extends StatelessWidget {
     if (!context.mounted) return;
     if (year.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Nie ma jeszcze czego udostępnić — statystyki zbierają się podczas słuchania.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.profileScreenNothingToShare)),
       );
       return;
     }
@@ -85,7 +82,9 @@ class ProfileScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ScrollingText(
-                        loggedIn ? account!.userName! : 'Nie zalogowano',
+                        loggedIn
+                            ? account!.userName!
+                            : l10n.profileScreenNotLoggedIn,
                         style: const TextStyle(
                           fontSize: AppFontSize.section,
                           fontWeight: FontWeight.bold,
@@ -96,33 +95,23 @@ class ProfileScreen extends StatelessWidget {
                         loggedIn
                             ? [
                                 if (playlists != null)
-                                  _count(
-                                    playlists,
-                                    'playlista',
-                                    'playlisty',
-                                    'playlist',
-                                  ),
+                                  l10n.profileScreenPlaylists(playlists),
                                 if (moods != null)
-                                  _count(
-                                    moods,
-                                    'własny nastrój',
-                                    'własne nastroje',
-                                    'własnych nastrojów',
-                                  ),
+                                  l10n.profileScreenOwnMoods(moods),
                               ].join(' • ')
-                            : 'Zaloguj się do MusicDatabase',
+                            : l10n.profileScreenLogIn,
                         style: TextStyle(color: palette.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Edytuj profil',
+                  tooltip: l10n.profileScreenEditProfile,
                   icon: const Icon(Icons.edit_outlined),
                   onPressed: () => push(const AccountScreen()),
                 ),
                 IconButton(
-                  tooltip: 'Udostępnij profil',
+                  tooltip: l10n.profileScreenShareProfile,
                   icon: const Icon(Icons.ios_share),
                   onPressed: () => _shareProfile(context),
                 ),
@@ -132,22 +121,22 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 8),
           _Row(
             icon: Icons.history,
-            label: 'Ostatnie',
+            label: l10n.profileScreenRecents,
             onTap: () => push(const RecentsScreen()),
           ),
           _Row(
             icon: Icons.bookmark_border,
-            label: 'Na później',
+            label: l10n.profileScreenLater,
             subtitle: laterCount == 0
-                ? 'Linki od znajomych zapisane z „Otwórz w…”'
+                ? l10n.profileScreenLaterEmpty
                 : unopened == 0
-                ? 'Wszystko odsłuchane ($laterCount)'
-                : 'Do odsłuchania: $unopened z $laterCount',
+                ? l10n.profileScreenLaterAllHeard(laterCount)
+                : l10n.profileScreenLaterUnheard(unopened, laterCount),
             onTap: () => push(const LaterLinksScreen()),
           ),
           _Row(
             icon: Icons.show_chart,
-            label: 'Statystyki słuchania',
+            label: l10n.profileScreenListeningStats,
             onTap: () => push(const ListeningStatsScreen()),
             onLongPress: () =>
                 showFeatureInfo(context, FeatureInfos.listeningStats),
@@ -155,22 +144,19 @@ class ProfileScreen extends StatelessWidget {
           if (scheduled != null)
             _Row(
               icon: Icons.alarm,
-              label: 'Zaplanowana muzyka',
+              label: l10n.profileScreenScheduledMusic,
               subtitle: scheduledSummary(scheduled),
               onTap: () => push(const ScheduledMusicScreen()),
             ),
           _Row(
             icon: Icons.settings_outlined,
-            label: 'Ustawienia',
+            label: l10n.profileScreenSettings,
             onTap: () => push(const SettingsScreen()),
           ),
         ],
       ),
     );
   }
-
-  static String _count(int n, String one, String few, String many) =>
-      '$n ${pluralWord(n, one, few, many)}';
 }
 
 class _Card extends StatelessWidget {

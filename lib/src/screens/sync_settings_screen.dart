@@ -4,6 +4,7 @@ import '../data/account.dart';
 import '../data/database_sync.dart';
 import '../data/outbox.dart';
 import '../data/sync_sources.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/feature_info.dart';
@@ -18,16 +19,16 @@ import 'sync_tiles.dart';
 
 /// The name of each synced function, as Synchronizacja lists it.
 String syncFeatureName(SyncFeature feature) => switch (feature) {
-  SyncFeature.database => 'Baza danych',
-  SyncFeature.library => 'Biblioteka użytkownika',
-  SyncFeature.requests => 'Prośby do bazy danych',
-  SyncFeature.errorReports => 'Raportowanie błędów',
+  SyncFeature.database => l10n.syncSettingsScreenDatabase,
+  SyncFeature.library => l10n.syncSettingsScreenLibrary,
+  SyncFeature.requests => l10n.syncSettingsScreenRequests,
+  SyncFeature.errorReports => l10n.syncSettingsScreenErrorReports,
 };
 
 String _sourceName(SyncSource source) => switch (source) {
   SyncSource.gitHub => 'GitHub',
-  SyncSource.leina => 'Serwer Leina',
-  SyncSource.privateServer => 'Prywatny serwer',
+  SyncSource.leina => l10n.syncSettingsScreenLeinaServer,
+  SyncSource.privateServer => l10n.syncSettingsScreenPrivateServer,
 };
 
 IconData _featureIcon(SyncFeature feature) => switch (feature) {
@@ -45,7 +46,9 @@ IconData _sourceIcon(SyncSource source) => switch (source) {
 
 void _workInProgress(BuildContext context) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()
-  ..showSnackBar(const SnackBar(content: Text('Work in progress :)')));
+  ..showSnackBar(
+    SnackBar(content: Text(l10n.syncSettingsScreenWorkInProgress)),
+  );
 
 /// "Ustawienia › Synchronizacja": every function the phone syncs, each opening its own sources.
 class SyncSettingsScreen extends StatelessWidget {
@@ -58,7 +61,9 @@ class SyncSettingsScreen extends StatelessWidget {
         if (source != SyncSource.privateServer || sync.hasServer)
           _sourceName(source),
     ];
-    return names.isEmpty ? 'Tylko telefon' : '${names.join(' → ')} • telefon';
+    return names.isEmpty
+        ? l10n.syncSettingsScreenPhoneOnly
+        : l10n.syncSettingsScreenSourcesAndPhone(names.join(' → '));
   }
 
   @override
@@ -68,7 +73,7 @@ class SyncSettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Synchronizacja'),
+        title: Text(l10n.syncSettingsScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
@@ -92,9 +97,7 @@ class SyncSettingsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
-              'Każda funkcja ma własne źródła: włączasz je przełącznikiem, a kolejność, w '
-              'jakiej telefon ich próbuje, zmieniasz, przeciągając ≡. Dane na telefonie '
-              'zostają zawsze.',
+              l10n.syncSettingsScreenIntro,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -119,30 +122,26 @@ class SyncSourcesScreen extends StatelessWidget {
       ValueKey('sync.source.${source.name}');
 
   String get _intro => switch (feature) {
-    SyncFeature.database =>
-      'Skąd telefon pobiera bazę utworów — sam raz dziennie przy uruchomieniu albo przez '
-          '„Pobierz teraz” na dole. Włączone źródła są próbowane od góry, aż któreś odpowie; '
-          'GitHub daje tylko kopię nie starszą niż ta na telefonie.',
-    SyncFeature.library =>
-      'Z czym synchronizują się playlisty, nastroje, foldery, polubione, „Na później” i '
-          'statystyki słuchania zalogowanego konta. Wyłączone — zostają tylko na telefonie.',
-    SyncFeature.requests =>
-      'Dokąd idą zgłoszenia poprawek i prośby o dodanie utworów. Bez włączonego serwera '
-          'czekają na telefonie na „Wyślij paczkę…”.',
-    SyncFeature.errorReports => 'Dokąd idą raporty o problemach. Na razie tylko z telefonu, przez „Udostępnij”.',
+    SyncFeature.database => l10n.syncSettingsScreenDatabaseIntro,
+    SyncFeature.library => l10n.syncSettingsScreenLibraryIntro,
+    SyncFeature.requests => l10n.syncSettingsScreenRequestsIntro,
+    SyncFeature.errorReports => l10n.syncSettingsScreenErrorReportsIntro,
   };
 
   String _subtitle(BuildContext context, DatabaseSync sync, SyncSource source) {
-    if (!SyncSources.works(feature, source)) return 'Jeszcze nie działa';
+    if (!SyncSources.works(feature, source)) {
+      return l10n.syncSettingsScreenNotWorkingYet;
+    }
     return switch (source) {
       SyncSource.gitHub => sync.gitHubRepo,
-      SyncSource.privateServer when !sync.hasServer => 'Nie ustawiono adresu',
+      SyncSource.privateServer when !sync.hasServer =>
+        l10n.syncSettingsScreenNoAddress,
       SyncSource.privateServer
           when feature == SyncFeature.library &&
               AccountScope.maybeOf(context)?.loggedIn == false =>
-        'Adres ustawiony • niezalogowano (Ustawienia › Konto)',
-      SyncSource.privateServer => 'Adres ustawiony',
-      SyncSource.leina => 'Jeszcze nie działa',
+        l10n.syncSettingsScreenAddressSetLoggedOut,
+      SyncSource.privateServer => l10n.syncSettingsScreenAddressSet,
+      SyncSource.leina => l10n.syncSettingsScreenNotWorkingYet,
     };
   }
 
@@ -181,25 +180,24 @@ class SyncSourcesScreen extends StatelessWidget {
     final waiting = OutboxScope.maybeOf(context)?.waiting ?? 0;
     return switch (feature) {
       SyncFeature.database => (
-        subtitle: 'Kopia bazy na telefonie',
+        subtitle: l10n.syncSettingsScreenPhoneDatabase,
         onTap: () => _workInProgress(context),
         info: null,
       ),
       SyncFeature.library => (
-        subtitle: 'Biblioteka zapisana na telefonie',
+        subtitle: l10n.syncSettingsScreenPhoneLibrary,
         onTap: () => _workInProgress(context),
         info: null,
       ),
       SyncFeature.requests => (
         subtitle: waiting == 0
-            ? 'Zgłoszenia poprawek • nic nie czeka'
-            : 'Zgłoszenia poprawek • czeka '
-                  '${OutboxSettingsScreen.requestsLabel(waiting)}',
+            ? l10n.syncSettingsScreenPhoneRequestsNone
+            : l10n.syncSettingsScreenPhoneRequestsWaiting(waiting),
         onTap: () => push(const OutboxSettingsScreen()),
         info: FeatureInfos.outbox,
       ),
       SyncFeature.errorReports => (
-        subtitle: 'Problemy • Zgłoś problem • Dziennik błędów',
+        subtitle: l10n.syncSettingsScreenPhoneProblems,
         onTap: () => push(const ProblemsScreen()),
         info: null,
       ),
@@ -215,10 +213,8 @@ class SyncSourcesScreen extends StatelessWidget {
           : [
               ListTile(
                 leading: const Icon(Icons.account_circle_outlined),
-                title: const Text('Nie zalogowano'),
-                subtitle: const Text(
-                  'Biblioteka synchronizuje się z kontem MusicDatabase po zalogowaniu',
-                ),
+                title: Text(l10n.syncSettingsScreenNotLoggedIn),
+                subtitle: Text(l10n.syncSettingsScreenLibraryAfterLogin),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -263,7 +259,7 @@ class SyncSourcesScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SectionTitle('Źródła'),
+                SectionTitle(l10n.syncSettingsScreenSources),
               ],
             ),
           ),
@@ -299,7 +295,7 @@ class SyncSourcesScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(left: 8),
                         child: Icon(
                           Icons.drag_handle,
-                          semanticLabel: 'Przesuń',
+                          semanticLabel: l10n.syncSettingsScreenMove,
                           color: palette.textSecondary,
                         ),
                       ),
@@ -313,10 +309,10 @@ class SyncSourcesScreen extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 24),
             sliver: SliverList.list(
               children: [
-                const SectionTitle('Dane na telefonie'),
+                SectionTitle(l10n.syncSettingsScreenPhoneData),
                 ListTile(
                   leading: const Icon(Icons.smartphone),
-                  title: const Text('Telefon'),
+                  title: Text(l10n.syncSettingsScreenPhone),
                   subtitle: Text(phone.subtitle),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: phone.onTap,
@@ -325,7 +321,7 @@ class SyncSourcesScreen extends StatelessWidget {
                       : () => showFeatureInfo(context, phone.info!),
                 ),
                 if (lastSync.isNotEmpty) ...[
-                  const SectionTitle('Ostatnia synchronizacja'),
+                  SectionTitle(l10n.syncSettingsScreenLastSync),
                   ...lastSync,
                 ],
               ],

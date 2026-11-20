@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../playback/player_controller.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
@@ -16,13 +17,13 @@ class CoverFilterScreen extends StatefulWidget {
 }
 
 class _CoverFilterScreenState extends State<CoverFilterScreen> {
-  static const _presets = [
-    (ThemeController.defaultMonochromeColor, 'Fosfor'),
-    (Color(0xFF33FF66), 'Zielony'),
-    (Color(0xFFFFB000), 'Bursztyn'),
-    (Color(0xFF5FF5E8), 'Cyjan'),
-    (Color(0xFFE8E8E8), 'Biały'),
-    (Color(0xFFFF6EC7), 'Róż'),
+  static List<(Color, String)> get _presets => [
+    (ThemeController.defaultMonochromeColor, l10n.coverFilterScreenPhosphor),
+    (const Color(0xFF33FF66), l10n.coverFilterScreenGreen),
+    (const Color(0xFFFFB000), l10n.coverFilterScreenAmber),
+    (const Color(0xFF5FF5E8), l10n.coverFilterScreenCyan),
+    (const Color(0xFFE8E8E8), l10n.coverFilterScreenWhite),
+    (const Color(0xFFFF6EC7), l10n.coverFilterScreenPink),
   ];
 
   /// The slider while it's dragged: only the preview follows it, and it's saved on release —
@@ -30,17 +31,17 @@ class _CoverFilterScreenState extends State<CoverFilterScreen> {
   double? _dragged;
 
   static String _note(CoverFilter f) => switch (f) {
-    CoverFilter.none => 'Okładki bez zmian',
-    CoverFilter.lain => 'Błękit i zieleń, ziarno i linie jak w anime Serial Experiments Lain (1996)',
-    CoverFilter.monochrome => 'Jeden kolor: odcienie z gęstości zapalonych punktów, jak na starych ekranach',
+    CoverFilter.none => l10n.coverFilterScreenNoneNote,
+    CoverFilter.lain => l10n.coverFilterScreenLainNote,
+    CoverFilter.monochrome => l10n.coverFilterScreenMonochromeNote,
   };
 
   /// Unlit dots: a dark screen, Game Boy greens, paper.
-  static const _backgrounds = [
-    (Color(0xFF000000), 'Czarny'),
-    (Color(0xFF0F380F), 'Ciemna zieleń'),
-    (Color(0xFF9BBC0F), 'Jasna zieleń (Game Boy)'),
-    (Color(0xFFE8E2D0), 'Papier'),
+  static List<(Color, String)> get _backgrounds => [
+    (const Color(0xFF000000), l10n.coverFilterScreenBlack),
+    (const Color(0xFF0F380F), l10n.coverFilterScreenDarkGreen),
+    (const Color(0xFF9BBC0F), l10n.coverFilterScreenLightGreen),
+    (const Color(0xFFE8E2D0), l10n.coverFilterScreenPaper),
   ];
 
   /// A colour from the palette; one that isn't a preset is remembered among "your colours".
@@ -77,7 +78,7 @@ class _CoverFilterScreenState extends State<CoverFilterScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Filtry do albumów'),
+        title: Text(l10n.coverFilterScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 16, bottom: 24),
@@ -87,7 +88,7 @@ class _CoverFilterScreenState extends State<CoverFilterScreen> {
                 ? Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      'Włącz utwór, aby zobaczyć tu podgląd na jego okładce.',
+                      l10n.coverFilterScreenNoTrack,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: palette.textSecondary),
                     ),
@@ -120,7 +121,7 @@ class _CoverFilterScreenState extends State<CoverFilterScreen> {
               child: Row(
                 children: [
                   Text(
-                    'Intensywność',
+                    l10n.coverFilterScreenStrength,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: palette.textSecondary,
@@ -149,7 +150,7 @@ class _CoverFilterScreenState extends State<CoverFilterScreen> {
           if (selected == CoverFilter.monochrome) ...[
             const Divider(height: 24),
             _ColorRow(
-              title: 'Kolor punktów',
+              title: l10n.coverFilterScreenDotColor,
               presets: _presets,
               selected: color,
               saved: themes.savedColors,
@@ -158,12 +159,12 @@ class _CoverFilterScreenState extends State<CoverFilterScreen> {
               onCustom: () => _pickCustom(
                 themes,
                 initial: color,
-                title: 'Kolor punktów',
+                title: l10n.coverFilterScreenDotColor,
                 apply: themes.setMonochromeColor,
               ),
             ),
             _ColorRow(
-              title: 'Kolor tła',
+              title: l10n.coverFilterScreenBackgroundColor,
               presets: _backgrounds,
               selected: themes.monochromeBackground,
               saved: themes.savedColors,
@@ -173,7 +174,7 @@ class _CoverFilterScreenState extends State<CoverFilterScreen> {
               onCustom: () => _pickCustom(
                 themes,
                 initial: themes.monochromeBackground ?? Colors.black,
-                title: 'Kolor tła',
+                title: l10n.coverFilterScreenBackgroundColor,
                 apply: themes.setMonochromeBackground,
               ),
             ),
@@ -256,7 +257,9 @@ class _ColorRow extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  selected == null ? 'Auto' : '#${colorHex(selected!)}',
+                  selected == null
+                      ? l10n.coverFilterScreenAuto
+                      : '#${colorHex(selected!)}',
                   style: TextStyle(color: palette.textSecondary),
                 ),
               ],
@@ -267,7 +270,7 @@ class _ColorRow extends StatelessWidget {
             children: [
               if (onAuto != null)
                 Tooltip(
-                  message: 'Automatyczny: przyciemniony kolor punktów',
+                  message: l10n.coverFilterScreenAutoTooltip,
                   child: InkResponse(
                     onTap: onAuto,
                     child: Padding(
@@ -278,7 +281,7 @@ class _ColorRow extends StatelessWidget {
                         child: selected == null
                             ? Icon(Icons.check, color: palette.accent)
                             : Text(
-                                'A',
+                                l10n.coverFilterScreenAutoLetter,
                                 style: TextStyle(color: palette.textSecondary),
                               ),
                       ),
@@ -289,12 +292,11 @@ class _ColorRow extends StatelessWidget {
               for (final c in own)
                 _swatch(
                   c,
-                  tooltip:
-                      'Twój kolor #${colorHex(c)} • przytrzymaj, aby usunąć',
+                  tooltip: l10n.coverFilterScreenOwnColor(colorHex(c)),
                   onLongPress: () => onForget(c),
                 ),
               Tooltip(
-                message: 'Wybierz z palety',
+                message: l10n.coverFilterScreenPickFromPalette,
                 child: InkResponse(
                   onTap: onCustom,
                   child: Padding(

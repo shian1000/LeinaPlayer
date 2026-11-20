@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
 import '../data/youtube_search.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/feature_info.dart';
 import 'feature_infos.dart';
 
 /// Short name of a playback method for lists ("1. Pamięć podręczna, 2. NewPipe, ...").
 String shortPlaybackLabel(YouTubePlaybackMethod m) => switch (m) {
-  YouTubePlaybackMethod.cache => 'Pamięć podręczna',
+  YouTubePlaybackMethod.cache => l10n.youtubePlaybackScreenCache,
   YouTubePlaybackMethod.newPipe => 'NewPipe',
   YouTubePlaybackMethod.explode => 'youtube_explode',
   YouTubePlaybackMethod.ytDlpServer => 'yt-dlp',
-  YouTubePlaybackMethod.youtubeApp => 'Aplikacja YouTube',
+  YouTubePlaybackMethod.youtubeApp => l10n.youtubePlaybackScreenYouTubeApp,
 };
 
 /// "Ustawienia › Odtwarzanie › Źródła › YouTube": which ways of playing a YouTube
@@ -29,19 +30,15 @@ class YouTubePlaybackScreen extends StatelessWidget {
     final order = settings.playbackMethodOrder;
 
     String note(YouTubePlaybackMethod m) => switch (m) {
-      YouTubePlaybackMethod.cache =>
-        'Utwory odtworzone wcześniej grają z telefonu, także bez internetu (ustawienia: '
-            'Oszczędzanie danych › Pamięć podręczna)',
+      YouTubePlaybackMethod.cache => l10n.youtubePlaybackScreenCacheNote,
       YouTubePlaybackMethod.newPipe =>
         newPipeAvailable
-            ? 'Dźwięk prosto z YouTube, na telefonie'
-            : 'Dostępne tylko na Androidzie',
-      YouTubePlaybackMethod.explode =>
-        'Obecnie YouTube odrzuca pobieranie tą metodą (błąd 403)',
-      YouTubePlaybackMethod.ytDlpServer =>
-        'Jeszcze niedostępne — serwer bazy danych tego nie obsługuje',
+            ? l10n.youtubePlaybackScreenNewPipeNote
+            : l10n.youtubePlaybackScreenAndroidOnly,
+      YouTubePlaybackMethod.explode => l10n.youtubePlaybackScreenExplodeNote,
+      YouTubePlaybackMethod.ytDlpServer => l10n.youtubePlaybackScreenYtDlpNote,
       YouTubePlaybackMethod.youtubeApp =>
-        'Film otwiera się w oficjalnej aplikacji YouTube',
+        l10n.youtubePlaybackScreenYouTubeAppNote,
     };
     IconData icon(YouTubePlaybackMethod m) => switch (m) {
       YouTubePlaybackMethod.cache => Icons.offline_pin_outlined,
@@ -54,7 +51,7 @@ class YouTubePlaybackScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Sposoby odtwarzania YouTube'),
+        title: Text(l10n.youtubePlaybackScreenTitle),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -62,8 +59,7 @@ class YouTubePlaybackScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Utwór z YouTube gra pierwszym włączonym sposobem od góry; kolejne są używane '
-              'tylko wtedy, gdy poprzedni zawiedzie. Przeciągnij, aby zmienić kolejność.',
+              l10n.youtubePlaybackScreenIntro,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,

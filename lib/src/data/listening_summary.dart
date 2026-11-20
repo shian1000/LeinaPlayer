@@ -1,19 +1,15 @@
+import '../l10n.dart';
 import 'listening_log.dart';
 import 'listening_stats.dart';
 import 'song_catalog.dart';
 
 enum Season {
-  spring('Wiosna', 'Twoja wiosna', 3),
-  summer('Lato', 'Twoje lato', 6),
-  autumn('Jesień', 'Twoja jesień', 9),
-  winter('Zima', 'Twoja zima', 12);
+  spring(3),
+  summer(6),
+  autumn(9),
+  winter(12);
 
-  const Season(this.name, this.yours, this.firstMonth);
-
-  final String name;
-
-  /// "Twoja wiosna", for the first card.
-  final String yours;
+  const Season(this.firstMonth);
 
   /// Meteorological seasons: whole months, so a summary starts on the 1st.
   final int firstMonth;
@@ -58,10 +54,22 @@ class SummaryPeriod {
       : '${from.year}';
 
   /// "Rok 2026", "Lato 2026", "Zima 2025/26".
-  String get title => '${season?.name ?? 'Rok'} $yearLabel';
+  String get title => switch (season) {
+    null => l10n.listeningSummaryYear(yearLabel),
+    Season.spring => l10n.listeningSummarySpring(yearLabel),
+    Season.summer => l10n.listeningSummarySummer(yearLabel),
+    Season.autumn => l10n.listeningSummaryAutumn(yearLabel),
+    Season.winter => l10n.listeningSummaryWinter(yearLabel),
+  };
 
   /// "Twój rok 2026", "Twoje lato 2026".
-  String get yourTitle => '${season?.yours ?? 'Twój rok'} $yearLabel';
+  String get yourTitle => switch (season) {
+    null => l10n.listeningSummaryYourYear(yearLabel),
+    Season.spring => l10n.listeningSummaryYourSpring(yearLabel),
+    Season.summer => l10n.listeningSummaryYourSummer(yearLabel),
+    Season.autumn => l10n.listeningSummaryYourAutumn(yearLabel),
+    Season.winter => l10n.listeningSummaryYourWinter(yearLabel),
+  };
 
   bool contains(DateTime at) => !at.isBefore(from) && at.isBefore(to);
 

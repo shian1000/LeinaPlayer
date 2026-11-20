@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/error_log.dart';
+import '../l10n.dart';
 import '../theme.dart';
 
 /// "Problemy › Dziennik błędów" (Synchronizacja › Raportowanie błędów › Telefon): what went wrong lately (newest first), kept only on
@@ -15,18 +16,16 @@ class ErrorLogScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Wyczyścić dziennik błędów?'),
-        content: const Text(
-          'Wpisy znikną z telefonu. Nie da się ich potem dołączyć do raportu.',
-        ),
+        title: Text(l10n.errorLogScreenClearTitle),
+        content: Text(l10n.errorLogScreenClearBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Anuluj'),
+            child: Text(l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Wyczyść'),
+            child: Text(l10n.errorLogScreenClear),
           ),
         ],
       ),
@@ -45,11 +44,11 @@ class ErrorLogScreen extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(
             backgroundColor: palette.surface,
-            title: const Text('Dziennik błędów'),
+            title: Text(l10n.errorLogScreenTitle),
             actions: [
               if (entries.isNotEmpty)
                 IconButton(
-                  tooltip: 'Wyczyść',
+                  tooltip: l10n.errorLogScreenClear,
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () => _clear(context, log),
                 ),
@@ -58,7 +57,7 @@ class ErrorLogScreen extends StatelessWidget {
           body: entries.isEmpty
               ? Center(
                   child: Text(
-                    'Brak błędów z ostatnich ${ErrorLog.keepFor.inDays} dni',
+                    l10n.errorLogScreenEmpty(ErrorLog.keepFor.inDays),
                     style: TextStyle(color: palette.textSecondary),
                   ),
                 )

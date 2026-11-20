@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/local_library.dart';
+import '../l10n.dart';
 import '../data/smart_playlists.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
@@ -28,12 +29,12 @@ class SmartPlaylistsScreen extends StatelessWidget {
     final palette = context.palette;
     final playlists = SmartPlaylistsScope.maybeOf(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Dynamiczne playlisty')),
+      appBar: AppBar(title: Text(l10n.smartPlaylistScreenTitle)),
       floatingActionButton: playlists == null
           ? null
           : FloatingActionButton.extended(
               icon: const Icon(Icons.add),
-              label: const Text('Nowa'),
+              label: Text(l10n.smartPlaylistScreenNew),
               onPressed: () => createSmartPlaylist(context),
             ),
       body: ListView(
@@ -42,9 +43,7 @@ class SmartPlaylistsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Text(
-              'Dynamiczna playlista to zapisany filtr — np. „Wykonawca: Kino” albo '
-              '„Rok: 1987”. Jej utwory są wyszukiwane od nowa przy każdym otwarciu, '
-              'więc same dochodzą po pobraniu nowszej bazy. Tylko na tym telefonie.',
+              l10n.smartPlaylistScreenIntro,
               style: TextStyle(
                 color: palette.textSecondary,
                 fontSize: AppFontSize.small,
@@ -80,7 +79,7 @@ class SmartPlaylistTile extends StatelessWidget {
         child: Icon(Icons.auto_mode, color: palette.textSecondary),
       ),
       title: ScrollingText(playlist.name),
-      subtitle: Text('Dynamiczna • ${playlist.rule}'),
+      subtitle: Text(l10n.smartPlaylistScreenTileSubtitle(playlist.rule)),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => SmartPlaylistScreen(playlistId: playlist.id),
@@ -127,13 +126,15 @@ class _NewSmartPlaylistDialogState extends State<_NewSmartPlaylistDialog> {
   Widget build(BuildContext context) {
     final value = _value.text.trim();
     return AlertDialog(
-      title: const Text('Nowa dynamiczna playlista'),
+      title: Text(l10n.smartPlaylistScreenNewDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<SearchField>(
             initialValue: _field,
-            decoration: const InputDecoration(labelText: 'Pole'),
+            decoration: InputDecoration(
+              labelText: l10n.smartPlaylistScreenField,
+            ),
             items: [
               for (final field in SearchField.values)
                 DropdownMenuItem(value: field, child: Text(field.label)),
@@ -142,17 +143,19 @@ class _NewSmartPlaylistDialogState extends State<_NewSmartPlaylistDialog> {
           ),
           TextField(
             controller: _value,
-            decoration: const InputDecoration(
-              labelText: 'Wartość',
-              hintText: 'np. Kino, 1987, polski',
+            decoration: InputDecoration(
+              labelText: l10n.smartPlaylistScreenValue,
+              hintText: l10n.smartPlaylistScreenValueHint,
             ),
             onChanged: (_) => setState(() {}),
           ),
           TextField(
             controller: _name,
             decoration: InputDecoration(
-              labelText: 'Nazwa',
-              hintText: value.isEmpty ? 'Nazwa playlisty' : value,
+              labelText: l10n.smartPlaylistScreenName,
+              hintText: value.isEmpty
+                  ? l10n.smartPlaylistScreenNameHint
+                  : value,
             ),
           ),
         ],
@@ -160,7 +163,7 @@ class _NewSmartPlaylistDialogState extends State<_NewSmartPlaylistDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
         TextButton(
           onPressed: value.isEmpty
@@ -170,7 +173,7 @@ class _NewSmartPlaylistDialogState extends State<_NewSmartPlaylistDialog> {
                   _field,
                   value,
                 )),
-          child: const Text('Utwórz'),
+          child: Text(l10n.smartPlaylistScreenCreate),
         ),
       ],
     );
@@ -192,7 +195,7 @@ class SmartPlaylistScreen extends StatelessWidget {
         appBar: AppBar(),
         body: Center(
           child: Text(
-            'Tej playlisty już nie ma.',
+            l10n.smartPlaylistScreenGone,
             style: TextStyle(color: palette.textSecondary),
           ),
         ),
@@ -227,7 +230,7 @@ class SmartPlaylistScreen extends StatelessWidget {
         title: ScrollingText(playlist.name),
         actions: [
           IconButton(
-            tooltip: 'Menu playlisty (⋮)',
+            tooltip: l10n.smartPlaylistScreenMenu,
             icon: const Icon(Icons.more_vert),
             onPressed: () => showMenuSheet(
               context,
@@ -244,8 +247,8 @@ class SmartPlaylistScreen extends StatelessWidget {
                 ],
                 MenuSheetEntry(
                   Icons.delete_outline,
-                  'Usuń dynamiczną playlistę',
-                  subtitle: 'Utwory zostają',
+                  l10n.smartPlaylistScreenDelete,
+                  subtitle: l10n.smartPlaylistScreenDeleteSubtitle,
                   onTap: () {
                     SmartPlaylistsScope.maybeOf(context)?.delete(playlist.id);
                     Navigator.of(context).pop();
@@ -264,7 +267,10 @@ class SmartPlaylistScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Text(
-                '${playlist.rule} • ${hits.length} utw.',
+                l10n.smartPlaylistScreenRuleAndCount(
+                  playlist.rule,
+                  hits.length,
+                ),
                 style: TextStyle(color: palette.textSecondary),
               ),
             ),
@@ -274,7 +280,7 @@ class SmartPlaylistScreen extends StatelessWidget {
                 children: [
                   FilledButton.icon(
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('Odtwórz'),
+                    label: Text(l10n.commonPlay),
                     onPressed: hits.isEmpty
                         ? null
                         : () => play(shuffled: false),
@@ -282,7 +288,7 @@ class SmartPlaylistScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.shuffle),
-                    label: const Text('Losowo'),
+                    label: Text(l10n.smartPlaylistScreenShuffle),
                     onPressed: hits.isEmpty ? null : () => play(shuffled: true),
                   ),
                 ],
@@ -292,7 +298,7 @@ class SmartPlaylistScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Text(
-                  'Żaden utwór nie pasuje teraz do „${playlist.rule}”.',
+                  l10n.smartPlaylistScreenNoMatch(playlist.rule),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.textSecondary),
                 ),

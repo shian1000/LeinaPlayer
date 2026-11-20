@@ -3,6 +3,7 @@ package com.shian1000.music_database_app
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
@@ -63,6 +64,10 @@ class LinkChooserActivity : Activity() {
     private var shared = false
     private var closing = false
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (intent?.action == Intent.ACTION_SEND) {
@@ -110,7 +115,7 @@ class LinkChooserActivity : Activity() {
                     .addFlags(MAIN_FLAGS),
             )
         } catch (e: Exception) {
-            Toast.makeText(this, "Nie udało się otworzyć Leina Player", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.link_open_failed), Toast.LENGTH_SHORT).show()
         }
         finishNow()
     }
@@ -132,26 +137,26 @@ class LinkChooserActivity : Activity() {
         return when (service) {
             LinkService.YOUTUBE -> when {
                 first == "playlist" && uri.getQueryParameter("list") != null ->
-                    Kind("Playlista z YouTube", "Zaimportuj do Biblioteki", true)
+                    Kind(getString(R.string.link_youtube_playlist), getString(R.string.link_action_import), true)
                 uri.host == "youtu.be" && first != null ||
                     first == "watch" && uri.getQueryParameter("v") != null ||
                     first in setOf("shorts", "live", "embed") && segments.size > 1 ->
-                    Kind("Film z YouTube", "Odtwórz", true, playable = true)
-                else -> Kind("Link z YouTube", "Otwiera tylko filmy i playlisty", false)
+                    Kind(getString(R.string.link_youtube_video), getString(R.string.link_action_play), true, playable = true)
+                else -> Kind(getString(R.string.link_youtube_other), getString(R.string.link_youtube_unsupported), false)
             }
             LinkService.SPOTIFY -> {
                 val type = segments.dropWhile { it.startsWith("intl-") || it == "embed" }
                     .firstOrNull()
                 when {
                     uri.host != "open.spotify.com" ->
-                        Kind("Link ze Spotify", "Odtwórz albo zaimportuj", true)
-                    type == "track" -> Kind("Utwór ze Spotify", "Odtwórz", true, playable = true)
-                    type == "album" -> Kind("Album ze Spotify", "Zaimportuj do Biblioteki", true)
+                        Kind(getString(R.string.link_spotify_other), getString(R.string.link_action_play_or_import), true)
+                    type == "track" -> Kind(getString(R.string.link_spotify_track), getString(R.string.link_action_play), true, playable = true)
+                    type == "album" -> Kind(getString(R.string.link_spotify_album), getString(R.string.link_action_import), true)
                     type == "playlist" ->
-                        Kind("Playlista ze Spotify", "Zaimportuj do Biblioteki", true)
+                        Kind(getString(R.string.link_spotify_playlist), getString(R.string.link_action_import), true)
                     else -> Kind(
-                        "Link ze Spotify",
-                        "Otwiera tylko utwory, albumy i playlisty",
+                        getString(R.string.link_spotify_other),
+                        getString(R.string.link_spotify_unsupported),
                         false,
                     )
                 }
@@ -390,10 +395,10 @@ class LinkChooserActivity : Activity() {
         hideKeyboard()
         content.removeAllViews()
         val kind = kind()
-        content.addView(header("Otwórz w…", kind))
+        content.addView(header(getString(R.string.link_open_in), kind))
 
         val remember = CheckBox(this).apply {
-            text = "Zapamiętaj wybór dla linków ${service.from}"
+            text = getString(service.rememberText)
             setTextColor(look.text)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             typeface = face
@@ -424,19 +429,19 @@ class LinkChooserActivity : Activity() {
         }
         if (LinkTargets.isInstalled(this, service.appPackage)) {
             val info = pm.getApplicationInfo(service.appPackage, 0)
-            choiceRow(info.loadIcon(pm), info.loadLabel(pm).toString(), "Otwórz w aplikacji",
+            choiceRow(info.loadIcon(pm), info.loadLabel(pm).toString(), getString(R.string.link_open_in_app),
                 LinkChoice.APP)
         }
         LinkTargets.browserPackage(this)?.let { browser ->
             val info = pm.getApplicationInfo(browser, 0)
-            choiceRow(info.loadIcon(pm), info.loadLabel(pm).toString(), "Otwórz w przeglądarce",
+            choiceRow(info.loadIcon(pm), info.loadLabel(pm).toString(), getString(R.string.link_open_in_browser),
                 LinkChoice.BROWSER)
         }
         if (kind.supported) {
             content.addView(divider(), dividerParams())
             content.addView(
-                row(roundIcon(iconRes = R.drawable.ic_save_later), "Zapisz na później",
-                    "Wybierz, od kogo jest ten link") {
+                row(roundIcon(iconRes = R.drawable.ic_save_later), getString(R.string.link_save_later),
+                    getString(R.string.link_save_later_subtitle)) {
                     showPeople()
                 },
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT),
@@ -453,7 +458,7 @@ class LinkChooserActivity : Activity() {
             },
         )
         content.addView(
-            text("Zmienisz to w Ustawienia › Otwieranie linków", 12f, look.textSecondary).apply {
+            text(getString(R.string.link_change_in_settings), 12f, look.textSecondary).apply {
                 setPadding(dp(24), 0, dp(24), dp(16))
                 maxLines = 2
             },
@@ -467,7 +472,7 @@ class LinkChooserActivity : Activity() {
     private fun showPlayModes(kind: Kind) {
         onSubPage = !shared
         content.removeAllViews()
-        content.addView(header("Jak odtworzyć?", kind))
+        content.addView(header(getString(R.string.link_how_to_play), kind))
         fun modeRow(iconRes: Int, title: String, subtitle: String, play: String?) {
             content.addView(
                 row(roundIcon(iconRes = iconRes), title, subtitle) {
@@ -477,14 +482,14 @@ class LinkChooserActivity : Activity() {
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT),
             )
         }
-        modeRow(R.drawable.ic_play_now, "Odtwórz teraz", "Zamiast tego, co gra", null)
-        modeRow(R.drawable.ic_play_next, "Odtwórz jako następny", "Zaraz po obecnym utworze",
+        modeRow(R.drawable.ic_play_now, getString(R.string.link_play_now), getString(R.string.link_play_now_subtitle), null)
+        modeRow(R.drawable.ic_play_next, getString(R.string.link_play_next), getString(R.string.link_play_next_subtitle),
             PLAY_NEXT)
-        modeRow(R.drawable.ic_add_to_queue, "Dodaj do kolejki", "Na sam koniec kolejki", PLAY_END)
+        modeRow(R.drawable.ic_add_to_queue, getString(R.string.link_add_to_queue), getString(R.string.link_add_to_queue_subtitle), PLAY_END)
         content.addView(divider(), dividerParams())
         if (shared) {
             content.addView(
-                text("Anuluj", 15f, look.textSecondary, bold = true).apply {
+                text(getString(R.string.link_cancel), 15f, look.textSecondary, bold = true).apply {
                     setPadding(dp(24), dp(14), dp(24), dp(16))
                     pressable(this)
                     setOnClickListener { close() }
@@ -496,7 +501,7 @@ class LinkChooserActivity : Activity() {
         }
     }
 
-    private fun backRow() = text("← Wróć", 15f, look.textSecondary, bold = true).apply {
+    private fun backRow() = text(getString(R.string.link_back), 15f, look.textSecondary, bold = true).apply {
         setPadding(dp(24), dp(14), dp(24), dp(16))
         pressable(this)
         setOnClickListener { showChoices() }
@@ -507,7 +512,7 @@ class LinkChooserActivity : Activity() {
         onSubPage = true
         content.removeAllViews()
         val kind = kind()
-        content.addView(header("Od kogo?", kind))
+        content.addView(header(getString(R.string.link_from_whom), kind))
 
         val people = LaterLinks.people(this)
         val newPerson = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -515,7 +520,7 @@ class LinkChooserActivity : Activity() {
         fun showNewPersonRow() {
             newPerson.removeAllViews()
             newPerson.addView(
-                row(roundIcon(glyph = "+"), "Nowa osoba", null) { showNameField(newPerson, kind) },
+                row(roundIcon(glyph = "+"), getString(R.string.link_new_person), null) { showNameField(newPerson, kind) },
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT),
             )
         }
@@ -551,7 +556,7 @@ class LinkChooserActivity : Activity() {
     private fun showNameField(into: LinearLayout, kind: Kind) {
         into.removeAllViews()
         val field = EditText(this).apply {
-            hint = "Imię lub nazwa"
+            hint = getString(R.string.link_name_hint)
             setTextColor(look.text)
             setHintTextColor(look.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
@@ -576,7 +581,7 @@ class LinkChooserActivity : Activity() {
             if (action == EditorInfo.IME_ACTION_DONE) submit()
             true
         }
-        val save = text("Zapisz", 15f, look.accent, bold = true).apply {
+        val save = text(getString(R.string.link_save), 15f, look.accent, bold = true).apply {
             setPadding(dp(16), dp(12), dp(16), dp(12))
             pressable(this)
             setOnClickListener { submit() }
@@ -601,7 +606,7 @@ class LinkChooserActivity : Activity() {
     private fun saveFor(personId: String, name: String, kind: Kind) {
         LaterLinks.save(this, uri.toString(), service.key, kind.label, personId)
         hideKeyboard()
-        Toast.makeText(applicationContext, "Zapisano na później — od: $name", Toast.LENGTH_SHORT)
+        Toast.makeText(applicationContext, getString(R.string.link_saved_later, name), Toast.LENGTH_SHORT)
             .show()
         close()
     }

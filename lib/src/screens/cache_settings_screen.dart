@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/album_covers.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/downloads.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -32,11 +33,7 @@ class CacheSettingsScreen extends StatefulWidget {
 class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
   static const _coverLimits = [25, 50, 100, 200, 500];
 
-  Future<bool> _confirm(
-    String title,
-    String text, {
-    String action = 'Wyczyść',
-  }) async =>
+  Future<bool> _confirm(String title, String text, {String? action}) async =>
       await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -45,11 +42,11 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Anuluj'),
+              child: Text(l10n.commonCancel),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(action),
+              child: Text(action ?? l10n.cacheSettingsScreenClear),
             ),
           ],
         ),
@@ -69,7 +66,7 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (_) => TextInputDialog(
-        title: 'Liczba utworów w pamięci podręcznej',
+        title: l10n.cacheSettingsScreenSongLimitTitle,
         hint: '${SourceSettings.defaultCacheLimit}',
         initial: '${settings.cacheLimit}',
         number: true,
@@ -84,49 +81,46 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
   Future<void> _clearSongs() async {
     final library = YouTubeLibraryScope.of(context);
     if (!await _confirm(
-      'Wyczyścić utwory z YouTube?',
-      'Zapisane na telefonie utwory z YouTube zostaną usunięte i przy następnym '
-          'odtworzeniu pobrane ponownie.',
+      l10n.cacheSettingsScreenClearSongsTitle,
+      l10n.cacheSettingsScreenClearSongsBody,
     )) {
       return;
     }
     await library.clearCache();
-    _done('Wyczyszczono utwory z YouTube.');
+    _done(l10n.cacheSettingsScreenSongsCleared);
   }
 
   Future<void> _forgetMatches() async {
     final library = YouTubeLibraryScope.of(context);
     if (!await _confirm(
-      'Zapomnieć filmy dopasowane przez telefon?',
-      'Utwory, do których telefon sam znalazł film na YouTube, zostaną przy następnym '
-          'odtworzeniu wyszukane od nowa. Linki z bazy danych zostają.',
-      action: 'Zapomnij',
+      l10n.cacheSettingsScreenForgetMatchesTitle,
+      l10n.cacheSettingsScreenForgetMatchesBody,
+      action: l10n.cacheSettingsScreenForget,
     )) {
       return;
     }
     await library.forgetPhoneMatches();
-    _done('Zapomniano filmy dopasowane przez telefon.');
+    _done(l10n.cacheSettingsScreenMatchesForgotten);
   }
 
   Future<void> _forgetNotFound() async {
     final library = YouTubeLibraryScope.of(context);
     if (!await _confirm(
-      'Zapomnieć „nie znaleziono na YouTube”?',
-      'Telefon poszuka tych utworów na YouTube ponownie, także w kolejce. Oznaczenia N/A z '
-          'bazy danych zostają.',
-      action: 'Zapomnij',
+      l10n.cacheSettingsScreenForgetNotFoundTitle,
+      l10n.cacheSettingsScreenForgetNotFoundBody,
+      action: l10n.cacheSettingsScreenForget,
     )) {
       return;
     }
     await library.forgetNotFound();
-    _done('Zapomniano utwory nieznalezione na YouTube.');
+    _done(l10n.cacheSettingsScreenNotFoundForgotten);
   }
 
   Future<void> _pickPrefetch(SourceSettings settings) async {
     final count = await showDialog<int>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
-        title: const Text('Ile następnych utworów z kolejki zapisywać?'),
+        title: Text(l10n.cacheSettingsScreenPrefetchTitle),
         children: [
           for (var n = 1; n <= SourceSettings.maxQueuePrefetch; n++)
             ListTile(
@@ -146,7 +140,7 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
     final mb = await showDialog<int>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
-        title: const Text('Rozmiar pamięci podręcznej okładek'),
+        title: Text(l10n.cacheSettingsScreenCoverLimitTitle),
         children: [
           for (final mb in _coverLimits)
             ListTile(
@@ -165,41 +159,38 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
 
   Future<void> _clearCovers(AlbumCovers covers) async {
     if (!await _confirm(
-      'Wyczyścić okładki?',
-      'Pobrane okładki zostaną usunięte i pobrane ponownie, gdy będą potrzebne.',
+      l10n.cacheSettingsScreenClearCoversTitle,
+      l10n.cacheSettingsScreenClearCoversBody,
     )) {
       return;
     }
     await covers.clear();
-    _done('Wyczyszczono okładki.');
+    _done(l10n.cacheSettingsScreenCoversCleared);
   }
 
   Future<void> _clearAll(AlbumCovers? covers) async {
     final library = YouTubeLibraryScope.of(context);
     if (!await _confirm(
-      'Wyczyścić całą pamięć podręczną?',
-      'Zapisane utwory z YouTube i pobrane okładki zostaną usunięte. Pobrana baza danych, '
-          'utwory pobrane przyciskiem „Pobierz” i muzyka z telefonu zostają.',
+      l10n.cacheSettingsScreenClearAllTitle,
+      l10n.cacheSettingsScreenClearAllBody,
     )) {
       return;
     }
     await library.clearCache();
     await covers?.clear();
-    _done('Wyczyszczono pamięć podręczną.');
+    _done(l10n.cacheSettingsScreenAllCleared);
   }
 
   Future<void> _removeDownloads(Downloads downloads) async {
     if (!await _confirm(
-      'Usunąć wszystkie pobrane?',
-      'Utwory pobrane przyciskiem „Pobierz” przestaną być dostępne bez internetu. Pliki z '
-          'serwera zostaną usunięte z telefonu, utwory z YouTube wrócą do zwykłej pamięci '
-          'podręcznej.',
-      action: 'Usuń',
+      l10n.cacheSettingsScreenRemoveDownloadsTitle,
+      l10n.cacheSettingsScreenRemoveDownloadsBody,
+      action: l10n.commonDelete,
     )) {
       return;
     }
     await downloads.removeAll();
-    _done('Usunięto pobrane utwory.');
+    _done(l10n.cacheSettingsScreenDownloadsRemoved);
   }
 
   @override
@@ -220,7 +211,7 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Pamięć podręczna'),
+        title: Text(l10n.cacheSettingsScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
@@ -228,18 +219,20 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Text(
-              'Zajęte razem: ${_mb(cacheBytesOf(context))} MB.',
+              l10n.cacheSettingsScreenTotal(_mb(cacheBytesOf(context))),
               style: hint,
             ),
           ),
           if (downloads != null) ...[
-            const SectionTitle('Pobrane'),
+            SectionTitle(l10n.cacheSettingsScreenDownloadsSection),
             ListTile(
               leading: const Icon(Icons.download_for_offline_outlined),
-              title: const Text('Pobrane utwory'),
+              title: Text(l10n.cacheSettingsScreenDownloadedSongs),
               subtitle: Text(
-                '${downloads.count} ${_songs(downloads.count)}, '
-                '${_mb(downloads.bytes)} MB',
+                l10n.cacheSettingsScreenSongsAndSize(
+                  l10n.songsCount(downloads.count),
+                  _mb(downloads.bytes),
+                ),
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
@@ -251,35 +244,35 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
             ListTile(
               enabled: downloads.count > 0,
               leading: const Icon(Icons.delete_outline),
-              title: const Text('Usuń wszystkie pobrane'),
+              title: Text(l10n.cacheSettingsScreenRemoveDownloads),
               onTap: () => _removeDownloads(downloads),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Text(
-                'Utwory i playlisty pobrane przyciskiem „Pobierz” zostają na telefonie. '
-                'Muzyka z telefonu nie liczy się do limitu pamięci podręcznej.',
-                style: hint,
-              ),
+              child: Text(l10n.cacheSettingsScreenDownloadsNote, style: hint),
             ),
           ],
-          const SectionTitle('Utwory z YouTube'),
+          SectionTitle(l10n.cacheSettingsScreenYouTubeSongsSection),
           ListTile(
             enabled: songsOn,
             leading: const Icon(Icons.library_music_outlined),
-            title: const Text('Liczba utworów'),
+            title: Text(l10n.cacheSettingsScreenSongLimit),
             subtitle: Text(
-              songsOn ? '${settings.cacheLimit}' : 'Wyłączone (Odtwarzanie › Źródła › YouTube › Pamięć podręczna)',
+              songsOn
+                  ? '${settings.cacheLimit}'
+                  : l10n.cacheSettingsScreenSongsOff,
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _editSongLimit(settings),
           ),
           ListTile(
             leading: const Icon(Icons.sd_storage_outlined),
-            title: const Text('Zajęte miejsce'),
+            title: Text(l10n.cacheSettingsScreenUsedSpace),
             subtitle: Text(
-              '${library.cachedCount} ${_songs(library.cachedCount)}, '
-              '${_mb(library.cachedBytes)} MB',
+              l10n.cacheSettingsScreenSongsAndSize(
+                l10n.songsCount(library.cachedCount),
+                _mb(library.cachedBytes),
+              ),
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
@@ -291,26 +284,21 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           ListTile(
             enabled: library.cachedCount > 0,
             leading: const Icon(Icons.delete_outline),
-            title: const Text('Wyczyść utwory z YouTube'),
+            title: Text(l10n.cacheSettingsScreenClearSongs),
             onTap: _clearSongs,
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Text(
-              'Gdy pamięć jest pełna, usuwany jest utwór, którego najdawniej słuchano.',
-              style: hint,
-            ),
+            child: Text(l10n.cacheSettingsScreenEvictionNote, style: hint),
           ),
-          const SectionTitle('Kolejka'),
+          SectionTitle(l10n.cacheSettingsScreenQueueSection),
           SwitchListTile(
             secondary: const Icon(Icons.download_outlined),
-            title: const Text(
-              'Zapisuj z wyprzedzeniem następne utwory z kolejki',
-            ),
+            title: Text(l10n.cacheSettingsScreenPrefetch),
             subtitle: Text(
               songsOn
-                  ? 'Następne utwory z YouTube są pobierane na telefon, zanim zagrają'
-                  : 'Wymaga zapisywania utworów z YouTube (powyżej)',
+                  ? l10n.cacheSettingsScreenPrefetchOn
+                  : l10n.cacheSettingsScreenPrefetchNeedsCache,
             ),
             value: settings.queuePrefetchEnabled,
             onChanged: settings.setQueuePrefetchEnabled,
@@ -318,47 +306,51 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           ListTile(
             enabled: settings.queuePrefetchEnabled,
             leading: const Icon(Icons.queue_music),
-            title: const Text('Ile następnych utworów'),
+            title: Text(l10n.cacheSettingsScreenPrefetchCount),
             subtitle: Text(_nextSongs(settings.queuePrefetch)),
             onTap: () => _pickPrefetch(settings),
           ),
-          const SectionTitle('Dopasowania z YouTube'),
+          SectionTitle(l10n.cacheSettingsScreenMatchesSection),
           ListTile(
             enabled: library.phoneMatchCount > 0,
             leading: const Icon(Icons.youtube_searched_for),
-            title: const Text('Zapomnij filmy dopasowane przez telefon'),
+            title: Text(l10n.cacheSettingsScreenForgetMatches),
             subtitle: Text(
-              '${library.phoneMatchCount} ${_songs(library.phoneMatchCount)} — '
-              'zostaną wyszukane od nowa',
+              l10n.cacheSettingsScreenMatchesCount(
+                l10n.songsCount(library.phoneMatchCount),
+              ),
             ),
             onTap: _forgetMatches,
           ),
           ListTile(
             enabled: library.notFoundCount > 0,
             leading: const Icon(Icons.search_off),
-            title: const Text('Zapomnij „nie znaleziono na YouTube”'),
+            title: Text(l10n.cacheSettingsScreenForgetNotFound),
             subtitle: Text(
-              '${library.notFoundCount} ${_songs(library.notFoundCount)} — '
-              'telefon poszuka ich ponownie',
+              l10n.cacheSettingsScreenNotFoundCount(
+                l10n.songsCount(library.notFoundCount),
+              ),
             ),
             onTap: _forgetNotFound,
           ),
           Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0)),
           if (covers != null) ...[
-            const SectionTitle('Okładki'),
+            SectionTitle(l10n.cacheSettingsScreenCoversSection),
             ListTile(
               leading: const Icon(Icons.photo_size_select_large_outlined),
-              title: const Text('Rozmiar'),
+              title: Text(l10n.cacheSettingsScreenCoverSize),
               subtitle: Text('${settings.coverCacheLimitMb} MB'),
               onTap: () => _pickCoverLimit(settings),
             ),
             ListTile(
               enabled: covers.cachedCount > 0,
               leading: const Icon(Icons.delete_outline),
-              title: const Text('Wyczyść okładki'),
+              title: Text(l10n.cacheSettingsScreenClearCovers),
               subtitle: Text(
-                'Zajęte: ${_mb(covers.cachedBytes)} MB '
-                '(${covers.cachedCount} obrazów)',
+                l10n.cacheSettingsScreenCoversUsed(
+                  _mb(covers.cachedBytes),
+                  covers.cachedCount,
+                ),
               ),
               onTap: () => _clearCovers(covers),
             ),
@@ -366,10 +358,8 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
           const Divider(height: 32),
           ListTile(
             leading: Icon(Icons.delete_sweep_outlined, color: palette.accent),
-            title: const Text('Wyczyść wszystko'),
-            subtitle: const Text(
-              'Utwory z YouTube i okładki (pobrane zostają)',
-            ),
+            title: Text(l10n.cacheSettingsScreenClearAll),
+            subtitle: Text(l10n.cacheSettingsScreenClearAllSubtitle),
             onTap: () => _clearAll(covers),
           ),
         ],
@@ -378,17 +368,5 @@ class _CacheSettingsScreenState extends State<CacheSettingsScreen> {
   }
 }
 
-/// "1 utwór", "2 utwory", "5 utworów".
-String _songs(int n) {
-  if (n == 1) return 'utwór';
-  final tens = n % 100;
-  if (n % 10 >= 2 && n % 10 <= 4 && (tens < 12 || tens > 14)) return 'utwory';
-  return 'utworów';
-}
-
 /// "1 następny utwór", "3 następne utwory", "5 następnych utworów".
-String _nextSongs(int n) {
-  if (n == 1) return '1 następny utwór';
-  final few = n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
-  return few ? '$n następne utwory' : '$n następnych utworów';
-}
+String _nextSongs(int n) => l10n.cacheSettingsScreenNextSongs(n);

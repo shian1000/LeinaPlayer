@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
+import '../l10n.dart';
 
 /// A dialog to pick any colour: a saturation/brightness square, a hue bar, the hex code and
 /// [swatches] to start from (e.g. colours picked before); returns `null` on "Anuluj".
 Future<Color?> showColorPicker(
   BuildContext context, {
   required Color initial,
-  String title = 'Własny kolor',
+  String? title,
   List<Color> swatches = const [],
 }) => showDialog<Color>(
   context: context,
-  builder: (_) =>
-      _ColorPickerDialog(initial: initial, title: title, swatches: swatches),
+  builder: (_) => _ColorPickerDialog(
+    initial: initial,
+    title: title ?? l10n.colorPickerCustomColor,
+    swatches: swatches,
+  ),
 );
 
 /// Black or white, whichever reads better on [background] (a check mark on a swatch).
@@ -133,11 +137,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(_color),
-          child: const Text('OK'),
+          child: Text(l10n.commonOk),
         ),
       ],
     );

@@ -9,21 +9,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/text_normalizer.dart';
 import 'data/theme_repository.dart';
+import 'l10n.dart';
 import 'theme.dart';
 
 /// "Ustawienia › Wygląd › Filtry do albumów": a look laid over every album cover.
 enum CoverFilter {
-  none('Brak'),
+  none,
 
   /// Blue-green, grainy, with scan lines — like Serial Experiments Lain (1996).
-  lain('Lain'),
+  lain,
 
   /// One colour on black: shades come from how many dots are lit, like old monochrome screens.
-  monochrome('Monochromatic');
+  monochrome;
 
-  const CoverFilter(this.label);
-
-  final String label;
+  /// The filters' own names (Lain, Monochromatic) stay as they are in every language.
+  String get label => switch (this) {
+    none => l10n.themeControllerCoverFilterNone,
+    lain => 'Lain',
+    monochrome => 'Monochromatic',
+  };
 }
 
 /// "Ustawienia › Wygląd": the chosen light and dark theme and which of the two is shown.
@@ -51,6 +55,7 @@ class ThemeController extends ChangeNotifier {
   static const _monochromeBackgroundKey = 'appearance.monochrome_background';
   static const _savedColorsKey = 'appearance.saved_colors';
   static const _latinNamesKey = 'appearance.latin_names';
+  static const _languageKey = 'appearance.language';
   static const maxSavedColors = 8;
   static String _strengthKey(CoverFilter f) =>
       'appearance.cover_filter_strength.${f.name}';
@@ -124,8 +129,28 @@ class ThemeController extends ChangeNotifier {
       ? ThemeMode.system
       : (_darkMode ? ThemeMode.dark : ThemeMode.light);
 
+  /// "Ustawienia › Wygląd › Język": one of [availableLanguages]' tags or [systemLanguageTag].
+  String get languageTag => _languageTag;
+  String _languageTag = systemLanguageTag;
+
+  /// For `MaterialApp.locale`: `null` while following the phone, which then resolves it with
+  /// [resolveSystemLocale] (and again whenever the phone's language changes).
+  Locale? get locale => languageByTag(_languageTag)?.locale;
+
+  /// The saved language for [l10n] before [load]: the media notification's channel is named
+  /// while starting, before the backup restore that [load] has to wait for.
+  static Future<void> applySavedLanguage() async {
+    final tag = (await SharedPreferences.getInstance()).getString(_languageKey);
+    setAppLocale(localeForTag(tag ?? systemLanguageTag));
+  }
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
+    final languageTag = prefs.getString(_languageKey);
+    if (languageTag != null && languageByTag(languageTag) != null) {
+      _languageTag = languageTag;
+    }
+    setAppLocale(localeForTag(_languageTag));
     _downloaded = _sorted([
       for (final raw in prefs.getStringList(_downloadedKey) ?? const <String>[])
         ?_parse(raw),
@@ -374,6 +399,12 @@ class ThemeController extends ChangeNotifier {
       _latinNamesKey,
       value,
     );
+  }
+
+  Future<void> setLanguage(String tag) async {
+    _languageTag = tag;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setString(_languageKey, tag);
   }
 
   Future<void> setFollowSystem(bool value) async {

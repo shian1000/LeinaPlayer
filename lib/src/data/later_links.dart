@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../l10n.dart';
 import 'combined_search.dart';
 import 'incoming_links.dart';
 import 'item_sync.dart';
@@ -276,7 +277,7 @@ class LaterLinks extends ItemSync {
        super(
          collection: 'later-links',
          field: 'links',
-         problemNoun: 'linków na później',
+         problemNoun: () => l10n.laterLinksProblemNoun,
        );
 
   final LaterStore _store;

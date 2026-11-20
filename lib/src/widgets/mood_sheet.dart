@@ -5,6 +5,7 @@ import '../data/combined_search.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
 import '../data/text_normalizer.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import 'common.dart';
 import 'menu_sheet.dart';
@@ -22,7 +23,7 @@ MenuSheetEntry? moodMenuEntry(BuildContext context, SearchHit hit) {
   if (MoodLibraryScope.maybeOf(context) == null) return null;
   return MenuSheetEntry(
     moodIcon,
-    'Dodaj do nastroju',
+    l10n.moodSheetAddToMood,
     onTap: () => showMoodPicker(context, hit),
   );
 }
@@ -58,15 +59,15 @@ Future<void> showMoodFilterSheet(BuildContext context) {
             children: [
               SwitchListTile(
                 contentPadding: padding,
-                title: const Text(
-                  'Filtr nastrojów',
-                  style: TextStyle(
+                title: Text(
+                  l10n.moodSheetFilterTitle,
+                  style: const TextStyle(
                     fontSize: AppFontSize.emphasis,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 subtitle: Text(
-                  'Kolejka pomija i ukrywa utwory spoza zaznaczonych nastrojów.',
+                  l10n.moodSheetFilterSubtitle,
                   style: TextStyle(color: palette.textSecondary),
                 ),
                 value: filter.enabled,
@@ -76,23 +77,23 @@ Future<void> showMoodFilterSheet(BuildContext context) {
               CheckboxListTile(
                 contentPadding: padding,
                 secondary: const Icon(noMoodIcon),
-                title: const Text('Utwory bez nastroju'),
+                title: Text(l10n.moodSheetUntagged),
                 subtitle: Text(
-                  'Też utwory spoza bazy danych MusicDatabase',
+                  l10n.moodSheetUntaggedSubtitle,
                   style: TextStyle(color: palette.textSecondary),
                 ),
                 value: filter.untagged,
                 onChanged: (ticked) => filter.setUntagged(ticked!),
               ),
               if (moods.userMoods.isNotEmpty) ...[
-                const SectionTitle('Twoje nastroje'),
+                SectionTitle(l10n.moodSheetYourMoods),
                 for (final mood in moods.userMoods) tile(mood),
               ],
               if (moods.globalMoods.isNotEmpty) ...[
-                const SectionTitle('Globalne'),
+                SectionTitle(l10n.moodSheetGlobalMoods),
                 for (final mood in moods.globalMoods) tile(mood),
               ],
-              const SectionTitle('Utwór dodany spoza filtra'),
+              SectionTitle(l10n.moodSheetAddedOutside),
               RadioGroup<bool>(
                 groupValue: filter.offWhenAdded,
                 onChanged: (value) => filter.setOffWhenAdded(value!),
@@ -101,18 +102,18 @@ Future<void> showMoodFilterSheet(BuildContext context) {
                     RadioListTile<bool>(
                       contentPadding: padding,
                       value: true,
-                      title: const Text('Wyłącz filtr'),
+                      title: Text(l10n.moodSheetTurnOffFilter),
                       subtitle: Text(
-                        'Odznacza wszystko — kolejka gra jak bez filtra',
+                        l10n.moodSheetTurnOffFilterSubtitle,
                         style: TextStyle(color: palette.textSecondary),
                       ),
                     ),
                     RadioListTile<bool>(
                       contentPadding: padding,
                       value: false,
-                      title: const Text('Pomiń utwór'),
+                      title: Text(l10n.moodSheetSkipSong),
                       subtitle: Text(
-                        'Trafia do kolejki, ale jest ukryty i pomijany',
+                        l10n.moodSheetSkipSongSubtitle,
                         style: TextStyle(color: palette.textSecondary),
                       ),
                     ),
@@ -139,8 +140,8 @@ Future<bool> createMood(
   final typed = await showDialog<String>(
     context: context,
     builder: (_) => TextInputDialog(
-      title: 'Nowy nastrój',
-      hint: 'Nazwa, np. Siłownia',
+      title: l10n.moodSheetNewMood,
+      hint: l10n.moodSheetNewMoodHint,
       initial: name,
     ),
   );
@@ -179,7 +180,7 @@ Future<void> showMoodPicker(BuildContext context, SearchHit hit) {
               header: [
                 MenuSheetHeader(
                   cover: SongCover(cover: CoverRequest.of(hit)),
-                  title: 'Dodaj do nastroju',
+                  title: l10n.moodSheetAddToMood,
                   subtitle:
                       '${hit.shownTitle(context)} • ${hit.shownArtist(context)}',
                 ),
@@ -209,7 +210,7 @@ MenuSheetEntry? moodForAllEntry(
   if (MoodLibraryScope.maybeOf(context) == null || hits.isEmpty) return null;
   return MenuSheetEntry(
     moodIcon,
-    'Nastrój dla wszystkich utworów',
+    l10n.moodSheetMoodForAll,
     onTap: () => showMoodPickerForAll(context, hits, title: title),
   );
 }
@@ -252,7 +253,7 @@ Future<void> showMoodPickerForAll(
                 subtitle: inMood == 0 || all
                     ? null
                     : Text(
-                        '$inMood z ${fitting.length}',
+                        l10n.moodSheetSomeInMood(inMood, fitting.length),
                         style: TextStyle(color: palette.textSecondary),
                       ),
                 tristate: true,
@@ -274,7 +275,7 @@ Future<void> showMoodPickerForAll(
               header: [
                 MenuSheetHeader(
                   cover: const Icon(moodIcon, size: 40),
-                  title: 'Nastrój dla wszystkich utworów',
+                  title: l10n.moodSheetMoodForAll,
                   subtitle: title,
                 ),
                 if (outside > 0 &&
@@ -283,8 +284,7 @@ Future<void> showMoodPickerForAll(
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                     child: Text(
-                      'Utwory spoza bazy danych MusicDatabase ($outside) '
-                      'nie trafią do nastrojów globalnych.',
+                      l10n.moodSheetOutsideNotGlobal(outside),
                       style: TextStyle(color: palette.textSecondary),
                     ),
                   ),
@@ -356,12 +356,12 @@ class _MoodPickerBodyState extends State<_MoodPickerBody> {
             child: TextField(
               controller: _search,
               decoration: InputDecoration(
-                hintText: 'Szukaj nastroju',
+                hintText: l10n.moodSheetSearch,
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _search.text.isEmpty
                     ? null
                     : IconButton(
-                        tooltip: 'Wyczyść',
+                        tooltip: l10n.moodSheetClearSearch,
                         icon: const Icon(Icons.close),
                         onPressed: () => setState(_search.clear),
                       ),
@@ -377,15 +377,15 @@ class _MoodPickerBodyState extends State<_MoodPickerBody> {
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                   leading: Icon(Icons.add, color: palette.textSecondary),
-                  title: const Text('Nowy nastrój'),
+                  title: Text(l10n.moodSheetNewMood),
                   onTap: () => widget.onNewMood(_search.text.trim()),
                 ),
                 if (userMoods.isNotEmpty) ...[
-                  const SectionTitle('Twoje nastroje'),
+                  SectionTitle(l10n.moodSheetYourMoods),
                   for (final mood in userMoods) widget.tile(mood),
                 ],
                 if (globalMoods.isNotEmpty) ...[
-                  const SectionTitle('Globalne'),
+                  SectionTitle(l10n.moodSheetGlobalMoods),
                   for (final mood in globalMoods) widget.tile(mood),
                 ],
                 if (words.isNotEmpty &&
@@ -394,7 +394,7 @@ class _MoodPickerBodyState extends State<_MoodPickerBody> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                     child: Text(
-                      'Żaden nastrój nie pasuje do „${_search.text.trim()}”.',
+                      l10n.moodSheetNoMatch(_search.text.trim()),
                       style: TextStyle(color: palette.textSecondary),
                     ),
                   ),
@@ -417,21 +417,21 @@ Future<void> _confirmForAll(
   required int changed,
 }) async {
   final question = add
-      ? 'Dodać $changed ${songsWord(changed)} do nastroju „${mood.name}”?'
-      : 'Usunąć $changed ${songsWord(changed)} z nastroju „${mood.name}”?';
+      ? l10n.moodSheetConfirmAdd(l10n.songsCount(changed), mood.name)
+      : l10n.moodSheetConfirmRemove(l10n.songsCount(changed), mood.name);
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Czy na pewno?'),
+      title: Text(l10n.moodSheetAreYouSure),
       content: Text(question),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: Text(add ? 'Dodaj' : 'Usuń'),
+          child: Text(add ? l10n.commonAdd : l10n.commonDelete),
         ),
       ],
     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../data/album_covers.dart';
@@ -58,7 +59,7 @@ class SongListScreen extends StatelessWidget {
         actions: [
           if (hits.isNotEmpty)
             IconButton(
-              tooltip: 'Menu (⋮)',
+              tooltip: l10n.songListScreenMenu,
               icon: const Icon(Icons.more_vert),
               onPressed: () => showMenuSheet(
                 context,
@@ -88,7 +89,7 @@ class SongListScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Text(
-                '$subtitle • ${hits.length} utw.',
+                l10n.songListScreenSubtitle(subtitle, hits.length),
                 style: TextStyle(color: palette.textSecondary),
               ),
             ),
@@ -98,7 +99,7 @@ class SongListScreen extends StatelessWidget {
                 children: [
                   FilledButton.icon(
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('Odtwórz'),
+                    label: Text(l10n.commonPlay),
                     onPressed: hits.isEmpty
                         ? null
                         : () => play(shuffled: false),
@@ -106,7 +107,7 @@ class SongListScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.shuffle),
-                    label: const Text('Losowo'),
+                    label: Text(l10n.songListScreenShuffle),
                     onPressed: hits.isEmpty ? null : () => play(shuffled: true),
                   ),
                 ],

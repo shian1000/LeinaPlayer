@@ -15,6 +15,7 @@ import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/theme_controller.dart';
 import 'package:music_database_app/src/widgets/common.dart';
 
+import 'support/navigation.dart';
 import 'support/waiting.dart';
 
 void main() {
@@ -511,7 +512,7 @@ void main() {
     expect(prefs.getBool('youtube.method.api'), isTrue);
     expect(prefs.getString('youtube.api_key'), 'AIzaSyTEST1234');
 
-    await tester.pageBack();
+    await tapBack(tester);
     await tester.pumpAndSettle();
     await scrollSettingsTo(tester, 'Odtwarzanie', delta: -200);
     await tester.tap(find.text('Odtwarzanie'));
@@ -541,7 +542,7 @@ void main() {
     await tester.tap(find.text('1. YouTube'));
     await tester.pumpAndSettle();
     expect(find.text('Sposoby odtwarzania YouTube'), findsOneWidget);
-    await tester.pageBack();
+    await tapBack(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.text('3. Prywatny serwer'));
     await tester.pumpAndSettle();
@@ -575,7 +576,7 @@ void main() {
         find.byKey(PrivateServerScreen.localFieldKey),
         '10.0.0.5:8002',
       );
-      await tester.pageBack();
+      await tapBack(tester);
       await tester.pumpAndSettle();
       expect(find.text('Zapisano adresy serwera'), findsOneWidget);
       final prefs = await SharedPreferences.getInstance();
@@ -599,7 +600,7 @@ void main() {
       find.byKey(PrivateServerScreen.localFieldKey),
       'ftp://serwer/',
     );
-    await tester.pageBack();
+    await tapBack(tester);
     await tester.pumpAndSettle();
     expect(
       find.text('Nie zapisano adresu serwera: jest nieprawidłowy'),
@@ -723,7 +724,7 @@ void main() {
 
     await tester.scrollUntilVisible(find.text('Pobierz teraz'), 200);
     expect(find.text('Dane na telefonie'), findsOneWidget);
-    await tester.pageBack();
+    await tapBack(tester);
     await tester.pumpAndSettle();
     expect(find.text('GitHub • telefon'), findsOneWidget);
   });

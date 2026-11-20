@@ -169,13 +169,14 @@ object ScheduledMusic {
         }
     }
 
-    private fun showNotification(context: Context) {
+    private fun showNotification(appContext: Context) {
+        val context = AppLanguage.wrap(appContext)
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Zaplanowana muzyka",
+                    context.getString(R.string.scheduled_music),
                     NotificationManager.IMPORTANCE_HIGH,
                 ).apply { setSound(null, null) },
             )
@@ -190,8 +191,8 @@ object ScheduledMusic {
             NOTIFICATION_ID,
             builder
                 .setSmallIcon(R.drawable.ic_stat_leina)
-                .setContentTitle("Zaplanowana muzyka")
-                .setContentText("Dotknij, aby otworzyć Leina Player")
+                .setContentTitle(context.getString(R.string.scheduled_music))
+                .setContentText(context.getString(R.string.scheduled_music_tap))
                 .setCategory(Notification.CATEGORY_ALARM)
                 .setContentIntent(openApp(context))
                 .setFullScreenIntent(openApp(context), true)

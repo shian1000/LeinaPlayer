@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../l10n.dart';
 import 'combined_search.dart';
 import 'server_trust.dart';
 import 'track_ref.dart';
@@ -136,7 +137,7 @@ class LyricsFinder {
 
   static String _serverCredit(Object? source) => switch (source) {
     'lrclib_fetcher' => 'MusicDatabase (LRCLIB)',
-    'library_tags_fetcher' => 'MusicDatabase (tagi pliku)',
+    'library_tags_fetcher' => l10n.lyricsSourceFileTags,
     'genius_lyrics_fetcher' => 'MusicDatabase (Genius)',
     'musixmatch_fetcher' => 'MusicDatabase (Musixmatch)',
     'lyricstranslate_fetcher' => 'MusicDatabase (LyricsTranslate)',

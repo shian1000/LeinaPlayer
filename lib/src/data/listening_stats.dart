@@ -1,3 +1,4 @@
+import '../l10n.dart';
 import 'album_covers.dart';
 import 'latin_names.dart';
 import 'listening_log.dart';
@@ -6,14 +7,17 @@ import 'text_normalizer.dart';
 
 /// The time spans Statystyki słuchania sums up, like Spotify's: rolling, ending now.
 enum StatsPeriod {
-  weeks4('4 tygodnie'),
-  months6('6 miesięcy'),
-  year('Rok'),
-  all('Od początku');
+  weeks4,
+  months6,
+  year,
+  all;
 
-  const StatsPeriod(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    weeks4 => l10n.listeningStatsPeriod4Weeks,
+    months6 => l10n.listeningStatsPeriod6Months,
+    year => l10n.listeningStatsPeriodYear,
+    all => l10n.listeningStatsPeriodAll,
+  };
 
   /// Where the span starts; `null`: every play.
   DateTime? from(DateTime now) => switch (this) {
@@ -222,8 +226,9 @@ class ListeningStats {
   }
 
   /// "Lata 90." / "2010–2019", as Wyszukaj's "Przeglądaj" names decades.
-  static String decadeName(int decade) =>
-      decade < 2000 ? 'Lata ${decade % 100}.' : '$decade–${decade + 9}';
+  static String decadeName(int decade) => decade < 2000
+      ? l10n.listeningStatsDecade(decade % 100)
+      : '$decade–${decade + 9}';
 }
 
 /// What song and artists a play was of, the same way for the stats and the highlights: music.db's
@@ -246,7 +251,8 @@ class IdentifiedListen {
   ) {
     final known = listen.songId == null ? null : song?.call(listen.songId!);
     final title = known?.title ?? listen.title;
-    final artist = known?.artistLabel ?? listen.artist ?? 'Nieznany wykonawca';
+    final artist =
+        known?.artistLabel ?? listen.artist ?? l10n.listeningStatsUnknownArtist;
     final names = artistNamesOf(artist);
     final latinNames = artistNamesOf(known?.artistLatin ?? '');
     return IdentifiedListen._(

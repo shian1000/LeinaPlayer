@@ -9,6 +9,7 @@ import '../data/youtube_account.dart';
 import '../data/youtube_api.dart';
 import '../data/youtube_export.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
@@ -119,36 +120,40 @@ class _YouTubeExportDialogState extends State<_YouTubeExportDialog> {
     return AlertDialog(
       title: Text(
         resuming
-            ? 'Dokończyć playlistę na YouTube?'
-            : 'Utworzyć playlistę na YouTube?',
+            ? l10n.youtubeExportDialogResumeTitle
+            : l10n.youtubeExportDialogCreateTitle,
       ),
       content: Text(
         resuming
-            ? 'Do „${_playlist.name}” na YouTube zostanie dodane '
-                  '${_playlist.trackCount - _playlist.youTubeCopyDone!} pozostałych '
-                  'utworów.'
-            : 'Na ${email ?? 'Twoim koncie Google'} powstanie niepubliczna playlista '
-                  '„${_playlist.name}” (${_playlist.trackCount} utw.) — każdy, kto dostanie '
-                  'link, ją otworzy. To kopia: późniejsze zmiany w Bibliotece do niej nie '
-                  'trafią.\n\n'
-                  'YouTube pozwala dodać około 200 utworów dziennie; resztę można dokończyć '
-                  'następnego dnia.',
+            ? l10n.youtubeExportDialogResumeBody(
+                _playlist.name,
+                _playlist.trackCount - _playlist.youTubeCopyDone!,
+              )
+            : l10n.youtubeExportDialogCreateBody(
+                email ?? l10n.youtubeExportDialogYourGoogleAccount,
+                _playlist.name,
+                _playlist.trackCount,
+              ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
         TextButton(
           onPressed: _start,
-          child: Text(resuming ? 'Dokończ' : 'Utwórz'),
+          child: Text(
+            resuming
+                ? l10n.youtubeExportDialogResume
+                : l10n.youtubeExportDialogCreate,
+          ),
         ),
       ],
     );
   }
 
   Widget _running(BuildContext context) => AlertDialog(
-    title: const Text('Tworzenie playlisty na YouTube'),
+    title: Text(l10n.youtubeExportDialogRunningTitle),
     content: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,7 +161,9 @@ class _YouTubeExportDialogState extends State<_YouTubeExportDialog> {
         LinearProgressIndicator(value: _total == 0 ? null : _done / _total),
         const SizedBox(height: 12),
         Text(
-          _total == 0 ? 'Logowanie…' : '$_done z $_total utworów',
+          _total == 0
+              ? l10n.youtubeExportDialogSigningIn
+              : l10n.youtubeExportDialogProgress(_done, _total),
           style: TextStyle(color: context.palette.textSecondary),
         ),
       ],
@@ -164,7 +171,7 @@ class _YouTubeExportDialogState extends State<_YouTubeExportDialog> {
     actions: [
       TextButton(
         onPressed: _cancelled ? null : () => setState(() => _cancelled = true),
-        child: const Text('Przerwij'),
+        child: Text(l10n.youtubeExportDialogStop),
       ),
     ],
   );
@@ -174,12 +181,12 @@ class _YouTubeExportDialogState extends State<_YouTubeExportDialog> {
     final palette = context.palette;
     if (result == null) {
       return AlertDialog(
-        title: const Text('Nie udało się utworzyć playlisty'),
+        title: Text(l10n.youtubeExportDialogFailed),
         content: Text(_error ?? ''),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: Text(l10n.commonOk),
           ),
         ],
       );
@@ -189,8 +196,8 @@ class _YouTubeExportDialogState extends State<_YouTubeExportDialog> {
     return AlertDialog(
       title: Text(
         stopped == null
-            ? 'Playlista jest na YouTube'
-            : 'Playlista na YouTube nie jest gotowa',
+            ? l10n.youtubeExportDialogDone
+            : l10n.youtubeExportDialogNotDone,
       ),
       content: SizedBox(
         width: double.maxFinite,
@@ -200,16 +207,15 @@ class _YouTubeExportDialogState extends State<_YouTubeExportDialog> {
           children: [
             Text(
               [
-                'Dodano ${result.added} utw.',
+                l10n.youtubeExportDialogAdded(result.added),
                 if (stopped != null)
-                  '${stopped.message}. Dokończysz ją z „Udostępnij” '
-                      'tej playlisty.',
+                  l10n.youtubeExportDialogStopped(stopped.message),
               ].join(' '),
             ),
             if (skipped.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
-                'Bez filmu na YouTube, pominięte (${skipped.length}):',
+                l10n.youtubeExportDialogSkipped(skipped.length),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
@@ -238,14 +244,14 @@ class _YouTubeExportDialogState extends State<_YouTubeExportDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Zamknij'),
+          child: Text(l10n.commonClose),
         ),
         TextButton(
           onPressed: () {
             Navigator.of(context).pop();
             openInYouTube(youTubePlaylistUri(result.playlistId));
           },
-          child: const Text('Otwórz w YouTube'),
+          child: Text(l10n.youtubeExportDialogOpen),
         ),
       ],
     );

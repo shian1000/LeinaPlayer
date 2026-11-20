@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
 import '../data/spotify_playlist.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/feature_info.dart';
 import 'feature_infos.dart';
@@ -30,10 +31,10 @@ class SpotifySourceScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SectionTitle('Wyszukiwanie'),
+          SectionTitle(l10n.spotifySourceScreenSearchSection),
           SwitchListTile(
             secondary: const Icon(Icons.queue_music),
-            title: const Text('Wyszukuj playlisty na Spotify'),
+            title: Text(l10n.spotifySourceScreenPlaylistSearch),
             value: settings.spotifyPlaylistSearch,
             onChanged: settings.setSpotifyPlaylistSearch,
           ),
@@ -44,7 +45,7 @@ class SpotifySourceScreen extends StatelessWidget {
                 showFeatureInfo(context, FeatureInfos.spotifyApi),
             subtitle: Text(
               settings.spotifyApiKey == null
-                  ? 'Nie ustawiono — wyszukiwanie bez klucza'
+                  ? l10n.spotifySourceScreenNoKey
                   : 'Client ID ${_masked(clientId!)}',
             ),
             trailing: const Icon(Icons.chevron_right),
@@ -55,19 +56,13 @@ class SpotifySourceScreen extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Text(
-              'Z kluczem API Spotify (developer.spotify.com) playlisty są '
-              'wyszukiwane przez oficjalne Web API. Bez klucza — albo gdy API zawiedzie — '
-              'tak jak robi to odtwarzacz na open.spotify.com bez logowania.',
-              style: hint,
-            ),
+            child: Text(l10n.spotifySourceScreenKeyNote, style: hint),
           ),
-          const SectionTitle('Importowanie playlist'),
+          SectionTitle(l10n.spotifySourceScreenImportSection),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
-              'Playlisty są wczytywane z publicznej strony Spotify, bez logowania — tylko '
-              'pierwsze ${SpotifyPlaylists.embedLimit} utworów każdej playlisty.',
+              l10n.spotifySourceScreenImportNote(SpotifyPlaylists.embedLimit),
               style: hint,
             ),
           ),
@@ -140,7 +135,9 @@ class _ApiKeyDialogState extends State<_ApiKeyDialog> {
                 labelText: 'Client Secret',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  tooltip: _showSecret ? 'Ukryj' : 'Pokaż',
+                  tooltip: _showSecret
+                      ? l10n.spotifySourceScreenHideSecret
+                      : l10n.spotifySourceScreenShowSecret,
                   icon: Icon(
                     _showSecret ? Icons.visibility_off : Icons.visibility,
                   ),
@@ -155,9 +152,9 @@ class _ApiKeyDialogState extends State<_ApiKeyDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
-        TextButton(onPressed: _save, child: const Text('Zapisz')),
+        TextButton(onPressed: _save, child: Text(l10n.commonSave)),
       ],
     );
   }

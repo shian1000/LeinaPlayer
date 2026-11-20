@@ -13,6 +13,7 @@ import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/downloads.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
@@ -68,7 +69,7 @@ class CurrentTitle extends StatelessWidget {
 }
 
 /// How a full album (music.db's `songs.kind`) is marked in song rows, the player and menus.
-const fullAlbumLabel = 'Cały album';
+String get fullAlbumLabel => l10n.songTileFullAlbum;
 
 /// [text] (a song's artist line) with [fullAlbumLabel] first when [hit] is a full album.
 String withFullAlbumLabel(SearchHit? hit, String text) =>
@@ -132,12 +133,12 @@ List<MenuSheetEntry> queueAllEntries(
   if (hits.isNotEmpty) ...[
     MenuSheetEntry(
       Icons.queue_music,
-      'Dodaj do kolejki',
+      l10n.songTileAddToQueue,
       onTap: () => queueSongs(context, hits, next: false, origin: origin),
     ),
     MenuSheetEntry(
       Icons.playlist_play,
-      feminine ? 'Odtwórz jako następną' : 'Odtwórz jako następny',
+      feminine ? l10n.songTilePlayNextFeminine : l10n.songTilePlayNext,
       onTap: () => queueSongs(context, hits, next: true, origin: origin),
     ),
   ],
@@ -149,7 +150,7 @@ SwipeAction queueSwipe(BuildContext context, SearchHit hit) {
   final next = SourceSettingsScope.maybeOf(context)?.swipePlaysNext ?? true;
   return SwipeAction(
     icon: next ? Icons.playlist_play : Icons.queue_music,
-    label: next ? 'Odtwórz jako następny' : 'Dodaj do kolejki',
+    label: next ? l10n.songTilePlayNext : l10n.songTileAddToQueue,
     onTriggered: () =>
         next ? playNextInQueue(context, hit) : addToQueue(context, hit),
   );
@@ -197,13 +198,16 @@ Future<bool> queueSongs(
     final turnOff = filter!.offWhenAdded;
     if (turnOff) await filter.reset();
     filterNote = hits.length == 1
-        ? 'Utwór dodany do kolejki jest poza filtrami nastroju: '
-              '${turnOff ? 'wyłączam filtr' : 'będzie pominięty'}'
+        ? (turnOff
+              ? l10n.songTileFilterOneTurnedOff
+              : l10n.songTileFilterOneSkipped)
         : outside == waiting.length
-        ? 'Utwory dodane do kolejki są poza filtrami nastroju: '
-              '${turnOff ? 'wyłączam filtr' : 'będą pominięte'}'
-        : 'Część utworów dodanych do kolejki jest poza filtrami nastroju: '
-              '${turnOff ? 'wyłączam filtr' : 'będą pominięte'}';
+        ? (turnOff
+              ? l10n.songTileFilterAllTurnedOff
+              : l10n.songTileFilterAllSkipped)
+        : (turnOff
+              ? l10n.songTileFilterSomeTurnedOff
+              : l10n.songTileFilterSomeSkipped);
   }
   if (!context.mounted) return false;
   final result = await runQueueAction(context, (onStatus) async {
@@ -215,16 +219,16 @@ Future<bool> queueSongs(
       final text =
           filterNote ??
           (!next
-              ? 'Dodano do kolejki'
+              ? l10n.songTileAddedToQueue
               : origin == null
-              ? 'Zagra jako następny'
-              : 'Zagra jako następna');
+              ? l10n.songTilePlaysNext
+              : l10n.songTilePlaysNextFeminine);
       if (toast != null && context.mounted) {
         messenger.clearSnackBars();
         toast.show(
           text,
           shownFor: filterNote == null ? null : const Duration(seconds: 5),
-          actionLabel: 'Otwórz',
+          actionLabel: l10n.songTileOpen,
           onAction: () {
             if (context.mounted) QueueScreen.open(context);
           },
@@ -266,7 +270,7 @@ class SongTile extends StatelessWidget {
     this.menuIdPrefix = 'Utwór › Menu (⋮)',
     this.bookmarked = false,
     this.onSwipeRemove,
-    this.swipeRemoveLabel = 'Usuń',
+    this.swipeRemoveLabel,
   });
 
   final SearchHit hit;
@@ -318,7 +322,7 @@ class SongTile extends StatelessWidget {
   final VoidCallback? onSwipeRemove;
 
   /// Read out by screen readers for [onSwipeRemove].
-  final String swipeRemoveLabel;
+  final String? swipeRemoveLabel;
 
   static const coverSize = 48.0;
 
@@ -421,7 +425,7 @@ class SongTile extends StatelessWidget {
               children: [
                 if (bookmarked)
                   Tooltip(
-                    message: 'Ostatnio odtwarzany z tej playlisty',
+                    message: l10n.songTileBookmark,
                     child: Icon(
                       Icons.bookmark,
                       size: 18,
@@ -450,7 +454,11 @@ class SongTile extends StatelessWidget {
       right: queueSwipe(context, hit),
       left: onSwipeRemove == null
           ? null
-          : removeSwipe(context, swipeRemoveLabel, onSwipeRemove!),
+          : removeSwipe(
+              context,
+              swipeRemoveLabel ?? l10n.commonDelete,
+              onSwipeRemove!,
+            ),
       child: tile,
     );
   }
@@ -486,15 +494,18 @@ class SourceIcons extends StatelessWidget {
         hit.youTube == YouTubeLink.unknown;
 
     final (IconData? icon, String tooltip) = switch (source) {
-      PlaybackSource.phone => (Icons.smartphone, 'Na telefonie'),
-      PlaybackSource.server => (Icons.dns, 'Na serwerze'),
+      PlaybackSource.phone => (Icons.smartphone, l10n.songTileOnPhone),
+      PlaybackSource.server => (Icons.dns, l10n.songTileOnServer),
       PlaybackSource.youtube => (
         Icons.smart_display,
         hit.phoneMatch != null
-            ? 'Na YouTube (znalezione przez telefon)'
-            : 'Na YouTube',
+            ? l10n.songTileOnYouTubeFoundByPhone
+            : l10n.songTileOnYouTube,
       ),
-      null when searchable => (Icons.smart_display, 'Do wyszukania na YouTube'),
+      null when searchable => (
+        Icons.smart_display,
+        l10n.songTileToSearchOnYouTube,
+      ),
       null => (null, ''),
     };
     final color = source == null
@@ -522,7 +533,7 @@ class SourceIcons extends StatelessWidget {
                 right: -6,
                 top: -6,
                 child: Tooltip(
-                  message: 'Spoza bazy danych',
+                  message: l10n.songTileNotInDatabase,
                   child: Text(
                     '*',
                     style: TextStyle(
@@ -540,10 +551,10 @@ class SourceIcons extends StatelessWidget {
                 bottom: -5,
                 child: Tooltip(
                   message: hit.onPhone
-                      ? 'Dostępne offline (plik na telefonie)'
+                      ? l10n.songTileOfflinePhoneFile
                       : downloaded
-                      ? 'Dostępne offline (pobrane)'
-                      : 'Dostępne offline (pamięć podręczna)',
+                      ? l10n.songTileOfflineDownloaded
+                      : l10n.songTileOfflineCached,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: palette.background,
@@ -594,12 +605,12 @@ Future<void> showSongMenu(
     entries: [
       MenuSheetEntry(
         Icons.queue_music,
-        'Dodaj do kolejki',
+        l10n.songTileAddToQueue,
         onTap: () => addToQueue(context, hit),
       ),
       MenuSheetEntry(
         Icons.playlist_play,
-        'Odtwórz jako następny',
+        l10n.songTilePlayNext,
         onTap: () => playNextInQueue(context, hit),
       ),
       ?moodMenuEntry(context, hit),
@@ -609,23 +620,23 @@ Future<void> showSongMenu(
         saved.contains(hit)
             ? MenuSheetEntry(
                 Icons.bookmark_remove_outlined,
-                'Usuń z „Na później”',
+                l10n.songTileRemoveFromLater,
                 onTap: () => saved.toggle(hit),
               )
             : MenuSheetEntry(
                 Icons.bookmark_border,
-                'Zapisz na później',
+                l10n.songTileSaveForLater,
                 onTap: () => saved.toggle(hit),
               ),
       if (hit.album case final album? when album.isNotEmpty)
         MenuSheetEntry(
           Icons.album_outlined,
-          'Przejdź do albumu',
+          l10n.songTileGoToAlbum,
           onTap: () => openAlbumSongs(context, album),
         ),
       MenuSheetEntry(
         Icons.person_outline,
-        'Przejdź do wykonawców',
+        l10n.songTileGoToArtists,
         submenu: () => [
           for (final artist in artistNamesOf(hit.artistLabel))
             MenuSheetEntry(
@@ -638,18 +649,18 @@ Future<void> showSongMenu(
       if (hit.mainSong case final song?)
         MenuSheetEntry(
           Icons.radio,
-          'Przejdź do radia utworu',
+          l10n.songTileGoToRadio,
           onTap: () => openSongRadio(context, song),
           onLongPress: () => showFeatureInfo(context, FeatureInfos.songRadio),
         ),
       MenuSheetEntry(
         Icons.share_outlined,
-        'Udostępnij',
+        l10n.songTileShare,
         onTap: () => showSongShareSheet(context, hit, idPrefix: idPrefix),
       ),
       MenuSheetEntry(
         Icons.info_outline,
-        'Wyświetl informacje o utworze',
+        l10n.songTileShowInfo,
         onTap: () => showSongInfoSheet(context, hit),
       ),
     ],
@@ -667,7 +678,7 @@ class SongMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IconButton(
-    tooltip: 'Menu utworu (⋮)',
+    tooltip: l10n.songTileSongMenu,
     icon: const Icon(Icons.more_vert),
     onPressed: () => showSongMenu(context, hit, idPrefix: idPrefix),
   );
@@ -678,7 +689,7 @@ Future<void> openArtistSongs(BuildContext context, String artist) =>
     SongListScreen.open(
       context,
       title: artist,
-      subtitle: 'Wykonawca',
+      subtitle: l10n.songTileArtist,
       songs: (context) => artistSongs(context, artist),
     );
 
@@ -708,12 +719,12 @@ MenuSheetEntry? hideEntry(BuildContext context, SearchHit hit) {
   return hidden.contains(hit)
       ? MenuSheetEntry(
           Icons.visibility_outlined,
-          'Przestań ukrywać',
+          l10n.songTileUnhide,
           onTap: () => hidden.toggle(hit),
         )
       : MenuSheetEntry(
           Icons.block,
-          'Ukryj utwór',
+          l10n.songTileHide,
           onTap: () async {
             await hidden.toggle(hit);
             if (!messenger.mounted) return;
@@ -722,11 +733,9 @@ MenuSheetEntry? hideEntry(BuildContext context, SearchHit hit) {
               ..showSnackBar(
                 SnackBar(
                   persist: false,
-                  content: Text(
-                    'Ukryto „${hit.title}” — kolejka, Odkrywaj i radio go pominą.',
-                  ),
+                  content: Text(l10n.songTileHidden(hit.title)),
                   action: SnackBarAction(
-                    label: 'Cofnij',
+                    label: l10n.commonUndo,
                     onPressed: () => hidden.toggle(hit),
                   ),
                 ),
@@ -741,19 +750,23 @@ MenuSheetEntry? downloadEntry(BuildContext context, SearchHit hit) {
   final downloads = DownloadsScope.maybeOf(context);
   if (downloads == null || hit.onPhone) return null;
   if (downloads.isDownloading(hit)) {
-    return MenuSheetEntry(Icons.downloading, 'Pobieram…', onTap: () {});
+    return MenuSheetEntry(
+      Icons.downloading,
+      l10n.songTileDownloading,
+      onTap: () {},
+    );
   }
   if (downloads.isDownloaded(hit)) {
     return MenuSheetEntry(
       Icons.download_done,
-      'Usuń z pobranych',
+      l10n.songTileRemoveDownload,
       onTap: () => downloads.remove([hit]),
     );
   }
   final messenger = ScaffoldMessenger.of(context);
   return MenuSheetEntry(
     Icons.download_outlined,
-    'Pobierz utwór',
+    l10n.songTileDownload,
     onTap: () async {
       final failed = await downloads.download([hit]);
       if (!messenger.mounted) return;
@@ -763,8 +776,8 @@ MenuSheetEntry? downloadEntry(BuildContext context, SearchHit hit) {
           SnackBar(
             content: Text(
               failed == 0
-                  ? 'Pobrano „${hit.title}” — zagra też bez internetu.'
-                  : 'Nie udało się pobrać „${hit.title}”.',
+                  ? l10n.songTileDownloaded(hit.title)
+                  : l10n.songTileDownloadFailed(hit.title),
             ),
           ),
         );
@@ -779,8 +792,8 @@ Future<void> openSongRadio(BuildContext context, CatalogSong seed) {
   CatalogSong? from;
   return SongListScreen.open(
     context,
-    title: 'Radio: ${seed.title}',
-    subtitle: 'Radio utworu',
+    title: l10n.songTileRadioTitle(seed.title),
+    subtitle: l10n.songTileRadioSubtitle,
     songs: (context) {
       final catalog = SongCatalogScope.of(context);
       final library = LocalLibraryScope.of(context);
@@ -817,7 +830,7 @@ Future<void> openAlbumSongs(BuildContext context, String album) =>
     SongListScreen.open(
       context,
       title: album,
-      subtitle: 'Album',
+      subtitle: l10n.songTileAlbum,
       songs: (context) => albumSongs(context, album),
     );
 

@@ -10,6 +10,7 @@ import '../data/song_catalog.dart';
 import '../data/text_normalizer.dart';
 import '../data/combined_search.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/collection_cover.dart';
@@ -98,12 +99,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TabHeader(
-            title: 'Biblioteka',
+            title: l10n.libraryScreenTitle,
             actions: [
               IconButton(
                 tooltip: _searching
-                    ? 'Zamknij wyszukiwanie'
-                    : 'Wyszukaj w Bibliotece',
+                    ? l10n.libraryScreenCloseSearch
+                    : l10n.libraryScreenSearchTooltip,
                 icon: Icon(_searching ? Icons.close : Icons.search, size: 30),
                 onPressed: () => setState(() {
                   _searching = !_searching;
@@ -111,7 +112,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 }),
               ),
               IconButton(
-                tooltip: 'Utwórz (+)',
+                tooltip: l10n.libraryScreenCreate,
                 icon: const Icon(Icons.add, size: 32),
                 onPressed: () =>
                     showCreateSheet(context, idPrefix: '$_id › Utwórz (+)'),
@@ -124,9 +125,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
               child: TextField(
                 controller: _search,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Szukaj w Bibliotece',
-                  prefixIcon: Icon(Icons.search),
+                decoration: InputDecoration(
+                  hintText: l10n.libraryScreenSearchHint,
+                  prefixIcon: const Icon(Icons.search),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -150,7 +151,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         _EmptyCategory(filter.single)
                       else
                         _EmptyNote(
-                          'Nic w Bibliotece nie pasuje do tych filtrów.',
+                          l10n.libraryScreenNoFilterMatch,
                           palette: context.palette,
                         ),
                     ],
@@ -244,7 +245,7 @@ class _Categories extends StatelessWidget {
           ),
         _CategoryRow(
           icon: Icons.person_outline,
-          label: 'Wykonawcy',
+          label: l10n.libraryScreenArtists,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const ArtistsScreen()),
           ),
@@ -252,7 +253,7 @@ class _Categories extends StatelessWidget {
         if (smart != null)
           _CategoryRow(
             icon: Icons.auto_mode,
-            label: 'Dynamiczne playlisty',
+            label: l10n.libraryScreenSmartPlaylists,
             count: smart.playlists.length,
             onTap: () => SmartPlaylistsScreen.open(context),
           ),
@@ -336,7 +337,7 @@ class _SearchResults extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.all(32),
         child: Text(
-          'Nic w Bibliotece nie pasuje do „$query”.',
+          l10n.libraryScreenNoSearchMatch(query),
           textAlign: TextAlign.center,
           style: TextStyle(color: context.palette.textSecondary),
         ),
@@ -385,15 +386,15 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
         if (words.every(normalizeForSearch(name).contains)) name,
     ]..sort((a, b) => compareNames(a, b));
     return Scaffold(
-      appBar: AppBar(title: const Text('Wykonawcy')),
+      appBar: AppBar(title: Text(l10n.libraryScreenArtists)),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Szukaj wykonawcy',
-                prefixIcon: Icon(Icons.search),
+              decoration: InputDecoration(
+                hintText: l10n.libraryScreenSearchArtist,
+                prefixIcon: const Icon(Icons.search),
               ),
               onChanged: (text) => setState(() => _query = text),
             ),
@@ -410,7 +411,9 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
                   ),
                 ),
                 title: Text(artists[i]),
-                subtitle: Text('${counts[artists[i]]} utw.'),
+                subtitle: Text(
+                  l10n.libraryScreenArtistSongs(counts[artists[i]]!),
+                ),
                 onTap: () => openArtistSongs(context, artists[i]),
               ),
             ),
@@ -436,7 +439,7 @@ class LibraryCategoryScreen extends StatelessWidget {
         title: Text(category.label),
         actions: [
           IconButton(
-            tooltip: 'Utwórz (+)',
+            tooltip: l10n.libraryScreenCreate,
             icon: const Icon(Icons.add),
             onPressed: () =>
                 showCreateSheet(context, idPrefix: '$_id › Utwórz (+)'),
@@ -470,13 +473,11 @@ class _EmptyCategory extends StatelessWidget {
       LibraryCategory.moods => const _EmptyMoods(),
       LibraryCategory.playlists => const _EmptyLibrary(),
       LibraryCategory.albums => _EmptyNote(
-        'Brak albumów. Album ze Spotify dodasz, importując jego link '
-        '(+ › Importuj playlistę).',
+        l10n.libraryScreenNoAlbums,
         palette: palette,
       ),
       LibraryCategory.folders => _EmptyNote(
-        'Brak folderów. Utwórz folder przyciskiem + albo przytrzymaj '
-        'playlistę lub nastrój.',
+        l10n.libraryScreenNoFolders,
         palette: palette,
       ),
     };
@@ -513,7 +514,9 @@ class _ViewRow extends StatelessWidget {
       _SortButton(folders: folders, folderId: folderId),
       const Spacer(),
       IconButton(
-        tooltip: folders.grid ? 'Widok listy' : 'Widok siatki',
+        tooltip: folders.grid
+            ? l10n.libraryScreenListView
+            : l10n.libraryScreenGridView,
         icon: Icon(folders.grid ? Icons.view_list : Icons.grid_view),
         onPressed: () => folders.setGrid(!folders.grid),
       ),
@@ -585,12 +588,12 @@ class _SortButton extends StatelessWidget {
     showMenuSheet(
       context,
       idPrefix: '$_id › Sortuj wg',
-      header: const Padding(
-        padding: EdgeInsets.only(bottom: 8),
+      header: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
         child: Center(
           child: Text(
-            'Sortuj wg',
-            style: TextStyle(
+            l10n.libraryScreenSortBy,
+            style: const TextStyle(
               fontSize: AppFontSize.listTitle,
               fontWeight: FontWeight.bold,
             ),
@@ -611,7 +614,7 @@ class _SortButton extends StatelessWidget {
         if (folderId != null)
           MenuSheetEntry(
             own ? Icons.circle_outlined : Icons.check,
-            'Jak w Bibliotece',
+            l10n.libraryScreenSortAsLibrary,
             subtitle: folders.sort.label,
             onTap: () => folders.setFolderSort(folderId, null),
           ),
@@ -656,20 +659,20 @@ class LibraryEntryTile extends StatelessWidget {
     final (leading, subtitle) = switch (entry) {
       FolderEntry(:final contents) => (
         FolderCover(size: coverSize),
-        'Folder • ${_itemCount(contents)}',
+        l10n.libraryScreenFolderSubtitle(_itemCount(contents)),
       ),
       PlaylistEntry(:final playlist) => (
         PlaylistCover(playlist: playlist, size: coverSize),
         [
           playlist.source == PlaylistSource.spotifyAlbum
-              ? 'Album'
-              : 'Playlista',
+              ? l10n.libraryScreenKindAlbum
+              : l10n.libraryScreenKindPlaylist,
           ?playlist.owner,
         ].join(' • '),
       ),
       MoodEntry(:final mood) => (
         MoodCover(mood: mood, size: coverSize),
-        mood.global ? 'Nastrój • globalny' : 'Nastrój • Twój',
+        mood.global ? l10n.libraryScreenGlobalMood : l10n.libraryScreenOwnMood,
       ),
     };
     final folders = LibraryFoldersScope.maybeOf(context);
@@ -734,19 +737,12 @@ class LibraryEntryTile extends StatelessWidget {
 
   static String _itemCount(List<LibraryEntry> contents) {
     final n = contents.length;
-    if (n == 0) return 'pusty';
+    if (n == 0) return l10n.libraryScreenFolderEmpty;
     final playlists = contents.whereType<PlaylistEntry>().length;
     final moods = n - playlists;
-    String form(int n, String one, String few, String many) {
-      if (n == 1) return '1 $one';
-      final tens = n % 100 ~/ 10;
-      final last = n % 10;
-      return '$n ${tens != 1 && last >= 2 && last <= 4 ? few : many}';
-    }
-
     return [
-      if (playlists > 0) form(playlists, 'playlista', 'playlisty', 'playlist'),
-      if (moods > 0) form(moods, 'nastrój', 'nastroje', 'nastrojów'),
+      if (playlists > 0) l10n.libraryScreenPlaylistCount(playlists),
+      if (moods > 0) l10n.libraryScreenMoodCount(moods),
     ].join(', ');
   }
 }
@@ -764,18 +760,18 @@ Future<void> showFolderMenu(
     header: MenuSheetHeader(
       cover: const FolderCover(size: 48),
       title: folder.name,
-      subtitle: 'Folder',
+      subtitle: l10n.libraryScreenFolder,
     ),
     entries: [
       MenuSheetEntry(
         Icons.edit_outlined,
-        'Zmień nazwę',
+        l10n.libraryScreenRename,
         onTap: () async {
           final name = await showDialog<String>(
             context: context,
             builder: (_) => TextInputDialog(
-              title: 'Nazwa folderu',
-              hint: 'Nazwa folderu',
+              title: l10n.libraryScreenFolderName,
+              hint: l10n.libraryScreenFolderName,
               initial: folder.name,
             ),
           );
@@ -786,8 +782,8 @@ Future<void> showFolderMenu(
       ),
       MenuSheetEntry(
         Icons.delete_outline,
-        'Usuń folder',
-        subtitle: 'Jego playlisty i nastroje wrócą do Biblioteki',
+        l10n.libraryScreenDeleteFolder,
+        subtitle: l10n.libraryScreenDeleteFolderSubtitle,
         onTap: () async {
           await folders.delete(folder.id);
           onDeleted?.call();
@@ -836,7 +832,7 @@ class FolderScreen extends StatelessWidget {
         appBar: AppBar(),
         body: Center(
           child: Text(
-            'Tego folderu już nie ma.',
+            l10n.libraryScreenFolderGone,
             style: TextStyle(color: palette.textSecondary),
           ),
         ),
@@ -854,7 +850,7 @@ class FolderScreen extends StatelessWidget {
         title: ScrollingText(folder.name),
         actions: [
           IconButton(
-            tooltip: 'Menu folderu (⋮)',
+            tooltip: l10n.libraryScreenFolderMenu,
             icon: const Icon(Icons.more_vert),
             onPressed: () => showFolderMenu(
               context,
@@ -874,8 +870,7 @@ class FolderScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
               child: Text(
-                'Pusty folder. Przenieś tu playlistę albo nastrój, przytrzymując '
-                'je w Bibliotece albo z ich menu (⋮): „Przenieś do folderu”.',
+                l10n.libraryScreenFolderEmptyNote,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: palette.textSecondary),
               ),
@@ -899,17 +894,16 @@ class _EmptyMoods extends StatelessWidget {
         children: [
           Icon(moodIcon, size: 48, color: palette.textSecondary),
           const SizedBox(height: 16),
-          const Text(
-            'Brak nastrojów',
-            style: TextStyle(
+          Text(
+            l10n.libraryScreenNoMoods,
+            style: const TextStyle(
               fontSize: AppFontSize.listTitle,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Utwórz nastrój przyciskiem + u góry albo z menu ⋮ utworu („Dodaj do '
-            'nastroju”). Nastroje globalne przychodzą z MusicDatabase.',
+            l10n.libraryScreenNoMoodsNote,
             textAlign: TextAlign.center,
             style: TextStyle(color: palette.textSecondary),
           ),
@@ -935,16 +929,16 @@ class _EmptyLibrary extends StatelessWidget {
             color: palette.textSecondary,
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Brak playlist',
-            style: TextStyle(
+          Text(
+            l10n.libraryScreenNoPlaylists,
+            style: const TextStyle(
               fontSize: AppFontSize.listTitle,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Dodaj playlistę przyciskiem + u góry, np. importując ją z YouTube.',
+            l10n.libraryScreenNoPlaylistsNote,
             textAlign: TextAlign.center,
             style: TextStyle(color: palette.textSecondary),
           ),
@@ -1001,7 +995,9 @@ Future<void> showLibraryEntryMenu(
         ..showSnackBar(
           SnackBar(
             content: Text(
-              playlist ? 'Ta playlista jest pusta.' : 'Ten nastrój jest pusty.',
+              playlist
+                  ? l10n.libraryScreenPlaylistEmpty
+                  : l10n.libraryScreenMoodEmpty,
             ),
           ),
         );
@@ -1021,12 +1017,14 @@ Future<void> showLibraryEntryMenu(
     entries: [
       MenuSheetEntry(
         Icons.queue_music,
-        'Dodaj do kolejki',
+        l10n.libraryScreenAddToQueue,
         onTap: () => queue(false),
       ),
       MenuSheetEntry(
         Icons.playlist_play,
-        feminine ? 'Odtwórz jako następną' : 'Odtwórz jako następny',
+        feminine
+            ? l10n.libraryScreenPlayNextFeminine
+            : l10n.libraryScreenPlayNext,
         onTap: () => queue(true),
       ),
       ?moveToFolderEntry(context, entry.key),

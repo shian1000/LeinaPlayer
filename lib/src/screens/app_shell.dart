@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../data/app_updates.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
+import '../l10n.dart';
 import '../data/incoming_links.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
@@ -43,12 +44,20 @@ class _TabSpec {
 
 // After Juxtopposed's Spotify redesign: "Odkrywaj" and the profile ("Ja") are tabs; "Utwórz"
 // is Biblioteka's "+".
-const _tabs = [
-  _TabSpec('Home', Icons.home_outlined, Icons.home),
-  _TabSpec('Odkrywaj', Icons.auto_awesome_outlined, Icons.auto_awesome),
-  _TabSpec('Wyszukaj', Icons.search, Icons.search),
-  _TabSpec('Biblioteka', Icons.library_music_outlined, Icons.library_music),
-  _TabSpec('Ja', Icons.person_outline, Icons.person),
+List<_TabSpec> get _tabs => [
+  _TabSpec(l10n.appShellTabHome, Icons.home_outlined, Icons.home),
+  _TabSpec(
+    l10n.appShellTabDiscover,
+    Icons.auto_awesome_outlined,
+    Icons.auto_awesome,
+  ),
+  _TabSpec(l10n.appShellTabSearch, Icons.search, Icons.search),
+  _TabSpec(
+    l10n.appShellTabLibrary,
+    Icons.library_music_outlined,
+    Icons.library_music,
+  ),
+  _TabSpec(l10n.appShellTabMe, Icons.person_outline, Icons.person),
 ];
 
 const _libraryTabIndex = 3;
@@ -157,10 +166,7 @@ class AppShellState extends State<AppShell> {
     final link = parseYouTubeLink(text);
     switch (link) {
       case null:
-        _tell(
-          'To nie jest link do filmu ani playlisty z YouTube ani do utworu, albumu lub '
-          'playlisty ze Spotify.',
-        );
+        _tell(l10n.appShellNotALink);
       case YouTubePlaylistLink(:final listId):
         await _importAndOpen(listId);
       case YouTubeVideoLink():
@@ -174,7 +180,7 @@ class AppShellState extends State<AppShell> {
       return _importAndOpen(text);
     }
     if (direct == null && findSpotifyShortLink(text) == null) {
-      return _tell('Ze Spotify można tu otworzyć utwór, album albo playlistę.');
+      return _tell(l10n.appShellSpotifyKinds);
     }
     final spotify = YouTubeScope.spotifyOf(context);
     final catalog = SongCatalogScope.of(context);
@@ -185,16 +191,14 @@ class AppShellState extends State<AppShell> {
     String? playlist;
     SearchHit? queued;
     await runQueueAction(context, (onStatus) async {
-      onStatus('Sprawdzam link ze Spotify…');
+      onStatus(l10n.appShellCheckingSpotify);
       final SpotifyTrack track;
       try {
         var link = direct;
         if (link == null) {
           link = await spotify.resolveShortLink(findSpotifyShortLink(text)!);
           if (link == null) {
-            return const PlayOutcome.failed(
-              'Ten link ze Spotify nie prowadzi do utworu, albumu ani playlisty.',
-            );
+            return PlayOutcome.failed(l10n.appShellSpotifyNotPlayable);
           }
           if (link.kind != SpotifyLinkKind.track) {
             playlist = 'spotify:${link.kind.name}:${link.id}';
@@ -258,7 +262,7 @@ class AppShellState extends State<AppShell> {
     final queue = PlaybackQueueScope.of(context);
     SearchHit? queued;
     await runQueueAction(context, (onStatus) async {
-      onStatus('Sprawdzam link z YouTube…');
+      onStatus(l10n.appShellCheckingYouTube);
       final hit = await hitForVideoLink(
         link,
         catalog: catalog,

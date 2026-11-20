@@ -17,6 +17,7 @@ import 'cover_art.dart';
 import 'menu_sheet.dart';
 import 'mood_sheet.dart';
 import 'song_cover.dart';
+import '../l10n.dart';
 
 /// The cover of a playlist or mood: the one the user picked ([CustomCovers]), else a collage
 /// of its first songs' covers — four different albums in a 2×2 grid, as the reference app does
@@ -237,14 +238,16 @@ List<MenuSheetEntry> customCoverEntries(
   return [
     MenuSheetEntry(
       Icons.add_photo_alternate_outlined,
-      current == null ? 'Dodaj okładkę' : 'Zmień okładkę',
+      current == null
+          ? l10n.collectionCoverAddCover
+          : l10n.collectionCoverChangeCover,
       onTap: () => _pickCover(context, covers, onSet),
     ),
     if (current != null)
       MenuSheetEntry(
         Icons.hide_image_outlined,
-        'Usuń okładkę',
-        subtitle: 'Wróci kolaż z okładek utworów',
+        l10n.collectionCoverRemoveCover,
+        subtitle: l10n.collectionCoverRemoveCoverHelp,
         onTap: () => onSet(null),
       ),
   ];
@@ -258,7 +261,7 @@ Future<void> _pickCover(
   final messenger = ScaffoldMessenger.of(context);
   try {
     final picked = await FilePicker.pickFiles(
-      dialogTitle: 'Wybierz okładkę',
+      dialogTitle: l10n.collectionCoverPickCover,
       type: FileType.image,
     );
     final file = picked.firstOrNull;
@@ -267,7 +270,7 @@ Future<void> _pickCover(
   } catch (e) {
     debugPrint('Setting a cover failed: $e');
     messenger.showSnackBar(
-      const SnackBar(content: Text('Nie udało się wczytać tego obrazu.')),
+      SnackBar(content: Text(l10n.collectionCoverImageFailed)),
     );
   }
 }

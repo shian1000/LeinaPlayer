@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/account.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import 'scrolling_text.dart';
 
@@ -323,43 +324,18 @@ class _TextInputDialogState extends State<TextInputDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('Zapisz'),
+          child: Text(l10n.commonSave),
         ),
       ],
     );
   }
 }
 
-/// The Polish word for [count] things: [one] for 1, [few] for 2–4 (22–24, …), else [many].
-String pluralWord(int count, String one, String few, String many) {
-  if (count == 1) return one;
-  final tens = count % 100 ~/ 10;
-  final last = count % 10;
-  return tens != 1 && last >= 2 && last <= 4 ? few : many;
-}
-
-/// "utwór" in the form that goes with [count]: 1 utwór, 2 utwory, 5 utworów.
-String songsWord(int count) => pluralWord(count, 'utwór', 'utwory', 'utworów');
-
-const _monthsGenitive = [
-  'stycznia',
-  'lutego',
-  'marca',
-  'kwietnia',
-  'maja',
-  'czerwca',
-  'lipca',
-  'sierpnia',
-  'września',
-  'października',
-  'listopada',
-  'grudnia',
-];
-
-/// "16 października", with [year] "16 października 2026".
-String dayMonthLabel(DateTime d, {bool year = false}) =>
-    '${d.day} ${_monthsGenitive[d.month - 1]}${year ? ' ${d.year}' : ''}';
+/// "16 października", with [year] "16 października 2026" — in the app's language.
+String dayMonthLabel(DateTime d, {bool year = false}) => year
+    ? l10n.dateDayMonthYear(d.day, '${d.month}', d.year)
+    : l10n.dateDayMonth(d.day, '${d.month}');

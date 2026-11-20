@@ -11,11 +11,11 @@ import android.net.Uri
 enum class LinkService(
     val key: String,
     val appPackage: String,
-    /** "z YouTube", "ze Spotify". */
-    val from: String,
+    /** "Zapamiętaj wybór dla linków z YouTube": one whole sentence per service (Polish cases). */
+    val rememberText: Int,
 ) {
-    YOUTUBE("youtube", "com.google.android.youtube", "z YouTube"),
-    SPOTIFY("spotify", "com.spotify.music", "ze Spotify");
+    YOUTUBE("youtube", "com.google.android.youtube", R.string.link_remember_youtube),
+    SPOTIFY("spotify", "com.spotify.music", R.string.link_remember_spotify);
 
     companion object {
         fun of(uri: Uri): LinkService? {

@@ -7,7 +7,9 @@ import '../data/song_catalog.dart';
 import '../data/text_normalizer.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import 'history_settings_screen.dart';
@@ -41,27 +43,13 @@ List<RecentDay> groupRecents(List<PlayedTrack> entries, DateTime now) {
   return days;
 }
 
-const _months = [
-  'stycznia',
-  'lutego',
-  'marca',
-  'kwietnia',
-  'maja',
-  'czerwca',
-  'lipca',
-  'sierpnia',
-  'września',
-  'października',
-  'listopada',
-  'grudnia',
-];
-
 String _dayLabel(DateTime day, DateTime now) {
   final today = DateTime(now.year, now.month, now.day);
-  if (day == today) return 'Dzisiaj';
-  if (day == DateTime(today.year, today.month, today.day - 1)) return 'Wczoraj';
-  final label = '${day.day} ${_months[day.month - 1]}';
-  return day.year == now.year ? label : '$label ${day.year}';
+  if (day == today) return l10n.recentsScreenToday;
+  if (day == DateTime(today.year, today.month, today.day - 1)) {
+    return l10n.recentsScreenYesterday;
+  }
+  return dayMonthLabel(day, year: day.year != now.year);
 }
 
 /// "Ostatnie", opened from the profile menu: what was played, newest first.
@@ -114,7 +102,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
   PreferredSizeWidget _searchBar(AppPalette palette) => AppBar(
     backgroundColor: palette.background,
     leading: IconButton(
-      tooltip: 'Zamknij wyszukiwanie',
+      tooltip: l10n.recentsScreenCloseSearch,
       icon: const Icon(Icons.arrow_back),
       onPressed: () => Navigator.of(context).pop(),
     ),
@@ -124,8 +112,8 @@ class _RecentsScreenState extends State<RecentsScreen> {
       autofocus: true,
       textInputAction: TextInputAction.search,
       onChanged: (_) => setState(() {}),
-      decoration: const InputDecoration(
-        hintText: 'Szukaj w ostatnich',
+      decoration: InputDecoration(
+        hintText: l10n.recentsScreenSearch,
         border: InputBorder.none,
       ),
     ),
@@ -134,7 +122,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
         SearchEverywhereButton(query: _query.text),
       if (_query.text.isNotEmpty)
         IconButton(
-          tooltip: 'Wyczyść',
+          tooltip: l10n.recentsScreenClear,
           icon: const Icon(Icons.close),
           onPressed: () => setState(_query.clear),
         ),
@@ -168,7 +156,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Text(
-            'Brak wyników dla „${_query.text.trim()}”',
+            l10n.recentsScreenNoResults(_query.text.trim()),
             textAlign: TextAlign.center,
             style: TextStyle(color: context.palette.textSecondary),
           ),
@@ -211,15 +199,15 @@ class _RecentsScreenState extends State<RecentsScreen> {
           : AppBar(
               backgroundColor: palette.background,
               centerTitle: true,
-              title: const Text('Ostatnie'),
+              title: Text(l10n.recentsScreenTitle),
               actions: [
                 IconButton(
-                  tooltip: 'Szukaj w ostatnich',
+                  tooltip: l10n.recentsScreenSearch,
                   icon: const Icon(Icons.search),
                   onPressed: days.isEmpty ? null : _startSearch,
                 ),
                 IconButton(
-                  tooltip: 'Wyczyść historię',
+                  tooltip: l10n.recentsScreenClearHistory,
                   icon: const Icon(Icons.delete_outline),
                   onPressed: days.isEmpty
                       ? null
@@ -241,7 +229,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
                       child: Text(
-                        'Nic jeszcze nie odtworzono.',
+                        l10n.recentsScreenEmpty,
                         textAlign: TextAlign.center,
                         style: TextStyle(color: palette.textSecondary),
                       ),

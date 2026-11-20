@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n.dart';
 import 'network_errors.dart';
 
 /// The GitHub repository whose releases carry this app's APK, `<owner>/<repo>`, set at build
@@ -263,8 +264,8 @@ class AppUpdates extends ChangeNotifier {
       }
     } catch (e) {
       _problem = isNetworkError(e)
-          ? 'Brak połączenia z internetem'
-          : 'Nie udało się sprawdzić aktualizacji ($e)';
+          ? l10n.appUpdatesNoConnection
+          : l10n.appUpdatesCheckFailed('$e');
     } finally {
       _checking = false;
       notifyListeners();

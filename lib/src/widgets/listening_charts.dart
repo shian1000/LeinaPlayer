@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../theme.dart';
 
 /// "45 min", "< 1 min".
 String minutesLabel(Duration d) {
   final minutes = (d.inSeconds / 60).round();
-  return minutes == 0 && d > Duration.zero ? '< 1 min' : '$minutes min';
+  return minutes == 0 && d > Duration.zero
+      ? l10n.listeningChartsUnderAMinute
+      : l10n.listeningChartsMinutes(minutes);
 }
 
 /// Listened time by the hour of day: one thin bar per hour, the busiest hour named.
@@ -31,7 +34,7 @@ class HourChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Najwięcej słuchasz między $peak:00 a ${(peak + 1) % 24}:00',
+            l10n.listeningChartsPeakHour(peak, (peak + 1) % 24),
             style: const TextStyle(fontSize: AppFontSize.body),
           ),
           const SizedBox(height: 12),
@@ -85,21 +88,6 @@ class HourChart extends StatelessWidget {
 class MonthChart extends StatelessWidget {
   const MonthChart({super.key, required this.months, this.height = 120});
 
-  static const _names = [
-    'sty',
-    'lut',
-    'mar',
-    'kwi',
-    'maj',
-    'cze',
-    'lip',
-    'sie',
-    'wrz',
-    'paź',
-    'lis',
-    'gru',
-  ];
-
   final List<({DateTime month, Duration listened})> months;
   final double height;
 
@@ -147,7 +135,7 @@ class MonthChart extends StatelessWidget {
             for (final m in months)
               Expanded(
                 child: Text(
-                  _names[m.month.month - 1],
+                  l10n.listeningChartsMonthShort('${m.month.month}'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: AppFontSize.caption,

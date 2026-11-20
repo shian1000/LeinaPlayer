@@ -11,6 +11,7 @@ import '../data/saved_songs.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../theme.dart';
@@ -106,7 +107,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         if (!(hidden?.contains(hit) ?? false)) hit,
     ];
     final categories = <(String?, String)>[
-      (null, 'Wszystko'),
+      (null, l10n.discoverScreenEverything),
       for (final mood in moods) (mood.key, mood.name),
     ];
     return SafeArea(
@@ -125,7 +126,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     onTap: () => setState(() => _category = key),
                   ),
                 IconButton(
-                  tooltip: 'Wylosuj inne',
+                  tooltip: l10n.discoverScreenShuffle,
                   icon: const Icon(Icons.casino_outlined),
                   onPressed: () => setState(() {
                     _seed++;
@@ -142,9 +143,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       padding: const EdgeInsets.all(32),
                       child: Text(
                         catalog.songCount == 0
-                            ? 'Nie ma jeszcze bazy danych MusicDatabase na telefonie '
-                                  '(Ustawienia › Synchronizacja › Baza danych).'
-                            : 'Brak utworów w tej kategorii.',
+                            ? l10n.discoverScreenNoDatabase
+                            : l10n.discoverScreenNoSongs,
                         textAlign: TextAlign.center,
                         style: TextStyle(color: palette.textSecondary),
                       ),
@@ -305,7 +305,7 @@ class _DiscoverCard extends StatelessWidget {
                                 child: Icon(
                                   playing ? Icons.graphic_eq : Icons.play_arrow,
                                   size: 40,
-                                  semanticLabel: 'Odtwórz',
+                                  semanticLabel: l10n.commonPlay,
                                 ),
                               ),
                             ],
@@ -318,7 +318,7 @@ class _DiscoverCard extends StatelessWidget {
                       children: [
                         _SideButton(
                           icon: Icons.person_outline,
-                          label: 'Artysta',
+                          label: l10n.discoverScreenArtist,
                           onTap: () => openArtistSongs(
                             context,
                             artistNamesOf(hit.artistLabel).firstOrNull ??
@@ -330,7 +330,9 @@ class _DiscoverCard extends StatelessWidget {
                             icon: isSaved
                                 ? Icons.bookmark
                                 : Icons.bookmark_border,
-                            label: isSaved ? 'Zapisane' : 'Na później',
+                            label: isSaved
+                                ? l10n.discoverScreenSaved
+                                : l10n.discoverScreenSaveForLater,
                             color: isSaved ? palette.accent : null,
                             onTap: () => saved.toggle(hit),
                           ),
@@ -338,18 +340,18 @@ class _DiscoverCard extends StatelessWidget {
                             case final onTap?)
                           _SideButton(
                             icon: Icons.add_circle_outline,
-                            label: 'Dodaj',
+                            label: l10n.commonAdd,
                             onTap: onTap,
                           ),
                         _SideButton(
                           icon: Icons.share_outlined,
-                          label: 'Udostępnij',
+                          label: l10n.discoverScreenShare,
                           onTap: () =>
                               showSongShareSheet(context, hit, idPrefix: _id),
                         ),
                         _SideButton(
                           icon: Icons.more_horiz,
-                          label: 'Więcej',
+                          label: l10n.discoverScreenMore,
                           onTap: () => showSongMenu(
                             context,
                             hit,
@@ -421,20 +423,20 @@ class _DiscoverCard extends StatelessWidget {
                 children: [
                   FilledButton.tonalIcon(
                     icon: const Icon(Icons.graphic_eq),
-                    label: const Text('Fragment'),
+                    label: Text(l10n.discoverScreenFragment),
                     onPressed: () => onPlay(fragment: true),
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('Od początku'),
+                    label: Text(l10n.discoverScreenFromStart),
                     onPressed: () => onPlay(fragment: false),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                'Przesuń w górę po następny',
+                l10n.discoverScreenSwipeUp,
                 style: TextStyle(
                   fontSize: AppFontSize.small,
                   color: palette.textSecondary,

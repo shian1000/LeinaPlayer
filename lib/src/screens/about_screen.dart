@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/update_dialog.dart';
 import 'cache_settings_screen.dart';
+import '../l10n.dart';
 
 /// "Ustawienia › Informacje i pomoc": the app's version and the terms it may be shared under.
 /// Mostly a reminder for the owner — the app is for private use only and must never go to an
@@ -31,7 +32,7 @@ class AboutScreen extends StatelessWidget {
     );
     if (!opened) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nie udało się otworzyć przeglądarki.')),
+        SnackBar(content: Text(l10n.aboutScreenBrowserFailed)),
       );
     }
   }
@@ -39,9 +40,7 @@ class AboutScreen extends StatelessWidget {
   Future<void> _copySource(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     await Clipboard.setData(ClipboardData(text: sourceUrl.toString()));
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Skopiowano link do kodu źródłowego')),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.aboutScreenLinkCopied)));
   }
 
   @override
@@ -61,7 +60,7 @@ class AboutScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Informacje i pomoc'),
+        title: Text(l10n.aboutScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
@@ -70,37 +69,20 @@ class AboutScreen extends StatelessWidget {
           if (AppUpdatesScope.maybeOf(context) case final updates?
               when updates.configured)
             ..._updateTiles(context, updates),
-          const SectionTitle('Tylko do użytku prywatnego'),
-          paragraph(
-            'Aplikacja pobiera i odtwarza dźwięk z YouTube poza jego oficjalnym '
-            'odtwarzaczem, co jest niezgodne z regulaminem YouTube i zasadami sklepów. '
-            'Nie publikuj jej w Google Play ani w żadnym innym sklepie.',
-          ),
-          const SectionTitle('Rozmiar aplikacji'),
-          paragraph(
-            'Sama aplikacja to ok. 22 MB: silnik Flutter, którym rysuje ekran, i jej kod '
-            'skompilowany do kodu maszynowego, razem z biblioteką NewPipe i silnikiem JavaScript '
-            'do odtwarzania z YouTube.',
-          ),
-          paragraph(
-            'Aplikacja jest wydawana w dwóch wersjach. Mała (ok. 25 MB) jest dla '
-            'współczesnych telefonów z procesorem 64-bitowym — prawie wszystkich. Duża (ok. '
-            '69 MB) zawiera wersje dla trzech rodzajów procesorów i działa na każdym '
-            'telefonie, ale zajmuje około trzy razy więcej: Android przechowuje cały plik, '
-            'choć używa tylko jednej części. Aktualizacje same wybierają małą, jeśli pasuje do '
-            'telefonu; z dużej można przejść na małą bez utraty danych.',
-          ),
+          SectionTitle(l10n.aboutScreenPrivateUse),
+          paragraph(l10n.aboutScreenPrivateUseText),
+          SectionTitle(l10n.aboutScreenAppSize),
+          paragraph(l10n.aboutScreenAppSizeText),
+          paragraph(l10n.aboutScreenAppVariantsText),
           _ApkVariantTile(packageInfo: packageInfo ?? PackageInfo.fromPlatform),
-          paragraph(
-            'W trakcie używania najwięcej miejsca zajmuje pamięć podręczna: utwory z YouTube '
-            '(by grały bez internetu i nie pobierały się ponownie), okładki i utwory zapisane '
-            'przez „Pobierz”. Jej limit ustawisz poniżej. Baza utworów zajmuje kilka MB.',
-          ),
+          paragraph(l10n.aboutScreenCacheText),
           ListTile(
             leading: const Icon(Icons.sd_storage_outlined),
-            title: const Text('Pamięć podręczna'),
+            title: Text(l10n.aboutScreenCache),
             subtitle: Text(
-              'Zajęte ${(cacheBytesOf(context) / (1024 * 1024)).toStringAsFixed(1)} MB',
+              l10n.aboutScreenCacheUsed(
+                (cacheBytesOf(context) / (1024 * 1024)).toStringAsFixed(1),
+              ),
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
@@ -109,19 +91,16 @@ class AboutScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SectionTitle('Linki z YouTube i Spotify'),
-          paragraph(
-            'Co robi kliknięty albo udostępniony link i jak sprawić, żeby trafiał do '
-            '$appName: Ustawienia › Otwieranie linków.',
-          ),
-          const SectionTitle('Licencja'),
+          SectionTitle(l10n.aboutScreenLinks),
+          paragraph(l10n.aboutScreenLinksText(appName)),
+          SectionTitle(l10n.aboutScreenLicense),
           paragraph('GNU General Public License v3 (GPLv3)'),
           ListTile(
             leading: const Icon(Icons.code),
-            title: const Text('Kod źródłowy'),
+            title: Text(l10n.aboutScreenSourceCode),
             subtitle: Text(sourceUrl.toString()),
             trailing: IconButton(
-              tooltip: 'Kopiuj link',
+              tooltip: l10n.aboutScreenCopyLink,
               icon: const Icon(Icons.copy),
               onPressed: () => _copySource(context),
             ),
@@ -129,7 +108,7 @@ class AboutScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),
-            title: const Text('Licencje bibliotek'),
+            title: Text(l10n.aboutScreenLibraryLicenses),
             trailing: const Icon(Icons.chevron_right),
             onTap: () =>
                 showLicensePage(context: context, applicationName: appName),
@@ -146,8 +125,8 @@ List<Widget> _updateTiles(BuildContext context, AppUpdates updates) => [
   updateCheckTile(context, updates),
   SwitchListTile(
     secondary: const Icon(Icons.schedule),
-    title: const Text('Sprawdzaj aktualizacje automatycznie'),
-    subtitle: const Text('Raz dziennie, w wydaniach aplikacji na GitHubie'),
+    title: Text(l10n.aboutScreenAutoCheck),
+    subtitle: Text(l10n.aboutScreenAutoCheckSubtitle),
     value: updates.autoCheck,
     onChanged: updates.setAutoCheck,
   ),
@@ -161,26 +140,28 @@ Widget updateCheckTile(BuildContext context, AppUpdates updates) {
   final last = updates.lastCheck;
   String two(int n) => n.toString().padLeft(2, '0');
   final subtitle = updates.checking
-      ? 'Sprawdzam…'
+      ? l10n.aboutScreenChecking
       : release != null
-      ? 'Dostępna wersja ${release.label} — stuknij, żeby pobrać'
+      ? l10n.aboutScreenUpdateAvailable(release.label)
       : updates.problem ??
             (last == null
-                ? 'Jeszcze nie sprawdzano'
-                : 'Masz najnowszą wersję (sprawdzono '
-                      '${dayMonthLabel(last)}, ${two(last.hour)}:${two(last.minute)})');
+                ? l10n.aboutScreenNeverChecked
+                : l10n.aboutScreenUpToDate(
+                    dayMonthLabel(last),
+                    '${two(last.hour)}:${two(last.minute)}',
+                  ));
   return ListTile(
     leading: Icon(
       Icons.system_update_outlined,
       color: release != null ? palette.accent : null,
     ),
-    title: const Text('Aktualizacje'),
+    title: Text(l10n.aboutScreenUpdates),
     subtitle: Text(
       subtitle,
       style: release != null ? TextStyle(color: palette.accent) : null,
     ),
     trailing: IconButton(
-      tooltip: 'Sprawdź teraz',
+      tooltip: l10n.aboutScreenCheckNow,
       icon: const Icon(Icons.refresh),
       onPressed: updates.checking ? null : updates.check,
     ),
@@ -199,7 +180,7 @@ const gitCommit = String.fromEnvironment('GIT_COMMIT');
 /// "1.0.0 (kompilacja 312, c11e6c4)": the build number and commit only when known.
 String versionLabel(String version, String buildNumber, String commit) {
   final details = [
-    if (buildNumber.isNotEmpty) 'kompilacja $buildNumber',
+    if (buildNumber.isNotEmpty) l10n.aboutScreenBuild(buildNumber),
     if (commit.isNotEmpty) commit,
   ];
   return details.isEmpty ? version : '$version (${details.join(', ')})';
@@ -217,25 +198,33 @@ class _VersionTile extends StatefulWidget {
 }
 
 class _VersionTileState extends State<_VersionTile> {
-  late final Future<String> _version = widget
+  // The label is made in build, so a language change reaches "kompilacja".
+  late final Future<PackageInfo?> _info = widget
       .packageInfo()
-      .then(
-        (info) => versionLabel(
-          info.version,
-          buildNumberOf(info.buildNumber),
-          gitCommit,
-        ),
-      )
-      .catchError((Object _) => 'nieznana');
+      .then<PackageInfo?>((info) => info)
+      .catchError((Object _) => null);
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<String>(
-    future: _version,
-    builder: (context, snapshot) => ListTile(
-      leading: const Icon(Icons.info_outline),
-      title: Text('$appName — wersja'),
-      subtitle: Text(snapshot.data ?? '…'),
-    ),
+  Widget build(BuildContext context) => FutureBuilder<PackageInfo?>(
+    future: _info,
+    builder: (context, snapshot) {
+      final info = snapshot.data;
+      return ListTile(
+        leading: const Icon(Icons.info_outline),
+        title: Text(l10n.aboutScreenVersion(appName)),
+        subtitle: Text(
+          snapshot.connectionState != ConnectionState.done
+              ? '…'
+              : info == null
+              ? l10n.aboutScreenVersionUnknown
+              : versionLabel(
+                  info.version,
+                  buildNumberOf(info.buildNumber),
+                  gitCommit,
+                ),
+        ),
+      );
+    },
   );
 }
 
@@ -265,13 +254,13 @@ class _ApkVariantTileState extends State<_ApkVariantTile> {
         leading: const Icon(Icons.inventory_2_outlined),
         title: Text(
           universal
-              ? 'Zainstalowana wersja: duża'
-              : 'Zainstalowana wersja: mała',
+              ? l10n.aboutScreenInstalledLarge
+              : l10n.aboutScreenInstalledSmall,
         ),
         subtitle: Text(
           universal
-              ? 'Następna aktualizacja przejdzie na małą, jeśli pasuje do telefonu'
-              : 'Tylko dla procesora tego telefonu',
+              ? l10n.aboutScreenNextUpdateSmall
+              : l10n.aboutScreenOnlyThisCpu,
         ),
       );
     },

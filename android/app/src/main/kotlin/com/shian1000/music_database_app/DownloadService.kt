@@ -67,14 +67,18 @@ class DownloadService : Service() {
          *  background may be refused on Android 12+. */
         @Volatile private var running = false
 
-        private fun notification(context: Context, done: Int, total: Int, title: String): Notification {
+        private fun notification(appContext: Context, done: Int, total: Int, title: String): Notification {
+            val context = AppLanguage.wrap(appContext)
             val manager = context.getSystemService(NotificationManager::class.java)
             val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (manager.getNotificationChannel(CHANNEL) == null) {
-                    manager.createNotificationChannel(
-                        NotificationChannel(CHANNEL, "Pobieranie utworów", NotificationManager.IMPORTANCE_LOW),
-                    )
-                }
+                // Created again each time: that renames it after a language change.
+                manager.createNotificationChannel(
+                    NotificationChannel(
+                        CHANNEL,
+                        context.getString(R.string.downloads_channel),
+                        NotificationManager.IMPORTANCE_LOW,
+                    ),
+                )
                 Notification.Builder(context, CHANNEL)
             } else {
                 @Suppress("DEPRECATION")
@@ -83,7 +87,7 @@ class DownloadService : Service() {
             val open = context.packageManager.getLaunchIntentForPackage(context.packageName)
             return builder
                 .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle("Pobieranie utworów: ${done + 1} z $total")
+                .setContentTitle(context.getString(R.string.downloads_progress, done + 1, total))
                 .setContentText(title)
                 .setProgress(total, done, false)
                 .setOngoing(true)

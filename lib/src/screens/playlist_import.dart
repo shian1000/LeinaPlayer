@@ -5,6 +5,7 @@ import '../data/source_settings.dart';
 import '../data/spotify_playlist.dart';
 import '../data/youtube_playlist.dart';
 import '../data/youtube_search.dart';
+import '../l10n.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/playlist_picker.dart';
 
@@ -20,14 +21,14 @@ Future<void> showPlaylistSheet(
     entries: [
       MenuSheetEntry(
         Icons.add,
-        'Utwórz nową playlistę',
-        subtitle: 'Pusta playlista do uzupełnienia utworami',
+        l10n.playlistImportCreateNew,
+        subtitle: l10n.playlistImportCreateNewSubtitle,
         onTap: () => createEmptyPlaylist(context),
       ),
       MenuSheetEntry(
         Icons.smart_display_outlined,
-        'Importuj playlistę',
-        subtitle: 'Z linku do playlisty na YouTube lub Spotify albo albumu',
+        l10n.playlistImportImport,
+        subtitle: l10n.playlistImportImportSubtitle,
         onTap: () => importPlaylist(context),
       ),
     ],
@@ -42,7 +43,7 @@ Future<void> createEmptyPlaylist(BuildContext context) async {
   if (name == null) return;
   await library.create(name, const []);
   messenger.showSnackBar(
-    SnackBar(content: Text('Utworzono playlistę „$name” w Bibliotece')),
+    SnackBar(content: Text(l10n.playlistImportCreated(name))),
   );
 }
 
@@ -97,17 +98,17 @@ Future<PlaylistSummary?> runPlaylistImport(
   showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const PopScope(
+    builder: (_) => PopScope(
       canPop: false,
       child: AlertDialog(
         content: Row(
           children: [
-            SizedBox.square(
+            const SizedBox.square(
               dimension: 28,
               child: CircularProgressIndicator(strokeWidth: 3),
             ),
-            SizedBox(width: 20),
-            Expanded(child: Text('Importuję playlistę…')),
+            const SizedBox(width: 20),
+            Expanded(child: Text(l10n.playlistImportImporting)),
           ],
         ),
       ),
@@ -124,7 +125,7 @@ Future<PlaylistSummary?> runPlaylistImport(
     }
     switch (ref?.source) {
       case null || PlaylistSource.folder:
-        message = 'To nie jest link do playlisty z YouTube ani playlisty lub albumu ze Spotify.';
+        message = l10n.playlistImportNotALink;
       case PlaylistSource.youtube:
         final result = await playlists.importYouTube(
           await fetcher.fetch(ref!.id, settings),
@@ -134,8 +135,7 @@ Future<PlaylistSummary?> runPlaylistImport(
         final removed = result.removedVideos;
         message = [
           _summary(result),
-          if (removed > 0)
-            'YouTube usunął $removed utw. — zostały na liście i zostaną wyszukane od nowa.',
+          if (removed > 0) l10n.playlistImportRemovedVideos(removed),
         ].join(' ');
       case PlaylistSource.spotify || PlaylistSource.spotifyAlbum:
         final data = ref!.source == PlaylistSource.spotifyAlbum
@@ -147,7 +147,7 @@ Future<PlaylistSummary?> runPlaylistImport(
         message = [
           _summary(result),
           if (total != null && total > data.tracks.length)
-            'Spotify pokazuje bez logowania tylko pierwsze ${data.tracks.length} z $total.',
+            l10n.playlistImportSpotifyLimit(data.tracks.length, total),
         ].join(' ');
     }
   } on YouTubeSearchException catch (e) {
@@ -156,7 +156,7 @@ Future<PlaylistSummary?> runPlaylistImport(
     message = e.message;
   } catch (e) {
     debugPrint('Importing playlist $link failed: $e');
-    message = 'Nie udało się zaimportować playlisty.';
+    message = l10n.playlistImportFailed;
   }
   if (progressOpen) navigator.pop();
   messenger.showSnackBar(
@@ -167,8 +167,9 @@ Future<PlaylistSummary?> runPlaylistImport(
 
 String _summary(PlaylistImportResult result) {
   final p = result.playlist;
-  return '${result.updated ? 'Zaktualizowano' : 'Zaimportowano'} „${p.name}”: '
-      '${p.trackCount} utw., w bazie danych ${result.recognised}.';
+  return result.updated
+      ? l10n.playlistImportUpdated(p.name, p.trackCount, result.recognised)
+      : l10n.playlistImportImported(p.name, p.trackCount, result.recognised);
 }
 
 /// Link field; returns the link, and won't close on text that isn't a playlist link.
@@ -192,11 +193,7 @@ class _LinkDialogState extends State<_LinkDialog> {
   void _submit() {
     final text = _controller.text.trim();
     if (parsePlaylistLink(text) == null && findSpotifyShortLink(text) == null) {
-      setState(
-        () => _error =
-            'To nie jest link do playlisty z YouTube („list=…” w adresie) ani do playlisty '
-            'lub albumu ze Spotify („open.spotify.com/playlist/…”, „…/album/…”).',
-      );
+      setState(() => _error = l10n.playlistImportNotALinkHelp);
       return;
     }
     Navigator.of(context).pop(text);
@@ -205,7 +202,7 @@ class _LinkDialogState extends State<_LinkDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Importuj playlistę'),
+      title: Text(l10n.playlistImportImport),
       content: TextField(
         controller: _controller,
         autofocus: true,
@@ -213,10 +210,8 @@ class _LinkDialogState extends State<_LinkDialog> {
         enableSuggestions: false,
         keyboardType: TextInputType.url,
         decoration: InputDecoration(
-          hintText: 'Link z YouTube lub Spotify',
-          helperText:
-              'Playlista musi być publiczna (na YouTube może być niepubliczna). Ze Spotify '
-              'wczytuje się do 100 utworów.',
+          hintText: l10n.playlistImportLinkHint,
+          helperText: l10n.playlistImportLinkHelper,
           helperMaxLines: 2,
           errorText: _error,
           errorMaxLines: 2,
@@ -227,9 +222,12 @@ class _LinkDialogState extends State<_LinkDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
-        TextButton(onPressed: _submit, child: const Text('Importuj')),
+        TextButton(
+          onPressed: _submit,
+          child: Text(l10n.playlistImportImportButton),
+        ),
       ],
     );
   }

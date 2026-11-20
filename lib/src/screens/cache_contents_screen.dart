@@ -4,6 +4,7 @@ import '../data/combined_search.dart';
 import '../data/local_library.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
@@ -63,7 +64,7 @@ class _CacheContentsScreenState extends State<CacheContentsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Utwory z YouTube'),
+        title: Text(l10n.cacheContentsScreenTitle),
       ),
       body: SongSelectionArea(
         child: ListView(
@@ -73,9 +74,11 @@ class _CacheContentsScreenState extends State<CacheContentsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
                 entries.isEmpty
-                    ? 'Pamięć podręczna jest pusta.'
-                    : 'Utwory: ${entries.length}, ${mb(library.cachedBytes)} MB • '
-                          'od ostatnio słuchanych',
+                    ? l10n.cacheContentsScreenEmpty
+                    : l10n.cacheContentsScreenSummary(
+                        entries.length,
+                        mb(library.cachedBytes),
+                      ),
                 style: TextStyle(
                   color: palette.textSecondary,
                   fontSize: AppFontSize.small,
@@ -91,7 +94,7 @@ class _CacheContentsScreenState extends State<CacheContentsScreen> {
                 subtitle:
                     '${hits[i].shownArtist(context)} • ${mb(entry.sizeBytes)} MB',
                 trailing: IconButton(
-                  tooltip: 'Usuń z pamięci podręcznej',
+                  tooltip: l10n.cacheContentsScreenRemove,
                   icon: Icon(
                     Icons.remove_circle_outline,
                     color: palette.textSecondary,

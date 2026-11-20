@@ -5,6 +5,7 @@ import '../data/local_library.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/song_tile.dart';
 
@@ -27,14 +28,13 @@ class HiddenSongsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Ukryte utwory'),
+        title: Text(l10n.hiddenSongsScreenTitle),
       ),
       body: hits.isEmpty
           ? Padding(
               padding: const EdgeInsets.all(32),
               child: Text(
-                'Brak ukrytych utworów. Ukryjesz utwór z jego menu ⋮: „Ukryj utwór” — '
-                'kolejka, Odkrywaj i radio utworu będą go pomijać.',
+                l10n.hiddenSongsScreenEmpty,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: palette.textSecondary),
               ),
@@ -46,7 +46,7 @@ class HiddenSongsScreen extends StatelessWidget {
                   SongTile(
                     hit: hit,
                     trailing: IconButton(
-                      tooltip: 'Przestań ukrywać',
+                      tooltip: l10n.hiddenSongsScreenUnhide,
                       icon: const Icon(Icons.visibility_outlined),
                       onPressed: () => hidden?.toggle(hit),
                     ),

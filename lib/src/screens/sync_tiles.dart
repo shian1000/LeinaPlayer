@@ -12,6 +12,7 @@ import '../data/playlist_library.dart';
 import '../data/playlist_sync.dart';
 import '../data/saved_songs.dart';
 import '../data/sync_sources.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/feature_info.dart';
 import 'feature_infos.dart';
@@ -42,14 +43,14 @@ List<_SyncPart> _accountSyncParts(BuildContext context) {
   return <_SyncPart>[
     if (playlists != null)
       (
-        name: 'Playlisty',
+        name: l10n.syncTilesPlaylists,
         syncing: playlists.syncing,
         last: () => playlists.lastSync,
         sync: () async => playlists.sync(await servers()),
       ),
     if (moods != null)
       (
-        name: 'Nastroje',
+        name: l10n.syncTilesMoods,
         syncing: moods.syncing,
         last: () => moods.lastSync,
         sync: () async {
@@ -60,28 +61,28 @@ List<_SyncPart> _accountSyncParts(BuildContext context) {
       ),
     if (folders != null)
       (
-        name: 'Foldery',
+        name: l10n.syncTilesFolders,
         syncing: folders.syncing,
         last: () => folders.lastSync,
         sync: () async => folders.sync(await servers()),
       ),
     if (listens != null)
       (
-        name: 'Statystyki słuchania',
+        name: l10n.syncTilesListeningStats,
         syncing: listens.syncing,
         last: () => listens.lastSync,
         sync: () async => listens.sync(await servers()),
       ),
     if (songs != null)
       (
-        name: 'Polubione i zapisane utwory',
+        name: l10n.syncTilesSavedSongs,
         syncing: songs.syncing,
         last: () => songs.lastSync,
         sync: () async => songs.sync(await servers()),
       ),
     if (links != null)
       (
-        name: 'Linki na później',
+        name: l10n.syncTilesLaterLinks,
         syncing: links.syncing,
         last: () => links.lastSync,
         sync: () async => links.sync(await servers()),
@@ -111,17 +112,18 @@ class AccountSyncTile extends StatelessWidget {
       ..sort();
     final String subtitle;
     if (syncing) {
-      subtitle = 'Synchronizowanie…';
+      subtitle = l10n.syncTilesSyncing;
     } else if (failed.isNotEmpty) {
-      subtitle =
-          '${failed.map((p) => p.name).join(', ')}: ${failed.first.last()!.problem}';
+      subtitle = l10n.syncTilesPartsFailed(
+        failed.map((p) => p.name).join(', '),
+        failed.first.last()!.problem!,
+      );
     } else if (done.isEmpty) {
-      subtitle = 'Jeszcze nie synchronizowano';
+      subtitle = l10n.syncTilesNeverSynced;
     } else {
       // The oldest one: everything has synced at least since then.
       final at = done.first;
-      subtitle =
-          'Wszystko zsynchronizowane (najpóźniej o ${two(at.hour)}:${two(at.minute)})';
+      subtitle = l10n.syncTilesAllSynced('${two(at.hour)}:${two(at.minute)}');
     }
 
     return ListTile(
@@ -129,11 +131,11 @@ class AccountSyncTile extends StatelessWidget {
         failed.isEmpty ? Icons.sync : Icons.sync_problem,
         color: failed.isEmpty ? null : error,
       ),
-      title: const Text('Synchronizuj konto'),
+      title: Text(l10n.syncTilesSyncAccount),
       subtitle: Text(subtitle),
       onLongPress: () => showFeatureInfo(context, FeatureInfos.accountSync),
       trailing: IconButton(
-        tooltip: 'Synchronizuj teraz',
+        tooltip: l10n.syncTilesSyncNow,
         icon: const Icon(Icons.refresh),
         onPressed: syncing
             ? null
@@ -181,10 +183,10 @@ class SyncEverythingTileState extends State<SyncEverythingTile> {
         await part.sync();
       }
       if (parts.any((p) => p.last()?.problem != null)) {
-        failed.add('Biblioteka użytkownika');
+        failed.add(l10n.syncTilesFailedLibrary);
       }
       if (catalog.hasSource && !await catalog.syncNow()) {
-        failed.add('Baza danych');
+        failed.add(l10n.syncTilesFailedDatabase);
       }
       if (outbox != null &&
           outbox.waiting > 0 &&
@@ -193,15 +195,15 @@ class SyncEverythingTileState extends State<SyncEverythingTile> {
           await catalog.serverAddresses(),
           manual: true,
         );
-        if (sent.problem != null) failed.add('Prośby do bazy danych');
+        if (sent.problem != null) failed.add(l10n.syncTilesFailedRequests);
       }
       if (updates != null && updates.configured) {
         await updates.check();
-        if (updates.problem != null) failed.add('Aktualizacje');
+        if (updates.problem != null) failed.add(l10n.syncTilesFailedUpdates);
       }
     } catch (e) {
       debugPrint('Syncing everything failed: $e');
-      failed.add('błąd: $e');
+      failed.add(l10n.syncTilesError('$e'));
     } finally {
       if (mounted) {
         setState(() {
@@ -224,26 +226,29 @@ class SyncEverythingTileState extends State<SyncEverythingTile> {
     final parts = [
       if ((AccountScope.maybeOf(context)?.loggedIn ?? false) &&
           sync.usesServer(SyncFeature.library))
-        'biblioteka użytkownika',
-      if (sync.hasSource) 'baza danych',
+        l10n.syncTilesPartLibrary,
+      if (sync.hasSource) l10n.syncTilesPartDatabase,
       if (OutboxScope.maybeOf(context) != null &&
           sync.usesServer(SyncFeature.requests))
-        'prośby do bazy danych',
-      if (AppUpdatesScope.maybeOf(context)?.configured ?? false) 'aktualizacje',
+        l10n.syncTilesPartRequests,
+      if (AppUpdatesScope.maybeOf(context)?.configured ?? false)
+        l10n.syncTilesPartUpdates,
     ];
     final covers = parts.isEmpty
-        ? 'nic — żadne źródło nie jest włączone'
+        ? l10n.syncTilesNothing
         : parts.length == 1
         ? parts.single
-        : '${parts.sublist(0, parts.length - 1).join(', ')} i ${parts.last}';
+        : l10n.syncTilesListAnd(
+            parts.sublist(0, parts.length - 1).join(', '),
+            parts.last,
+          );
     final String subtitle;
     if (_running) {
-      subtitle = 'Synchronizowanie…';
+      subtitle = l10n.syncTilesSyncing;
     } else if (failed != null && failed.isNotEmpty) {
-      subtitle =
-          'Nie udało się: ${failed.join(', ')} — szczegóły w każdej z nich';
+      subtitle = l10n.syncTilesEverythingFailed(failed.join(', '));
     } else if (failed != null && at != null) {
-      subtitle = 'Zsynchronizowano o ${two(at.hour)}:${two(at.minute)}';
+      subtitle = l10n.syncTilesSyncedAt('${two(at.hour)}:${two(at.minute)}');
     } else {
       subtitle = '${covers[0].toUpperCase()}${covers.substring(1)}';
     }
@@ -255,7 +260,7 @@ class SyncEverythingTileState extends State<SyncEverythingTile> {
         color: problem ? error : palette.accent,
       ),
       title: Text(
-        'Synchronizuj wszystko',
+        l10n.syncTilesSyncEverything,
         style: TextStyle(color: palette.accent, fontWeight: FontWeight.bold),
       ),
       subtitle: Text(subtitle, style: problem ? TextStyle(color: error) : null),
@@ -284,20 +289,29 @@ class PhoneOnlyRows extends StatelessWidget {
         playlists?.playlists.where((p) => p.account == null).length ?? 0;
     final moodCount = moods?.phoneOnlyCount ?? 0;
     final folderCount = folders?.phoneOnlyCount ?? 0;
-    Widget row(String what, int count, VoidCallback onTap) => ListTile(
+    Widget row(String title, VoidCallback onTap) => ListTile(
       leading: const Icon(Icons.phone_android),
-      title: Text('$what tylko na tym telefonie: $count'),
-      subtitle: const Text('Dotknij, aby dodać je do konta'),
+      title: Text(title),
+      subtitle: Text(l10n.syncTilesPhoneOnlyTap),
       onTap: onTap,
     );
     return Column(
       children: [
         if (playlistCount > 0)
-          row('Playlisty', playlistCount, playlists!.addPhoneOnlyToAccount),
+          row(
+            l10n.syncTilesPhoneOnlyPlaylists(playlistCount),
+            playlists!.addPhoneOnlyToAccount,
+          ),
         if (moodCount > 0)
-          row('Nastroje', moodCount, moods!.addPhoneOnlyToAccount),
+          row(
+            l10n.syncTilesPhoneOnlyMoods(moodCount),
+            moods!.addPhoneOnlyToAccount,
+          ),
         if (folderCount > 0)
-          row('Foldery', folderCount, folders!.addPhoneOnlyToAccount),
+          row(
+            l10n.syncTilesPhoneOnlyFolders(folderCount),
+            folders!.addPhoneOnlyToAccount,
+          ),
       ],
     );
   }

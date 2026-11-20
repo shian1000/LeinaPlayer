@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n.dart';
 import '../theme.dart';
 
 /// A button at the bottom of a [FeatureInfo] sheet; [onTap] runs after the sheet closes, with
@@ -115,11 +116,11 @@ Future<void> showFeatureInfo(BuildContext context, FeatureInfo info) {
                   ),
                 ),
               ),
-            section('Co to jest', info.what),
-            section('Do czego służy', info.why),
-            section('Jak działa', info.how),
-            section('Z czego korzysta', info.libraries),
-            section('Z czym się łączy', info.connects),
+            section(l10n.featureInfoWhat, info.what),
+            section(l10n.featureInfoWhy, info.why),
+            section(l10n.featureInfoHow, info.how),
+            section(l10n.featureInfoLibraries, info.libraries),
+            section(l10n.featureInfoConnects, info.connects),
             if (info.actions.isNotEmpty) const Divider(),
             for (final action in info.actions)
               ListTile(

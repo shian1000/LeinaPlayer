@@ -15,6 +15,7 @@ import 'spotify_playlist.dart';
 import 'youtube_library.dart';
 import 'youtube_playlist.dart';
 import 'youtube_video.dart';
+import '../l10n.dart';
 
 /// Where a playlist was imported from: a YouTube or Spotify playlist, a Spotify album, or (in
 /// MusicDatabase's menu) a music folder on the server.
@@ -1268,7 +1269,7 @@ class PlaylistLibrary extends ChangeNotifier {
         return e.problem;
       } catch (e) {
         debugPrint('Playlist sync on $server failed: $e');
-        problem = 'Brak połączenia z serwerem MusicDatabase';
+        problem = l10n.playlistLibraryNoConnection;
       } finally {
         client.close();
       }
@@ -1403,20 +1404,13 @@ class PlaylistLibrary extends ChangeNotifier {
         return null;
       case HttpStatus.unauthorized:
         onUnauthorized?.call();
-        throw const _SyncStopped(
-          'Serwer nie przyjął logowania — zaloguj się ponownie (Ustawienia › Konto)',
-        );
+        throw _SyncStopped(l10n.playlistLibraryLoginRejected);
       case HttpStatus.serviceUnavailable:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie może teraz zapisać playlist (dysk niepodłączony lub '
-          'baza użytkownika jeszcze nieprzygotowana)',
-        );
+        throw _SyncStopped(l10n.playlistLibraryServerUnavailable);
       case HttpStatus.notFound when !keepGoing:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie obsługuje jeszcze playlist',
-        );
+        throw _SyncStopped(l10n.playlistLibraryNotSupported);
     }
-    final problem = 'Serwer odrzucił playlistę (HTTP ${answer.status})';
+    final problem = l10n.playlistLibraryRejected(answer.status);
     if (keepGoing) return problem;
     throw _SyncStopped(problem);
   }

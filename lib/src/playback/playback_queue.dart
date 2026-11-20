@@ -9,6 +9,7 @@ import '../data/hidden_songs.dart';
 import '../data/mood_filter.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_video.dart';
+import '../l10n.dart';
 import 'player_controller.dart';
 import 'track_player.dart';
 import '../data/album_covers.dart';
@@ -140,7 +141,8 @@ class ReplacedQueue {
   String? get name {
     final origin = _state.mainOrigin;
     final query = origin?.searchQuery;
-    return origin?.playlistName ?? (query == null ? null : '„$query”');
+    return origin?.playlistName ??
+        (query == null ? null : l10n.playbackQueueSearchName(query));
   }
 
   SearchHit get current => _state.current.hit;

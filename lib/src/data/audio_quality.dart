@@ -1,3 +1,4 @@
+import '../l10n.dart';
 import 'youtube_audio.dart';
 
 /// "Jakość" in Informacje o utworze for the YouTube audio stream the player chose: YouTube's own
@@ -27,7 +28,7 @@ String fileQuality(
       : (sizeBytes * 8 / duration.inMilliseconds).round();
   return [
     _formatName(extension, fromYouTube: fromYouTube),
-    if (kbps != null) 'średnio $kbps kb/s',
+    if (kbps != null) l10n.audioQualityAverageBitrate(kbps),
   ].join(', ');
 }
 
@@ -35,16 +36,16 @@ String _formatName(String extension, {required bool fromYouTube}) =>
     switch (extension) {
       'webm' || 'opus' => 'Opus',
       'm4a' || 'mp4' || 'aac' when fromYouTube => 'AAC',
-      'm4a' || 'mp4' => 'M4A (AAC lub ALAC)',
+      'm4a' || 'mp4' => l10n.audioQualityM4a,
       'aac' => 'AAC',
       'mp3' => 'MP3',
       'ogg' || 'oga' => 'Ogg Vorbis',
-      'flac' => 'FLAC, bezstratny',
-      'wav' => 'WAV, bezstratny',
-      'aif' || 'aiff' => 'AIFF, bezstratny',
-      'wv' => 'WavPack, bezstratny',
-      'ape' => "Monkey's Audio, bezstratny",
+      'flac' => l10n.audioQualityLossless('FLAC'),
+      'wav' => l10n.audioQualityLossless('WAV'),
+      'aif' || 'aiff' => l10n.audioQualityLossless('AIFF'),
+      'wv' => l10n.audioQualityLossless('WavPack'),
+      'ape' => l10n.audioQualityLossless("Monkey's Audio"),
       'wma' => 'WMA',
-      '' => 'nieznany format',
+      '' => l10n.audioQualityUnknownFormat,
       _ => extension.toUpperCase(),
     };

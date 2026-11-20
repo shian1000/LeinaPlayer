@@ -6,6 +6,7 @@ import '../data/moods.dart';
 import '../data/playlist_library.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
@@ -58,17 +59,19 @@ class QueueScreen extends StatelessWidget {
 
   /// The heading over a run of songs queued from [origin].
   static String heading(PlaybackQueue queue, QueueOrigin? origin) {
-    if (origin == null) return 'Następne w kolejce';
+    if (origin == null) return l10n.queueScreenNextInQueue;
     final name = origin.playlistName;
     if (identical(origin, queue.mainOrigin)) {
       final query = origin.searchQuery;
       return name != null
-          ? 'Następne z: $name'
+          ? l10n.queueScreenNextFrom(name)
           : query != null
-          ? 'Następne z: „$query” w wyszukiwarce'
-          : 'Następne';
+          ? l10n.queueScreenNextFromSearch(query)
+          : l10n.queueScreenNext;
     }
-    return name != null ? 'Z playlisty: $name' : 'Następne w kolejce';
+    return name != null
+        ? l10n.queueScreenFromPlaylist(name)
+        : l10n.queueScreenNextInQueue;
   }
 
   /// Saves [songs] (every song listed: the shown previous ones, the one playing, what comes
@@ -82,9 +85,9 @@ class QueueScreen extends StatelessWidget {
     final navigator = Navigator.of(context);
     final name = (await showDialog<String>(
       context: context,
-      builder: (_) => const TextInputDialog(
-        title: 'Zapisz kolejkę jako playlistę',
-        hint: 'Nazwa playlisty',
+      builder: (_) => TextInputDialog(
+        title: l10n.queueScreenSaveAsPlaylist,
+        hint: l10n.queueScreenPlaylistName,
         initial: '',
       ),
     ))?.trim();
@@ -95,13 +98,12 @@ class QueueScreen extends StatelessWidget {
       ..showSnackBar(
         SnackBar(
           content: Text(
-            'Zapisano w Bibliotece: „${playlist.name}” '
-            '(${trackCountLabel(songs.length)})',
+            l10n.queueScreenSaved(playlist.name, trackCountLabel(songs.length)),
           ),
           // With an action a SnackBar otherwise stays until closed by hand.
           persist: false,
           action: SnackBarAction(
-            label: 'Pokaż',
+            label: l10n.queueScreenShow,
             onPressed: () => navigator.push(
               MaterialPageRoute<void>(
                 builder: (_) => PlaylistScreen(playlist: playlist),
@@ -150,13 +152,16 @@ class QueueScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: palette.surface,
-          title: const Text('Kolejka'),
+          title: Text(l10n.queueScreenTitle),
           actions: [
             if (queue.replaced case final replaced?)
               IconButton(
-                tooltip:
-                    'Przywróć poprzednią kolejkę: '
-                    '${[?replaced.name, trackCountLabel(replaced.songCount)].join(', ')}',
+                tooltip: l10n.queueScreenRestorePrevious(
+                  [
+                    ?replaced.name,
+                    trackCountLabel(replaced.songCount),
+                  ].join(', '),
+                ),
                 icon: const Icon(Icons.restore),
                 onPressed: () => runQueueAction(
                   context,
@@ -168,7 +173,7 @@ class QueueScreen extends StatelessWidget {
               // Its context is under the screen's own messenger, which shows the note.
               Builder(
                 builder: (context) => IconButton(
-                  tooltip: 'Zapisz kolejkę jako playlistę',
+                  tooltip: l10n.queueScreenSaveAsPlaylist,
                   icon: const Icon(Icons.playlist_add),
                   onPressed: () => _saveAsPlaylist(context, [
                     for (final entry in previous.reversed) entry.hit,
@@ -179,14 +184,14 @@ class QueueScreen extends StatelessWidget {
               ),
             if (current != null && MoodLibraryScope.maybeOf(context) != null)
               IconButton(
-                tooltip: 'Nastrój dla wszystkich utworów w kolejce',
+                tooltip: l10n.queueScreenMoodForAll,
                 icon: const Icon(moodIcon),
                 // The songs listed: the ones the mood filter hides stay out.
                 onPressed: () => showMoodPickerForAll(context, [
                   for (final entry in previous.reversed) entry.hit,
                   current,
                   for (final entry in upcoming) entry.hit,
-                ], title: 'Kolejka: wszystkie widoczne utwory'),
+                ], title: l10n.queueScreenAllVisibleSongs),
               ),
           ],
         ),
@@ -199,7 +204,7 @@ class QueueScreen extends StatelessWidget {
               children: [
                 for (final entry in previous)
                   _PreviousRow(key: ValueKey(entry.key), entry: entry),
-                if (queue.hasPrevious) const _Heading('Poprzednie'),
+                if (queue.hasPrevious) _Heading(l10n.queueScreenPrevious),
               ],
             ),
             SliverToBoxAdapter(
@@ -207,22 +212,15 @@ class QueueScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const _Heading('Teraz odtwarzane'),
+                  _Heading(l10n.queueScreenNowPlaying),
                   if (current != null)
                     _QueueRow(hit: current, isCurrent: true)
                   else
-                    const _Empty('Nic nie jest odtwarzane'),
+                    _Empty(l10n.queueScreenNothingPlaying),
                   if (upcoming.isEmpty && filtering)
-                    const _Empty(
-                      'Po tym utworze nic więcej nie zagra: filtr nastrojów '
-                      'pomija resztę kolejki.',
-                    )
+                    _Empty(l10n.queueScreenEndFiltered)
                   else if (upcoming.isEmpty)
-                    const _Empty(
-                      'Po tym utworze nic więcej nie zagra. Dodaj coś przez '
-                      '„Dodaj do kolejki” w menu utworu albo przeciągając utwór '
-                      'w prawo.',
-                    ),
+                    _Empty(l10n.queueScreenEnd),
                 ],
               ),
             ),
@@ -255,11 +253,11 @@ class QueueScreen extends StatelessWidget {
                     ..showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Usunięto z kolejki: ${removed.length} utw.',
+                          l10n.queueScreenRemovedCount(removed.length),
                         ),
                         persist: false,
                         action: SnackBarAction(
-                          label: 'Cofnij',
+                          label: l10n.commonUndo,
                           onPressed: () {
                             for (final (entry, at) in removed.reversed) {
                               queue.reinsert(entry, at);
@@ -279,17 +277,17 @@ class QueueScreen extends StatelessWidget {
                       // more or taken out at once (Juxtopposed's redesign).
                       if (playlistGroup) ...[
                         IconButton(
-                          tooltip: 'Losowo w tej grupie',
+                          tooltip: l10n.queueScreenShuffleGroup,
                           icon: const Icon(Icons.shuffle, size: 20),
                           onPressed: () => queue.shuffleGroup(group),
                         ),
                         IconButton(
-                          tooltip: 'Powtórz tę grupę',
+                          tooltip: l10n.queueScreenRepeatGroup,
                           icon: const Icon(Icons.repeat, size: 20),
                           onPressed: () => queue.repeatGroup(group),
                         ),
                         IconButton(
-                          tooltip: 'Usuń tę grupę z kolejki',
+                          tooltip: l10n.queueScreenRemoveGroup,
                           icon: const Icon(Icons.playlist_remove, size: 22),
                           onPressed: removeGroup,
                         ),
@@ -297,7 +295,7 @@ class QueueScreen extends StatelessWidget {
                       if (heading.clear)
                         TextButton(
                           onPressed: queue.clearAdded,
-                          child: const Text('Wyczyść kolejkę'),
+                          child: Text(l10n.queueScreenClear),
                         ),
                     ],
                   ),
@@ -324,7 +322,9 @@ class QueueScreen extends StatelessWidget {
                     color: queue.shuffle ? palette.accent : null,
                   ),
                   label: Text(
-                    queue.shuffle ? 'Losowo: wł.' : 'Losowo: wył.',
+                    queue.shuffle
+                        ? l10n.queueScreenShuffleOn
+                        : l10n.queueScreenShuffleOff,
                     style: TextStyle(
                       color: queue.shuffle
                           ? palette.accent
@@ -340,7 +340,9 @@ class QueueScreen extends StatelessWidget {
                       color: filtering ? palette.accent : null,
                     ),
                     label: Text(
-                      filtering ? 'Nastroje: wł.' : 'Nastroje: wył.',
+                      filtering
+                          ? l10n.queueScreenMoodsOn
+                          : l10n.queueScreenMoodsOff,
                       style: TextStyle(
                         color: filtering ? palette.accent : palette.textPrimary,
                       ),
@@ -429,11 +431,11 @@ class _UpcomingRow extends StatelessWidget {
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text('Usunięto z kolejki: „${entry.hit.title}”'),
+          content: Text(l10n.queueScreenRemoved(entry.hit.title)),
           // With an action a SnackBar otherwise stays until closed by hand.
           persist: false,
           action: SnackBarAction(
-            label: 'Cofnij',
+            label: l10n.commonUndo,
             onPressed: () => queue.reinsert(entry, at),
           ),
         ),
@@ -447,12 +449,12 @@ class _UpcomingRow extends StatelessWidget {
     return SwipeActions(
       right: SwipeAction(
         icon: next ? Icons.playlist_play : Icons.queue_music,
-        label: next ? 'Odtwórz jako następny' : 'Przenieś na koniec kolejki',
+        label: next ? l10n.queueScreenPlayNext : l10n.queueScreenMoveToEnd,
         onTriggered: () => queue.move(entry, next ? 0 : queue.upcoming.length),
       ),
       left: removeSwipe(
         context,
-        'Usuń z kolejki',
+        l10n.queueScreenRemoveFromQueue,
         () => _remove(context, queue),
       ),
       child: _QueueRow(
@@ -465,7 +467,7 @@ class _UpcomingRow extends StatelessWidget {
           index: index,
           // No tooltip: its long press took the drag over when the finger rested first.
           child: Semantics(
-            label: 'Przeciągnij, aby zmienić kolejność',
+            label: l10n.queueScreenDragToReorder,
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Icon(Icons.drag_handle),

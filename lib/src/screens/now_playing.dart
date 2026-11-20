@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
+import '../l10n.dart';
 import '../data/lyrics.dart';
 import '../data/source_settings.dart';
 import '../data/mood_filter.dart';
@@ -267,7 +268,9 @@ class MiniPlayer extends StatelessWidget {
                           hit: PlaybackQueueScope.of(context).current,
                         ),
                         IconButton(
-                          tooltip: player.playing ? 'Pauza' : 'Odtwórz',
+                          tooltip: player.playing
+                              ? l10n.nowPlayingPause
+                              : l10n.commonPlay,
                           icon: Icon(
                             player.playing ? Icons.pause : Icons.play_arrow,
                             size: 30,
@@ -299,7 +302,7 @@ class _AddToPlaylistButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final hit = this.hit;
     return IconButton(
-      tooltip: 'Dodaj do playlisty',
+      tooltip: l10n.nowPlayingAddToPlaylist,
       icon: Icon(Icons.add_circle_outline, size: size),
       onPressed: () {
         final entry = hit == null ? null : playlistMenuEntry(context, [hit]);
@@ -334,7 +337,7 @@ class _LikeButton extends StatelessWidget {
     }
     final liked = likedSongs.contains(hit);
     return IconButton(
-      tooltip: liked ? 'Usuń z polubionych' : 'Polub',
+      tooltip: liked ? l10n.nowPlayingUnlike : l10n.nowPlayingLike,
       icon: Icon(
         liked ? Icons.favorite : Icons.favorite_border,
         size: size,
@@ -359,7 +362,7 @@ Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
     context: context,
     useRootNavigator: true,
     barrierDismissible: true,
-    barrierLabel: 'Zamknij',
+    barrierLabel: l10n.commonClose,
     barrierColor: Colors.black38,
     transitionDuration: const Duration(milliseconds: 120),
     pageBuilder: (dialogContext, _, _) {
@@ -405,26 +408,30 @@ Future<void> _showQuickActions(BuildContext context, SearchHit hit) {
                 if (moods != null)
                   action(
                     moodIcon,
-                    'Nastrój',
+                    l10n.nowPlayingMood,
                     () => showMoodPicker(context, hit),
                   ),
                 if (saved != null)
                   saved.contains(hit)
                       ? action(
                           Icons.bookmark,
-                          'Zapisane',
+                          l10n.nowPlayingSaved,
                           () => saved.toggle(hit),
                         )
                       : action(
                           Icons.bookmark_border,
-                          'Na później',
+                          l10n.nowPlayingSaveForLater,
                           () => saved.toggle(hit),
                         ),
                 if (playlist?.onTap case final onTap?)
-                  action(Icons.add_circle_outline, 'Playlista', onTap),
+                  action(
+                    Icons.add_circle_outline,
+                    l10n.nowPlayingPlaylist,
+                    onTap,
+                  ),
                 action(
                   Icons.more_horiz,
-                  'Więcej',
+                  l10n.nowPlayingMore,
                   () => showSongMenu(
                     context,
                     hit,
@@ -591,7 +598,7 @@ class NowPlayingScreen extends StatefulWidget {
     if (player.playing) await player.togglePlay();
     if (!await openInYouTube(fromHere ? youTubeUriAt(uri, at) : uri)) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nie udało się otworzyć YouTube.')),
+        SnackBar(content: Text(l10n.nowPlayingYouTubeOpenFailed)),
       );
     }
   }
@@ -614,14 +621,14 @@ class NowPlayingScreen extends StatefulWidget {
       entries: [
         MenuSheetEntry(
           Icons.music_note_outlined,
-          'Utwór na YouTube',
-          subtitle: 'Od miejsca, w którym jest odtwarzacz',
+          l10n.nowPlayingSongOnYouTube,
+          subtitle: l10n.nowPlayingSongOnYouTubeSubtitle,
           onTap: () => _openInYouTube(context, player, song),
         ),
         MenuSheetEntry(
           Icons.movie_outlined,
-          'Teledysk na YouTube',
-          subtitle: 'Od początku',
+          l10n.nowPlayingMusicVideoOnYouTube,
+          subtitle: l10n.nowPlayingMusicVideoOnYouTubeSubtitle,
           onTap: () =>
               _openInYouTube(context, player, musicVideo, fromHere: false),
         ),
@@ -676,7 +683,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         Row(
                           children: [
                             IconButton(
-                              tooltip: 'Zwiń',
+                              tooltip: l10n.nowPlayingCollapse,
                               icon: const Icon(
                                 Icons.keyboard_arrow_down,
                                 size: 32,
@@ -688,10 +695,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 children: [
                                   Text(
                                     track.playlistName != null
-                                        ? 'Odtwarzanie z playlisty'
+                                        ? l10n.nowPlayingFromPlaylist
                                         : track.searchQuery != null
-                                        ? 'Odtwarzanie z wyników wyszukiwania'
-                                        : 'Teraz odtwarzane',
+                                        ? l10n.nowPlayingFromSearch
+                                        : l10n.nowPlayingNowPlaying,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       fontSize: AppFontSize.small,
@@ -701,7 +708,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                       track.searchQuery != null)
                                     ScrollingText(
                                       track.playlistName ??
-                                          '„${track.searchQuery}” w wyszukiwarce',
+                                          l10n.nowPlayingSearchQuery(
+                                            track.searchQuery!,
+                                          ),
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
                                         fontSize: AppFontSize.body,
@@ -773,8 +782,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                           children: [
                             IconButton(
                               tooltip: queue.shuffle
-                                  ? 'Losowo: wł.'
-                                  : 'Losowo: wył.',
+                                  ? l10n.nowPlayingShuffleOn
+                                  : l10n.nowPlayingShuffleOff,
                               icon: Icon(
                                 Icons.shuffle,
                                 size: 28,
@@ -783,7 +792,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                               onPressed: () => queue.setShuffle(!queue.shuffle),
                             ),
                             IconButton(
-                              tooltip: 'Poprzedni',
+                              tooltip: l10n.nowPlayingPrevious,
                               icon: const Icon(Icons.skip_previous, size: 40),
                               // Restarts the song, or near its start goes back (PlaybackQueue.previous).
                               onPressed: () => runQueueAction(
@@ -796,7 +805,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                               color: palette.textPrimary,
                               shape: palette.buttonShape,
                               child: IconButton(
-                                tooltip: player.playing ? 'Pauza' : 'Odtwórz',
+                                tooltip: player.playing
+                                    ? l10n.nowPlayingPause
+                                    : l10n.commonPlay,
                                 iconSize: 44,
                                 padding: const EdgeInsets.all(12),
                                 color: palette.background,
@@ -809,7 +820,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Następny',
+                              tooltip: l10n.nowPlayingNext,
                               icon: const Icon(Icons.skip_next, size: 40),
                               onPressed: queue.hasNext
                                   ? () => runQueueAction(
@@ -822,9 +833,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             // The sleep timer moved to the song's menu.
                             IconButton(
                               tooltip: switch (queue.repeat) {
-                                QueueRepeat.off => 'Powtarzaj: wył.',
-                                QueueRepeat.all => 'Powtarzaj: wszystkie',
-                                QueueRepeat.one => 'Powtarzaj: utwór',
+                                QueueRepeat.off => l10n.nowPlayingRepeatOff,
+                                QueueRepeat.all => l10n.nowPlayingRepeatAll,
+                                QueueRepeat.one => l10n.nowPlayingRepeatOne,
                               },
                               icon: Icon(
                                 queue.repeat == QueueRepeat.one
@@ -847,7 +858,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             IconButton(
-                              tooltip: 'Otwórz w YouTube',
+                              tooltip: l10n.nowPlayingOpenInYouTube,
                               icon: const Icon(Icons.smart_display_outlined),
                               onPressed:
                                   youTubeUri == null && musicVideoUri == null
@@ -861,8 +872,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             ),
                             IconButton(
                               tooltip: moodFilter?.active ?? false
-                                  ? 'Filtr nastrojów: wł.'
-                                  : 'Filtr nastrojów: wył.',
+                                  ? l10n.nowPlayingMoodFilterOn
+                                  : l10n.nowPlayingMoodFilterOff,
                               icon: Icon(
                                 Icons.filter_list,
                                 color: moodFilter?.active ?? false
@@ -874,7 +885,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                   : () => showMoodFilterSheet(context),
                             ),
                             IconButton(
-                              tooltip: 'Udostępnij',
+                              tooltip: l10n.nowPlayingShare,
                               icon: const Icon(Icons.share_outlined),
                               onPressed: queue.current == null
                                   ? null
@@ -885,12 +896,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                     ),
                             ),
                             IconButton(
-                              tooltip: 'Kolejka',
+                              tooltip: l10n.nowPlayingQueue,
                               icon: const Icon(Icons.queue_music),
                               onPressed: () => QueueScreen.open(context),
                             ),
                             IconButton(
-                              tooltip: 'Menu odtwarzacza (⋮)',
+                              tooltip: l10n.nowPlayingMenu,
                               icon: const Icon(Icons.more_vert),
                               onPressed: () {
                                 final hit = queue.current;
@@ -1012,11 +1023,11 @@ class _LyricsCardState extends State<_LyricsCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Tekst',
-              style: TextStyle(
+              l10n.nowPlayingLyrics,
+              style: const TextStyle(
                 fontSize: AppFontSize.listTitle,
                 fontWeight: FontWeight.bold,
               ),
@@ -1027,14 +1038,14 @@ class _LyricsCardState extends State<_LyricsCard> {
               future: _lyrics,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
-                  return note('Szukam tekstu…');
+                  return note(l10n.nowPlayingLyricsSearching);
                 }
                 if (snapshot.hasError) {
                   return note(
-                    'Nie udało się pobrać tekstu. Brak połączenia?',
+                    l10n.nowPlayingLyricsFailed,
                     action: OutlinedButton.icon(
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Spróbuj ponownie'),
+                      label: Text(l10n.commonRetry),
                       onPressed: () => setState(() {
                         _lyrics = LyricsFinder.instance.find(
                           _hit!,
@@ -1046,9 +1057,11 @@ class _LyricsCardState extends State<_LyricsCard> {
                 }
                 final lyrics = snapshot.data;
                 if (lyrics == null) {
-                  return note('Nie znalazłem tekstu tego utworu.');
+                  return note(l10n.nowPlayingLyricsNotFound);
                 }
-                if (lyrics.instrumental) return note('Utwór instrumentalny.');
+                if (lyrics.instrumental) {
+                  return note(l10n.nowPlayingLyricsInstrumental);
+                }
                 if (lyrics.synced.isEmpty) {
                   return SingleChildScrollView(
                     child: Text(
@@ -1113,8 +1126,8 @@ class _LyricsCardState extends State<_LyricsCard> {
             future: _lyrics,
             builder: (context, snapshot) => ScrollingText(
               snapshot.data == null
-                  ? 'Teksty: MusicDatabase, LRCLIB'
-                  : 'Teksty: ${snapshot.data!.source}',
+                  ? l10n.nowPlayingLyricsCredit('MusicDatabase, LRCLIB')
+                  : l10n.nowPlayingLyricsCredit(snapshot.data!.source),
               style: TextStyle(
                 fontSize: AppFontSize.badge,
                 color: palette.textSecondary,
@@ -1137,7 +1150,9 @@ class _MoodButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final names = MoodLibraryScope.of(context).moodNameListOfHit(hit);
     return IconButton(
-      tooltip: names.isEmpty ? 'Nastrój' : 'Nastrój: ${names.join(', ')}',
+      tooltip: names.isEmpty
+          ? l10n.nowPlayingMood
+          : l10n.nowPlayingMoodNames(names.join(', ')),
       icon: Icon(
         moodIcon,
         size: 28,
@@ -1269,5 +1284,5 @@ class _SeekBarState extends State<_SeekBar> {
 void _copyName(BuildContext context, String text) {
   final messenger = ScaffoldMessenger.of(context);
   Clipboard.setData(ClipboardData(text: text));
-  messenger.showSnackBar(SnackBar(content: Text('Skopiowano: $text')));
+  messenger.showSnackBar(SnackBar(content: Text(l10n.nowPlayingCopied(text))));
 }

@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import '../l10n.dart';
 import 'cover_credit.dart';
 import 'database_sync.dart';
 import 'feat_credit.dart';
@@ -22,25 +23,31 @@ import 'youtube_playlist.dart';
 
 /// What song search can look at, chosen with the filter icon on the Wyszukaj tab.
 enum SearchField {
-  title('Tytuł'),
+  title,
 
   /// Main and additional (`additional_song_artists`) artists, including their other names
   /// (`artists.synonyms`, e.g. channel names).
-  artist('Wykonawca'),
-  album('Album'),
-  year('Rok'),
-  language('Język'),
+  artist,
+  album,
+  year,
+  language,
 
   /// `artists.origin` of all the song's artists ("Kraj - Region - Miasto").
-  origin('Pochodzenie wykonawcy'),
+  origin,
 
   /// The names of the moods the song is in (global and the user's own; see
   /// [SongCatalog.setMoodNames]), so typing a mood lists its songs.
-  mood('Nastrój');
+  mood;
 
-  const SearchField(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    title => l10n.songCatalogFieldTitle,
+    artist => l10n.songCatalogFieldArtist,
+    album => l10n.songCatalogFieldAlbum,
+    year => l10n.songCatalogFieldYear,
+    language => l10n.songCatalogFieldLanguage,
+    origin => l10n.songCatalogFieldOrigin,
+    mood => l10n.songCatalogFieldMood,
+  };
 
   static const defaults = {title, artist, album, mood};
 }

@@ -7,6 +7,7 @@ import '../data/moods.dart';
 import '../data/song_catalog.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -56,7 +57,7 @@ class _MoodScreenState extends State<MoodScreen> {
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Text(
-              'Tego nastroju już nie ma.',
+              l10n.moodScreenGone,
               textAlign: TextAlign.center,
               style: TextStyle(color: palette.textSecondary),
             ),
@@ -88,8 +89,8 @@ class _MoodScreenState extends State<MoodScreen> {
             ? ScrollingText(mood.name)
             : TextField(
                 autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Szukaj w nastroju',
+                decoration: InputDecoration(
+                  hintText: l10n.moodScreenSearch,
                   border: InputBorder.none,
                 ),
                 onChanged: (text) => setState(() => _query = text),
@@ -99,14 +100,14 @@ class _MoodScreenState extends State<MoodScreen> {
             SearchEverywhereButton(query: _query!),
           IconButton(
             tooltip: _query == null
-                ? 'Szukaj w nastroju'
-                : 'Zamknij wyszukiwanie',
+                ? l10n.moodScreenSearch
+                : l10n.moodScreenCloseSearch,
             icon: Icon(_query == null ? Icons.search : Icons.close),
             onPressed: () =>
                 setState(() => _query = _query == null ? '' : null),
           ),
           IconButton(
-            tooltip: 'Menu nastroju (⋮)',
+            tooltip: l10n.moodScreenMoodMenu,
             icon: const Icon(Icons.more_vert),
             onPressed: () => _showMoodMenu(context, mood, hits),
           ),
@@ -137,8 +138,8 @@ class _MoodScreenState extends State<MoodScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${mood.global ? 'Nastrój globalny' : 'Twój nastrój'} • '
-                          '${_songCount(hits.length)}',
+                          '${mood.global ? l10n.moodScreenGlobalMood : l10n.moodScreenOwnMood} • '
+                          '${l10n.songsCount(hits.length)}',
                           style: TextStyle(color: palette.textSecondary),
                         ),
                       ],
@@ -153,7 +154,7 @@ class _MoodScreenState extends State<MoodScreen> {
                 alignment: Alignment.centerLeft,
                 child: FilledButton.icon(
                   icon: const Icon(Icons.shuffle),
-                  label: const Text('Odtwórz losowo'),
+                  label: Text(l10n.moodScreenShuffle),
                   onPressed: hits.isEmpty
                       ? null
                       : () {
@@ -175,8 +176,7 @@ class _MoodScreenState extends State<MoodScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                  'Utworów, których nie ma w bazie danych na telefonie: $missing — '
-                  'pojawią się po pobraniu nowszej.',
+                  l10n.moodScreenMissing(missing),
                   style: TextStyle(
                     fontSize: AppFontSize.small,
                     color: palette.textSecondary,
@@ -187,7 +187,7 @@ class _MoodScreenState extends State<MoodScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(32, 32, 32, 0),
                 child: Text(
-                  'Brak utworów. Dodaj je z menu ⋮ utworu: „Dodaj do nastroju”.',
+                  l10n.moodScreenEmpty,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.textSecondary),
                 ),
@@ -201,7 +201,7 @@ class _MoodScreenState extends State<MoodScreen> {
                 playlistName: mood.name,
                 moodKey: mood.key,
                 trailing: IconButton(
-                  tooltip: 'Menu utworu (⋮)',
+                  tooltip: l10n.moodScreenSongMenu,
                   icon: const Icon(Icons.more_vert),
                   onPressed: () => _showSongMenu(context, mood, hit, editable),
                 ),
@@ -209,20 +209,13 @@ class _MoodScreenState extends State<MoodScreen> {
                 onSwipeRemove: editable
                     ? () => _swipeRemove(context, mood, hit)
                     : null,
-                swipeRemoveLabel: 'Usuń z tego nastroju',
+                swipeRemoveLabel: l10n.moodScreenRemoveFromMood,
               ),
           ],
         ),
       ),
     );
   }
-
-  static String _songCount(int n) => switch (n) {
-    1 => '1 utwór',
-    _ when n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) =>
-      '$n utwory',
-    _ => '$n utworów',
-  };
 
   void _showMoodMenu(BuildContext context, Mood mood, List<SearchHit> hits) {
     final origin = QueueOrigin(playlistName: mood.name, moodKey: mood.key);
@@ -232,22 +225,28 @@ class _MoodScreenState extends State<MoodScreen> {
       header: MenuSheetHeader(
         cover: MoodCover(mood: mood),
         title: mood.name,
-        subtitle: mood.global ? 'Nastrój globalny' : 'Twój nastrój',
+        subtitle: mood.global
+            ? l10n.moodScreenGlobalMood
+            : l10n.moodScreenOwnMood,
       ),
       entries: [
         if (hits.isNotEmpty) ...[
           MenuSheetEntry(
             Icons.queue_music,
-            'Dodaj do kolejki',
+            l10n.moodScreenAddToQueue,
             onTap: () => queueSongs(context, hits, next: false, origin: origin),
           ),
           MenuSheetEntry(
             Icons.playlist_play,
-            'Odtwórz jako następny',
+            l10n.moodScreenPlayNext,
             onTap: () => queueSongs(context, hits, next: true, origin: origin),
           ),
           ?moodForAllEntry(context, hits, title: mood.name),
-          ?playlistMenuEntry(context, hits, label: 'Dodaj do playlisty'),
+          ?playlistMenuEntry(
+            context,
+            hits,
+            label: l10n.moodScreenAddToPlaylist,
+          ),
         ],
         ?moveToFolderEntry(context, mood.key),
         ...customCoverEntries(
@@ -258,12 +257,12 @@ class _MoodScreenState extends State<MoodScreen> {
         if (!mood.global) ...[
           MenuSheetEntry(
             Icons.edit_outlined,
-            'Zmień nazwę',
+            l10n.moodScreenRename,
             onTap: () => _rename(context, mood),
           ),
           MenuSheetEntry(
             Icons.delete_outline,
-            'Usuń nastrój',
+            l10n.moodScreenDelete,
             onTap: () => _delete(context, mood),
           ),
         ],
@@ -284,7 +283,7 @@ class _MoodScreenState extends State<MoodScreen> {
       if (editable)
         MenuSheetEntry(
           Icons.remove_circle_outline,
-          'Usuń z tego nastroju',
+          l10n.moodScreenRemoveFromMood,
           onTap: () => MoodLibraryScope.of(context).setHits(mood, [hit], false),
         ),
     ],
@@ -298,10 +297,10 @@ class _MoodScreenState extends State<MoodScreen> {
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text('Usunięto z nastroju: „${hit.title}”'),
+          content: Text(l10n.moodScreenRemoved(hit.title)),
           persist: false,
           action: SnackBarAction(
-            label: 'Cofnij',
+            label: l10n.commonUndo,
             onPressed: () => moods.setHits(mood, [hit], true),
           ),
         ),
@@ -314,8 +313,8 @@ class _MoodScreenState extends State<MoodScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (_) => TextInputDialog(
-        title: 'Zmień nazwę nastroju',
-        hint: 'Nazwa',
+        title: l10n.moodScreenRenameTitle,
+        hint: l10n.moodScreenNameHint,
         initial: mood.name,
       ),
     );
@@ -333,21 +332,20 @@ class _MoodScreenState extends State<MoodScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Usunąć nastrój?'),
+        title: Text(l10n.moodScreenDeleteTitle),
         content: Text(
           mood.phoneOnly
-              ? '„${mood.name}” zniknie z telefonu. Utwory zostają.'
-              : '„${mood.name}” zniknie na wszystkich urządzeniach konta i z '
-                    'MusicDatabase (zostanie tam kopia w archiwum). Utwory zostają.',
+              ? l10n.moodScreenDeletePhoneOnly(mood.name)
+              : l10n.moodScreenDeleteSynced(mood.name),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Anuluj'),
+            child: Text(l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Usuń'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),

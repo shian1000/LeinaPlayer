@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Polish, the app's source language; translations in values-<locale>/strings.xml
+     (docs/agent-notes/localization.md). The app's chosen language is applied by AppLanguage.kt. -->
+<resources>
+    <string name="link_open_failed">Nie udało się otworzyć Leina Player</string>
+    <string name="link_youtube_playlist">Playlista z YouTube</string>
+    <string name="link_youtube_video">Film z YouTube</string>
+    <string name="link_youtube_other">Link z YouTube</string>
+    <string name="link_youtube_unsupported">Otwiera tylko filmy i playlisty</string>
+    <string name="link_spotify_other">Link ze Spotify</string>
+    <string name="link_spotify_track">Utwór ze Spotify</string>
+    <string name="link_spotify_album">Album ze Spotify</string>
+    <string name="link_spotify_playlist">Playlista ze Spotify</string>
+    <string name="link_spotify_unsupported">Otwiera tylko utwory, albumy i playlisty</string>
+    <string name="link_action_import">Zaimportuj do Biblioteki</string>
+    <string name="link_action_play">Odtwórz</string>
+    <string name="link_action_play_or_import">Odtwórz albo zaimportuj</string>
+    <string name="link_open_in">Otwórz w…</string>
+    <string name="link_remember_youtube">Zapamiętaj wybór dla linków z YouTube</string>
+    <string name="link_remember_spotify">Zapamiętaj wybór dla linków ze Spotify</string>
+    <string name="link_open_in_app">Otwórz w aplikacji</string>
+    <string name="link_open_in_browser">Otwórz w przeglądarce</string>
+    <string name="link_save_later">Zapisz na później</string>
+    <string name="link_save_later_subtitle">Wybierz, od kogo jest ten link</string>
+    <string name="link_change_in_settings">Zmienisz to w Ustawienia › Otwieranie linków</string>
+    <string name="link_how_to_play">Jak odtworzyć?</string>
+    <string name="link_play_now">Odtwórz teraz</string>
+    <string name="link_play_now_subtitle">Zamiast tego, co gra</string>
+    <string name="link_play_next">Odtwórz jako następny</string>
+    <string name="link_play_next_subtitle">Zaraz po obecnym utworze</string>
+    <string name="link_add_to_queue">Dodaj do kolejki</string>
+    <string name="link_add_to_queue_subtitle">Na sam koniec kolejki</string>
+    <string name="link_cancel">Anuluj</string>
+    <string name="link_back">← Wróć</string>
+    <string name="link_from_whom">Od kogo?</string>
+    <string name="link_new_person">Nowa osoba</string>
+    <string name="link_name_hint">Imię lub nazwa</string>
+    <string name="link_save">Zapisz</string>
+    <string name="link_saved_later">Zapisano na później — od: %1$s</string>
+    <string name="scheduled_music">Zaplanowana muzyka</string>
+    <string name="scheduled_music_tap">Dotknij, aby otworzyć Leina Player</string>
+    <string name="downloads_channel">Pobieranie utworów</string>
+    <string name="downloads_progress">Pobieranie utworów: %1$d z %2$d</string>
+</resources>

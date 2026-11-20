@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/app_updates.dart';
 import '../theme.dart';
+import '../l10n.dart';
 
 /// "Dostępna nowa wersja": the release's notes, "Pobierz" (the APK in the browser, which hands
 /// it to Android's installer) and "Później" (no more dialogs for this release).
@@ -17,7 +18,7 @@ Future<void> showUpdateDialog(
     builder: (dialogContext) {
       final palette = dialogContext.palette;
       return AlertDialog(
-        title: Text('Dostępna nowa wersja ${release.label}'),
+        title: Text(l10n.updateDialogTitle(release.label)),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -25,7 +26,7 @@ Future<void> showUpdateDialog(
             children: [
               if (release.notes.isNotEmpty) ...[
                 Text(
-                  'Co nowego',
+                  l10n.updateDialogWhatsNew,
                   style: TextStyle(
                     fontSize: AppFontSize.body,
                     fontWeight: FontWeight.w700,
@@ -43,9 +44,7 @@ Future<void> showUpdateDialog(
                 const SizedBox(height: 12),
               ],
               Text(
-                '„Pobierz” otworzy plik w przeglądarce. Po pobraniu stuknij go i '
-                'zainstaluj — za pierwszym razem Android poprosi o zgodę na instalowanie '
-                'aplikacji z przeglądarki. Dane w aplikacji zostają.',
+                l10n.updateDialogHelp,
                 style: TextStyle(
                   fontSize: AppFontSize.small,
                   color: palette.textSecondary,
@@ -57,11 +56,11 @@ Future<void> showUpdateDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Później'),
+            child: Text(l10n.updateDialogLater),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Pobierz'),
+            child: Text(l10n.updateDialogDownload),
           ),
         ],
       );
@@ -78,7 +77,7 @@ Future<void> showUpdateDialog(
   );
   if (!opened) {
     messenger?.showSnackBar(
-      const SnackBar(content: Text('Nie udało się otworzyć przeglądarki.')),
+      SnackBar(content: Text(l10n.updateDialogBrowserFailed)),
     );
   }
 }

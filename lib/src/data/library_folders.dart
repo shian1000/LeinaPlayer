@@ -9,29 +9,36 @@ import 'moods.dart';
 import 'playlist_library.dart';
 import 'playlist_sync.dart';
 import 'text_normalizer.dart';
+import '../l10n.dart';
 
 /// How Biblioteka is ordered ("Sortuj wg").
 enum LibrarySort {
-  recent('Ostatnie'),
-  added('Ostatnio dodane'),
-  alphabetical('Alfabetycznie'),
-  creator('Twórca');
+  recent,
+  added,
+  alphabetical,
+  creator;
 
-  const LibrarySort(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    recent => l10n.libraryFoldersSortRecent,
+    added => l10n.libraryFoldersSortAdded,
+    alphabetical => l10n.libraryFoldersSortAlphabetical,
+    creator => l10n.libraryFoldersSortCreator,
+  };
 }
 
 /// What one of Biblioteka's categories lists; also its filter chips.
 enum LibraryCategory {
-  playlists('Playlisty'),
-  albums('Albumy'),
-  moods('Nastroje'),
-  folders('Foldery');
+  playlists,
+  albums,
+  moods,
+  folders;
 
-  const LibraryCategory(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    playlists => l10n.libraryFoldersCategoryPlaylists,
+    albums => l10n.libraryFoldersCategoryAlbums,
+    moods => l10n.libraryFoldersCategoryMoods,
+    folders => l10n.libraryFoldersCategoryFolders,
+  };
 }
 
 /// A folder in Biblioteka holding playlists and moods.
@@ -222,7 +229,8 @@ class PlaylistEntry extends LibraryEntry {
   @override
   String get name => playlist.name;
   @override
-  String get creator => playlist.owner ?? playlist.account ?? 'Ty';
+  String get creator =>
+      playlist.owner ?? playlist.account ?? l10n.libraryFoldersCreatorYou;
   @override
   DateTime? get createdAt => playlist.createdAt;
   @override
@@ -239,7 +247,8 @@ class MoodEntry extends LibraryEntry {
   @override
   String get name => mood.name;
   @override
-  String get creator => mood.global ? 'MusicDatabase' : 'Ty';
+  String get creator =>
+      mood.global ? 'MusicDatabase' : l10n.libraryFoldersCreatorYou;
   @override
   DateTime? get createdAt => mood.createdAt;
   @override
@@ -637,7 +646,7 @@ class LibraryFolders extends ChangeNotifier {
         return e.problem;
       } catch (e) {
         debugPrint('Folder sync on $server failed: $e');
-        problem = 'Brak połączenia z serwerem MusicDatabase';
+        problem = l10n.libraryFoldersNoConnection;
       } finally {
         client.close();
       }
@@ -796,20 +805,13 @@ class LibraryFolders extends ChangeNotifier {
         return null;
       case HttpStatus.unauthorized:
         onUnauthorized?.call();
-        throw const _SyncStopped(
-          'Serwer nie przyjął logowania — zaloguj się ponownie (Ustawienia › Konto)',
-        );
+        throw _SyncStopped(l10n.libraryFoldersLoginRejected);
       case HttpStatus.serviceUnavailable:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie może teraz zapisać folderów (dysk niepodłączony lub '
-          'baza użytkownika jeszcze nieprzygotowana)',
-        );
+        throw _SyncStopped(l10n.libraryFoldersServerUnavailable);
       case HttpStatus.notFound when !keepGoing:
-        throw const _SyncStopped(
-          'Serwer MusicDatabase nie obsługuje jeszcze folderów',
-        );
+        throw _SyncStopped(l10n.libraryFoldersNotSupported);
     }
-    final problem = 'Serwer odrzucił folder (HTTP ${answer.status})';
+    final problem = l10n.libraryFoldersRejected(answer.status);
     if (keepGoing) return problem;
     throw _SyncStopped(problem);
   }

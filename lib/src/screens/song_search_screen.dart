@@ -12,6 +12,7 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
+import '../l10n.dart';
 import '../data/sync_sources.dart';
 import '../data/youtube_library.dart';
 import '../data/video_link.dart';
@@ -87,7 +88,7 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
         slot.error = e.message;
       } catch (e) {
         debugPrint('Online search for "$query" failed: $e');
-        slot.error = 'Wyszukiwanie się nie udało.';
+        slot.error = l10n.songSearchScreenSearchFailed;
       }
       if (mounted && _online == pending) setState(() {});
     }
@@ -125,7 +126,7 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
         backgroundColor: palette.surface,
         titleSpacing: 0,
         leading: IconButton(
-          tooltip: 'Wstecz',
+          tooltip: l10n.songSearchScreenBack,
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -139,7 +140,7 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
             fontSize: AppFontSize.listTitle,
           ),
           decoration: InputDecoration(
-            hintText: 'Czego chcesz posłuchać?',
+            hintText: l10n.songSearchScreenHint,
             hintStyle: TextStyle(color: palette.textSecondary),
             border: InputBorder.none,
           ),
@@ -154,7 +155,7 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
           const SearchFieldsButton(),
           if (_query.text.isNotEmpty)
             IconButton(
-              tooltip: 'Wyczyść',
+              tooltip: l10n.songSearchScreenClear,
               icon: const Icon(Icons.close),
               onPressed: () {
                 _query.clear();
@@ -185,7 +186,7 @@ class SearchEverywhereButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IconButton(
-    tooltip: 'Szukaj w całej bazie',
+    tooltip: l10n.songSearchScreenSearchEverywhere,
     icon: const Icon(Icons.travel_explore),
     onPressed: () {
       FocusScope.of(context).unfocus();
@@ -212,7 +213,7 @@ class _QueueResultsButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: 'Utwórz kolejkę z wyników',
+      tooltip: l10n.songSearchScreenQueueResults,
       icon: const Icon(Icons.playlist_play, size: 28),
       onPressed: () {
         FocusScope.of(context).unfocus();
@@ -229,7 +230,7 @@ class _QueueResultsButton extends StatelessWidget {
           ScaffoldMessenger.of(context)
             ..clearSnackBars()
             ..showSnackBar(
-              SnackBar(content: Text('Brak utworów dla „$query”')),
+              SnackBar(content: Text(l10n.songSearchScreenNoSongsFor(query))),
             );
           return;
         }
@@ -295,32 +296,32 @@ class _Results extends StatelessWidget {
     if (!mainReady && library.songCount == 0) {
       switch (catalog.status) {
         case CatalogStatus.notLoaded || CatalogStatus.loading:
-          return const _Message(
+          return _Message(
             icon: Icons.hourglass_empty,
-            title: 'Wczytywanie bazy danych…',
+            title: l10n.songSearchScreenLoadingDatabase,
             busy: true,
           );
         case CatalogStatus.noDatabase:
           if (sync.downloading) {
-            return const _Message(
+            return _Message(
               icon: Icons.cloud_download_outlined,
-              title: 'Trwa pobieranie bazy danych…',
+              title: l10n.songSearchScreenDownloadingDatabase,
               busy: true,
             );
           }
           return _Message(
             icon: Icons.storage_outlined,
-            title: 'Brak pobranej bazy danych',
+            title: l10n.songSearchScreenNoDatabase,
             details: !sync.hasSource
-                ? 'Włącz źródło bazy w Ustawienia › Synchronizacja › Baza danych.'
-                : (sync.lastError ?? 'Baza nie została jeszcze pobrana.'),
+                ? l10n.songSearchScreenEnableDatabaseSource
+                : (sync.lastError ?? l10n.songSearchScreenNotDownloadedYet),
             action: _OpenDatabaseSettings(),
           );
         case CatalogStatus.error:
           return _Message(
             icon: Icons.error_outline,
-            title: 'Nie udało się odczytać bazy danych',
-            details: 'Spróbuj pobrać ją ponownie.',
+            title: l10n.songSearchScreenReadFailed,
+            details: l10n.songSearchScreenDownloadAgain,
             action: _OpenDatabaseSettings(),
           );
         case CatalogStatus.ready:
@@ -332,8 +333,8 @@ class _Results extends StatelessWidget {
       final total = (mainReady ? catalog.songCount : 0) + library.pendingCount;
       return _Message(
         icon: Icons.search,
-        title: 'Szukaj wśród $total utworów',
-        details: 'Wpisz tytuł utworu albo wykonawcę.',
+        title: l10n.songSearchScreenSearchAmong(total),
+        details: l10n.songSearchScreenTypeHint,
       );
     }
     final youTubeLibrary = YouTubeLibraryScope.of(context);
@@ -376,7 +377,7 @@ class _Results extends StatelessWidget {
         onlineSection == null) {
       return _Message(
         icon: Icons.search_off,
-        title: 'Brak wyników dla „${query.trim()}”',
+        title: l10n.songSearchScreenNoResultsFor(query.trim()),
       );
     }
     final header = Padding(
@@ -386,8 +387,8 @@ class _Results extends StatelessWidget {
           Expanded(
             child: Text(
               results.isEmpty
-                  ? 'Brak utworów dla „${query.trim()}” w bazie i na telefonie'
-                  : 'Utwory: ${results.length}',
+                  ? l10n.songSearchScreenNoSongsAnywhere(query.trim())
+                  : l10n.songSearchScreenSongsHeader(results.length),
               style: TextStyle(
                 color: context.palette.textSecondary,
                 fontSize: AppFontSize.small,
@@ -396,7 +397,7 @@ class _Results extends StatelessWidget {
           ),
           if (fullAlbums > 0)
             PillChip(
-              label: 'Całe albumy: $fullAlbums',
+              label: l10n.songSearchScreenFullAlbumsChip(fullAlbums),
               selected: onlyFullAlbums,
               onTap: () => onOnlyFullAlbums(!onlyFullAlbums),
             ),
@@ -406,11 +407,11 @@ class _Results extends StatelessWidget {
     final leading = [
       ?onlineSection,
       if (playlists.isNotEmpty) ...[
-        _SectionLabel('Playlisty w Bibliotece: ${playlists.length}'),
+        _SectionLabel(l10n.songSearchScreenLibraryPlaylists(playlists.length)),
         for (final playlist in playlists) _SavedPlaylistTile(playlist),
       ],
       if (albums.isNotEmpty) ...[
-        _SectionLabel('Albumy: ${albums.length}'),
+        _SectionLabel(l10n.songSearchScreenAlbums(albums.length)),
         _AlbumRow(albums),
       ],
       header,
@@ -475,10 +476,10 @@ class _OnlineSection extends StatelessWidget {
           ),
           label: Text(
             youTube && spotify
-                ? 'Wyszukaj na YouTubie i Spotify'
+                ? l10n.songSearchScreenSearchYouTubeAndSpotify
                 : youTube
-                ? 'Wyszukaj na YouTubie'
-                : 'Wyszukaj playlisty na Spotify',
+                ? l10n.songSearchScreenSearchYouTube
+                : l10n.songSearchScreenSearchSpotifyPlaylists,
           ),
           onPressed: onSearch,
         ),
@@ -491,16 +492,16 @@ class _OnlineSection extends StatelessWidget {
           ..._part(
             context,
             part,
-            label: 'Playlisty na YouTube',
-            empty: 'Brak playlist na YouTube dla „$query”',
+            label: l10n.songSearchScreenYouTubePlaylists,
+            empty: l10n.songSearchScreenNoYouTubePlaylists(query),
             found: (playlists) => [_PlaylistRow(playlists)],
           ),
         if (results.spotifyPlaylists case final part?)
           ..._part(
             context,
             part,
-            label: 'Playlisty na Spotify',
-            empty: 'Brak playlist na Spotify dla „$query”',
+            label: l10n.songSearchScreenSpotifyPlaylists,
+            empty: l10n.songSearchScreenNoSpotifyPlaylists(query),
             found: (playlists) => [_PlaylistRow(playlists)],
           ),
         if (results.videos case final part?)
@@ -508,7 +509,7 @@ class _OnlineSection extends StatelessWidget {
             context,
             part,
             label: 'YouTube',
-            empty: 'Brak wyników na YouTube dla „$query”',
+            empty: l10n.songSearchScreenNoYouTubeResults(query),
             found: (videos) => [
               for (final video in videos)
                 _YouTubeTile(video: video, query: query),
@@ -529,7 +530,11 @@ class _OnlineSection extends StatelessWidget {
   }) {
     final value = part.value;
     return [
-      _SectionLabel(value == null ? label : '$label: ${value.length}'),
+      _SectionLabel(
+        value == null
+            ? label
+            : l10n.songSearchScreenSectionCount(label, value.length),
+      ),
       if (part.loading)
         const Padding(
           padding: EdgeInsets.all(16),
@@ -548,7 +553,7 @@ class _OnlineSection extends StatelessWidget {
           ),
           title: Text(part.error!),
           trailing: IconButton(
-            tooltip: 'Spróbuj ponownie',
+            tooltip: l10n.commonRetry,
             icon: const Icon(Icons.refresh),
             onPressed: onSearch,
           ),
@@ -631,7 +636,9 @@ class _PlaylistRow extends StatelessWidget {
                   ScrollingText(
                     [
                       ?playlist.owner,
-                      ?(count == null ? null : '$count utw.'),
+                      ?(count == null
+                          ? null
+                          : l10n.songSearchScreenSongsShort(count)),
                     ].join(' • '),
                     style: TextStyle(
                       fontSize: AppFontSize.small,
@@ -698,8 +705,10 @@ class _AlbumRow extends StatelessWidget {
                   ),
                   // Count on a line of its own: after a long artist it got cut off.
                   for (final line in [
-                    artists.length == 1 ? artists.first : 'Różni wykonawcy',
-                    '$count utw.',
+                    artists.length == 1
+                        ? artists.first
+                        : l10n.songSearchScreenVariousArtists,
+                    l10n.songSearchScreenSongsShort(count),
                   ])
                     ScrollingText(
                       line,
@@ -762,7 +771,9 @@ class _SavedPlaylistTile extends StatelessWidget {
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
       leading: PlaylistCover(playlist: playlist, size: SongTile.coverSize),
       title: ScrollingText(playlist.name),
-      subtitle: ScrollingText(['Playlista', ?playlist.owner].join(' • ')),
+      subtitle: ScrollingText(
+        [l10n.songSearchScreenPlaylist, ?playlist.owner].join(' • '),
+      ),
       onTap: () {
         FocusScope.of(context).unfocus();
         Navigator.of(context).push(
@@ -845,7 +856,7 @@ class _OpenDatabaseSettings extends StatelessWidget {
               const SyncSourcesScreen(feature: SyncFeature.database),
         ),
       ),
-      child: const Text('Ustawienia bazy danych'),
+      child: Text(l10n.songSearchScreenDatabaseSettings),
     );
   }
 }

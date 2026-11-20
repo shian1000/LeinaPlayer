@@ -5,6 +5,7 @@ import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
@@ -71,7 +72,9 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
         ..clearSnackBars()
         ..showSnackBar(
           SnackBar(
-            content: Text('Ten utwór już jest na „${widget.playlist.name}”.'),
+            content: Text(
+              l10n.playlistAddScreenAlreadyThere(widget.playlist.name),
+            ),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -87,7 +90,7 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
       if (!mounted) return;
       setState(() => _present.remove(key));
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nie udało się dodać utworu.')),
+        SnackBar(content: Text(l10n.playlistAddScreenAddFailed)),
       );
     }
   }
@@ -111,23 +114,26 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
           textInputAction: TextInputAction.search,
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
-            hintText: 'Dodaj do „${widget.playlist.name}”',
+            hintText: l10n.playlistAddScreenHint(widget.playlist.name),
             border: InputBorder.none,
           ),
         ),
         actions: [
           if (_query.text.isNotEmpty)
             IconButton(
-              tooltip: 'Wyczyść',
+              tooltip: l10n.playlistAddScreenClear,
               icon: const Icon(Icons.close),
               onPressed: () => setState(_query.clear),
             ),
         ],
       ),
       body: _query.text.trim().isEmpty
-          ? _Note('Wyszukaj utwory, które chcesz dodać.', palette: palette)
+          ? _Note(l10n.playlistAddScreenPrompt, palette: palette)
           : hits.isEmpty
-          ? _Note('Brak wyników dla „${_query.text.trim()}”', palette: palette)
+          ? _Note(
+              l10n.playlistAddScreenNoResults(_query.text.trim()),
+              palette: palette,
+            )
           : ListView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.only(bottom: 24),
@@ -137,7 +143,7 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
                     hit: hit,
                     trailing: _present.contains(SongSelection.keyOf(hit))
                         ? IconButton(
-                            tooltip: 'Jest na playliście',
+                            tooltip: l10n.playlistAddScreenOnPlaylist,
                             icon: Icon(
                               Icons.check_circle,
                               color: palette.accent,
@@ -145,7 +151,7 @@ class _PlaylistAddScreenState extends State<PlaylistAddScreen> {
                             onPressed: () => _add(hit),
                           )
                         : IconButton(
-                            tooltip: 'Dodaj do playlisty',
+                            tooltip: l10n.playlistAddScreenAddToPlaylist,
                             icon: const Icon(Icons.add_circle_outline),
                             onPressed: () => _add(hit),
                           ),

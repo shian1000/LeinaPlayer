@@ -16,6 +16,7 @@ import '../data/song_catalog.dart';
 import '../data/song_details.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
@@ -103,9 +104,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
           builder: (context, snapshot) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Informacje o utworze',
-                style: TextStyle(
+              Text(
+                l10n.songInfoTitle,
+                style: const TextStyle(
                   fontSize: AppFontSize.emphasis,
                   fontWeight: FontWeight.bold,
                 ),
@@ -136,18 +137,18 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final mainSong = hit.mainSong;
     return [
       if (mainSong == null)
-        const _Note('Tego utworu nie ma w MusicDatabase.')
+        _Note(l10n.songInfoNotInMusicDatabase)
       else if (details == null)
-        const _Note('Nie udało się odczytać szczegółów z music.db.'),
+        _Note(l10n.songInfoReadFailed),
       if (details == null)
-        _Section('Utwór', [
-          _Field('Tytuł', hit.title),
-          _Field('Wykonawca', hit.artistLabel),
-          _Field('Album', hit.album),
-          _Field('Rok', hit.year?.toString()),
+        _Section(l10n.songInfoSectionSong, [
+          _Field(l10n.songInfoLabelTitle, hit.title),
+          _Field(l10n.songInfoSectionArtist, hit.artistLabel),
+          _Field(l10n.songInfoLabelAlbum, hit.album),
+          _Field(l10n.songInfoLabelYear, hit.year?.toString()),
           if (mainSong != null) ...[
-            _Field('Język', mainSong.language),
-            _Field('ID w MusicDatabase', '${mainSong.id}'),
+            _Field(l10n.songInfoLabelLanguage, mainSong.language),
+            _Field(l10n.songInfoLabelMusicDatabaseId, '${mainSong.id}'),
           ],
         ])
       else ...[
@@ -180,19 +181,27 @@ class _SongInfoCardState extends State<SongInfoCard> {
       'music_video_youtube_id',
       'spotify_url',
     };
-    return _Section('Utwór', [
+    return _Section(l10n.songInfoSectionSong, [
       for (final key in song.keys)
         if (key == 'kind')
           _songKindField(song)
         else if (!shownElsewhere.contains(key))
           _editableField('songs', song, key, _songLabels[key] ?? key),
-      _Field('Cover utworu wykonawcy', details.coveredArtist),
+      _Field(l10n.songInfoCoverOf, details.coveredArtist),
       if (widget.hit.version case final version?)
-        _Field('Wersja', [version.kind.label, ?version.label].join(' · ')),
+        _Field(
+          l10n.songInfoVersion,
+          [version.kind.label, ?version.label].join(' · '),
+        ),
       for (final former in details.formerIds)
         _Field(
-          'Dawne ID',
-          '${former.id}${former.changedAt == null ? '' : ' (do ${former.changedAt})'}',
+          l10n.songInfoFormerId,
+          former.changedAt == null
+              ? '${former.id}'
+              : l10n.songInfoFormerIdUntil(
+                  '${former.id}',
+                  '${former.changedAt}',
+                ),
         ),
     ]);
   }
@@ -209,7 +218,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
       return youTube == null ? hit : withPhoneYouTube(hit, youTube);
     }
 
-    return _Section('Inne wersje', [
+    return _Section(l10n.songInfoOtherVersions, [
       // The card is padded already.
       ListTileTheme.merge(
         contentPadding: EdgeInsets.zero,
@@ -232,10 +241,10 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final row = _withLatinColumn(artist, 'name', 'name_latin');
     return _Section(
       song != null
-          ? 'Wykonawca'
+          ? l10n.songInfoSectionArtist
           : role == 'feat'
-          ? 'Gościnnie (feat.)'
-          : 'Współwykonawca',
+          ? l10n.songInfoSectionFeaturing
+          : l10n.songInfoSectionCoArtist,
       [
         for (final key in row.keys)
           if (key == 'name' && song != null)
@@ -270,14 +279,20 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final spelling = rowId is int
         ? outbox.correctionOf('artists', rowId, 'name', name)
         : null;
-    String state(FieldCorrection c) =>
-        c.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie';
     final notes = [
       // A sent one taken back names the same artist again: nothing to show.
       if (other != null && !_sameArtistName(other.newValue, name))
-        '${state(other)}: inny wykonawca — ${other.newValue}',
+        other.sent
+            ? l10n.songInfoOtherArtistSent('${other.newValue}')
+            : l10n.songInfoOtherArtistWaiting('${other.newValue}'),
       if (spelling != null)
-        '${state(spelling)}: pisownia — ${_text(spelling.newValue) ?? '(puste)'}',
+        spelling.sent
+            ? l10n.songInfoSpellingSent(
+                _text(spelling.newValue) ?? l10n.songInfoEmptyValue,
+              )
+            : l10n.songInfoSpellingWaiting(
+                _text(spelling.newValue) ?? l10n.songInfoEmptyValue,
+              ),
     ];
     return _Field(
       _artistLabels['name']!,
@@ -290,14 +305,14 @@ class _SongInfoCardState extends State<SongInfoCard> {
             title: Text(name),
             children: [
               _ChoiceOption(
-                'Ten utwór ma innego wykonawcę',
-                'Zmieni się tylko ten utwór.',
+                l10n.songInfoOtherArtistOption,
+                l10n.songInfoOtherArtistOptionNote,
                 onPressed: () => Navigator.of(context).pop(true),
               ),
               if (rowId is int)
                 _ChoiceOption(
-                  'Popraw pisownię nazwy',
-                  'We wszystkich utworach tego wykonawcy.',
+                  l10n.songInfoSpellingOption,
+                  l10n.songInfoSpellingOptionNote,
                   onPressed: () => Navigator.of(context).pop(false),
                 ),
             ],
@@ -320,7 +335,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
             table: 'artists',
             rowId: rowId,
             column: 'name',
-            label: 'Pisownia nazwy wykonawcy',
+            label: l10n.songInfoArtistSpelling,
             kind: _Kind.required,
             current: name,
             shown: spelling == null ? name : spelling.newValue,
@@ -353,8 +368,8 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final text = await showDialog<String>(
       context: context,
       builder: (_) => TextInputDialog(
-        title: 'Inny wykonawca tego utworu',
-        hint: 'Nazwa wykonawcy',
+        title: l10n.songInfoOtherArtistTitle,
+        hint: l10n.songInfoArtistName,
         initial: shown,
       ),
     );
@@ -362,7 +377,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final typed = text.trim();
     if (typed.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Nazwa wykonawcy nie może być pusta.')),
+        SnackBar(content: Text(l10n.songInfoArtistNameEmpty)),
       );
       return;
     }
@@ -400,7 +415,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          back ? 'Poprawka wycofana.' : 'Propozycja innego wykonawcy trafi do MusicDatabase (Zgłoszenia dla MusicDatabase).',
+          back
+              ? l10n.songInfoCorrectionWithdrawn
+              : l10n.songInfoOtherArtistQueued,
         ),
       ),
     );
@@ -428,10 +445,10 @@ class _SongInfoCardState extends State<SongInfoCard> {
         (id) => 'https://open.spotify.com/album/$id',
       ),
     };
-    return _Section('Album', [
+    return _Section(l10n.songInfoLabelAlbum, [
       for (final MapEntry(:key, :value) in album.entries)
         if (key == 'artist_id')
-          _Field('Wykonawca albumu', details.albumArtist ?? _text(value))
+          _Field(l10n.songInfoAlbumArtist, details.albumArtist ?? _text(value))
         else
           _editableField(
             'albums',
@@ -467,8 +484,10 @@ class _SongInfoCardState extends State<SongInfoCard> {
       link: link,
       correction: correction == null
           ? null
-          : '${correction.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie'}: '
-                '${_shown(kind, correction.newValue) ?? '(puste)'}',
+          : _correctionNote(
+              correction,
+              _shown(kind, correction.newValue) ?? l10n.songInfoEmptyValue,
+            ),
       onEdit: () => _edit(
         outbox,
         song,
@@ -498,12 +517,14 @@ class _SongInfoCardState extends State<SongInfoCard> {
         SongKind.of(correction == null ? stored : correction.newValue) ==
         SongKind.fullAlbum;
     return _Field(
-      'To jest cały album',
+      l10n.songInfoIsFullAlbum,
       fieldValue('songs', 'kind', stored),
       correction: correction == null
           ? null
-          : '${correction.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie'}: '
-                '${fieldValue('songs', 'kind', correction.newValue)}',
+          : _correctionNote(
+              correction,
+              '${fieldValue('songs', 'kind', correction.newValue)}',
+            ),
       trailing: outbox == null || song == null || id is! int
           ? null
           : Switch(
@@ -527,7 +548,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text(
-                      _sameValue(value, stored) ? 'Poprawka wycofana.' : 'Poprawka trafi do MusicDatabase (Zgłoszenia dla MusicDatabase).',
+                      _sameValue(value, stored)
+                          ? l10n.songInfoCorrectionWithdrawn
+                          : l10n.songInfoCorrectionQueued,
                     ),
                   ),
                 );
@@ -547,26 +570,28 @@ class _SongInfoCardState extends State<SongInfoCard> {
     context: context,
     builder: (context) => SimpleDialog(
       title: Text(
-        asOtherArtist == null ? 'To nie wygląda na poprawkę pisowni.' : 'To nie wygląda na poprawkę pisowni. Czy ten utwór ma innego wykonawcę?',
+        asOtherArtist == null
+            ? l10n.songInfoNotSpellingFix
+            : l10n.songInfoNotSpellingFixOtherArtist,
       ),
       children: [
         if (asOtherArtist != null)
           _ChoiceOption(
-            'Tak, tylko ten utwór',
-            '„$typed” będzie wykonawcą tylko tego utworu.',
+            l10n.songInfoOnlyThisSong,
+            l10n.songInfoOnlyThisSongNote(typed),
             onPressed: () => Navigator.of(context).pop(false),
           ),
         _ChoiceOption(
           asOtherArtist == null
-              ? 'Zmień nazwę we wszystkich utworach'
-              : 'Nie, zmień nazwę we wszystkich utworach',
-          'Wszystkie utwory wykonawcy „$name” dostaną nazwę „$typed”.',
+              ? l10n.songInfoRenameEverywhere
+              : l10n.songInfoNoRenameEverywhere,
+          l10n.songInfoRenameEverywhereNote(name, typed),
           onPressed: () => Navigator.of(context).pop(true),
         ),
         if (asOtherArtist == null)
           _ChoiceOption(
-            'Anuluj',
-            'Nazwa zostaje bez zmian.',
+            l10n.commonCancel,
+            l10n.songInfoNameUnchanged,
             onPressed: () => Navigator.of(context).pop(),
           ),
       ],
@@ -595,7 +620,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
           children: [
             for (final MapEntry(:key, value: name) in {
               ..._albumTypes,
-              '': 'nie wiadomo',
+              '': l10n.songInfoUnknown,
             }.entries)
               SimpleDialogOption(
                 onPressed: () => Navigator.of(context).pop(key),
@@ -617,7 +642,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
         context: context,
         builder: (_) => TextInputDialog(
           title: label,
-          hint: kind == _Kind.required ? label : 'Puste — usuń wartość',
+          hint: kind == _Kind.required ? label : l10n.songInfoEmptyHint,
           initial: _text(shown) ?? '',
           number: kind == _Kind.number,
         ),
@@ -626,7 +651,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
       final trimmed = text.trim();
       if (trimmed.isEmpty && kind == _Kind.required) {
         messenger.showSnackBar(
-          SnackBar(content: Text('„$label” nie może być puste.')),
+          SnackBar(content: Text(l10n.songInfoFieldEmpty(label))),
         );
         return;
       }
@@ -660,7 +685,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          _sameValue(value, current) ? 'Poprawka wycofana.' : 'Poprawka trafi do MusicDatabase (Zgłoszenia dla MusicDatabase).',
+          _sameValue(value, current)
+              ? l10n.songInfoCorrectionWithdrawn
+              : l10n.songInfoCorrectionQueued,
         ),
       ),
     );
@@ -673,12 +700,15 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final bytes = cover['bytes'] as int?;
     final url = cover['url'] as String?;
     return _Field(
-      'Okładka: ${cover['source']}',
+      l10n.songInfoCover('${cover['source']}'),
       [
-        cover['status'] == 'found' ? 'jest' : 'brak',
+        cover['status'] == 'found'
+            ? l10n.songInfoCoverFound
+            : l10n.songInfoNone,
         ?size,
         if (bytes != null) '${(bytes / 1024).round()} KB',
-        if (cover['checked_at'] != null) 'sprawdzono ${cover['checked_at']}',
+        if (cover['checked_at'] != null)
+          l10n.songInfoCoverChecked('${cover['checked_at']}'),
         ?url,
         ?cover['path'] as String?,
       ].join(' · '),
@@ -693,7 +723,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final spotifyUrl = details?.song['spotify_url'] as String?;
     Uri video(String id) => youTubeWatchUri(id);
     final fromPlayer = widget.track != null;
-    return _Section('Linki', [
+    return _Section(l10n.songInfoSectionLinks, [
       if (mainSong != null) ...[
         _youTubeField(
           mainSong.fromMusicDb,
@@ -705,19 +735,19 @@ class _SongInfoCardState extends State<SongInfoCard> {
         _youTubeField(
           mainSong.fromMusicDb,
           column: 'music_video_youtube_id',
-          label: 'Teledysk (music.db)',
+          label: l10n.songInfoMusicVideoMusicDb,
           stored: mainSong.fromMusicDb.musicVideoId,
         ),
       ],
       if (mainSong != null)
         _Field(
           'Spotify (music.db)',
-          spotifyUrl ?? 'brak',
+          spotifyUrl ?? l10n.songInfoNone,
           link: spotifyUrl == null ? null : Uri.tryParse(spotifyUrl),
         ),
       if (hit.phoneMatch != null && hit.phoneMatch != storedVideo?.trim())
         _Field(
-          'YouTube (znaleziony na telefonie)',
+          l10n.songInfoYouTubeFoundOnPhone,
           hit.phoneMatch,
           link: video(hit.phoneMatch!),
           fromPlayer: fromPlayer,
@@ -725,7 +755,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
       if (hit.playlistVideoId != null &&
           hit.playlistVideoId != storedVideo?.trim())
         _Field(
-          'YouTube (z playlisty)',
+          l10n.songInfoYouTubeFromPlaylist,
           hit.playlistVideoId,
           link: video(hit.playlistVideoId!),
           fromPlayer: fromPlayer,
@@ -733,20 +763,20 @@ class _SongInfoCardState extends State<SongInfoCard> {
       if (hit.spotifyTrackId != null &&
           hit.spotifyTrackId != mainSong?.spotifyTrackId)
         _Field(
-          'Spotify (z playlisty)',
+          l10n.songInfoSpotifyFromPlaylist,
           hit.spotifyTrackId,
           link: Uri.https('open.spotify.com', '/track/${hit.spotifyTrackId}'),
         ),
       if (hit.notFoundOnYouTube)
-        const _Field('YouTube', 'telefon niedawno szukał i nie znalazł'),
+        _Field('YouTube', l10n.songInfoYouTubeNotFound),
       for (final other in details?.additionalVideos ?? const <DbRow>[])
         _Field(
-          'YouTube (inne wydanie w MusicDatabase)',
+          l10n.songInfoYouTubeOtherRelease,
           [
             '${other['video_id']}',
             switch (other['source']) {
-              'folder_playlist' => 'z playlisty folderu',
-              'song_merge' => 'z połączenia utworów',
+              'folder_playlist' => l10n.songInfoFromFolderPlaylist,
+              'song_merge' => l10n.songInfoFromSongMerge,
               final source => '$source',
             },
             if (other['added_at'] != null) '${other['added_at']}',
@@ -756,12 +786,12 @@ class _SongInfoCardState extends State<SongInfoCard> {
         ),
       for (final bad in details?.badVideos ?? const <DbRow>[])
         _Field(
-          'YouTube (odrzucony w MusicDatabase)',
+          l10n.songInfoYouTubeRejected,
           [
             '${bad['video_id']}',
             switch (bad['reason']) {
-              'wrong_for_song' => 'zły film dla tego utworu',
-              'no_video_for_song' => 'utwór oznaczony jako N/A',
+              'wrong_for_song' => l10n.songInfoWrongVideo,
+              'no_video_for_song' => l10n.songInfoMarkedNA,
               final reason => '$reason',
             },
             if (bad['marked_at'] != null) '${bad['marked_at']}',
@@ -786,20 +816,21 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final correction = outbox?.correctionOf('songs', song.id, column, stored);
     final fromPlayer = widget.track != null;
     String shown(Object? value) => switch (value) {
-      null || '' => 'brak',
-      'N/A' => 'oznaczony jako niedostępny na YouTube (N/A)',
+      null || '' => l10n.songInfoNone,
+      'N/A' => l10n.songInfoNotOnYouTube,
       _ => '$value',
     };
     final newValue = correction?.newValue as String?;
     return _Field(
       label,
-      removed ? '$stored — usunięty z YouTube' : shown(stored),
+      removed ? l10n.songInfoRemovedFromYouTube('$stored') : shown(stored),
       link: stored == null || stored == 'N/A' ? null : youTubeWatchUri(stored),
       fromPlayer: fromPlayer && column == 'youtube_video_id',
       correction: correction == null
           ? null
-          : '${correction.sent ? 'Wysłano poprawkę' : 'Poprawka czeka na wysłanie'}, '
-                'telefon już używa: ${shown(newValue)}',
+          : correction.sent
+          ? l10n.songInfoLinkCorrectionSent(shown(newValue))
+          : l10n.songInfoLinkCorrectionWaiting(shown(newValue)),
       correctionLink: newValue == null || newValue.isEmpty || newValue == 'N/A'
           ? null
           : youTubeWatchUri(newValue),
@@ -830,7 +861,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
       context: context,
       builder: (_) => TextInputDialog(
         title: label,
-        hint: musicVideo ? 'Link lub ID filmu' : 'Link, ID filmu lub N/A',
+        hint: musicVideo
+            ? l10n.songInfoVideoLinkHint
+            : l10n.songInfoVideoLinkOrNAHint,
         initial: shown == null || shown.isEmpty ? '' : shown,
       ),
     );
@@ -838,7 +871,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
     final value = parseYouTubeLinkInput(text, allowNotOnYouTube: !musicVideo);
     if (value == null) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('To nie jest link do filmu na YouTube.')),
+        SnackBar(content: Text(l10n.songInfoNotYouTubeLink)),
       );
       return;
     }
@@ -855,7 +888,9 @@ class _SongInfoCardState extends State<SongInfoCard> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          _sameValue(newValue, stored) ? 'Wrócono do linku z music.db.' : 'Telefon używa już tego linku; poprawka trafi do MusicDatabase.',
+          _sameValue(newValue, stored)
+              ? l10n.songInfoBackToMusicDbLink
+              : l10n.songInfoLinkInUse,
         ),
       ),
     );
@@ -873,16 +908,16 @@ class _SongInfoCardState extends State<SongInfoCard> {
       for (final tag in details?.tags ?? const <({String name, String kind})>[])
         if (tag.kind != 'mood') tag,
     ];
-    return _Section('Nastroje i tagi', [
-      _Chips('Nastroje', [
+    return _Section(l10n.songInfoSectionMoodsAndTags, [
+      _Chips(l10n.songInfoMoods, [
         for (final mood in inMoods)
           mood.global
-              ? '${mood.name} (globalny)'
+              ? l10n.songInfoMoodGlobal(mood.name)
               : mood.phoneOnly
-              ? '${mood.name} (twój, tylko na telefonie)'
-              : '${mood.name} (twój)',
+              ? l10n.songInfoMoodOwnPhoneOnly(mood.name)
+              : l10n.songInfoMoodOwn(mood.name),
       ]),
-      _Chips('Tagi (tag.db)', [
+      _Chips(l10n.songInfoTags, [
         for (final tag in tags)
           tag.kind == 'marker' ? tag.name : '${tag.name} (${tag.kind})',
       ]),
@@ -892,39 +927,48 @@ class _SongInfoCardState extends State<SongInfoCard> {
   Widget _phoneSection() {
     final hit = _hit;
     final track = widget.track;
-    return _Section('Na telefonie', [
+    return _Section(l10n.songInfoSectionPhone, [
       // Empty until a song restored after a restart is played.
       if (track != null && track.source.isNotEmpty)
         track.serverFileId != null
-            ? _Field('Odtwarzane z', 'serwera: ${track.source}')
+            ? _Field(
+                l10n.songInfoPlayedFrom,
+                l10n.songInfoFromServer(track.source),
+              )
             : track.isStream
             ? _Field(
-                'Odtwarzane z',
+                l10n.songInfoPlayedFrom,
                 'YouTube${track.youtubeVideoId == null ? '' : ': ${track.youtubeVideoId}'}',
                 link: track.youtubeVideoId == null
                     ? null
                     : youTubeWatchUri(track.youtubeVideoId!),
                 fromPlayer: true,
               )
-            : _Field('Odtwarzane z', 'pliku: ${track.source}'),
+            : _Field(
+                l10n.songInfoPlayedFrom,
+                l10n.songInfoFromFile(track.source),
+              ),
       if (track != null && track.source.isNotEmpty)
-        _Field('Jakość', _playingQuality(track, hit)),
+        _Field(l10n.songInfoQuality, _playingQuality(track, hit)),
       if (track == null && hit.youtubeVideoId != null)
         if (YouTubeLibraryScope.maybeOf(context)
                 ?.cachedFileOf(hit.youtubeVideoId!)
             case final copy?)
           _Field(
-            'Kopia z YouTube na telefonie',
+            l10n.songInfoYouTubeCopy,
             fileQuality(copy.path, fromYouTube: true),
           ),
       if (hit.inMainDatabase)
-        _Field('Plik na serwerze (files.db)', hit.serverFile?.path ?? 'brak'),
-      if (hit.phoneFiles.isEmpty) const _Field('Pliki', 'brak'),
-      for (final file in hit.phoneFiles) ...[
-        _Field('Plik', file.filePath),
-        _Field('Format', fileQuality(file.filePath)),
         _Field(
-          'Tagi pliku',
+          l10n.songInfoServerFile,
+          hit.serverFile?.path ?? l10n.songInfoNone,
+        ),
+      if (hit.phoneFiles.isEmpty) _Field(l10n.songInfoFiles, l10n.songInfoNone),
+      for (final file in hit.phoneFiles) ...[
+        _Field(l10n.songInfoFile, file.filePath),
+        _Field(l10n.songInfoFormat, fileQuality(file.filePath)),
+        _Field(
+          l10n.songInfoFileTags,
           [
             file.title,
             ?file.artist,
@@ -933,7 +977,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
           ].join(' · '),
         ),
         if (file.pending)
-          const _Field('MusicDatabase', 'jeszcze go nie ma (do dodania)'),
+          _Field('MusicDatabase', l10n.songInfoNotYetInMusicDatabase),
       ],
     ]);
   }
@@ -1001,10 +1045,10 @@ String? _shown(_Kind? kind, Object? value) => switch (kind) {
   // A value the phone doesn't know yet counts as a song (SongKind.of), but is shown as it is.
   _Kind.songKind =>
     SongKind.of(value) == SongKind.fullAlbum
-        ? 'tak'
+        ? l10n.songInfoYes
         : _text(value) == null
-        ? 'nie'
-        : 'nie ($value)',
+        ? l10n.songInfoNo
+        : l10n.songInfoNoWithValue('$value'),
   _ => _text(value),
 };
 
@@ -1061,48 +1105,54 @@ String? _text(Object? value) => switch (value) {
   _ => '$value',
 };
 
-const _songLabels = {
-  'id': 'ID w MusicDatabase',
-  'artist_id': 'Wykonawca utworu',
-  'title': 'Tytuł',
-  'title_latin': 'Tytuł alfabetem łacińskim',
-  'covered_title': 'Tytuł oryginału',
-  'album': 'Album',
-  'year': 'Rok',
-  'language': 'Język',
-  'genre': 'Gatunek',
-  'kind': 'Cały album',
-  'track_number': 'Numer utworu',
-  'disc_number': 'Numer płyty',
+Map<String, String> get _songLabels => {
+  'id': l10n.songInfoLabelMusicDatabaseId,
+  'artist_id': l10n.songInfoLabelSongArtist,
+  'title': l10n.songInfoLabelTitle,
+  'title_latin': l10n.songInfoLabelTitleLatin,
+  'covered_title': l10n.songInfoLabelCoveredTitle,
+  'album': l10n.songInfoLabelAlbum,
+  'year': l10n.songInfoLabelYear,
+  'language': l10n.songInfoLabelLanguage,
+  'genre': l10n.songInfoLabelGenre,
+  'kind': l10n.songInfoLabelFullAlbum,
+  'track_number': l10n.songInfoLabelTrackNumber,
+  'disc_number': l10n.songInfoLabelDiscNumber,
 };
 
-const _artistLabels = {
+Map<String, String> get _artistLabels => {
   'id': 'ID',
-  'name': 'Nazwa',
-  'name_latin': 'Nazwa alfabetem łacińskim',
-  'origin': 'Pochodzenie',
-  'synonyms': 'Inne nazwy',
+  'name': l10n.songInfoLabelName,
+  'name_latin': l10n.songInfoLabelNameLatin,
+  'origin': l10n.songInfoLabelOrigin,
+  'synonyms': l10n.songInfoLabelSynonyms,
 };
 
-const _albumLabels = {
-  'id': 'ID albumu',
-  'title': 'Tytuł',
-  'title_latin': 'Tytuł alfabetem łacińskim',
-  'year': 'Rok',
-  'type': 'Rodzaj',
+Map<String, String> get _albumLabels => {
+  'id': l10n.songInfoLabelAlbumId,
+  'title': l10n.songInfoLabelTitle,
+  'title_latin': l10n.songInfoLabelTitleLatin,
+  'year': l10n.songInfoLabelYear,
+  'type': l10n.songInfoLabelAlbumType,
   'musicbrainz_release_group_id': 'MusicBrainz',
   'itunes_collection_id': 'iTunes',
   'deezer_album_id': 'Deezer',
   'spotify_album_id': 'Spotify',
 };
 
-const _albumTypes = {
-  'album': 'album',
-  'ep': 'EP',
-  'single': 'singiel',
-  'compilation': 'kompilacja',
-  'soundtrack': 'ścieżka dźwiękowa',
+Map<String, String> get _albumTypes => {
+  'album': l10n.songInfoAlbumTypeAlbum,
+  'ep': l10n.songInfoAlbumTypeEp,
+  'single': l10n.songInfoAlbumTypeSingle,
+  'compilation': l10n.songInfoAlbumTypeCompilation,
+  'soundtrack': l10n.songInfoAlbumTypeSoundtrack,
 };
+
+/// A correction of a field waiting for MusicDatabase or sent, with the value it gives.
+String _correctionNote(FieldCorrection correction, String value) =>
+    correction.sent
+    ? l10n.songInfoCorrectionSent(value)
+    : l10n.songInfoCorrectionWaiting(value);
 
 /// An option of a [SimpleDialog] with a line saying what it does.
 class _ChoiceOption extends StatelessWidget {
@@ -1227,9 +1277,7 @@ class _Field extends StatelessWidget {
       onTap: link == null ? null : () => _openLink(link!, player: player),
       onLongPress: () {
         Clipboard.setData(ClipboardData(text: value!));
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Skopiowano do schowka.')),
-        );
+        messenger.showSnackBar(SnackBar(content: Text(l10n.songInfoCopied)));
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1322,7 +1370,10 @@ class _Chips extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           if (names.isEmpty)
-            const Text('brak', style: TextStyle(fontSize: AppFontSize.small))
+            Text(
+              l10n.songInfoNone,
+              style: const TextStyle(fontSize: AppFontSize.small),
+            )
           else
             Wrap(
               spacing: 6,

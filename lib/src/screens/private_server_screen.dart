@@ -6,6 +6,7 @@ import '../data/server_trust.dart';
 import '../data/sync_sources.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../l10n.dart';
 
 /// "Synchronizacja › … › Prywatny serwer" (and Odtwarzanie › Źródła) — the addresses of the
 /// user's MusicDatabase server (remote, and local for the home Wi-Fi) and its certificate; one
@@ -65,7 +66,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
         _local.text.trim() != shown(sync.localUrl);
     if (!changed) return;
     if (_validate(_remote.text) != null || _validate(_local.text) != null) {
-      _noteAfterLeaving('Nie zapisano adresu serwera: jest nieprawidłowy');
+      _noteAfterLeaving(l10n.privateServerScreenInvalidNotSaved);
       return;
     }
     final remote = _remote.text;
@@ -75,7 +76,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
       await sync.setLocalUrl(local);
       if (sync.usesServer(SyncFeature.database)) await sync.syncNow();
     }();
-    _noteAfterLeaving('Zapisano adresy serwera');
+    _noteAfterLeaving(l10n.privateServerScreenAddressesSaved);
   }
 
   /// A note shown once this screen is gone: during dispose the tree is locked and the
@@ -122,8 +123,8 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
         SnackBar(
           content: Text(
             sync.localUrl != null
-                ? 'Zapisano. Wybierz jeszcze sieć Wi-Fi albo podaj adres zdalny.'
-                : 'Usunięto adresy — telefon nie łączy się z prywatnym serwerem',
+                ? l10n.privateServerScreenSavedPickWifi
+                : l10n.privateServerScreenAddressesRemoved,
           ),
         ),
       );
@@ -132,7 +133,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
     if (!await _confirmCertificates([sync.remoteUrl, sync.localUrl])) return;
     if (!sync.usesServer(SyncFeature.database)) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Zapisano adresy serwera')),
+        SnackBar(content: Text(l10n.privateServerScreenAddressesSaved)),
       );
       return;
     }
@@ -141,7 +142,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
     final ok = await sync.syncNow();
     if (ok) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Pobrano bazę danych')),
+        SnackBar(content: Text(l10n.privateServerScreenDatabaseDownloaded)),
       );
     }
   }
@@ -157,10 +158,10 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
       final permission = await Permission.locationWhenInUse.request();
       if (!permission.isGranted) {
         say(
-          'Bez dostępu do lokalizacji Android nie podaje nazwy sieci Wi-Fi.',
+          l10n.privateServerScreenNoLocationPermission,
           action: permission.isPermanentlyDenied
-              ? const SnackBarAction(
-                  label: 'Ustawienia',
+              ? SnackBarAction(
+                  label: l10n.privateServerScreenSettingsAction,
                   onPressed: openAppSettings,
                 )
               : null,
@@ -169,9 +170,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
       }
       final ssid = await sync.currentWifiName();
       if (ssid == null) {
-        say(
-          'Nie wykryto sieci Wi-Fi. Połącz się z Wi-Fi i włącz lokalizację w telefonie.',
-        );
+        say(l10n.privateServerScreenNoWifi);
         return;
       }
       await sync.setLocalWifi(ssid);
@@ -179,15 +178,15 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
       if (mounted) setState(() => _searchingServer = true);
       final server = await sync.discoverLocalServer();
       if (server == null) {
-        say(
-          'Zapisano sieć „$ssid”, ale nie znaleziono w niej serwera bazy danych. '
-          'Wpisz adres sieci lokalnej ręcznie.',
-        );
+        say(l10n.privateServerScreenWifiSavedNoServer(ssid));
         return;
       }
       if (!await _confirmCertificates([server])) {
         say(
-          'Zapisano sieć „$ssid”. Nie zapisano serwera $server — certyfikat odrzucony.',
+          l10n.privateServerScreenWifiSavedCertRejected(
+            ssid,
+            server.toString(),
+          ),
         );
         return;
       }
@@ -198,7 +197,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
           _localError = null;
         });
       }
-      say('Zapisano sieć „$ssid” i adres serwera $server');
+      say(l10n.privateServerScreenWifiAndServerSaved(ssid, server.toString()));
     } finally {
       if (mounted) {
         setState(() {
@@ -233,19 +232,16 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
     final sure = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Zapomnieć certyfikat serwera?'),
-        content: const Text(
-          'Przy następnym zapisaniu adresów telefon znów pokaże kod certyfikatu do '
-          'porównania. Do tego czasu połączenia z serwerem przez HTTPS nie będą działać.',
-        ),
+        title: Text(l10n.privateServerScreenForgetCertTitle),
+        content: Text(l10n.privateServerScreenForgetCertText),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Anuluj'),
+            child: Text(l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Zapomnij'),
+            child: Text(l10n.privateServerScreenForget),
           ),
         ],
       ),
@@ -295,28 +291,26 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Prywatny serwer'),
+        title: Text(l10n.privateServerScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SectionTitle('Adres serwera (połączenie zdalne)'),
+          SectionTitle(l10n.privateServerScreenRemoteAddress),
           _addressField(
             key: PrivateServerScreen.remoteFieldKey,
             controller: _remote,
             hint: 'https://serwer:8002/',
-            helper:
-                'Używany poza siecią lokalną. Pobierane są pliki '
-                'music.db, tag.db i files.db (lokalizacja plików na serwerze).',
+            helper: l10n.privateServerScreenRemoteAddressHelp,
             error: _remoteError,
             onSubmitted: () => _save(sync),
           ),
-          const SectionTitle('Adres serwera (sieć lokalna)'),
+          SectionTitle(l10n.privateServerScreenLocalAddress),
           _addressField(
             key: PrivateServerScreen.localFieldKey,
             controller: _local,
             hint: 'https://192.168.x.x:8002/',
-            helper: 'Używany, gdy telefon jest w sieci Wi-Fi wybranej poniżej.',
+            helper: l10n.privateServerScreenLocalAddressHelp,
             error: _localError,
             onSubmitted: () => _save(sync),
           ),
@@ -330,40 +324,37 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               onPressed: sync.downloading ? null : () => _save(sync),
-              child: const Text(
-                'Zapisz adresy',
+              child: Text(
+                l10n.privateServerScreenSaveAddresses,
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ),
           if (ServerTrust.instance.hasPins) ...[
-            const SectionTitle('Certyfikat serwera'),
+            SectionTitle(l10n.privateServerScreenCertificate),
             ListTile(
               leading: const Icon(Icons.verified_user_outlined),
-              title: const Text('Zaufany certyfikat zapamiętany'),
-              subtitle: const Text(
-                'Telefon łączy się przez HTTPS tylko z serwerem, którego kod potwierdzono. '
-                'Gdy serwer dostał nowy certyfikat, zapomnij stary i zapisz adresy ponownie.',
-              ),
+              title: Text(l10n.privateServerScreenCertificateTrusted),
+              subtitle: Text(l10n.privateServerScreenCertificateHelp),
               trailing: TextButton(
                 onPressed: _forgetCertificates,
-                child: const Text('Zapomnij'),
+                child: Text(l10n.privateServerScreenForget),
               ),
             ),
           ],
-          const SectionTitle('Wi-Fi sieci lokalnej'),
+          SectionTitle(l10n.privateServerScreenLocalWifi),
           ListTile(
             leading: Icon(wifi == null ? Icons.wifi_off : Icons.wifi),
-            title: Text(wifi ?? 'Nie wybrano'),
+            title: Text(wifi ?? l10n.privateServerScreenNoWifiPicked),
             subtitle: Text(
               wifi == null
-                  ? 'Bez wybranej sieci używany jest tylko adres zdalny.'
-                  : 'W tej sieci telefon łączy się z adresem sieci lokalnej.',
+                  ? l10n.privateServerScreenNoWifiPickedHelp
+                  : l10n.privateServerScreenWifiPickedHelp,
             ),
             trailing: wifi == null
                 ? null
                 : IconButton(
-                    tooltip: 'Usuń sieć',
+                    tooltip: l10n.privateServerScreenRemoveWifi,
                     icon: Icon(Icons.close, color: palette.textSecondary),
                     onPressed: () => sync.setLocalWifi(null),
                   ),
@@ -371,9 +362,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
-              'Przycisk poniżej zapisuje bieżącą sieć Wi-Fi i wyszukuje w niej serwer bazy '
-              '(na tym samym porcie co adres zdalny), a znaleziony adres wpisuje jako adres '
-              'sieci lokalnej.',
+              l10n.privateServerScreenUseCurrentHelp,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -399,8 +388,8 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
                   : const Icon(Icons.wifi_find),
               label: Text(
                 _searchingServer
-                    ? 'Szukam serwera w sieci lokalnej…'
-                    : 'Użyj bieżącego połączenia',
+                    ? l10n.privateServerScreenSearchingServer
+                    : l10n.privateServerScreenUseCurrent,
               ),
               onPressed: _readingWifi ? null : () => _useCurrentWifi(sync),
             ),
@@ -408,11 +397,7 @@ class _PrivateServerScreenState extends State<PrivateServerScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Text(
-              'W wybranej sieci Wi-Fi telefon łączy się z adresem sieci lokalnej (a gdy ten nie '
-              'odpowiada — z adresem zdalnym), poza nią z adresem zdalnym. Rozpoznanie sieci '
-              'wymaga dostępu do lokalizacji i włączonej lokalizacji w telefonie. Z czym się '
-              'synchronizuje, ustawisz w Synchronizacja — osobno dla bazy danych, biblioteki i '
-              'próśb do bazy.',
+              l10n.privateServerScreenExplanation,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -436,12 +421,12 @@ Future<bool> confirmServerCertificate(
   final yes = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Czy to Twój serwer?'),
+      title: Text(l10n.privateServerScreenConfirmCertTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Serwer ${url.host}:${url.port} pokazuje certyfikat o kodzie:'),
+          Text(l10n.privateServerScreenConfirmCertCode(url.host, url.port)),
           const SizedBox(height: 12),
           SelectableText(
             code,
@@ -454,9 +439,7 @@ Future<bool> confirmServerCertificate(
           ),
           const SizedBox(height: 12),
           Text(
-            'Porównaj go z kodem, który pokazuje MusicDatabase (serwer wypisuje go przy '
-            'starcie). Potwierdź tylko, gdy oba są takie same — inny kod może oznaczać, że '
-            'ktoś podszywa się pod serwer.',
+            l10n.privateServerScreenConfirmCertHelp,
             style: TextStyle(color: palette.textSecondary),
           ),
         ],
@@ -464,11 +447,11 @@ Future<bool> confirmServerCertificate(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
-          child: const Text('Nie, odrzuć'),
+          child: Text(l10n.privateServerScreenReject),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, true),
-          child: const Text('Tak, to mój serwer'),
+          child: Text(l10n.privateServerScreenAccept),
         ),
       ],
     ),

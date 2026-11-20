@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
 import '../theme.dart';
+import '../l10n.dart';
 
 /// Filter icon that opens the "Szukaj w" sheet; shows a dot while the selection differs from
 /// the defaults (Tytuł, Wykonawca, Album, Nastrój, playlists and albums searched).
@@ -18,7 +19,7 @@ class SearchFieldsButton extends StatelessWidget {
         !SourceSettingsScope.of(context).playlistSearch ||
         !SourceSettingsScope.of(context).albumSearch;
     return IconButton(
-      tooltip: 'Filtry wyszukiwania',
+      tooltip: l10n.searchFieldsSheetTitle,
       icon: Badge(
         isLabelVisible: customised,
         smallSize: 8,
@@ -62,9 +63,9 @@ class _SearchFieldsSheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 0, 8, 0),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Szukaj w',
+                    l10n.searchFieldsSheetSearchIn,
                     style: TextStyle(
                       fontSize: AppFontSize.emphasis,
                       fontWeight: FontWeight.bold,
@@ -77,7 +78,7 @@ class _SearchFieldsSheet extends StatelessWidget {
                     catalog.setSearchFields(SearchField.defaults);
                     settings.setPlaylistSearch(true);
                   },
-                  child: const Text('Przywróć domyślne'),
+                  child: Text(l10n.searchFieldsSheetRestoreDefaults),
                 ),
               ],
             ),
@@ -85,7 +86,7 @@ class _SearchFieldsSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text(
-              'Każde wpisane słowo musi wystąpić w którymś z zaznaczonych pól.',
+              l10n.searchFieldsSheetHelp,
               style: TextStyle(color: palette.textSecondary),
             ),
           ),
@@ -94,13 +95,11 @@ class _SearchFieldsSheet extends StatelessWidget {
               contentPadding: const EdgeInsets.symmetric(horizontal: 20),
               title: Text(field.label),
               subtitle: switch (field) {
-                SearchField.artist => const Text(
-                  'Także dodatkowi wykonawcy i inne nazwy wykonawców',
+                SearchField.artist => Text(l10n.searchFieldsSheetArtistHelp),
+                SearchField.language => Text(
+                  l10n.searchFieldsSheetLanguageHelp,
                 ),
-                SearchField.language => const Text('np. Polish, English'),
-                SearchField.mood => const Text(
-                  'Nazwa nastroju pokazuje wszystkie jego utwory',
-                ),
+                SearchField.mood => Text(l10n.searchFieldsSheetMoodHelp),
                 _ => null,
               },
               value: selected.contains(field),
@@ -116,19 +115,15 @@ class _SearchFieldsSheet extends StatelessWidget {
           const Divider(),
           SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-            title: const Text('Wyszukuj playlisty'),
-            subtitle: const Text(
-              'W Bibliotece, a przyciskiem wyszukiwania także na YouTube i Spotify',
-            ),
+            title: Text(l10n.searchFieldsSheetSearchPlaylists),
+            subtitle: Text(l10n.searchFieldsSheetSearchPlaylistsHelp),
             value: settings.playlistSearch,
             onChanged: settings.setPlaylistSearch,
           ),
           SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-            title: const Text('Wyszukuj albumy'),
-            subtitle: const Text(
-              'Albumy, których nazwa pasuje do wpisanych słów',
-            ),
+            title: Text(l10n.searchFieldsSheetSearchAlbums),
+            subtitle: Text(l10n.searchFieldsSheetSearchAlbumsHelp),
             value: settings.albumSearch,
             onChanged: settings.setAlbumSearch,
           ),

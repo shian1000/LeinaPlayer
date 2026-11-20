@@ -12,6 +12,7 @@ import '../data/local_library.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -123,14 +124,14 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
       appBar: AppBar(
         backgroundColor: palette.background,
         centerTitle: true,
-        title: const Text('Statystyki słuchania'),
+        title: Text(l10n.listeningStatsScreenTitle),
       ),
       body: SongSelectionArea(
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
             if (highlights.isNotEmpty) ...[
-              const SectionTitle('Ten tydzień'),
+              SectionTitle(l10n.listeningStatsScreenThisWeek),
               _HighlightRow(
                 highlights: highlights,
                 hitOf: (s) => _hitOf(context, s),
@@ -138,7 +139,7 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
               const SizedBox(height: 8),
             ],
             if (summaries.isNotEmpty) ...[
-              const SectionTitle('Podsumowania'),
+              SectionTitle(l10n.listeningStatsScreenSummaries),
               _SummaryRow(
                 periods: summaries,
                 onOpen: (period) => ListeningSummaryScreen.open(
@@ -173,9 +174,7 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
                 child: Text(
-                  'Nic jeszcze nie przesłuchano w tym okresie.\n\n'
-                  'Statystyki liczą się od wersji aplikacji, która je zapisuje: każdy utwór '
-                  'z tym, ile go naprawdę słuchano.',
+                  l10n.listeningStatsScreenEmpty,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.textSecondary),
                 ),
@@ -194,18 +193,20 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
     final shown = _allSongs
         ? hits.length
         : ListeningStatsScreen.shortList.clamp(0, hits.length);
-    final queueName = 'Najczęściej słuchane: ${_period.label.toLowerCase()}';
+    final queueName = l10n.listeningStatsScreenQueueName(
+      _period.label.toLowerCase(),
+    );
     return [
       _Summary(stats: stats, period: _period),
       SectionTitle(
-        'Utwory',
+        l10n.listeningStatsScreenSongs,
         trailing: TextButton(
           onPressed: () => runQueueAction(
             context,
             (onStatus) => PlaybackQueueScope.of(context)
                 .start(hits, 0, playlistName: queueName, onStatus: onStatus),
           ),
-          child: const Text('Odtwórz'),
+          child: Text(l10n.commonPlay),
         ),
       ),
       for (var i = 0; i < shown; i++)
@@ -238,11 +239,15 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
         Center(
           child: TextButton(
             onPressed: () => setState(() => _allSongs = !_allSongs),
-            child: Text(_allSongs ? 'Pokaż mniej' : 'Pokaż więcej'),
+            child: Text(
+              _allSongs
+                  ? l10n.listeningStatsScreenShowLess
+                  : l10n.listeningStatsScreenShowMore,
+            ),
           ),
         ),
       if (stats.artists.isNotEmpty) ...[
-        const SectionTitle('Wykonawcy'),
+        SectionTitle(l10n.listeningStatsScreenArtists),
         _CoverRow(
           entries: stats.artists.take(10).toList(),
           round: true,
@@ -251,7 +256,7 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
         ),
       ],
       if (stats.albums.isNotEmpty) ...[
-        const SectionTitle('Albumy'),
+        SectionTitle(l10n.listeningStatsScreenAlbums),
         _CoverRow(
           entries: stats.albums.take(10).toList(),
           round: false,
@@ -259,12 +264,12 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
           onTap: (e) => openAlbumSongs(context, e.name),
         ),
       ],
-      const SectionTitle('Pory dnia'),
+      SectionTitle(l10n.listeningStatsScreenTimesOfDay),
       HourChart(hours: stats.hours),
       for (final (title, entries) in [
-        ('Dekady', stats.decades),
-        ('Języki', stats.languages),
-        ('Kraje wykonawców', stats.countries),
+        (l10n.listeningStatsScreenDecades, stats.decades),
+        (l10n.listeningStatsScreenLanguages, stats.languages),
+        (l10n.listeningStatsScreenCountries, stats.countries),
       ])
         if (entries.isNotEmpty) ...[
           SectionTitle(title),
@@ -275,15 +280,15 @@ class _ListeningStatsScreenState extends State<ListeningStatsScreen> {
             total: stats.listened,
           ),
         ],
-      const SectionTitle('Skąd grało'),
+      SectionTitle(l10n.listeningStatsScreenSources),
       _Shares(
         shares: [
           for (final source in ListenSource.values)
             if (stats.sources[source] case final time?)
               (
                 name: switch (source) {
-                  ListenSource.phone => 'Pliki na telefonie',
-                  ListenSource.server => 'Serwer MusicDatabase',
+                  ListenSource.phone => l10n.listeningStatsScreenSourcePhone,
+                  ListenSource.server => l10n.listeningStatsScreenSourceServer,
                   ListenSource.youtube => 'YouTube',
                 },
                 time: time,
@@ -315,7 +320,7 @@ SearchHit hitOfStatsSong(BuildContext context, StatsSong song) => resolveTrack(
 
 /// "12 odtw. • 45 min" — short, after the artist in a song row.
 String _playsAndTime(int plays, Duration listened) =>
-    '$plays odtw. • ${minutesLabel(listened)}';
+    l10n.listeningStatsScreenPlaysAndTime(plays, minutesLabel(listened));
 
 /// The big number: minutes listened, with plays, songs and artists under it.
 class _Summary extends StatelessWidget {
@@ -343,7 +348,7 @@ class _Summary extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '$minutes ${pluralWord(minutes, 'minuta', 'minuty', 'minut')}',
+                l10n.listeningStatsScreenMinutes(minutes),
                 style: TextStyle(
                   fontSize: AppFontSize.hero,
                   fontWeight: FontWeight.bold,
@@ -353,9 +358,9 @@ class _Summary extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 [
-                  '${stats.plays} ${pluralWord(stats.plays, 'odtworzenie', 'odtworzenia', 'odtworzeń')}',
-                  '$songs ${songsWord(songs)}',
-                  '$artists ${pluralWord(artists, 'wykonawca', 'wykonawców', 'wykonawców')}',
+                  l10n.listeningStatsScreenPlays(stats.plays),
+                  l10n.songsCount(songs),
+                  l10n.listeningStatsScreenArtistCount(artists),
                 ].join(' • '),
                 style: const TextStyle(fontSize: AppFontSize.body),
               ),
@@ -363,9 +368,10 @@ class _Summary extends StatelessWidget {
               if (first != null && (from == null || first.isAfter(from))) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Liczone od ${dayMonthLabel(first, year: true)}. '
-                  'Odtworzenie liczy się od '
-                  '${ListeningStats.playThreshold.inSeconds} s słuchania.',
+                  l10n.listeningStatsScreenCountedFrom(
+                    dayMonthLabel(first, year: true),
+                    ListeningStats.playThreshold.inSeconds,
+                  ),
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     color: palette.textSecondary,
@@ -456,7 +462,7 @@ class _CoverRow extends StatelessWidget {
   }
 
   static String _playsOf(StatsEntry e) =>
-      '${e.plays} ${pluralWord(e.plays, 'odtworzenie', 'odtworzenia', 'odtworzeń')}';
+      l10n.listeningStatsScreenPlays(e.plays);
 }
 
 /// Shares of the listened time: a name, its share as a bar and a percentage.
@@ -557,42 +563,45 @@ class _HighlightRow extends StatelessWidget {
               : h.artist!;
           final songLine = hit == null
               ? ''
-              : '„${hit.shownTitle(context)}” • ${hit.shownArtist(context)}';
+              : l10n.listeningStatsScreenSongLine(
+                  hit.shownTitle(context),
+                  hit.shownArtist(context),
+                );
           final (icon, title, detail) = switch (h.kind) {
             HighlightKind.hours => (
               Icons.schedule,
-              '${h.count} ${pluralWord(h.count, 'godzina', 'godziny', 'godzin')} słuchania',
-              'Tyle już razem w statystykach',
+              l10n.listeningStatsScreenHoursListened(h.count),
+              l10n.listeningStatsScreenHoursListenedDetail,
             ),
             HighlightKind.songMilestone => (
               Icons.emoji_events_outlined,
-              '${h.count}. odtworzenie',
+              l10n.listeningStatsScreenNthPlay(h.count),
               songLine,
             ),
             HighlightKind.artistMilestone => (
               Icons.emoji_events_outlined,
-              '${h.count} odtworzeń',
+              l10n.listeningStatsScreenPlays(h.count),
               artist!,
             ),
             HighlightKind.discovery => (
               Icons.explore_outlined,
-              'Nowe odkrycie',
-              '$artist • ${h.count} odtw. w tym tygodniu',
+              l10n.listeningStatsScreenDiscovery,
+              l10n.listeningStatsScreenDiscoveryDetail(artist ?? '', h.count),
             ),
             HighlightKind.comeback => (
               Icons.replay,
-              'Powrót ${_after(h.gap!)}',
+              _comeback(h.gap!),
               songLine,
             ),
             HighlightKind.songOfWeek => (
               Icons.star_outline,
-              'Utwór tygodnia',
-              '$songLine • ${h.count} odtw.',
+              l10n.listeningStatsScreenSongOfWeek,
+              l10n.listeningStatsScreenSongOfWeekDetail(songLine, h.count),
             ),
             HighlightKind.onRepeat => (
               Icons.repeat,
-              'Na zapętleniu',
-              '$songLine • ${h.count} razy jednego dnia',
+              l10n.listeningStatsScreenOnRepeat,
+              l10n.listeningStatsScreenOnRepeatDetail(songLine, h.count),
             ),
           };
           final byArtist =
@@ -674,15 +683,13 @@ class _HighlightRow extends StatelessWidget {
     );
   }
 
-  /// "po 4 miesiącach", "po roku", "po 2 latach".
-  static String _after(Duration gap) {
+  /// "Powrót po 4 miesiącach", "Powrót po roku", "Powrót po 2 latach".
+  static String _comeback(Duration gap) {
     final days = gap.inDays;
     if (days >= 365) {
-      final years = days ~/ 365;
-      return years == 1 ? 'po roku' : 'po $years latach';
+      return l10n.listeningStatsScreenComebackYears(days ~/ 365);
     }
-    final months = days ~/ 30;
-    return months == 1 ? 'po miesiącu' : 'po $months miesiącach';
+    return l10n.listeningStatsScreenComebackMonths(days ~/ 30);
   }
 }
 
@@ -732,7 +739,9 @@ class _SummaryRow extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        period.inProgress(now) ? 'Trwa' : 'Zobacz',
+                        period.inProgress(now)
+                            ? l10n.listeningStatsScreenInProgress
+                            : l10n.listeningStatsScreenSee,
                         style: const TextStyle(fontSize: AppFontSize.small),
                       ),
                     ],

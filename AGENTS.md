@@ -10,8 +10,9 @@ library / metadata enrichment tool. MusicDatabase today is a Python terminal app
 SQLite database and enrichment from MusicBrainz, Wikipedia, iTunes, and Genius.
 
 This app is a Flutter client, targeting Android first, with iOS support kept buildable.
-Everything on GitHub (README, PRIVACY.md, docs) is in English; the app's UI is Polish (user's
-rule). The public README doesn't mention playing audio from YouTube or name the YouTube
+Everything on GitHub (README, PRIVACY.md, docs) is in English; the app's UI is written in Polish
+(user's rule) and translated (Ustawienia › Wygląd › Język, default the phone's language —
+[`localization.md`](docs/agent-notes/localization.md)). The public README doesn't mention playing audio from YouTube or name the YouTube
 libraries (user's choice; the add-ons, sharing checklist 8.3, will document them). It is for
 private use only and is never published in an app store; the app is GPLv3
 ([ADR 0004](docs/decisions/0004-license-and-distribution.md)). It uses MusicDatabase's data and
@@ -251,8 +252,8 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   jako następny" for a whole list of songs, for any new list's menu; `QueueToast` — the short note above the mini player after
   adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player (also from a song's menu, `showSongInfoSheet`); `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
-  collage); `color_picker.dart`; `TextInputDialog`, `pluralWord` (Polish plurals) and
-  `dayMonthLabel` in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
+  collage); `color_picker.dart`; `TextInputDialog` and
+  `dayMonthLabel` (in the app's language) in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
   `ScrollingText` — a text that slides when it does not fit; `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `update_dialog.dart` — "Dostępna nowa wersja"; `feature_info.dart` — the long-press explanation sheet (`showFeatureInfo`, texts in `screens/feature_infos.dart`); `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files from a server or GitHub (`database_sync.dart`), each synced function's sources and their order (`sync_sources.dart`), reading
@@ -354,6 +355,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Lists sorted by a name (playlists, folders, moods, artists, track titles) use `compareNames`
   (`text_normalizer.dart`): numbers by value, so "2. Telefon" comes before "10. Pidvalia" —
   not `normalizeForSearch(a).compareTo(…)` (user's request; numbered names are common there).
+- Screens never hard-code a text: it is a key in `lib/l10n/app_pl.arb` (Polish, the template)
+  read through the global `l10n` (`lib/src/l10n.dart`), with its translations in the same change
+  where they exist; a value that is also stored or matched (`SongRequest.unknownArtist`) stays
+  Polish and is mapped for display ([`localization.md`](docs/agent-notes/localization.md)).
 - Screens never hard-code colours or font sizes: `context.palette` and `AppFontSize`
   ([`theming.md`](docs/agent-notes/theming.md), [`ui-sizing.md`](docs/agent-notes/ui-sizing.md)).
 - System Back in `AppShell` pops tab routes directly (bypassing their `PopScope`), so a pushed
@@ -565,6 +570,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `android/key.properties`), why it must never change, its SHA-1 in Google Cloud.
 - [`releases.md`](docs/agent-notes/releases.md) — making a GitHub release (tag `<version>+<build>`)
   and the app's update check (`tool/release.env`, once a day, dialog, APK via the browser).
+- [`localization.md`](docs/agent-notes/localization.md) — the UI's languages: ARB files, the
+  global `l10n`, key naming, plurals, what stays untranslated, the Kotlin side.
 - [`ui-sizing.md`](docs/agent-notes/ui-sizing.md) — font sizes/spacing are calibrated against the
   reference app; why there's no screen-size scaling.
 

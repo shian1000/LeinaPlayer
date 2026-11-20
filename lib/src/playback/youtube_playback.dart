@@ -7,6 +7,7 @@ import '../data/incoming_links.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import 'player_controller.dart';
 
 /// How a YouTube video ended up being played.
@@ -134,7 +135,7 @@ class YouTubePlayback {
             if (player.playing) await player.togglePlay();
             return YouTubePlayedVia.youtubeApp;
           }
-          errors.add('aplikacja YouTube: nie udało się otworzyć');
+          errors.add(l10n.youtubePlaybackAppFailed);
         case YouTubePlaybackMethod.newPipe ||
             YouTubePlaybackMethod.explode ||
             YouTubePlaybackMethod.ytDlpServer:
@@ -163,14 +164,15 @@ class YouTubePlayback {
               }
               if (attempt == 2) {
                 errors.add(
-                  player.lastError ?? '${method.label}: błąd odtwarzania',
+                  player.lastError ??
+                      l10n.youtubePlaybackMethodFailed(method.label),
                 );
               }
             } on YouTubeAudioException catch (e) {
               // Gone for every method — and not worth opening in the YouTube app either.
               if (e.gone) {
-                throw const YouTubePlaybackException(
-                  'Tego filmu nie ma już na YouTube.',
+                throw YouTubePlaybackException(
+                  l10n.youtubePlaybackVideoGone,
                   gone: true,
                 );
               }
@@ -183,9 +185,8 @@ class YouTubePlayback {
     }
     throw YouTubePlaybackException(
       errors.isEmpty
-          ? 'Brak włączonego sposobu odtwarzania z YouTube '
-                '(Ustawienia › Odtwarzanie › Źródła › YouTube).'
-          : 'Nie udało się odtworzyć z YouTube (${errors.join('; ')}).',
+          ? l10n.youtubePlaybackNoMethod
+          : l10n.youtubePlaybackFailed(errors.join('; ')),
       offline: offline,
     );
   }

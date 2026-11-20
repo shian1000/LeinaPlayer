@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/play_history.dart';
+import '../l10n.dart';
 import '../theme.dart';
 
 /// "Ustawienia › Historia odtwarzania": how long "Ostatnie" keeps plays, and clearing it.
@@ -14,28 +15,27 @@ class HistorySettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Historia odtwarzania'),
+        title: Text(l10n.historySettingsScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(top: 12),
         children: [
           ListTile(
             leading: const Icon(Icons.timer_outlined),
-            title: const Text('Przechowuj historię'),
+            title: Text(l10n.historySettingsScreenKeep),
             subtitle: Text(keepDaysLabel(history.keepDays)),
             onTap: () => _pickKeepDays(context, history),
           ),
           ListTile(
             enabled: history.entries.isNotEmpty,
             leading: const Icon(Icons.delete_outline),
-            title: const Text('Wyczyść historię'),
+            title: Text(l10n.historySettingsScreenClear),
             onTap: () => confirmClearHistory(context),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
-              'Historia to lista „Ostatnie” w menu profilu. Starsze odtworzenia są '
-              'usuwane same.',
+              l10n.historySettingsScreenNote,
               style: TextStyle(
                 color: palette.textSecondary,
                 fontSize: AppFontSize.small,
@@ -51,7 +51,7 @@ class HistorySettingsScreen extends StatelessWidget {
     final days = await showDialog<int>(
       context: context,
       builder: (dialogContext) => SimpleDialog(
-        title: const Text('Przechowuj historię'),
+        title: Text(l10n.historySettingsScreenKeep),
         children: [
           for (final choice in PlayHistory.keepDaysChoices)
             ListTile(
@@ -70,9 +70,9 @@ class HistorySettingsScreen extends StatelessWidget {
 
 /// "7 dni", "rok", "bez limitu".
 String keepDaysLabel(int days) => switch (days) {
-  0 => 'Bez limitu',
-  365 => 'Rok',
-  _ => '$days dni',
+  0 => l10n.historySettingsScreenNoLimit,
+  365 => l10n.historySettingsScreenYear,
+  _ => l10n.historySettingsScreenDays(days),
 };
 
 /// Asks, then empties "Ostatnie".
@@ -81,19 +81,16 @@ Future<void> confirmClearHistory(BuildContext context) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Wyczyścić historię?'),
-      content: const Text(
-        'Lista „Ostatnie” zostanie opróżniona. Playlisty, kolejka i pamięć podręczna '
-        'zostają.',
-      ),
+      title: Text(l10n.historySettingsScreenClearTitle),
+      content: Text(l10n.historySettingsScreenClearBody),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Anuluj'),
+          child: Text(l10n.commonCancel),
         ),
         TextButton(
           onPressed: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Wyczyść'),
+          child: Text(l10n.historySettingsScreenClearButton),
         ),
       ],
     ),

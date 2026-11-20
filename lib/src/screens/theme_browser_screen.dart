@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/network_errors.dart';
+import '../l10n.dart';
 import '../data/theme_repository.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
@@ -41,8 +42,8 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
   }
 
   static String _message(Object error) => isNetworkError(error)
-      ? 'Nie udało się połączyć z GitHubem.'
-      : 'Nie udało się odczytać listy motywów.';
+      ? l10n.themeBrowserScreenNoConnection
+      : l10n.themeBrowserScreenListFailed;
 
   Future<void> _install(ThemeListing listing) async {
     final controller = ThemeScope.of(context);
@@ -53,9 +54,9 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
       messenger.showSnackBar(
         SnackBar(
           persist: false,
-          content: Text('Pobrano motyw ${listing.name}'),
+          content: Text(l10n.themeBrowserScreenDownloaded(listing.name)),
           action: SnackBarAction(
-            label: 'Użyj',
+            label: l10n.themeBrowserScreenUse,
             onPressed: () => theme.brightness == Brightness.dark
                 ? controller.setDark(theme)
                 : controller.setLight(theme),
@@ -68,8 +69,8 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
         SnackBar(
           content: Text(
             isNetworkError(e)
-                ? 'Nie udało się połączyć z GitHubem.'
-                : 'Nie udało się pobrać motywu.',
+                ? l10n.themeBrowserScreenNoConnection
+                : l10n.themeBrowserScreenDownloadFailed,
           ),
         ),
       );
@@ -88,7 +89,7 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
     final installed = controller.downloadedVersion(listing.id);
     if (installed == null) {
       return IconButton(
-        tooltip: 'Pobierz',
+        tooltip: l10n.themeBrowserScreenDownload,
         icon: const Icon(Icons.download_outlined),
         onPressed: () => _install(listing),
       );
@@ -98,12 +99,12 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
       children: [
         if (installed < listing.version)
           IconButton(
-            tooltip: 'Aktualizuj',
+            tooltip: l10n.themeBrowserScreenUpdate,
             icon: const Icon(Icons.update),
             onPressed: () => _install(listing),
           ),
         IconButton(
-          tooltip: 'Usuń',
+          tooltip: l10n.commonDelete,
           icon: const Icon(Icons.delete_outline),
           onPressed: () => controller.remove(listing.id),
         ),
@@ -119,7 +120,7 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Pobierz motyw'),
+        title: Text(l10n.themeBrowserScreenTitle),
       ),
       body: switch ((listings, _error)) {
         (_, final String error) => Center(
@@ -128,17 +129,14 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
             children: [
               Text(error, style: TextStyle(color: palette.textSecondary)),
               const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _load,
-                child: const Text('Spróbuj ponownie'),
-              ),
+              FilledButton(onPressed: _load, child: Text(l10n.commonRetry)),
             ],
           ),
         ),
         (null, _) => const Center(child: CircularProgressIndicator()),
         (final List<ThemeListing> items, _) when items.isEmpty => Center(
           child: Text(
-            'Brak motywów do pobrania.',
+            l10n.themeBrowserScreenNoThemes,
             style: TextStyle(color: palette.textSecondary),
           ),
         ),
@@ -151,7 +149,9 @@ class _ThemeBrowserScreenState extends State<ThemeBrowserScreen> {
                 title: ScrollingText(listing.name),
                 subtitle: ScrollingText(
                   [
-                    listing.brightness == Brightness.dark ? 'Ciemny' : 'Jasny',
+                    listing.brightness == Brightness.dark
+                        ? l10n.themeBrowserScreenDark
+                        : l10n.themeBrowserScreenLight,
                     if (listing.author.isNotEmpty) listing.author,
                   ].join(' · '),
                 ),

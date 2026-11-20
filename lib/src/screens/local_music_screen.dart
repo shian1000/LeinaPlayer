@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../data/local_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../data/album_covers.dart';
@@ -27,12 +28,10 @@ class LocalMusicScreen extends StatelessWidget {
     if (statuses.values.any((s) => s.isGranted || s.isLimited)) return true;
     messenger.showSnackBar(
       SnackBar(
-        content: const Text(
-          'Bez dostępu do plików muzycznych nie da się ich skanować.',
-        ),
+        content: Text(l10n.localMusicScreenNoAccess),
         action: statuses.values.any((s) => s.isPermanentlyDenied)
-            ? const SnackBarAction(
-                label: 'Ustawienia',
+            ? SnackBarAction(
+                label: l10n.localMusicScreenSettings,
                 onPressed: openAppSettings,
               )
             : null,
@@ -45,24 +44,21 @@ class LocalMusicScreen extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     if (!await _ensureAudioAccess(messenger)) return;
     final path = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Wybierz folder z muzyką',
+      dialogTitle: l10n.localMusicScreenPickFolder,
     );
     if (path == null) return;
     if (path == '/') {
-      _say(
-        messenger,
-        'Tego folderu nie da się odczytać. Wybierz folder w pamięci telefonu.',
-      );
+      _say(messenger, l10n.localMusicScreenUnreadableFolder);
       return;
     }
     await library.addFolder(path);
-    _say(messenger, 'Dodano folder $path');
+    _say(messenger, l10n.localMusicScreenFolderAdded(path));
   }
 
   Future<void> _scan(BuildContext context, LocalLibrary library) async {
     final messenger = ScaffoldMessenger.of(context);
     if (library.folders.isEmpty) {
-      _say(messenger, 'Najpierw dodaj folder z muzyką.');
+      _say(messenger, l10n.localMusicScreenAddFolderFirst);
       return;
     }
     if (!await _ensureAudioAccess(messenger)) return;
@@ -70,10 +66,10 @@ class LocalMusicScreen extends StatelessWidget {
     _say(
       messenger,
       [
-        'Skanowanie zakończone: nowe pliki ${result.added}, '
-            'w tym spoza bazy danych ${result.newPending}.',
-        if (result.removed > 0) 'Usunięte z listy: ${result.removed}.',
-        if (!result.mainDatabaseAvailable) 'Brak pobranej bazy danych — nie dało się sprawdzić, które są w bazie.',
+        l10n.localMusicScreenScanDone(result.added, result.newPending),
+        if (result.removed > 0)
+          l10n.localMusicScreenScanRemoved(result.removed),
+        if (!result.mainDatabaseAvailable) l10n.localMusicScreenScanNoDatabase,
       ].join(' '),
     );
   }
@@ -87,19 +83,19 @@ class LocalMusicScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Muzyka na telefonie'),
+        title: Text(l10n.localMusicScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SectionTitle('Foldery do skanowania'),
+          SectionTitle(l10n.localMusicScreenFolders),
           if (library.folders.isEmpty)
             ListTile(
               leading: Icon(
                 Icons.folder_off_outlined,
                 color: palette.textSecondary,
               ),
-              title: const Text('Nie dodano folderów'),
+              title: Text(l10n.localMusicScreenNoFolders),
             ),
           for (final folder in library.folders)
             ListTile(
@@ -107,7 +103,7 @@ class LocalMusicScreen extends StatelessWidget {
               title: Text(folder.split('/').last),
               subtitle: Text(folder),
               trailing: IconButton(
-                tooltip: 'Usuń folder',
+                tooltip: l10n.localMusicScreenRemoveFolder,
                 icon: Icon(Icons.close, color: palette.textSecondary),
                 onPressed: () => library.removeFolder(folder),
               ),
@@ -118,16 +114,20 @@ class LocalMusicScreen extends StatelessWidget {
               color: palette.accent,
             ),
             title: Text(
-              'Dodaj folder',
+              l10n.localMusicScreenAddFolder,
               style: TextStyle(color: palette.accent),
             ),
             onTap: () => _addFolder(context, library),
           ),
-          const SectionTitle('Skanowanie'),
+          SectionTitle(l10n.localMusicScreenScanning),
           ListTile(
             leading: const Icon(Icons.history),
-            title: const Text('Ostatnie skanowanie'),
-            subtitle: Text(lastScan == null ? 'Nigdy' : _formatDate(lastScan)),
+            title: Text(l10n.localMusicScreenLastScan),
+            subtitle: Text(
+              lastScan == null
+                  ? l10n.localMusicScreenNever
+                  : _formatDate(lastScan),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -148,7 +148,9 @@ class LocalMusicScreen extends StatelessWidget {
                     )
                   : const Icon(Icons.manage_search),
               label: Text(
-                library.scanning ? 'Skanowanie…' : 'Skanuj teraz',
+                library.scanning
+                    ? l10n.localMusicScreenScanInProgress
+                    : l10n.localMusicScreenScanNow,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               onPressed: library.scanning
@@ -158,13 +160,11 @@ class LocalMusicScreen extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.library_music_outlined),
-            title: Text('Utwory zapisane na urządzeniu: ${library.songCount}'),
+            title: Text(l10n.localMusicScreenSongsOnDevice(library.songCount)),
           ),
           ListTile(
             leading: Icon(Icons.fiber_new_outlined, color: palette.accent),
-            title: Text(
-              'Nowe utwory spoza bazy danych: ${library.pendingCount}',
-            ),
+            title: Text(l10n.localMusicScreenNewSongs(library.pendingCount)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -208,7 +208,7 @@ class _PendingSongsScreenState extends State<PendingSongsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Nowe utwory spoza bazy'),
+        title: Text(l10n.localMusicScreenPendingTitle),
       ),
       body: FutureBuilder<List<LocalSong>>(
         future: _songs,
@@ -222,7 +222,7 @@ class _PendingSongsScreenState extends State<PendingSongsScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(32),
                 child: Text(
-                  'Wszystkie utwory z telefonu są w bazie danych.',
+                  l10n.localMusicScreenAllInDatabase,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: palette.textSecondary),
                 ),
@@ -238,7 +238,7 @@ class _PendingSongsScreenState extends State<PendingSongsScreen> {
                 title: ScrollingText(song.title),
                 subtitle: ScrollingText(
                   [
-                    song.artist ?? 'Nieznany wykonawca',
+                    song.artist ?? l10n.localMusicScreenUnknownArtist,
                     song.fileName,
                   ].join(' • '),
                   maxLines: 2,

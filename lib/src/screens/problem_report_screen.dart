@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app_name.dart';
 import '../data/error_log.dart';
 import '../data/problem_report.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -77,7 +78,7 @@ class _ProblemReportScreenState extends State<ProblemReportScreen> {
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'text/plain')],
-        subject: '$appName — raport problemu',
+        subject: l10n.problemReportScreenSubject(appName),
       ),
     );
   }
@@ -89,7 +90,7 @@ class _ProblemReportScreenState extends State<ProblemReportScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Zgłoś problem'),
+        title: Text(l10n.problemReportScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -98,20 +99,15 @@ class _ProblemReportScreenState extends State<ProblemReportScreen> {
             controller: _description,
             minLines: 3,
             maxLines: 8,
-            decoration: const InputDecoration(
-              labelText: 'Co się stało? (opcjonalnie)',
-              hintText: 'Co robiłeś, co się stało, czego się spodziewałeś',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.problemReportScreenDescriptionLabel,
+              hintText: l10n.problemReportScreenDescriptionHint,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 16),
           Text(
-            'Raport zawiera wersję aplikacji, model telefonu, wersję Androida, Twój opis i '
-            'dziennik błędów z ostatnich ${ErrorLog.keepFor.inDays} dni. W dzienniku mogą '
-            'być tytuły utworów; adresy serwera (IP, nazwy w Tailscale i sieci domowej), '
-            'tokeny i hasła są z niego wycinane. '
-            'Aplikacja niczego nie wysyła sama — „Wyślij” otwiera „Udostępnij”, a Ty wybierasz, '
-            'komu i jak.',
+            l10n.problemReportScreenWhatIsSent(ErrorLog.keepFor.inDays),
             style: TextStyle(
               fontSize: AppFontSize.small,
               color: palette.textSecondary,
@@ -126,10 +122,10 @@ class _ProblemReportScreenState extends State<ProblemReportScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
             icon: const Icon(Icons.send),
-            label: const Text('Wyślij'),
+            label: Text(l10n.problemReportScreenSend),
             onPressed: report == null ? null : _send,
           ),
-          const SectionTitle('Podgląd raportu'),
+          SectionTitle(l10n.problemReportScreenPreview),
           if (report == null)
             const Center(child: CircularProgressIndicator())
           else

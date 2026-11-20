@@ -10,6 +10,7 @@ import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/song_catalog.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/cover_art.dart';
@@ -31,7 +32,7 @@ class SearchScreen extends StatelessWidget {
         slivers: [
           SliverToBoxAdapter(
             child: TabHeader(
-              title: 'Wyszukaj',
+              title: l10n.searchScreenTitle,
               actions: const [SearchFieldsButton()],
             ),
           ),
@@ -60,7 +61,7 @@ class SearchScreen extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: ScrollingText(
-                            'Czego chcesz posłuchać?',
+                            l10n.searchScreenPrompt,
                             style: TextStyle(
                               color: palette.background.withValues(alpha: 0.65),
                               fontSize: AppFontSize.listTitle,
@@ -77,7 +78,9 @@ class SearchScreen extends StatelessWidget {
           ),
           if (discoverGenres(SongCatalogScope.of(context)) case final genres
               when genres.isNotEmpty) ...[
-            const SliverToBoxAdapter(child: SectionTitle('Odkryj coś nowego')),
+            SliverToBoxAdapter(
+              child: SectionTitle(l10n.searchScreenDiscoverNew),
+            ),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 220,
@@ -95,7 +98,9 @@ class SearchScreen extends StatelessWidget {
             ),
           ],
           ..._browseGroups(context),
-          const SliverToBoxAdapter(child: SectionTitle('Inne kategorie')),
+          SliverToBoxAdapter(
+            child: SectionTitle(l10n.searchScreenOtherCategories),
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             sliver: SliverGrid.count(
@@ -164,7 +169,7 @@ List<Widget> _browseGroups(BuildContext context) {
 
   return [
     if (moods.isNotEmpty)
-      group('Nastroje', [
+      group(l10n.searchScreenMoods, [
         for (final mood in moods)
           _CategoryTile(
             name: mood.name,
@@ -172,7 +177,7 @@ List<Widget> _browseGroups(BuildContext context) {
           ),
       ]),
     if (genres.isNotEmpty)
-      group('Gatunki', [
+      group(l10n.searchScreenGenres, [
         for (final MapEntry(key: genre, value: count) in biggest(genres))
           _CategoryTile(
             name: genre,
@@ -181,19 +186,19 @@ List<Widget> _browseGroups(BuildContext context) {
           ),
       ]),
     if (decades.isNotEmpty)
-      group('Dekady', [
+      group(l10n.searchScreenDecades, [
         for (final decade in decades.keys.toList()..sort((a, b) => b - a))
           _CategoryTile(
             // "Lata 80." only for the 1900s: 1890 or a year like 1000 (likely a mistake in
             // music.db) would read as the 1990s or "Lata 0.".
             name: decade >= 1900 && decade < 2000
-                ? 'Lata ${decade % 100}.'
+                ? l10n.searchScreenDecade(decade % 100)
                 : '$decade–${decade + 9}',
             count: decades[decade],
             onTap: () => SongListScreen.open(
               context,
-              title: 'Lata $decade–${decade + 9}',
-              subtitle: 'Dekada',
+              title: l10n.searchScreenDecadeTitle(decade, decade + 9),
+              subtitle: l10n.searchScreenDecadeSubtitle,
               songs: (context) => hitsWhere(
                 context,
                 (song) => song.year != null && song.year! ~/ 10 * 10 == decade,
@@ -203,7 +208,7 @@ List<Widget> _browseGroups(BuildContext context) {
           ),
       ]),
     if (languages.isNotEmpty)
-      group('Języki', [
+      group(l10n.searchScreenLanguages, [
         for (final MapEntry(key: language, value: count) in biggest(languages))
           _CategoryTile(
             name: language,
@@ -211,7 +216,7 @@ List<Widget> _browseGroups(BuildContext context) {
             onTap: () => SongListScreen.open(
               context,
               title: language,
-              subtitle: 'Język',
+              subtitle: l10n.searchScreenLanguageSubtitle,
               songs: (context) => hitsWhere(
                 context,
                 (song) => song.language == language,
@@ -221,7 +226,7 @@ List<Widget> _browseGroups(BuildContext context) {
           ),
       ]),
     if (countries.isNotEmpty)
-      group('Kraje wykonawców', [
+      group(l10n.searchScreenCountries, [
         for (final MapEntry(key: country, value: count) in biggest(countries))
           _CategoryTile(
             name: country,
@@ -229,7 +234,7 @@ List<Widget> _browseGroups(BuildContext context) {
             onTap: () => SongListScreen.open(
               context,
               title: country,
-              subtitle: 'Kraj wykonawcy',
+              subtitle: l10n.searchScreenCountrySubtitle,
               songs: (context) => hitsWhere(
                 context,
                 (song) => song.countries.contains(country),
@@ -280,7 +285,7 @@ Future<void> openGenreSongs(BuildContext context, String genre) =>
     SongListScreen.open(
       context,
       title: genre,
-      subtitle: 'Gatunek',
+      subtitle: l10n.searchScreenGenreSubtitle,
       songs: (context) => hitsWhere(
         context,
         (song) => song.genres.contains(genre),
@@ -293,11 +298,11 @@ List<Widget> _otherCategories(BuildContext context) {
   final moods = MoodLibraryScope.maybeOf(context);
   return [
     _CategoryTile(
-      name: 'Ostatnio dodane',
+      name: l10n.searchScreenRecentlyAdded,
       onTap: () => SongListScreen.open(
         context,
-        title: 'Ostatnio dodane',
-        subtitle: 'Najnowsze w bazie danych',
+        title: l10n.searchScreenRecentlyAdded,
+        subtitle: l10n.searchScreenRecentlyAddedSubtitle,
         songs: (context) {
           final library = LocalLibraryScope.of(context);
           final youTube = YouTubeLibraryScope.of(context);
@@ -316,45 +321,45 @@ List<Widget> _otherCategories(BuildContext context) {
     ),
     if (SongCatalogScope.of(context).songs.any((s) => s.isFullAlbum))
       _CategoryTile(
-        name: 'Całe albumy',
+        name: l10n.searchScreenFullAlbums,
         onTap: () => SongListScreen.open(
           context,
-          title: 'Całe albumy',
-          subtitle: 'Albumy w jednym nagraniu',
+          title: l10n.searchScreenFullAlbums,
+          subtitle: l10n.searchScreenFullAlbumsSubtitle,
           songs: (context) => hitsWhere(context, (song) => song.isFullAlbum),
         ),
       ),
     _CategoryTile(
-      name: 'Najczęściej słuchane',
+      name: l10n.searchScreenMostPlayed,
       onTap: () => _openMostPlayed(context),
     ),
     if (moods != null)
       _CategoryTile(
-        name: 'Bez nastroju',
+        name: l10n.searchScreenNoMood,
         onTap: () => SongListScreen.open(
           context,
-          title: 'Bez nastroju',
-          subtitle: 'Utwory, które nie są w żadnym nastroju',
+          title: l10n.searchScreenNoMood,
+          subtitle: l10n.searchScreenNoMoodSubtitle,
           songs: (context) =>
               hitsWhere(context, (song) => moods.moodKeysOf(song.id).isEmpty),
         ),
       ),
     _CategoryTile(
-      name: 'Bez linku YouTube',
+      name: l10n.searchScreenNoYouTubeLink,
       onTap: () => SongListScreen.open(
         context,
-        title: 'Bez linku YouTube',
-        subtitle: 'Baza danych nie zna jeszcze filmu',
+        title: l10n.searchScreenNoYouTubeLink,
+        subtitle: l10n.searchScreenNoYouTubeLinkSubtitle,
         songs: (context) =>
             hitsWhere(context, (song) => song.youTube == YouTubeLink.unknown),
       ),
     ),
     _CategoryTile(
-      name: 'Tylko na telefonie',
+      name: l10n.searchScreenPhoneOnly,
       onTap: () => SongListScreen.open(
         context,
-        title: 'Tylko na telefonie',
-        subtitle: 'Pliki spoza bazy danych',
+        title: l10n.searchScreenPhoneOnly,
+        subtitle: l10n.searchScreenPhoneOnlySubtitle,
         songs: (context) =>
             [
               for (final song in LocalLibraryScope.of(context).songs)
@@ -382,8 +387,8 @@ Future<void> _openMostPlayed(BuildContext context) async {
   ].take(_newestCount).toList();
   await SongListScreen.open(
     context,
-    title: 'Najczęściej słuchane',
-    subtitle: 'Ze statystyk słuchania',
+    title: l10n.searchScreenMostPlayed,
+    subtitle: l10n.searchScreenMostPlayedSubtitle,
     songs: (context) => [for (final song in top) hitOfStatsSong(context, song)],
   );
 }
@@ -473,7 +478,7 @@ class _CategoryTile extends StatelessWidget {
                   ),
                   if (count != null)
                     Text(
-                      '$count utw.',
+                      l10n.searchScreenSongCount(count!),
                       style: const TextStyle(fontSize: AppFontSize.small),
                     ),
                 ],

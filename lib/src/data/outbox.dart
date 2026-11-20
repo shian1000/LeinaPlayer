@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../app_name.dart';
+import '../l10n.dart';
 import 'song_catalog.dart';
 import 'song_requests.dart';
 import 'text_normalizer.dart';
@@ -598,10 +599,7 @@ class Outbox extends ChangeNotifier {
     final files = await pending();
     if (files.isEmpty) return const OutboxSendResult(sent: 0);
     if (servers.isEmpty) {
-      return const OutboxSendResult(
-        sent: 0,
-        problem: 'Nie ustawiono adresu serwera MusicDatabase',
-      );
+      return OutboxSendResult(sent: 0, problem: l10n.outboxNoServerAddress);
     }
     final dir = await directory();
     final client = ServerTrust.instance.client()
@@ -642,22 +640,20 @@ class Outbox extends ChangeNotifier {
                 return OutboxSendResult(
                   sent: sent,
                   refused: refused,
-                  problem:
-                      'Serwer nie przyjął logowania — zaloguj się ponownie '
-                      '(Ustawienia › Konto)',
+                  problem: l10n.outboxLoginRejected,
                 );
               case HttpStatus.insufficientStorage:
                 return OutboxSendResult(
                   sent: sent,
                   refused: refused,
-                  problem: 'Skrzynka odbiorcza MusicDatabase jest pełna',
+                  problem: l10n.outboxInboxFull,
                   serverRefused: true,
                 );
               case HttpStatus.serviceUnavailable:
                 return OutboxSendResult(
                   sent: sent,
                   refused: refused,
-                  problem: 'Dysk serwera MusicDatabase nie jest podłączony',
+                  problem: l10n.outboxDiskNotConnected,
                   serverRefused: true,
                 );
               default:
@@ -667,16 +663,13 @@ class Outbox extends ChangeNotifier {
           return OutboxSendResult(
             sent: sent,
             refused: refused,
-            problem: otherUser == 0
-                ? null
-                : 'Zgłoszenia innego użytkownika ($otherUser) wyślą się po '
-                      'zalogowaniu na jego konto',
+            problem: otherUser == 0 ? null : l10n.outboxOtherUser(otherUser),
           );
         } catch (e) {
           debugPrint('Outbox: sending to $server failed: $e');
           problem = e is HttpException
-              ? 'Serwer odpowiedział: ${e.message}'
-              : 'Brak połączenia z serwerem MusicDatabase';
+              ? l10n.outboxServerAnswered(e.message)
+              : l10n.outboxNoConnection;
         }
       }
     } finally {

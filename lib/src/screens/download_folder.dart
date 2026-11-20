@@ -6,17 +6,20 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../app_name.dart';
 import '../data/source_settings.dart';
+import '../l10n.dart';
 import '../playback/downloads.dart';
 import '../theme.dart';
-import '../widgets/common.dart';
 import '../widgets/menu_sheet.dart';
 
 /// [path] as the user knows it: the phone's own storage and an SD card by name.
 String shownDownloadFolder(String path) => path
-    .replaceFirst(RegExp(r'^/storage/emulated/0(?=/|$)'), 'Pamięć telefonu')
+    .replaceFirst(
+      RegExp(r'^/storage/emulated/0(?=/|$)'),
+      l10n.downloadFolderPhoneStorage,
+    )
     .replaceFirst(
       RegExp(r'^/storage/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}(?=/|$)'),
-      'Karta SD',
+      l10n.downloadFolderSdCard,
     );
 
 /// "Miejsce na pobrane utwory" (Oszczędzanie danych i tryb offline): where "Pobierz" keeps songs
@@ -30,10 +33,10 @@ class DownloadFolderTile extends StatelessWidget {
     final folder = SourceSettingsScope.of(context).downloadFolder;
     return ListTile(
       leading: const Icon(Icons.download_for_offline_outlined),
-      title: const Text('Miejsce na pobrane utwory'),
+      title: Text(l10n.downloadFolderTitle),
       subtitle: Text(
         folder == null
-            ? 'W aplikacji — niewidoczne dla innych aplikacji'
+            ? l10n.downloadFolderInAppSubtitle
             : shownDownloadFolder(folder),
       ),
       trailing: const Icon(Icons.chevron_right),
@@ -49,17 +52,16 @@ class DownloadFolderTile extends StatelessWidget {
       entries: [
         MenuSheetEntry(
           folder == null ? Icons.check : Icons.phone_android,
-          'W aplikacji',
-          subtitle:
-              'Widać je tylko w $appName; znikają po odinstalowaniu aplikacji',
+          l10n.downloadFolderInApp,
+          subtitle: l10n.downloadFolderInAppNote(appName),
           onTap: folder == null ? () {} : () => _apply(context, null),
         ),
         MenuSheetEntry(
           folder == null ? Icons.create_new_folder_outlined : Icons.check,
-          folder == null ? 'Wybierz folder…' : 'Wybierz inny folder…',
-          subtitle:
-              'Np. Music — pliki „Wykonawca - Tytuł” widać w innych aplikacjach i zostają '
-              'po odinstalowaniu',
+          folder == null
+              ? l10n.downloadFolderPick
+              : l10n.downloadFolderPickOther,
+          subtitle: l10n.downloadFolderPickNote,
           onTap: () => _pick(context),
         ),
       ],
@@ -69,7 +71,7 @@ class DownloadFolderTile extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final path = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Wybierz folder na pobrane utwory',
+      dialogTitle: l10n.downloadFolderPickerTitle,
     );
     if (path == null || !context.mounted) return;
     final folder = path.length > 1 && path.endsWith('/')
@@ -77,11 +79,7 @@ class DownloadFolderTile extends StatelessWidget {
         : path;
     if (folder == '/') {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Do tego folderu nie da się zapisywać. Wybierz folder w pamięci telefonu.',
-          ),
-        ),
+        SnackBar(content: Text(l10n.downloadFolderRootNotWritable)),
       );
       return;
     }
@@ -93,11 +91,13 @@ class DownloadFolderTile extends StatelessWidget {
           SnackBar(
             persist: false,
             content: Text(
-              '$appName nie może zapisywać w folderze ${shownDownloadFolder(folder)}. '
-              'Zezwól na dostęp do wszystkich plików albo wybierz inny folder.',
+              l10n.downloadFolderCannotWrite(
+                appName,
+                shownDownloadFolder(folder),
+              ),
             ),
-            action: const SnackBarAction(
-              label: 'Ustawienia',
+            action: SnackBarAction(
+              label: l10n.downloadFolderSettings,
               onPressed: openAppSettings,
             ),
           ),
@@ -126,20 +126,16 @@ class DownloadFolderTile extends StatelessWidget {
       await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Dostęp do plików'),
-          content: const Text(
-            'Żeby zapisywać utwory w wybranym folderze, $appName potrzebuje dostępu do '
-            'wszystkich plików. Android otworzy ustawienia — włącz tam „Zezwalaj na dostęp do '
-            'wszystkich plików” i wróć do aplikacji.',
-          ),
+          title: Text(l10n.downloadFolderAccessTitle),
+          content: Text(l10n.downloadFolderAccessText(appName)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Anuluj'),
+              child: Text(l10n.commonCancel),
             ),
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Dalej'),
+              child: Text(l10n.downloadFolderContinue),
             ),
           ],
         ),
@@ -152,12 +148,16 @@ class DownloadFolderTile extends StatelessWidget {
     final settings = SourceSettingsScope.of(context);
     final downloads = DownloadsScope.maybeOf(context);
     await settings.setDownloadFolder(folder);
-    final where = folder == null
-        ? 'do aplikacji'
-        : 'do ${shownDownloadFolder(folder)}';
+    final shown = folder == null ? null : shownDownloadFolder(folder);
     if (downloads == null || downloads.count == 0 || !context.mounted) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Pobierane utwory będą trafiać $where.')),
+        SnackBar(
+          content: Text(
+            shown == null
+                ? l10n.downloadFolderWillGoToApp
+                : l10n.downloadFolderWillGoTo(shown),
+          ),
+        ),
       );
       return;
     }
@@ -171,7 +171,7 @@ class DownloadFolderTile extends StatelessWidget {
       builder: (dialogContext) => PopScope(
         canPop: false,
         child: AlertDialog(
-          title: const Text('Przenoszenie pobranych utworów'),
+          title: Text(l10n.downloadFolderMovingTitle),
           content: ValueListenableBuilder(
             valueListenable: progress,
             builder: (context, value, _) => Column(
@@ -183,7 +183,7 @@ class DownloadFolderTile extends StatelessWidget {
                   color: context.palette.accent,
                 ),
                 const SizedBox(height: 12),
-                Text('${value.done} z ${value.total}'),
+                Text(l10n.downloadFolderProgress(value.done, value.total)),
               ],
             ),
           ),
@@ -206,12 +206,12 @@ class DownloadFolderTile extends StatelessWidget {
     final moved = total - failed;
     messenger.showSnackBar(
       SnackBar(
-        content: Text(
-          failed == 0
-              ? 'Przeniesiono $moved ${pluralWord(moved, 'utwór', 'utwory', 'utworów')} $where.'
-              : 'Nie udało się przenieść części utworów — grają dalej ze starego miejsca. '
-                    'Nowe pobrania trafiają $where.',
-        ),
+        content: Text(switch ((failed == 0, shown)) {
+          (true, null) => l10n.downloadFolderMovedToApp(moved),
+          (true, final to?) => l10n.downloadFolderMovedTo(moved, to),
+          (false, null) => l10n.downloadFolderMoveFailedApp,
+          (false, final to?) => l10n.downloadFolderMoveFailed(to),
+        }),
       ),
     );
   }

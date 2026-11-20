@@ -11,6 +11,8 @@
   measuring a start on the Huawei.
 - [`signing.md`](signing.md) — the release key outside the repo, `android/key.properties`, why it
   must never change, its SHA-1 in Google Cloud.
+- [`localization.md`](localization.md) — the UI's languages: ARB files, the global `l10n`,
+  keys, plurals, what stays Polish, tests, the Kotlin side.
 - [`releases.md`](releases.md) — making a GitHub release and the app's update check.
 - [`theming.md`](theming.md) — how themes work and how to add one.
 - [`ui-sizing.md`](ui-sizing.md) — calibrated font sizes and spacing, no screen-size scaling.

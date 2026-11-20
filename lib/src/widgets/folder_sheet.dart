@@ -6,6 +6,7 @@ import '../theme.dart';
 import 'common.dart';
 import 'menu_sheet.dart';
 import 'scrolling_text.dart';
+import '../l10n.dart';
 
 /// "Przenieś do folderu" for a playlist's or mood's menu; `null` where there are no folders
 /// (widget tests).
@@ -13,7 +14,7 @@ MenuSheetEntry? moveToFolderEntry(BuildContext context, String itemKey) {
   if (LibraryFoldersScope.maybeOf(context) == null) return null;
   return MenuSheetEntry(
     Icons.drive_file_move_outline,
-    'Przenieś do folderu',
+    l10n.folderSheetMoveToFolder,
     onTap: () => showMoveToFolderSheet(context, itemKey),
   );
 }
@@ -23,9 +24,9 @@ Future<LibraryFolder?> createFolder(BuildContext context) async {
   final folders = LibraryFoldersScope.of(context);
   final name = await showDialog<String>(
     context: context,
-    builder: (_) => const TextInputDialog(
-      title: 'Nowy folder',
-      hint: 'Nazwa folderu',
+    builder: (_) => TextInputDialog(
+      title: l10n.folderSheetNewFolder,
+      hint: l10n.folderSheetFolderName,
       initial: '',
     ),
   );
@@ -73,10 +74,10 @@ Future<void> showMoveToFolderSheet(BuildContext context, String itemKey) {
           shrinkWrap: true,
           padding: const EdgeInsets.only(bottom: 16),
           children: [
-            const MenuSheetHeader(
+            MenuSheetHeader(
               cover: Icon(Icons.drive_file_move_outline, size: 40),
-              title: 'Przenieś do folderu',
-              subtitle: 'Foldery są tylko na tym telefonie',
+              title: l10n.folderSheetMoveToFolder,
+              subtitle: l10n.folderSheetPhoneOnly,
             ),
             const Divider(),
             ListTile(
@@ -85,24 +86,24 @@ Future<void> showMoveToFolderSheet(BuildContext context, String itemKey) {
                 Icons.create_new_folder_outlined,
                 color: palette.textSecondary,
               ),
-              title: const Text('Nowy folder'),
+              title: Text(l10n.folderSheetNewFolder),
               onTap: () async {
                 final navigator = Navigator.of(sheetContext);
                 final folder = await createFolder(sheetContext);
                 if (folder == null) return;
                 navigator.pop();
                 await folders.move(itemKey, folder.id);
-                said('Przeniesiono do folderu „${folder.name}”');
+                said(l10n.folderSheetMovedTo(folder.name));
               },
             ),
             tile(
               icon: Icons.library_music_outlined,
-              title: 'Bez folderu',
+              title: l10n.folderSheetNoFolder,
               here: current == null,
               onTap: () {
                 if (current == null) return;
                 folders.move(itemKey, null);
-                said('Wyjęto z folderu „${current.name}”');
+                said(l10n.folderSheetTakenOut(current.name));
               },
             ),
             for (final folder in [
@@ -114,7 +115,7 @@ Future<void> showMoveToFolderSheet(BuildContext context, String itemKey) {
                 here: current?.id == folder.id,
                 onTap: () {
                   folders.move(itemKey, folder.id);
-                  said('Przeniesiono do folderu „${folder.name}”');
+                  said(l10n.folderSheetMovedTo(folder.name));
                 },
               ),
           ],

@@ -9,6 +9,7 @@ import '../data/song_details.dart';
 import '../data/song_requests.dart';
 import '../data/text_normalizer.dart';
 import '../data/youtube_library.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
 import '../widgets/song_info.dart';
@@ -48,7 +49,7 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Czeka na wysłanie'),
+        title: Text(l10n.outboxContentsScreenTitle),
       ),
       body:
           FutureBuilder<
@@ -57,7 +58,7 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
             future: _reports,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                return _Note('Nie udało się odczytać zgłoszeń.');
+                return _Note(l10n.outboxContentsScreenReadFailed);
               }
               final data = snapshot.data;
               if (data == null) {
@@ -68,58 +69,53 @@ class _OutboxContentsScreenState extends State<OutboxContentsScreen> {
                   found.isEmpty &&
                   corrections.isEmpty &&
                   songs.isEmpty) {
-                return const _Note('Wszystkie zgłoszenia zostały wysłane.');
+                return _Note(l10n.outboxContentsScreenAllSent);
               }
               return ListView(
                 padding: const EdgeInsets.only(bottom: 24),
                 children: [
                   if (reports.isNotEmpty) ...[
-                    const _Note(
-                      'Linki z bazy danych, których YouTube już nie odtwarza. Do czasu poprawki w '
-                      'MusicDatabase telefon gra film znaleziony w zamian.',
-                    ),
+                    _Note(l10n.outboxContentsScreenDeadLinks),
                     for (final report in reports)
                       _SongReportTile(
                         songId: report.songId,
                         title: report.title,
                         artist: report.artist,
                         what: report.replacementTitle == null
-                            ? 'Bez zamiennika'
-                            : 'Zamiennik: '
-                                  '${_video(report.replacementTitle, report.replacementChannel)}',
+                            ? l10n.outboxContentsScreenNoReplacement
+                            : l10n.outboxContentsScreenReplacement(
+                                _video(
+                                  report.replacementTitle,
+                                  report.replacementChannel,
+                                ),
+                              ),
                       ),
                   ],
                   if (found.isNotEmpty) ...[
-                    const _Note(
-                      'Filmy znalezione przez telefon dla utworów bez linku w bazie danych.',
-                    ),
+                    _Note(l10n.outboxContentsScreenFoundLinks),
                     for (final report in found)
                       _SongReportTile(
                         songId: report.songId,
                         title: report.title,
                         artist: report.artist,
-                        what:
-                            'Znaleziono: ${_video(report.videoTitle, report.videoChannel)}',
+                        what: l10n.outboxContentsScreenFound(
+                          _video(report.videoTitle, report.videoChannel),
+                        ),
                       ),
                   ],
                   if (corrections.isNotEmpty) ...[
-                    const _Note(
-                      'Poprawki informacji o utworach. Do czasu ich przyjęcia w MusicDatabase '
-                      'telefon pokazuje wartości z bazy danych.',
-                    ),
+                    _Note(l10n.outboxContentsScreenCorrections),
                     for (final correction in corrections)
                       _CorrectionTile(correction),
                   ],
                   if (songs.isNotEmpty) ...[
-                    const _Note(
-                      'Utwory spoza bazy danych, o których dodanie telefon prosi MusicDatabase.',
-                    ),
+                    _Note(l10n.outboxContentsScreenSongRequests),
                     for (final song in songs)
                       ListTile(
                         leading: const Icon(Icons.playlist_add),
                         title: ScrollingText(song.title),
                         subtitle: ScrollingText(
-                          song.artist ?? SongRequest.unknownArtist,
+                          song.artist ?? l10n.outboxContentsScreenUnknownArtist,
                         ),
                       ),
                   ],
@@ -204,8 +200,7 @@ class _CorrectionTile extends StatelessWidget {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '„${c.oldValue}” nie jest głównym wykonawcą utworu „${c.title}” — '
-            'zostaje zmiana nazwy.',
+            l10n.outboxContentsScreenNotMainArtist('${c.oldValue}', c.title),
           ),
         ),
       );
@@ -231,7 +226,7 @@ class _CorrectionTile extends StatelessWidget {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          'Zamiast zmiany nazwy: „${c.newValue}” jako wykonawca utworu „${c.title}”.',
+          l10n.outboxContentsScreenSwitchedToArtist('${c.newValue}', c.title),
         ),
       ),
     );
@@ -240,10 +235,11 @@ class _CorrectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = correction;
-    String shown(Object? v) => fieldValue(c.table, c.column, v) ?? '(puste)';
+    String shown(Object? v) =>
+        fieldValue(c.table, c.column, v) ?? l10n.outboxContentsScreenEmptyValue;
     final where = switch (c.table) {
-      'artists' => 'wykonawca',
-      'albums' => 'album',
+      'artists' => l10n.outboxContentsScreenOfArtist,
+      'albums' => l10n.outboxContentsScreenOfAlbum,
       _ => null,
     };
     final unlike = _unlikeRename;
@@ -252,9 +248,17 @@ class _CorrectionTile extends StatelessWidget {
       title: ScrollingText(
         // old_value is an artists.id there; the song's artist is in the subtitle.
         c.table == 'songs' && c.column == 'artist_id'
-            ? 'Inny wykonawca: ${shown(c.newValue)}'
-            : '${fieldLabel(c.table, c.column)}${where == null ? '' : ' ($where)'}: '
-                  '${shown(c.oldValue)} → ${shown(c.newValue)}',
+            ? l10n.outboxContentsScreenOtherArtist(shown(c.newValue))
+            : l10n.outboxContentsScreenCorrection(
+                where == null
+                    ? fieldLabel(c.table, c.column)
+                    : l10n.outboxContentsScreenFieldOf(
+                        fieldLabel(c.table, c.column),
+                        where,
+                      ),
+                shown(c.oldValue),
+                shown(c.newValue),
+              ),
         maxLines: 2,
       ),
       subtitle: Column(
@@ -263,15 +267,14 @@ class _CorrectionTile extends StatelessWidget {
           ScrollingText('${c.title} · ${c.artist}'),
           if (unlike) ...[
             Text(
-              'To nie wygląda na poprawkę pisowni — zmieni nazwę we wszystkich utworach '
-              'wykonawcy. Czy ten utwór ma innego wykonawcę?',
+              l10n.outboxContentsScreenUnlikeRename,
               style: TextStyle(color: context.palette.accent),
             ),
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: TextButton(
                 onPressed: () => _switchToOtherArtist(context),
-                child: const Text('Tak, tylko ten utwór'),
+                child: Text(l10n.outboxContentsScreenOnlyThisSong),
               ),
             ),
           ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
 import '../data/youtube_search.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/feature_info.dart';
@@ -19,8 +20,8 @@ class YouTubeSourceScreen extends StatelessWidget {
     final result = await showDialog<String>(
       context: context,
       builder: (_) => TextInputDialog(
-        title: 'Kod YouTube API',
-        hint: 'Klucz YouTube Data API',
+        title: l10n.youtubeSourceScreenApiKey,
+        hint: l10n.youtubeSourceScreenApiKeyHint,
         initial: settings.apiKey ?? '',
       ),
     );
@@ -38,13 +39,14 @@ class YouTubeSourceScreen extends StatelessWidget {
     String methodNote(YouTubeMethod m) => switch (m) {
       YouTubeMethod.newPipe =>
         newPipeSearch
-            ? 'Wyszukiwanie z telefonu, ta sama biblioteka co odtwarzanie'
-            : 'Dostępne tylko na Androidzie',
-      YouTubeMethod.explode => 'Wyszukiwanie z telefonu (pakiet Dart)',
-      YouTubeMethod.ytDlpServer =>
-        'Jeszcze niedostępne — serwer bazy danych nie obsługuje wyszukiwania',
+            ? l10n.youtubeSourceScreenNewPipeNote
+            : l10n.youtubeSourceScreenAndroidOnly,
+      YouTubeMethod.explode => l10n.youtubeSourceScreenExplodeNote,
+      YouTubeMethod.ytDlpServer => l10n.youtubeSourceScreenServerNote,
       YouTubeMethod.api =>
-        apiKey == null ? 'Wymaga kodu YouTube API' : 'YouTube Data API',
+        apiKey == null
+            ? l10n.youtubeSourceScreenApiNeedsKey
+            : 'YouTube Data API',
     };
     final hint = TextStyle(
       fontSize: AppFontSize.listSubtitle,
@@ -59,10 +61,10 @@ class YouTubeSourceScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SectionTitle('Wyszukiwanie'),
+          SectionTitle(l10n.youtubeSourceScreenSearchSection),
           SwitchListTile(
             secondary: const Icon(Icons.travel_explore),
-            title: const Text('Włącz szukanie w serwisie YouTube'),
+            title: Text(l10n.youtubeSourceScreenSearchSwitch),
             value: enabled,
             onChanged: settings.setYouTubeSearchEnabled,
           ),
@@ -93,28 +95,25 @@ class YouTubeSourceScreen extends StatelessWidget {
             ),
           ListTile(
             leading: const Icon(Icons.key),
-            title: const Text('Kod YouTube API'),
-            subtitle: Text(apiKey == null ? 'Nie ustawiono' : _masked(apiKey)),
+            title: Text(l10n.youtubeSourceScreenApiKey),
+            subtitle: Text(
+              apiKey == null ? l10n.youtubeSourceScreenNotSet : _masked(apiKey),
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _editApiKey(context, settings),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Text(
-              'Używany jest pierwszy włączony sposób od góry, a kolejne tylko wtedy, gdy '
-              'poprzedni zawiedzie. Odtwarzanie z YouTube: Odtwarzanie › Źródła › '
-              'YouTube.',
-              style: hint,
-            ),
+            child: Text(l10n.youtubeSourceScreenOrderNote, style: hint),
           ),
-          const SectionTitle('Playlisty'),
+          SectionTitle(l10n.youtubeSourceScreenPlaylistsSection),
           SwitchListTile(
             secondary: const Icon(Icons.playlist_play),
-            title: const Text('Wyszukuj playlisty na YouTube'),
+            title: Text(l10n.youtubeSourceScreenPlaylistSearch),
             subtitle: Text(
               settings.playlistSearch
-                  ? 'Przyciskiem wyszukiwania w internecie, tymi samymi sposobami co utwory'
-                  : 'Wyłączone w filtrach wyszukiwania („Wyszukuj playlisty”)',
+                  ? l10n.youtubeSourceScreenPlaylistSearchOn
+                  : l10n.youtubeSourceScreenPlaylistSearchOff,
             ),
             value: settings.youTubePlaylistSearch,
             onChanged: enabled ? settings.setYouTubePlaylistSearch : null,

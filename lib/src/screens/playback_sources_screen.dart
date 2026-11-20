@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
+import '../l10n.dart';
 import '../theme.dart';
 import 'local_music_screen.dart';
 import 'private_server_screen.dart';
@@ -33,7 +34,7 @@ class PlaybackSourcesScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Źródła'),
+        title: Text(l10n.playbackSourcesScreenTitle),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -41,10 +42,7 @@ class PlaybackSourcesScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Gdy utwór jest dostępny w kilku miejscach, odtwarzany jest z pierwszego '
-              'włączonego na liście; z YouTube — pierwszym włączonym sposobem, który zadziała. '
-              'Wyłączone źródła nie są używane. Przeciągnij, aby zmienić kolejność; dotknij '
-              'źródła, aby otworzyć jego ustawienia.',
+              l10n.playbackSourcesScreenIntro,
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -62,7 +60,7 @@ class PlaybackSourcesScreen extends StatelessWidget {
               footer: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 child: Text(
-                  'Zapisane utwory: Oszczędzanie danych i tryb offline › Pamięć podręczna.',
+                  l10n.playbackSourcesScreenCachedSongs,
                   style: TextStyle(
                     color: palette.textSecondary,
                     fontSize: AppFontSize.small,

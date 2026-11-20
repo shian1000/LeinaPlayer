@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="link_open_failed">Couldn\'t open Leina Player</string>
+    <string name="link_youtube_playlist">YouTube playlist</string>
+    <string name="link_youtube_video">YouTube video</string>
+    <string name="link_youtube_other">YouTube link</string>
+    <string name="link_youtube_unsupported">Opens only videos and playlists</string>
+    <string name="link_spotify_other">Spotify link</string>
+    <string name="link_spotify_track">Spotify track</string>
+    <string name="link_spotify_album">Spotify album</string>
+    <string name="link_spotify_playlist">Spotify playlist</string>
+    <string name="link_spotify_unsupported">Opens only tracks, albums and playlists</string>
+    <string name="link_action_import">Import to Library</string>
+    <string name="link_action_play">Play</string>
+    <string name="link_action_play_or_import">Play or import</string>
+    <string name="link_open_in">Open in…</string>
+    <string name="link_remember_youtube">Remember my choice for YouTube links</string>
+    <string name="link_remember_spotify">Remember my choice for Spotify links</string>
+    <string name="link_open_in_app">Open in the app</string>
+    <string name="link_open_in_browser">Open in the browser</string>
+    <string name="link_save_later">Save for later</string>
+    <string name="link_save_later_subtitle">Choose who this link is from</string>
+    <string name="link_change_in_settings">You can change this in Settings › Opening links</string>
+    <string name="link_how_to_play">How to play it?</string>
+    <string name="link_play_now">Play now</string>
+    <string name="link_play_now_subtitle">Instead of what\'s playing</string>
+    <string name="link_play_next">Play next</string>
+    <string name="link_play_next_subtitle">Right after the current song</string>
+    <string name="link_add_to_queue">Add to queue</string>
+    <string name="link_add_to_queue_subtitle">At the very end of the queue</string>
+    <string name="link_cancel">Cancel</string>
+    <string name="link_back">← Back</string>
+    <string name="link_from_whom">Who is it from?</string>
+    <string name="link_new_person">New person</string>
+    <string name="link_name_hint">Name</string>
+    <string name="link_save">Save</string>
+    <string name="link_saved_later">Saved for later — from: %1$s</string>
+    <string name="scheduled_music">Scheduled music</string>
+    <string name="scheduled_music_tap">Tap to open Leina Player</string>
+    <string name="downloads_channel">Downloading songs</string>
+    <string name="downloads_progress">Downloading songs: %1$d of %2$d</string>
+</resources>

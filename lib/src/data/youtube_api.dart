@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../l10n.dart';
+
 /// Why a YouTube Data API call failed. [quota]: the project's daily limit is used up (it
 /// resets at midnight Pacific time); [unauthorized]: the access token was refused.
 class YouTubeApiException implements Exception {
@@ -115,10 +117,7 @@ class YouTubeApi {
       rethrow;
     } on Exception catch (e) {
       debugPrint('YouTube API $resource failed: $e');
-      throw const YouTubeApiException(
-        'Brak połączenia z YouTube',
-        offline: true,
-      );
+      throw YouTubeApiException(l10n.youtubeApiNoConnection, offline: true);
     } finally {
       client.close(force: true);
     }
@@ -143,33 +142,26 @@ class _HttpFailure implements Exception {
   YouTubeApiException toApiException() {
     debugPrint('YouTube API HTTP $status: $body');
     if (status == HttpStatus.unauthorized) {
-      return const YouTubeApiException(
-        'Google nie przyjął logowania — spróbuj ponownie',
+      return YouTubeApiException(
+        l10n.youtubeApiSignInRejected,
         unauthorized: true,
       );
     }
     if (reason == 'quotaExceeded' || reason == 'dailyLimitExceeded') {
-      return const YouTubeApiException(
-        'Wyczerpany dzienny limit YouTube — dokończ jutro',
-        quota: true,
-      );
+      return YouTubeApiException(l10n.youtubeApiDailyLimit, quota: true);
     }
     if (reason == 'playlistNotFound') {
-      return const YouTubeApiException(
-        'Tej playlisty nie ma już na YouTube',
+      return YouTubeApiException(
+        l10n.youtubeApiPlaylistGone,
         playlistGone: true,
       );
     }
     if (reason == 'youtubeSignupRequired') {
-      return const YouTubeApiException(
-        'To konto Google nie ma kanału YouTube — załóż go w aplikacji YouTube',
-      );
+      return YouTubeApiException(l10n.youtubeApiNoChannel);
     }
     if (reason == 'accessNotConfigured' || reason == 'SERVICE_DISABLED') {
-      return const YouTubeApiException(
-        'YouTube Data API nie jest włączone w projekcie Google Cloud',
-      );
+      return YouTubeApiException(l10n.youtubeApiNotEnabled);
     }
-    return YouTubeApiException('YouTube odpowiedział: HTTP $status');
+    return YouTubeApiException(l10n.youtubeApiHttpError(status));
   }
 }

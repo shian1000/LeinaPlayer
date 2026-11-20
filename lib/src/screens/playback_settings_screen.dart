@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/hidden_songs.dart';
 import '../data/source_settings.dart';
+import '../l10n.dart';
 import '../playback/volume_leveling.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -34,17 +35,17 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Odtwarzanie'),
+        title: Text(l10n.playbackSettingsScreenTitle),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           ListTile(
             leading: const Icon(Icons.low_priority),
-            title: const Text('Źródła'),
+            title: Text(l10n.playbackSettingsScreenSources),
             subtitle: Text(
               order.isEmpty
-                  ? 'Wszystkie źródła wyłączone'
+                  ? l10n.playbackSettingsScreenAllSourcesOff
                   : [
                       for (final (i, source) in order.indexed)
                         '${i + 1}. ${source.label}',
@@ -60,11 +61,13 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
           if (HiddenSongsScope.maybeOf(context) case final hidden?)
             ListTile(
               leading: const Icon(Icons.block),
-              title: const Text('Ukryte utwory'),
+              title: Text(l10n.playbackSettingsScreenHiddenSongs),
               subtitle: Text(
                 hidden.songs.isEmpty
-                    ? 'Brak — „Ukryj utwór” w menu utworu'
-                    : '${hidden.songs.length} — kolejka, Odkrywaj i radio je pomijają',
+                    ? l10n.playbackSettingsScreenHiddenNone
+                    : l10n.playbackSettingsScreenHiddenCount(
+                        hidden.songs.length,
+                      ),
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
@@ -73,17 +76,17 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
                 ),
               ),
             ),
-          const SectionTitle('Przejścia między utworami'),
+          SectionTitle(l10n.playbackSettingsScreenTransitions),
           ListTile(
             leading: const Icon(Icons.join_inner),
-            title: const Text('Przenikanie utworów'),
+            title: Text(l10n.playbackSettingsScreenCrossfade),
             subtitle: Text(crossfadeLabel(seconds)),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
-                _Edge('Wył.'),
+                _Edge(l10n.playbackSettingsScreenCrossfadeOffShort),
                 Expanded(
                   child: Slider(
                     value: seconds.toDouble(),
@@ -104,38 +107,37 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
-              'Gdy utwór dobiega końca, następny z kolejki zaczyna się tyle sekund wcześniej: '
-              'jeden cichnie, a drugi narasta.',
+              l10n.playbackSettingsScreenCrossfadeNote,
               style: TextStyle(
                 color: palette.textSecondary,
                 fontSize: AppFontSize.small,
               ),
             ),
           ),
-          const SectionTitle('Głośność'),
+          SectionTitle(l10n.playbackSettingsScreenVolume),
           FutureBuilder(
             future: _levelingSupported,
             builder: (context, snapshot) =>
                 _leveling(settings, supported: snapshot.data ?? true),
           ),
-          const SectionTitle('Przeciągnięcie utworu w prawo'),
+          SectionTitle(l10n.playbackSettingsScreenSwipeRight),
           RadioGroup<bool>(
             groupValue: settings.swipePlaysNext,
             onChanged: (value) {
               if (value != null) settings.setSwipePlaysNext(value);
             },
-            child: const Column(
+            child: Column(
               children: [
                 RadioListTile<bool>(
                   value: true,
-                  secondary: Icon(Icons.playlist_play),
-                  title: Text('Odtwórz jako następny'),
+                  secondary: const Icon(Icons.playlist_play),
+                  title: Text(l10n.playbackSettingsScreenPlayNext),
                 ),
                 RadioListTile<bool>(
                   value: false,
-                  secondary: Icon(Icons.queue_music),
-                  title: Text('Dodaj do kolejki'),
-                  subtitle: Text('Na sam koniec kolejki'),
+                  secondary: const Icon(Icons.queue_music),
+                  title: Text(l10n.playbackSettingsScreenAddToQueue),
+                  subtitle: Text(l10n.playbackSettingsScreenAddToQueueSubtitle),
                 ),
               ],
             ),
@@ -143,9 +145,7 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
-              'Utwór przeciągnięty w prawo na liście (wyniki, playlisty, nastroje, kolejka) '
-              'zagra zaraz po obecnym albo trafi na koniec kolejki. W lewo: usuwa go z '
-              'kolejki, playlisty lub nastroju.',
+              l10n.playbackSettingsScreenSwipeNote,
               style: TextStyle(
                 color: palette.textSecondary,
                 fontSize: AppFontSize.small,
@@ -165,11 +165,11 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
       children: [
         SwitchListTile(
           secondary: const Icon(Icons.equalizer),
-          title: const Text('Wyrównywanie głośności'),
+          title: Text(l10n.playbackSettingsScreenLeveling),
           subtitle: Text(
             supported
-                ? 'Głośne i ciche utwory grają podobnie głośno'
-                : 'Ten telefon tego nie obsługuje',
+                ? l10n.playbackSettingsScreenLevelingSubtitle
+                : l10n.playbackSettingsScreenLevelingUnsupported,
           ),
           value: on,
           onChanged: supported ? settings.setLeveling : null,
@@ -177,14 +177,14 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
         ListTile(
           enabled: on,
           leading: const Icon(Icons.tune),
-          title: const Text('Intensywność'),
+          title: Text(l10n.playbackSettingsScreenStrength),
           subtitle: Text('$percent%'),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             children: [
-              _Edge('Łagodnie'),
+              _Edge(l10n.playbackSettingsScreenStrengthGentle),
               Expanded(
                 child: Slider(
                   value: percent.toDouble(),
@@ -201,18 +201,14 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
                   },
                 ),
               ),
-              _Edge('Mocno'),
+              _Edge(l10n.playbackSettingsScreenStrengthStrong),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Text(
-            'Jak mocno przybliżać utwory do jednej głośności. Cały utwór jest ściszany lub '
-            'podgłaśniany o tę samą wartość, więc brzmi jak w oryginale — ciche i głośne '
-            'fragmenty zostają takie, jakie były. Cichy utwór jest podgłaśniany tylko tyle, '
-            'żeby jego najgłośniejsze miejsca nie przesterowały. Działa dla każdego źródła, '
-            'także przy przenikaniu.',
+            l10n.playbackSettingsScreenStrengthNote,
             style: TextStyle(
               color: palette.textSecondary,
               fontSize: AppFontSize.small,
@@ -221,20 +217,15 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
         ),
         SwitchListTile(
           secondary: const Icon(Icons.graphic_eq),
-          title: const Text('Mierz głośność na telefonie'),
-          subtitle: const Text('Gdy nie ma jej w bazie ani w tagach pliku'),
+          title: Text(l10n.playbackSettingsScreenMeasure),
+          subtitle: Text(l10n.playbackSettingsScreenMeasureSubtitle),
           value: on && settings.levelingMeasure,
           onChanged: on ? settings.setLevelingMeasure : null,
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Text(
-            'Żeby wyrównać utwór, trzeba znać jego głośność. Telefon raz przesłuchuje w tle '
-            'każdy utwór, który ma w całości (pliki na telefonie, pobrane, zapisane w pamięci '
-            'podręcznej — także następne z kolejki), i ją zapamiętuje. Utwór słuchany pierwszy '
-            'raz bez zapisu gra bez zmian i jest mierzony, gdy trafi do pamięci podręcznej. '
-            'Zajmuje to od kilku do ok. 30 sekund pracy telefonu na utwór. Wyłączone — '
-            'wyrównywane są tylko pliki z zapisaną głośnością (tagi ReplayGain).',
+            l10n.playbackSettingsScreenMeasureNote,
             style: TextStyle(
               color: palette.textSecondary,
               fontSize: AppFontSize.small,
@@ -247,7 +238,8 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
 }
 
 /// "Wyłączone", "5 s".
-String crossfadeLabel(int seconds) => seconds == 0 ? 'Wyłączone' : '$seconds s';
+String crossfadeLabel(int seconds) =>
+    seconds == 0 ? l10n.playbackSettingsScreenCrossfadeOff : '$seconds s';
 
 class _Edge extends StatelessWidget {
   const _Edge(this.text);

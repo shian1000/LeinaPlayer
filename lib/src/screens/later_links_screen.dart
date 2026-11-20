@@ -14,6 +14,7 @@ import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../data/spotify_playlist.dart';
+import '../l10n.dart';
 import '../playback/playback_queue.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
@@ -125,10 +126,10 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       appBar: AppBar(
         backgroundColor: palette.background,
         centerTitle: true,
-        title: const Text(_id),
+        title: Text(l10n.laterLinksScreenTitle),
         actions: [
           IconButton(
-            tooltip: 'Ustawienia „$_id”',
+            tooltip: l10n.laterLinksScreenSettings,
             icon: const Icon(Icons.settings_outlined),
             onPressed: _openSettings,
           ),
@@ -144,7 +145,7 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
               child: Row(
                 children: [
                   PillChip(
-                    label: 'Wszyscy',
+                    label: l10n.laterLinksScreenEveryone,
                     selected: _personId == null,
                     onTap: () => setState(() => _personId = null),
                   ),
@@ -169,12 +170,8 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
               child: Text(
                 later.links.isEmpty
-                    ? 'Nic tu jeszcze nie ma.\n\nGdy ktoś przyśle Ci link z YouTube albo '
-                          'Spotify, stuknij go i w okienku „Otwórz w…” wybierz „Zapisz na '
-                          'później” — potem wskaż, od kogo jest.\n\nOkienko pokazuje się, gdy '
-                          'linki otwiera $appName i nie zapamiętano wyboru (Ustawienia › '
-                          'Otwieranie linków).'
-                    : 'Nic od tej osoby.',
+                    ? l10n.laterLinksScreenEmpty(appName)
+                    : l10n.laterLinksScreenNothingFromPerson,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: palette.textSecondary),
               ),
@@ -185,7 +182,7 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
               right: _queueSwipe(link),
               left: removeSwipe(
                 context,
-                'Usuń z „$_id”',
+                l10n.laterLinksScreenRemove,
                 () => _swipeRemove(link),
               ),
               child: _LaterRow(
@@ -214,9 +211,9 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       icon: next ? Icons.playlist_play : Icons.queue_music,
       label: next
           ? (_isPlaylist(link)
-                ? 'Odtwórz jako następną'
-                : 'Odtwórz jako następny')
-          : 'Dodaj do kolejki',
+                ? l10n.laterLinksScreenPlayNextPlaylist
+                : l10n.laterLinksScreenPlayNext)
+          : l10n.laterLinksScreenAddToQueue,
       onTriggered: () => _queue(link, next: next),
     );
   }
@@ -229,7 +226,7 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text('Usunięto z „$_id”: ${link.title ?? link.kind}'),
+          content: Text(l10n.laterLinksScreenRemoved(link.title ?? link.kind)),
         ),
       );
   }
@@ -250,49 +247,53 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       entries: [
         MenuSheetEntry(
           Icons.play_arrow,
-          'Otwórz w $appName',
+          l10n.laterLinksScreenOpenIn(appName),
           onTap: () => _open(link),
         ),
         MenuSheetEntry(
           Icons.queue_music,
-          'Dodaj do kolejki',
+          l10n.laterLinksScreenAddToQueue,
           onTap: () => _queue(link, next: false),
         ),
         MenuSheetEntry(
           Icons.playlist_play,
-          _isPlaylist(link) ? 'Odtwórz jako następną' : 'Odtwórz jako następny',
+          _isPlaylist(link)
+              ? l10n.laterLinksScreenPlayNextPlaylist
+              : l10n.laterLinksScreenPlayNext,
           onTap: () => _queue(link, next: true),
         ),
         MenuSheetEntry(
           link.opened
               ? Icons.radio_button_unchecked
               : Icons.check_circle_outline,
-          link.opened ? 'Oznacz jako nieodsłuchany' : 'Oznacz jako odsłuchany',
+          link.opened
+              ? l10n.laterLinksScreenMarkUnheard
+              : l10n.laterLinksScreenMarkHeard,
           onTap: () => later.setOpened(link, !link.opened),
         ),
         MenuSheetEntry(
           Icons.person_outline,
-          'Zmień, od kogo jest',
+          l10n.laterLinksScreenChangePerson,
           onTap: () => _choosePerson(link),
         ),
         MenuSheetEntry(
           Icons.open_in_new,
-          'Otwórz w aplikacji $app',
+          l10n.laterLinksScreenOpenInApp(app),
           onTap: () => _openOutside(link.service, uri),
         ),
         MenuSheetEntry(
           Icons.link,
-          'Kopiuj link',
+          l10n.laterLinksScreenCopyLink,
           onTap: () async {
             await Clipboard.setData(ClipboardData(text: link.url));
             messenger.showSnackBar(
-              const SnackBar(content: Text('Skopiowano link.')),
+              SnackBar(content: Text(l10n.laterLinksScreenLinkCopied)),
             );
           },
         ),
         MenuSheetEntry(
           Icons.delete_outline,
-          'Usuń z „Na później”',
+          l10n.laterLinksScreenRemove,
           onTap: () => later.remove(link),
         ),
       ],
@@ -319,9 +320,9 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
     messenger
       ..clearSnackBars()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('Sprawdzam link…'),
-          duration: Duration(seconds: 30),
+        SnackBar(
+          content: Text(l10n.laterLinksScreenChecking),
+          duration: const Duration(seconds: 30),
         ),
       );
     String problem;
@@ -353,14 +354,14 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
                 ),
         );
       }
-      problem = 'W tym linku nie ma utworów do dodania.';
+      problem = l10n.laterLinksScreenNoSongs;
     } on YouTubeSearchException catch (e) {
       problem = e.message;
     } on SpotifyException catch (e) {
       problem = e.message;
     } catch (e) {
       debugPrint('Queueing ${link.url} failed: $e');
-      problem = 'Nie udało się odczytać linku.';
+      problem = l10n.laterLinksScreenReadFailed;
     }
     if (messenger.mounted) {
       messenger
@@ -386,15 +387,15 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       idPrefix: '$_id › Od kogo',
       header: MenuSheetHeader(
         cover: _ServiceIcon(service: link.service),
-        title: 'Od kogo?',
+        title: l10n.laterLinksScreenFromWhom,
         subtitle: link.title ?? link.kind,
       ),
       entries: [
         MenuSheetEntry(
           Icons.person_add_alt,
-          'Nowa osoba',
+          l10n.laterLinksScreenNewPerson,
           onTap: () async {
-            final name = await _askName('Nowa osoba', '');
+            final name = await _askName(l10n.laterLinksScreenNewPerson, '');
             if (name == null) return;
             await later.setPerson(link, await later.addPerson(name));
           },
@@ -414,7 +415,7 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       context: context,
       builder: (_) => TextInputDialog(
         title: title,
-        hint: 'Imię lub nazwa',
+        hint: l10n.laterLinksScreenNameHint,
         initial: initial,
       ),
     );
@@ -430,21 +431,25 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
       header: MenuSheetHeader(
         cover: _Initial(name: person.name),
         title: person.name,
-        subtitle:
-            'Linków: ${later.links.where((l) => l.personId == person.id).length}',
+        subtitle: l10n.laterLinksScreenLinkCount(
+          later.links.where((l) => l.personId == person.id).length,
+        ),
       ),
       entries: [
         MenuSheetEntry(
           Icons.edit_outlined,
-          'Zmień nazwę',
+          l10n.laterLinksScreenRename,
           onTap: () async {
-            final name = await _askName('Zmień nazwę', person.name);
+            final name = await _askName(
+              l10n.laterLinksScreenRename,
+              person.name,
+            );
             if (name != null) await later.renamePerson(person, name);
           },
         ),
         MenuSheetEntry(
           Icons.delete_outline,
-          'Usuń osobę',
+          l10n.laterLinksScreenRemovePerson,
           onTap: () => _confirmRemovePerson(person),
         ),
       ],
@@ -457,20 +462,20 @@ class _LaterLinksScreenState extends State<LaterLinksScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Usunąć „${person.name}”?'),
+        title: Text(l10n.laterLinksScreenRemovePersonQuestion(person.name)),
         content: Text(
           count == 0
-              ? 'Zniknie z listy osób w okienku „Zapisz na później”.'
-              : 'Razem z nią znikną zapisane od niej linki ($count).',
+              ? l10n.laterLinksScreenRemovePersonNoLinks
+              : l10n.laterLinksScreenRemovePersonWithLinks(count),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Anuluj'),
+            child: Text(l10n.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Usuń'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -490,11 +495,11 @@ class _LaterSettingsSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Text(
-              'Ustawienia „$_id”',
-              style: TextStyle(
+              l10n.laterLinksScreenSettings,
+              style: const TextStyle(
                 fontSize: AppFontSize.emphasis,
                 fontWeight: FontWeight.bold,
               ),
@@ -502,7 +507,7 @@ class _LaterSettingsSheet extends StatelessWidget {
           ),
           SwitchListTile(
             secondary: const Icon(Icons.check_circle_outline),
-            title: const Text('Po dodaniu do kolejki, oznacz jako odsłuchane'),
+            title: Text(l10n.laterLinksScreenMarkHeardWhenQueued),
             value: settings.laterQueuedListened,
             onChanged: settings.setLaterQueuedListened,
           ),
@@ -532,7 +537,7 @@ class _LaterRow extends StatelessWidget {
     final details = [
       // The icon already tells YouTube from Spotify; the kind only names an untitled link.
       ?link.artist,
-      if (person != null) 'od: $person',
+      if (person case final person?) l10n.laterLinksScreenFrom(person),
       laterDateLabel(link.savedAt, DateTime.now()),
     ];
     return ListTile(
@@ -542,7 +547,7 @@ class _LaterRow extends StatelessWidget {
         children: [
           if (!link.opened) ...[
             Tooltip(
-              message: 'Nieodsłuchany',
+              message: l10n.laterLinksScreenUnheard,
               child: Icon(Icons.circle, size: 10, color: palette.accent),
             ),
             const SizedBox(width: 6),
@@ -560,7 +565,7 @@ class _LaterRow extends StatelessWidget {
       ),
       subtitle: ScrollingText(details.join(' • ')),
       trailing: IconButton(
-        tooltip: 'Menu linku (⋮)',
+        tooltip: l10n.laterLinksScreenLinkMenu,
         icon: const Icon(Icons.more_vert),
         onPressed: onMenu,
       ),
@@ -625,9 +630,9 @@ String laterDateLabel(DateTime at, DateTime now) {
     now.month,
     now.day,
   ).difference(DateTime(at.year, at.month, at.day)).inDays;
-  if (days <= 0) return 'dzisiaj';
-  if (days == 1) return 'wczoraj';
-  if (days < 7) return '$days dni temu';
+  if (days <= 0) return l10n.laterLinksScreenToday;
+  if (days == 1) return l10n.laterLinksScreenYesterday;
+  if (days < 7) return l10n.laterLinksScreenDaysAgo(days);
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(at.day)}.${two(at.month)}.${at.year}';
 }

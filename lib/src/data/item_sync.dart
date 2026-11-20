@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n.dart';
 import 'playlist_sync.dart';
 
 /// What an item synced with MusicDatabase item by item ([ItemSync]) remembers about that.
@@ -157,7 +158,7 @@ abstract class ItemSync extends ChangeNotifier {
 
   /// What the list is, in the genitive, for problems shown in Synchronizacja › Biblioteka użytkownika ("…nie obsługuje jeszcze
   /// polubionych i zapisanych utworów").
-  final String problemNoun;
+  final String Function() problemNoun;
 
   final DateTime Function() now;
 
@@ -260,7 +261,7 @@ abstract class ItemSync extends ChangeNotifier {
         return e.problem;
       } catch (e) {
         debugPrint('Syncing $collection on $server failed: $e');
-        problem = 'Brak połączenia z serwerem MusicDatabase';
+        problem = l10n.itemSyncNoConnection;
       } finally {
         client.close();
       }
@@ -328,20 +329,13 @@ abstract class ItemSync extends ChangeNotifier {
         return null;
       case HttpStatus.unauthorized:
         onUnauthorized?.call();
-        throw const _SyncStopped(
-          'Serwer nie przyjął logowania — zaloguj się ponownie (Ustawienia › Konto)',
-        );
+        throw _SyncStopped(l10n.itemSyncLoginRejected);
       case HttpStatus.serviceUnavailable:
-        throw _SyncStopped(
-          'Serwer MusicDatabase nie może teraz zapisać $problemNoun (dysk niepodłączony '
-          'lub baza użytkownika jeszcze nieprzygotowana)',
-        );
+        throw _SyncStopped(l10n.itemSyncServerCantSave(problemNoun()));
       case HttpStatus.notFound when !keepGoing:
-        throw _SyncStopped(
-          'Serwer MusicDatabase nie obsługuje jeszcze $problemNoun',
-        );
+        throw _SyncStopped(l10n.itemSyncNotSupported(problemNoun()));
     }
-    final problem = 'Serwer odrzucił zmianę (HTTP ${answer.status})';
+    final problem = l10n.itemSyncRejected(answer.status);
     if (keepGoing) return problem;
     throw _SyncStopped(problem);
   }
