@@ -20,8 +20,8 @@ when MusicDatabase knows its file. MusicDatabase already knows it: `files.db` ma
 file under `Settings.local_library_dir` (a path relative to that folder) to its `songs.id`, and
 the sharing server already serves `files.db` with `music.db` and `tag.db`.
 
-The phone now downloads `files.db` too. A song with a file there gets a new source, "Serwer", in
-Ustawienia › Odtwarzanie › Kolejność odtwarzania (default order: Telefon, Serwer, YouTube).
+The phone now downloads `files.db` too. A song with a file there gets a new source, "Prywatny serwer"
+(called "Serwer" at first), in Ustawienia › Odtwarzanie › Źródła (default order: Telefon, Prywatny serwer, YouTube).
 What's missing is a way to get the file's bytes. The sharing server serves nothing but the three
 databases, so the phone needs one more endpoint.
 

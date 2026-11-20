@@ -146,7 +146,7 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   unpinned — see `download_files.dart` and [`local-library.md`](local-library.md).
 
 Playback (`lib/src/playback/youtube_playback.dart`, `YouTubePlayback`): the switched-on
-`YouTubePlaybackMethod`s in the user's order (Ustawienia › Odtwarzanie › Sposoby odtwarzania YouTube;
+`YouTubePlaybackMethod`s in the user's order (Ustawienia › Odtwarzanie › Źródła › YouTube — the screen "Sposoby odtwarzania YouTube";
 default cache → NewPipe → youtube_explode → yt-dlp server → YouTube app), first that works wins.
 The YouTube app method opens `https://www.youtube.com/watch?v=<id>` — on Android by naming the
 YouTube app's package (`openInYouTubeApp` → `MainActivity.kt`, then a browser that isn't this

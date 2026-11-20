@@ -18,6 +18,7 @@ import 'link_settings_screen.dart';
 import 'local_music_screen.dart';
 import 'outbox_settings_screen.dart';
 import 'playback_settings_screen.dart';
+import 'playback_sources_screen.dart';
 import 'feature_infos.dart';
 import 'privacy_screen.dart';
 import 'private_server_screen.dart';
@@ -25,6 +26,7 @@ import 'problems_screen.dart';
 import 'sync_settings_screen.dart';
 import '../widgets/feature_info.dart';
 import 'spotify_source_screen.dart';
+import 'youtube_playback_screen.dart';
 import 'youtube_source_screen.dart';
 
 class _SettingsEntry {
@@ -186,28 +188,49 @@ const _sections = <(String, List<_SettingsEntry>)>[
       _SettingsEntry(
         Icons.volume_up_outlined,
         'Odtwarzanie',
-        'Kolejność źródeł • Sposoby odtwarzania YouTube • Przenikanie • '
-            'Wyrównywanie głośności',
+        'Źródła • Przenikanie • Wyrównywanie głośności',
         _openPlayback,
         keywords: [
-          'Kolejność odtwarzania',
-          'Źródła',
+          'Ukryte utwory',
           'Przejścia między utworami',
           'Przenikanie utworów',
           'Wyrównywanie głośności',
           'Normalizacja głośności',
           'Mierz głośność na telefonie',
+          'Przeciągnięcie utworu w prawo',
         ],
-      ),
-      _SettingsEntry(
-        Icons.folder_outlined,
-        'Muzyka na telefonie',
-        'Foldery z muzyką • Skanowanie',
-        _openLocalMusic,
-        keywords: [
-          'Foldery do skanowania',
-          'Nowe utwory spoza bazy',
-          'Ostatnie skanowanie',
+        deeper: [
+          _SettingsEntry(
+            Icons.low_priority,
+            'Źródła',
+            'Telefon • Prywatny serwer • YouTube',
+            _openPlaybackSources,
+            keywords: [
+              'Kolejność odtwarzania',
+              'Kolejność źródeł',
+              'Włącz źródło',
+            ],
+            deeper: [
+              _SettingsEntry(
+                Icons.folder_outlined,
+                'Muzyka na telefonie',
+                'Foldery z muzyką • Skanowanie',
+                _openLocalMusic,
+                keywords: [
+                  'Foldery do skanowania',
+                  'Nowe utwory spoza bazy',
+                  'Ostatnie skanowanie',
+                ],
+              ),
+              _SettingsEntry(
+                Icons.smart_display_outlined,
+                'Sposoby odtwarzania YouTube',
+                'NewPipeExtractor • youtube_explode • Aplikacja YouTube',
+                _openYouTubePlayback,
+                keywords: ['Otwórz w aplikacji YouTube'],
+              ),
+            ],
+          ),
         ],
       ),
       _SettingsEntry(
@@ -388,7 +411,13 @@ Widget _openOutbox(BuildContext context) => const OutboxSettingsScreen();
 
 Widget _openPlayback(BuildContext context) => const PlaybackSettingsScreen();
 
+Widget _openPlaybackSources(BuildContext context) =>
+    const PlaybackSourcesScreen();
+
 Widget _openLocalMusic(BuildContext context) => const LocalMusicScreen();
+
+Widget _openYouTubePlayback(BuildContext context) =>
+    const YouTubePlaybackScreen();
 
 Widget _openHistory(BuildContext context) => const HistorySettingsScreen();
 

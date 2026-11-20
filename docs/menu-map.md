@@ -25,7 +25,7 @@ The app is called **Leina Player** on the phone (`lib/src/app_name.dart`; packag
   (`watch?v=`, `youtu.be/`, `shorts/`, also with `&list=`) is recognised as a MusicDatabase song
   where possible (`video_link.dart`: music.db's link, a phone match, then the video's title) and,
   after the native "Jak odtworzyć?" sheet (`LinkChooserActivity`: teraz / jako następny / na koniec
-  kolejki — shared and tapped links alike), played from the first source in "Kolejność odtwarzania", in the full player. A Spotify playlist
+  kolejki — shared and tapped links alike), played from the first source in Odtwarzanie › "Źródła", in the full player. A Spotify playlist
   link (`open.spotify.com/playlist/…`, `spotify.link/…`) is imported and opened the same way; other
   Spotify links (tracks, albums) and anything else → a message. Only YouTube links can be *opened*
   with the app; Spotify ones arrive through "Udostępnij". On Android 12+ YouTube links reach the app only after the user allows it (see
@@ -228,7 +228,6 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   and Udostępnij profil (**implemented**: the latest year's summary opened on its last card, the
   one shared as a picture — `ListeningSummaryScreen(atShareCard:)`; a note when nothing has
   been played yet).
-- Konto MusicDatabase card (synced or phone only) **→ Konto**.
 - Statystyki słuchania **→ Statystyki słuchania** (`listening_stats_screen.dart`) —
   **implemented** (ADR 0012): "Ten tydzień" on top — the week's highlights as cards (milestones,
   Nowe odkrycie, Powrót, Utwór tygodnia, Na zapętleniu; a song's card plays it, an artist's opens
@@ -239,16 +238,18 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   queues them), Wykonawcy and Albumy (top 10, sideways, opening the artist's / album's songs),
   Pory dnia (listened time per hour), Dekady, Języki, Kraje wykonawców, Skąd grało (shares).
   Ustawienia **→ Ustawienia**.
-- Zaplanowane uruchomienie muzyki (when, or "Wyłączone") **→** `ScheduledStartScreen`
-  (`scheduled_music_screen.dart`) — **implemented**: the time (tap: picker, which also switches it
-  on) with a switch, days to repeat on (Pn–Nd; none ticked: once), Głośność (5–100%, sets the phone's music volume and leaves it there), Co ma
-  zagrać: Utwór (→ search, a tap picks) / Playlista (→ list) / Ostatnia kolejka;
-  the app starts if it isn't running and the music plays, nothing to confirm. Under the time,
-  while it's on and Android 14+ doesn't let the app open itself: "Muzyka nie włączy się sama" (tap:
-  Android's "Powiadomienia pełnoekranowe" screen for the app; switching it on asks the same in a
-  dialog, "Pozwól otwierać aplikację").
-- Zaplanowane wyłączenie (when, or "Wyłączone") **→** `ScheduledStopScreen` — **implemented**: the
-  time with a switch and the same days; the music fades out and pauses.
+- Zaplanowana muzyka ("Uruchomienie o 07:00 • wyłączenie o 23:00", or "Wyłączone") **→**
+  `ScheduledMusicScreen` (`scheduled_music_screen.dart`), with two rows:
+  - Zaplanowane uruchomienie (when, or "Wyłączone") **→** `ScheduledStartScreen` — **implemented**:
+    the time (tap: picker, which also switches it on) with a switch, days to repeat on (Pn–Nd;
+    none ticked: once), Głośność (5–100%, sets the phone's music volume and leaves it there), Co
+    ma zagrać: Utwór (→ search, a tap picks) / Playlista (→ list) / Ostatnia kolejka; the app
+    starts if it isn't running and the music plays, nothing to confirm. Under the time, while
+    it's on and Android 14+ doesn't let the app open itself: "Muzyka nie włączy się sama" (tap:
+    Android's "Powiadomienia pełnoekranowe" screen for the app; switching it on asks the same in
+    a dialog, "Pozwól otwierać aplikację").
+  - Zaplanowane wyłączenie (when, or "Wyłączone") **→** `ScheduledStopScreen` — **implemented**: the
+    time with a switch and the same days; the music fades out and pauses.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference
   app: 🔍 "Szukaj w ostatnich" in the app bar (as within a playlist: title, artist or album, under
   their days; Back closes it first; "Szukaj w całej bazie" carries the query over), 🗑 "Wyczyść
@@ -398,23 +399,39 @@ import, Wyświetlanie, Dane, Aplikacja.
 
 ### Słuchanie
 
-- Odtwarzanie **→ Odtwarzanie** (`playback_settings_screen.dart`) — **implemented**, section *Źródła*:
-  - Kolejność odtwarzania **→ Kolejność odtwarzania** (`playback_order_screen.dart`) — drag to
-    reorder the playback sources (default: 1. Telefon, 2. Serwer, 3. YouTube; Serwer = the song's
-    file in MusicDatabase's music library, streamed — [ADR 0010](decisions/0010-server-files.md)),
-    and a switch per source (all on by default; a switched-off source is never used, and with
-    YouTube off a song no other source has isn't searched there either). When a song is playable
-    from several, the first one in this order is used.
-  - "Sposoby odtwarzania YouTube" **→ Sposoby odtwarzania YouTube** (`youtube_playback_screen.dart`):
-    every `YouTubePlaybackMethod` with a switch and a drag handle; the first switched-on one that
-    works plays the video (`YouTubePlayback`). Default order and state: "Pamięć podręczna" (on),
-    "Korzystaj z NewPipeExtractor" (on; disabled with "Dostępne tylko na Androidzie"
-    elsewhere), "Korzystaj z pakietu youtube_explode" (off — YouTube answers 403), "Korzystaj z
-    yt-dlp przez serwer" (off, not implemented), "Otwórz w aplikacji YouTube" (on — the last
-    resort: opens the video in the YouTube app — inside its YouTube playlist when the song plays
-    from an imported one — or the browser without it, and pauses this app's player). The tile shows the active order ("1. Pamięć podręczna, 2. NewPipe, ...").
-  Then a note (the cache of played songs is in Oszczędzanie danych › Pamięć podręczna) and section
-  *Przejścia między utworami*:
+- Odtwarzanie **→ Odtwarzanie** (`playback_settings_screen.dart`) — **implemented**, from the top
+  (no section header). Muzyka na telefonie and Sposoby odtwarzania YouTube are reached only
+  through Źródła — no longer from Ustawienia's list / Odtwarzanie itself (user's decision,
+  2026-11-20):
+  - Źródła **→ Źródła** (`playback_sources_screen.dart`; the tile shows the active order, "1.
+    Telefon, 2. Prywatny serwer, 3. YouTube") — drag to reorder the playback sources (default:
+    1. Telefon, 2. Prywatny serwer, 3. YouTube; Prywatny serwer = the song's file in
+    MusicDatabase's music library, streamed — [ADR 0010](decisions/0010-server-files.md)), and a
+    switch per source (all on by default; a switched-off source is never used, and with YouTube
+    off a song no other source has isn't searched there either). When a song is playable from
+    several, the first one in this order is used. A note under the list: the cache of played
+    songs is in Oszczędzanie danych › Pamięć podręczna. Tapping a source opens its settings:
+    - Telefon **→ Muzyka na telefonie** (`local_music_screen.dart`):
+      - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
+        and opens Android's folder picker (`file_picker`).
+      - "Ostatnie skanowanie" and "Skanuj teraz": finds audio files in the folders (recursively),
+        adds new ones to the phone's `local.db` — artist/title from tags, else from the
+        "Artist - Title" file name — and links each to MusicDatabase (`main_db_id`) or marks it
+        `pending`; drops files that are gone and re-checks earlier pending ones.
+      - "Utwory zapisane na urządzeniu: X" and "Nowe utwory spoza bazy danych: X" — the latter
+        **→ list of pending files** (`PendingSongsScreen`).
+    - Prywatny serwer **→ Prywatny serwer** (`private_server_screen.dart`, the same screen as
+      Synchronizacja's).
+    - YouTube **→ Sposoby odtwarzania YouTube** (`youtube_playback_screen.dart`):
+      every `YouTubePlaybackMethod` with a switch and a drag handle; the first switched-on one that
+      works plays the video (`YouTubePlayback`). Default order and state: "Pamięć podręczna" (on),
+      "Korzystaj z NewPipeExtractor" (on; disabled with "Dostępne tylko na Androidzie"
+      elsewhere), "Korzystaj z pakietu youtube_explode" (off — YouTube answers 403), "Korzystaj z
+      yt-dlp przez serwer" (off, not implemented), "Otwórz w aplikacji YouTube" (on — the last
+      resort: opens the video in the YouTube app — inside its YouTube playlist when the song plays
+      from an imported one — or the browser without it, and pauses this app's player).
+  - Ukryte utwory **→ Ukryte utwory** (`hidden_songs_screen.dart`).
+  Then section *Przejścia między utworami*:
   "Przenikanie utworów" — slider Wył.–12 s (1 s steps, default off, saved on release): the
   next queue song starts that long before the current one ends, one fading out as the other
   fades in; only when the queue moves on by itself ("Następny" and tapped songs switch at
@@ -431,15 +448,6 @@ import, Wyświetlanie, Dane, Aplikacja.
   what it measures, when, and what it costs (`SourceSettings.levelingMeasure`). Section
   *Przeciągnięcie utworu w prawo*: Odtwórz jako następny (default) / Dodaj do kolejki (na sam
   koniec) — what dragging a song row right does (also in Kolejka: play next / move to the end).
-- Muzyka na telefonie **→ Muzyka na telefonie** (`local_music_screen.dart`) — **implemented**:
-  - Folders to scan, each with × to remove; "Dodaj folder" asks for read access to music files
-    and opens Android's folder picker (`file_picker`).
-  - "Ostatnie skanowanie" and "Skanuj teraz": finds audio files in the folders (recursively),
-    adds new ones to the phone's `local.db` — artist/title from tags, else from the
-    "Artist - Title" file name — and links each to MusicDatabase (`main_db_id`) or marks it
-    `pending`; drops files that are gone and re-checks earlier pending ones.
-  - "Utwory zapisane na urządzeniu: X" and "Nowe utwory spoza bazy danych: X" — the latter
-    **→ list of pending files** (`PendingSongsScreen`).
 - Historia odtwarzania **→ Historia odtwarzania** (`history_settings_screen.dart`) —
   **implemented**: "Przechowuj historię" (dialog: 7 / 30 / 90 — default / 180 dni, Rok, Bez
   limitu; older plays are deleted on start and with each new play, `PlayHistory.keepDays`;
@@ -615,7 +623,7 @@ connects to, buttons (Prywatność i połączenia; Wyloguj z Google; Konto): the
 and Odkrywaj; a song menu's "Przejdź do radia utworu" (`MenuSheetEntry.onLongPress`);
 Ustawienia › Konto › the Google account's e-mail; Synchronizacja › Biblioteka użytkownika › "Synchronizuj konto"; Ja › Statystyki słuchania;
 Synchronizacja › Prośby do bazy danych and each Prywatny serwer row (and the Telefon row to
-Zgłoszenia poprawek); Sposoby odtwarzania YouTube › NewPipeExtractor and
+Zgłoszenia poprawek); Odtwarzanie › Źródła › YouTube (Sposoby odtwarzania YouTube) › NewPipeExtractor and
 youtube_explode; YouTube › NewPipeExtractor, youtube_explode and "Korzystaj z API"; Spotify ›
 Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce").
 
@@ -678,7 +686,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   - Results are "Dostępne" (a phone file, pending or not, a file on the server, or a stored
     YouTube video),
     "Potencjalnie dostępne" (dimmed YouTube icon, not on the phone) or "Niedostępne"
-    (`SongAvailability`). Tapping a result uses the first source in "Kolejność odtwarzania"
+    (`SongAvailability`). Tapping a result uses the first source in Odtwarzanie › "Źródła"
     that has it: phone → plays the file (**implemented**, `just_audio`, row highlighted with a
     green title + `PlayingBars`, bars that bounce while it plays and stop while paused, like the
     reference app's); server → streams the song's `files.db` file (`GET /library/<id>`, ADR 0010; the database icon is then a server icon); YouTube → streams the video's audio (**implemented on Android**

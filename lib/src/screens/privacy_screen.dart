@@ -15,7 +15,7 @@ import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
 import 'private_server_screen.dart';
 import 'sync_settings_screen.dart';
-import 'playback_order_screen.dart';
+import 'playback_sources_screen.dart';
 import 'spotify_source_screen.dart';
 import 'youtube_source_screen.dart';
 
@@ -114,7 +114,7 @@ class PrivacyScreen extends StatelessWidget {
 
           const SectionTitle('Serwer MusicDatabase'),
           text(
-            'Baza utworów, Twoje pliki muzyczne (źródło „Serwer”; też okładki zapisane w tych '
+            'Baza utworów, Twoje pliki muzyczne (źródło „Prywatny serwer”; też okładki zapisane w tych '
             'plikach — sam początek pliku, bez muzyki), teksty piosenek (dostaje id utworu, '
             'gdy otwarty jest pełny odtwarzacz) i zgłoszenia poprawek. Po '
             'zalogowaniu także synchronizacja konta: playlisty, nastroje, foldery, okładki, '
@@ -182,8 +182,8 @@ class PrivacyScreen extends StatelessWidget {
               if (settings.youTubeSearchEnabled) 'wyszukiwanie',
             ]),
           goTo(
-            'Kolejność odtwarzania: źródła, w tym YouTube',
-            () => const PlaybackOrderScreen(),
+            'Odtwarzanie › Źródła, w tym YouTube',
+            () => const PlaybackSourcesScreen(),
           ),
           goTo(
             'YouTube: wyszukiwanie i klucz API',

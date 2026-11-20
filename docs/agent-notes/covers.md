@@ -5,7 +5,7 @@
 placeholder `CoverArt`). Lite logic per ADR 0003: MusicDatabase has no covers yet; the hand-off
 asking it for an `albums` table and covers is
 [`../handoffs/musicdatabase-albums-and-covers.md`](../handoffs/musicdatabase-albums-and-covers.md).
-Once it has them, the "Serwer" source should read them too, keyed on `album_id`.
+Once it has them, the "Prywatny serwer" source should read them too, keyed on `album_id`.
 
 - **Sources**, the user's order (`SourceSettings.coverOrder`/`coverSources`, Ustawienia › Źródła
   okładek): Serwer (the picture inside the song's file in the server's music library —

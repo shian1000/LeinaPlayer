@@ -358,11 +358,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nie ma ustawienia „nie ma takiego”.'), findsOneWidget);
 
+    // A source's screen is found under Odtwarzanie › Źródła, no longer on Ustawienia itself.
+    await tester.enterText(find.byType(TextField), 'skanowanie');
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Ustawienia › Słuchanie › Odtwarzanie › Źródła › Muzyka na telefonie',
+      ),
+      findsWidgets,
+    );
+
     await tester.enterText(find.byType(TextField), 'przenikanie');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Przenikanie utworów'));
     await tester.pumpAndSettle();
-    expect(find.text('Kolejność odtwarzania'), findsWidgets);
+    expect(find.text('Źródła'), findsWidgets);
   });
 
   testWidgets('Biblioteka\'s grid switch is remembered', (tester) async {
@@ -436,8 +446,14 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Muzyka na telefonie'));
+    expect(find.text('Muzyka na telefonie'), findsNothing);
+    await tester.tap(find.text('Odtwarzanie'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Źródła'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1. Telefon'));
+    await tester.pumpAndSettle();
+    expect(find.text('Muzyka na telefonie'), findsOneWidget);
 
     expect(find.text('Nie dodano folderów'), findsOneWidget);
     expect(find.text('Dodaj folder'), findsOneWidget);
@@ -500,8 +516,12 @@ void main() {
     await scrollSettingsTo(tester, 'Odtwarzanie', delta: -200);
     await tester.tap(find.text('Odtwarzanie'));
     await tester.pumpAndSettle();
-    expect(find.text('1. Telefon, 2. Serwer, 3. YouTube'), findsOneWidget);
-    await tester.tap(find.text('Kolejność odtwarzania'));
+    expect(
+      find.text('1. Telefon, 2. Prywatny serwer, 3. YouTube'),
+      findsOneWidget,
+    );
+    expect(find.text('Sposoby odtwarzania YouTube'), findsNothing);
+    await tester.tap(find.text('Źródła'));
     await tester.pumpAndSettle();
     await tester.drag(
       find.byIcon(Icons.drag_handle).last,
@@ -510,12 +530,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('1. YouTube'), findsOneWidget);
     expect(find.text('2. Telefon'), findsOneWidget);
-    expect(find.text('3. Serwer'), findsOneWidget);
+    expect(find.text('3. Prywatny serwer'), findsOneWidget);
     expect(prefs.getStringList('sources.playback_order'), [
       'youtube',
       'phone',
       'server',
     ]);
+
+    // Each source opens its own settings.
+    await tester.tap(find.text('1. YouTube'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sposoby odtwarzania YouTube'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('3. Prywatny serwer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Adres serwera (połączenie zdalne)'), findsOneWidget);
   });
 
   /// Ja › Ustawienia › Synchronizacja › Baza danych › Prywatny serwer.

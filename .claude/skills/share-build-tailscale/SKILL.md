@@ -1,13 +1,13 @@
 ---
 name: share-build-tailscale
-description: 'Make sure the release APK of this repo is up to date (rebuilding it if not), then copy it to music_database_app.apk and serve it over the Tailscale network for 15 minutes under a fixed download link that always points at the newest build, after which the server stops by itself. Trigger on "/share-build-tailscale", "udostępnij builda", "daj link do apki", "share the build", "send me the APK link", or when the user wants to download/install the current build on a device without a USB cable. Do not trigger when the user wants it installed on the USB-connected phone right now — that is run-on-physical-phone. Do not trigger when the user wants the existing build shared without building — that is share-existing-build-tailscale.'
+description: 'Make sure the release APK of this repo is up to date (rebuilding it if not), then copy it to leina-player.apk and serve it over the Tailscale network for 15 minutes under a fixed download link that always points at the newest build, after which the server stops by itself. Trigger on "/share-build-tailscale", "udostępnij builda", "daj link do apki", "share the build", "send me the APK link", or when the user wants to download/install the current build on a device without a USB cable. Do not trigger when the user wants it installed on the USB-connected phone right now — that is run-on-physical-phone. Do not trigger when the user wants the existing build shared without building — that is share-existing-build-tailscale.'
 ---
 
 # Share build over Tailscale
 
-Adapted from the same skill in `../CustomMapMarker`. Differences: file name
-`music_database_app.apk` and port **8001** (CustomMapMarker uses 8000, so both projects can share
-a build at the same time without either link changing).
+Adapted from the same skill in `../CustomMapMarker`.
+Difference: the file name `leina-player.apk`. All the owner's apps share through Leina APK Manager
+(Step 3), so no port belongs to this project.
 
 ## What this does, in order
 
@@ -50,28 +50,28 @@ Re-run `check_build_fresh.sh` afterwards; it must print `fresh`.
 .claude/skills/share-build-tailscale/scripts/serve_apk.sh 15
 ```
 
-The script:
+The script hands the APK to **Leina APK Manager** (`../LeinaAPKManager`, the owner's app next to
+this repo), which shares the builds of all the owner's apps from one server on one port of this
+machine's **Tailscale** address — never `0.0.0.0` or the LAN, and the tailnet policy lets the
+phone in only on that port. It:
 
-- binds to this machine's **Tailscale** IPv4 (`tailscale ip -4`), so
-  only devices on the user's tailnet can reach it. Never bind to `0.0.0.0` or the LAN address.
-  If Tailscale is down, the script exits with code 2; tell the user, don't fall back to another
-  interface.
-- copies the APK to `build/share/music_database_app.apk` and serves only that directory. The file
-  name, port and Tailscale IP don't change, so the link is always the same:
-  `http://<tailscale-ip>:8001/music_database_app.apk` (the script prints it as `URL=`), and it always points at the build just
-  checked. Every response carries `Cache-Control: no-store` (`scripts/no_cache_server.py`), so the
-  phone's browser can't hand out a previously downloaded, older APK under the same URL.
-- runs the server under `timeout` in its own session (`setsid nohup … & disown`, the same pattern
-  that keeps scrcpy alive), so it stops by itself after 15 minutes even if this conversation ends.
-- replaces an earlier share started by this script (PID in `build/share-server.pid`). If port
-  8001 is taken by some other program, it exits with code 4 instead of switching ports (that
-  would change the link): show the user what holds the port (`ss -ltnp 'sport = :8001'`) and ask.
-- checks the link with `curl` before printing `URL=…`, `BUILT=…` (APK build time) and
-  `EXPIRES=HH:MM`.
+- copies the APK and serves it as `leina-player.apk`, so the link is always the same:
+  `http://<tailscale-ip>:<port>/leina-player.apk` (printed as `URL=`; the port is in the manager's
+  `settings.json`), and it always points at the build just checked. Every response carries
+  `Cache-Control: no-store`, so the phone's browser can't hand out an older, cached APK.
+- keeps it for 15 minutes; builds of other apps shared at the same time keep their own times.
+  The server stops by itself once nothing is shared, even if this conversation ends. Sharing
+  again replaces the copy and restarts the 15 minutes.
+- checks the link before printing `URL=…`, `BUILT=…` (APK build time) and `EXPIRES=HH:MM`.
 
-Run it as one foreground Bash call; it returns within a few seconds. Never stop the server with
-`pkill -f <pattern>`: the pattern also matches the Bash tool's own shell and kills the call.
-To stop it early, use `kill -- -$(cat build/share-server.pid)`.
+Exit codes: `2` Tailscale is down — tell the user, don't fall back to another interface; `3` the
+server didn't come up — show the message (log: `~/.cache/leina-apk-manager/server.log`); `4` the
+port is held by another program — show the message and ask, don't change ports; `5`
+`../LeinaAPKManager` is missing — tell the user, don't start a server of your own.
+
+Run it as one foreground Bash call; it returns within a few seconds. To stop sharing early:
+`../LeinaAPKManager/apk_manager.py stop --repo .` — never `pkill -f <pattern>`, which also kills
+the Bash tool's own shell.
 
 ## Step 4 — Report back
 

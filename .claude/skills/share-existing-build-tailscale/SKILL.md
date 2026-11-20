@@ -7,11 +7,11 @@ description: 'Serve the release APK that is already built in this repo over Tail
 
 Same as `share-build-tailscale`, minus the build: it never runs `flutter build`, Gradle, or
 anything else that compiles. It serves whatever `build/app/outputs/flutter-apk/app-release.apk`
-is there right now, under the same link (`http://<tailscale-ip>:8001/music_database_app.apk`).
+is there right now, under the same link (`http://<tailscale-ip>:<port>/leina-player.apk`, Leina APK Manager's port).
 
 It reuses the scripts of `share-build-tailscale` instead of having its own copies, so both skills
-always serve the same way and replace each other's running share (shared PID file
-`build/share-server.pid`). Read `.claude/skills/share-build-tailscale/SKILL.md` Step 3 for how the
+always serve the same way (through Leina APK Manager, `../LeinaAPKManager`) and replace each
+other's running share. Read `.claude/skills/share-build-tailscale/SKILL.md` Step 3 for how the
 server behaves; don't duplicate those scripts here.
 
 Run everything from the repo root.
@@ -39,12 +39,12 @@ Use the result only for information, never as a reason to build:
 Run it as one foreground Bash call; it returns within a few seconds. Exit codes:
 
 - `2` → Tailscale is down. Tell the user; don't fall back to another interface.
-- `4` → port 8001 is held by another program. Show `ss -ltnp 'sport = :8001'` and ask; don't
-  change the port.
-- `3` → the server didn't come up; show `build/share-server.log`.
+- `4` → the sharing port is held by another program. Show the message and ask; don't change ports.
+- `3` → the server didn't come up; show the message (log: `~/.cache/leina-apk-manager/server.log`).
+- `5` → `../LeinaAPKManager` is missing. Tell the user; don't start a server of your own.
 
-Never stop the server with `pkill -f <pattern>` (it kills the Bash tool's own shell). To stop it
-early: `kill -- -$(cat build/share-server.pid)`.
+To stop sharing early: `../LeinaAPKManager/apk_manager.py stop --repo .` — never `pkill -f
+<pattern>` (it kills the Bash tool's own shell).
 
 ## Step 3 — Report back
 

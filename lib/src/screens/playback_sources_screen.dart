@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
 import '../theme.dart';
+import 'local_music_screen.dart';
+import 'private_server_screen.dart';
+import 'youtube_playback_screen.dart';
 
-/// "Ustawienia › Odtwarzanie › Kolejność odtwarzania": which source plays a song that more
-/// than one source has, and which sources are used at all (switches). Rows are reordered by
-/// dragging.
-class PlaybackOrderScreen extends StatelessWidget {
-  const PlaybackOrderScreen({super.key});
+/// "Ustawienia › Odtwarzanie › Źródła": which source plays a song that more than one source
+/// has, and which sources are used at all (switches). Rows are reordered by dragging; a tap
+/// opens the source's own settings.
+class PlaybackSourcesScreen extends StatelessWidget {
+  const PlaybackSourcesScreen({super.key});
 
   static IconData iconOf(PlaybackSource source) => switch (source) {
     PlaybackSource.phone => Icons.smartphone,
     PlaybackSource.server => Icons.dns_outlined,
     PlaybackSource.youtube => Icons.smart_display_outlined,
+  };
+
+  static Widget _settingsOf(PlaybackSource source) => switch (source) {
+    PlaybackSource.phone => const LocalMusicScreen(),
+    PlaybackSource.server => const PrivateServerScreen(),
+    PlaybackSource.youtube => const YouTubePlaybackScreen(),
   };
 
   @override
@@ -24,7 +33,7 @@ class PlaybackOrderScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Kolejność odtwarzania'),
+        title: const Text('Źródła'),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -33,8 +42,9 @@ class PlaybackOrderScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
               'Gdy utwór jest dostępny w kilku miejscach, odtwarzany jest z pierwszego '
-              'włączonego na liście. Wyłączone źródła nie są używane. Przeciągnij, aby zmienić '
-              'kolejność.',
+              'włączonego na liście; z YouTube — pierwszym włączonym sposobem, który zadziała. '
+              'Wyłączone źródła nie są używane. Przeciągnij, aby zmienić kolejność; dotknij '
+              'źródła, aby otworzyć jego ustawienia.',
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -49,12 +59,27 @@ class PlaybackOrderScreen extends StatelessWidget {
                 list.insert(to, list.removeAt(from));
                 settings.setPlaybackOrder(list);
               },
+              footer: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                child: Text(
+                  'Zapisane utwory: Oszczędzanie danych i tryb offline › Pamięć podręczna.',
+                  style: TextStyle(
+                    color: palette.textSecondary,
+                    fontSize: AppFontSize.small,
+                  ),
+                ),
+              ),
               children: [
                 for (final (i, source) in order.indexed)
                   ListTile(
                     key: ValueKey(source),
                     leading: Icon(iconOf(source)),
                     title: Text('${i + 1}. ${source.label}'),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => _settingsOf(source),
+                      ),
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

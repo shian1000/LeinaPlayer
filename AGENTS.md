@@ -33,7 +33,7 @@ exported as a `.zip` package ("Wyślij paczkę…", [ADR 0014](docs/decisions/00
 folders on the phone into the phone's own `local.db`, song search over both databases, and
 ticking several songs with a long press for a shared action (queue, playlist, mood),
 playing phone files with a mini/full player, streaming a song's file from MusicDatabase's
-music library on the server when its `files.db` knows one (source "Serwer";
+music library on the server when its `files.db` knows one (source "Prywatny serwer", Ustawienia › Odtwarzanie › Źródła, where each source opens its own settings;
 [ADR 0010](docs/decisions/0010-server-files.md)), a play queue (playlists, "Dodaj do kolejki" —
 at the very end — / "Odtwórz jako następny" for songs, playlists, moods, albums and links
 saved "Na później", each entry remembering the playlist it was queued from, shuffle, the queue

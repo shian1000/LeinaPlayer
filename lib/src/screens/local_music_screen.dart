@@ -9,7 +9,7 @@ import '../data/album_covers.dart';
 import '../widgets/scrolling_text.dart';
 import '../widgets/song_cover.dart';
 
-/// "Ustawienia › Muzyka na telefonie" — folders on the phone that hold music, the
+/// "Ustawienia › Odtwarzanie › Źródła › Telefon" — folders on the phone that hold music, the
 /// scan that records their files in the phone's `local.db`, and the files not yet in
 /// MusicDatabase ("Nowe utwory spoza bazy danych").
 class LocalMusicScreen extends StatelessWidget {

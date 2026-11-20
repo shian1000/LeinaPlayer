@@ -184,7 +184,7 @@ class YouTubePlayback {
     throw YouTubePlaybackException(
       errors.isEmpty
           ? 'Brak włączonego sposobu odtwarzania z YouTube '
-                '(Ustawienia › Odtwarzanie › Sposoby odtwarzania YouTube).'
+                '(Ustawienia › Odtwarzanie › Źródła › YouTube).'
           : 'Nie udało się odtworzyć z YouTube (${errors.join('; ')}).',
       offline: offline,
     );

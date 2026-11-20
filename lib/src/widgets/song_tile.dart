@@ -457,7 +457,7 @@ class SongTile extends StatelessWidget {
 }
 
 /// The one icon next to a result, as tall as the cover and half as wide: where tapping it
-/// plays from first — the first source in the user's "Kolejność odtwarzania" that has the song
+/// plays from first — the first source in the user's "Źródła" order that has the song
 /// (a dimmed YouTube icon when none has it but searching YouTube may find it). A "*" marks a
 /// song not in MusicDatabase (it could be sent there one day), and a small pin a song kept on the
 /// phone — the user's own file, or its YouTube audio in Pamięć podręczna — so it plays offline.

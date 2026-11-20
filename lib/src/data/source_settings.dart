@@ -6,12 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'spotify_playlist.dart';
 
 /// Where a song can be played from; the user orders them in "Ustawienia › Odtwarzanie ›
-/// Kolejność odtwarzania".
+/// Źródła".
 enum PlaybackSource {
   phone('Telefon'),
 
   /// The song's file in the music library on MusicDatabase's server (`files.db`), streamed.
-  server('Serwer'),
+  server('Prywatny serwer'),
   youtube('YouTube');
 
   const PlaybackSource(this.label);
@@ -192,7 +192,7 @@ class SourceSettings extends ChangeNotifier {
   /// Every [PlaybackSource], most preferred first.
   List<PlaybackSource> get playbackOrder => _playbackOrder;
 
-  /// The sources switched on in "Kolejność odtwarzania" (all by default).
+  /// The sources switched on in "Źródła" (all by default).
   Set<PlaybackSource> get enabledSources => _enabledSources;
 
   /// The switched-on sources, most preferred first: what playback picks from.

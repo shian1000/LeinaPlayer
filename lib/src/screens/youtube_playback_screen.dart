@@ -15,7 +15,7 @@ String shortPlaybackLabel(YouTubePlaybackMethod m) => switch (m) {
   YouTubePlaybackMethod.youtubeApp => 'Aplikacja YouTube',
 };
 
-/// "Ustawienia › Odtwarzanie › Sposoby odtwarzania YouTube": which ways of playing a YouTube
+/// "Ustawienia › Odtwarzanie › Źródła › YouTube": which ways of playing a YouTube
 /// video are used, and in what order (drag to reorder). The first switched-on one that works
 /// plays the video.
 class YouTubePlaybackScreen extends StatelessWidget {

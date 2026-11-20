@@ -6,11 +6,10 @@ import '../playback/volume_leveling.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'hidden_songs_screen.dart';
-import 'playback_order_screen.dart';
-import 'youtube_playback_screen.dart';
+import 'playback_sources_screen.dart';
 
-/// "Ustawienia › Odtwarzanie": which source plays a song, the ways of playing YouTube,
-/// "Przenikanie utworów", "Wyrównywanie głośności", and what dragging a song row to the right
+/// "Ustawienia › Odtwarzanie": which source plays a song (and through it each source's
+/// settings), "Przenikanie utworów", "Wyrównywanie głośności", and what dragging a song row to the right
 /// does.
 class PlaybackSettingsScreen extends StatefulWidget {
   const PlaybackSettingsScreen({super.key});
@@ -40,10 +39,9 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const SectionTitle('Źródła'),
           ListTile(
             leading: const Icon(Icons.low_priority),
-            title: const Text('Kolejność odtwarzania'),
+            title: const Text('Źródła'),
             subtitle: Text(
               order.isEmpty
                   ? 'Wszystkie źródła wyłączone'
@@ -55,35 +53,7 @@ class _PlaybackSettingsScreenState extends State<PlaybackSettingsScreen> {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => const PlaybackOrderScreen(),
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.smart_display_outlined),
-            title: const Text('Sposoby odtwarzania YouTube'),
-            subtitle: Text(
-              [
-                for (final (i, m) in settings.activePlaybackMethods.indexed)
-                  '${i + 1}. ${shortPlaybackLabel(m)}',
-              ].join(', '),
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const YouTubePlaybackScreen(),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Text(
-              'Utwór gra z pierwszego źródła w kolejności, w którym jest dostępny; z YouTube — '
-              'pierwszym włączonym sposobem, który zadziała. Zapisane utwory: Oszczędzanie '
-              'danych i tryb offline › Pamięć podręczna.',
-              style: TextStyle(
-                color: palette.textSecondary,
-                fontSize: AppFontSize.small,
+                builder: (_) => const PlaybackSourcesScreen(),
               ),
             ),
           ),

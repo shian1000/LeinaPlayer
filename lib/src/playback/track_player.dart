@@ -370,7 +370,7 @@ class TrackPlayer {
         if (!settings.enabledSources.contains(PlaybackSource.youtube)) {
           return const PlayOutcome.failed(
             'Tego utworu nie ma w żadnym włączonym źródle '
-            '(Ustawienia › Odtwarzanie › Kolejność odtwarzania).',
+            '(Ustawienia › Odtwarzanie › Źródła).',
           );
         }
         // Not found lately: the queue moves on, but a tap (allowExternal) searches again.

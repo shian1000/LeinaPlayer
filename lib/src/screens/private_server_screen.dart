@@ -7,9 +7,9 @@ import '../data/sync_sources.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// "Synchronizacja › … › Prywatny serwer" — the addresses of the user's MusicDatabase server
-/// (remote, and local for the home Wi-Fi) and its certificate; one server for every synced
-/// function, each switching it apart on its own screen.
+/// "Synchronizacja › … › Prywatny serwer" (and Odtwarzanie › Źródła) — the addresses of the
+/// user's MusicDatabase server (remote, and local for the home Wi-Fi) and its certificate; one
+/// server for every synced function, each switching it apart on its own screen.
 class PrivateServerScreen extends StatefulWidget {
   const PrivateServerScreen({super.key});
 

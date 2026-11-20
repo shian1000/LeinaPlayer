@@ -102,8 +102,8 @@ class YouTubeSourceScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Text(
               'Używany jest pierwszy włączony sposób od góry, a kolejne tylko wtedy, gdy '
-              'poprzedni zawiedzie. Odtwarzanie z YouTube: Odtwarzanie › Sposoby '
-              'odtwarzania YouTube.',
+              'poprzedni zawiedzie. Odtwarzanie z YouTube: Odtwarzanie › Źródła › '
+              'YouTube.',
               style: hint,
             ),
           ),
