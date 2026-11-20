@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../data/account.dart';
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
-import '../data/latin_names.dart';
 import '../data/listening_highlights.dart';
 import '../data/listening_log.dart';
 import '../data/listening_stats.dart';
@@ -408,7 +407,7 @@ class _CoverRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final latin = showsLatinNames(context);
+    final latin = latinNamesOf(context);
     return SizedBox(
       // Albums: two lines of name and the artist under it.
       height: _cover + (round ? 52 : 92),
@@ -436,7 +435,7 @@ class _CoverRow extends StatelessWidget {
                   round ? ClipOval(child: cover) : cover,
                   const SizedBox(height: 6),
                   ScrollingText(
-                    '${i + 1}. ${latin ? withLatin(entry.name, entry.latin) : entry.name}',
+                    '${i + 1}. ${latin.show(entry.name, entry.latin)}',
                     maxLines: round ? 1 : 2,
                     textAlign: round ? TextAlign.center : TextAlign.start,
                     style: const TextStyle(
@@ -544,7 +543,7 @@ class _HighlightRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final latin = showsLatinNames(context);
+    final latin = latinNamesOf(context);
     return SizedBox(
       height: _cover + 64,
       child: ListView.separated(
@@ -558,9 +557,7 @@ class _HighlightRow extends StatelessWidget {
           final hit = song == null ? null : hitOf(song);
           final artist = h.artist == null
               ? null
-              : latin
-              ? withLatin(h.artist!, h.artistLatin)
-              : h.artist!;
+              : latin.show(h.artist!, h.artistLatin);
           final songLine = hit == null
               ? ''
               : l10n.listeningStatsScreenSongLine(

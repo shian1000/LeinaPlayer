@@ -159,7 +159,10 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     bold and kept in view inside the card, tapping a line jumps there; else the plain text;
     "Szukam tekstu…", "Nie znalazłem tekstu tego utworu.", "Utwór instrumentalny." or no
     connection with "Spróbuj ponownie"; "Teksty: <source>" under it ("MusicDatabase (Genius)", "LRCLIB").
-    Not shown at all (and neither asked) with Oszczędzanie danych › "Pobieraj teksty piosenek" off. Then Informacje o utworze.
+    Not shown at all (and neither asked) with Oszczędzanie danych › "Pobieraj teksty piosenek" off.
+    With Wygląd › "Transliteracja tekstów piosenek" on "Na życzenie", lyrics with a non-Latin
+    letter get a "Transliteruj tekst" button (translate icon) in the header — "Work in
+    progress :)" for now. Then Informacje o utworze.
   - Kolejka
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
     e.g. by caching ahead): opens at "Teraz odtwarzane"; scrolled up, "Poprzednie" — the last
@@ -498,10 +501,21 @@ import, Wyświetlanie, Dane, Aplikacja.
     the system's current mode) while the next switch is on.
   - "Systemowe przełączanie trybu ciemnego" — switch; when on, light/dark follows the phone's
     dark-mode setting.
-  - "Nazwy w alfabecie łacińskim" — switch, on by default: a title, artist or album in another
-    alphabet is followed by its Latin form from music.db, "Кино (Kino)" — song rows, the queue,
-    menus, the mini/full player and the notification (`latin_names.dart`, `song_names.dart`;
-    hand-off [`musicdatabase-latin-names.md`](handoffs/musicdatabase-latin-names.md)).
+  - "Nazwy w alfabecie łacińskim" — three radios (`LatinNames`) for a title, artist or album in
+    another alphabet with its Latin form from music.db: "Pokazuj oryginalny alfabet" ("Кино"),
+    "Łacinka w nawiasie" ("Кино (Kino)", the default) and "Łacinka zamiast oryginalnego
+    alfabetu" ("Kino"; the name itself where music.db has no form) — song rows, the queue,
+    menus, the mini/full player, the stats and the notification (`latin_names.dart`,
+    `song_names.dart`; hand-off [`musicdatabase-latin-names.md`](handoffs/musicdatabase-latin-names.md)).
+    A switch until 2026-11 (`appearance.latin_names`; off is read as the first radio).
+  - "Transliteracja tekstów piosenek" — radios Nigdy (default) / Na życzenie (a "Transliteruj
+    tekst" button in the lyrics card's header, for lyrics with a non-Latin letter) / Zawsze
+    (`lyrics_transliteration.dart`). No method is built yet: the button says "Work in
+    progress :)".
+  - "Metoda transliteracji" — radios Brak (default) / Pobierz z serwera / Przelicz na miejscu;
+    the last two only say "Work in progress :)" and stay unpicked (server: hand-off
+    [`musicdatabase-lyrics-transliteration.md`](handoffs/musicdatabase-lyrics-transliteration.md);
+    phone: [`ideas/lyrics-transliteration.md`](ideas/lyrics-transliteration.md)).
   - Filtry do albumów **→ Filtry do albumów** (`cover_filter_screen.dart`) — **implemented**: a
     preview on the playing song's cover, then Brak / Lain / Monochromatic (radio); with a filter
     on, "Intensywność" (slider 0–100 % in 5 % steps, default 100 %, kept per filter; the preview

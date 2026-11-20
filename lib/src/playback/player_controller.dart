@@ -133,7 +133,7 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   }
 
   /// Ustawienia › Wygląd › "Nazwy w alfabecie łacińskim", for the notification.
-  bool latinNames = true;
+  LatinNames latinNames = LatinNames.inBrackets;
 
   final players = (
     AudioPlayer(handleInterruptions: false),
@@ -217,15 +217,13 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
       id: track.youtubeVideoId ?? track.source,
       title: titleWithCover(
         titleWithVersion(
-          latinNames ? withLatin(track.title, track.titleLatin) : track.title,
+          latinNames.show(track.title, track.titleLatin),
           track.version,
         ),
         track.coverOf,
-        latin: latinNames,
+        latin: latinNames.shown,
       ),
-      artist: latinNames
-          ? withLatin(track.artist, track.artistLatin)
-          : track.artist,
+      artist: latinNames.show(track.artist, track.artistLatin),
       duration: duration,
       artUri: art,
     );

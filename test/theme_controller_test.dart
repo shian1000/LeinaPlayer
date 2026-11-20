@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/latin_names.dart';
+import 'package:music_database_app/src/data/lyrics_transliteration.dart';
 import 'package:music_database_app/src/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,14 +47,32 @@ void main() {
     },
   );
 
-  test('Latin names: on at first, the choice kept', () async {
+  test('Latin names: in brackets at first, the choice kept', () async {
     final themes = ThemeController();
     await themes.load();
-    expect(themes.latinNames, isTrue);
-    await themes.setLatinNames(false);
+    expect(themes.latinNames, LatinNames.inBrackets);
+    await themes.setLatinNames(LatinNames.instead);
     final restarted = ThemeController();
     await restarted.load();
-    expect(restarted.latinNames, isFalse);
+    expect(restarted.latinNames, LatinNames.instead);
+  });
+
+  test('Latin names switched off before the three ways stay off', () async {
+    SharedPreferences.setMockInitialValues({'appearance.latin_names': false});
+    final themes = ThemeController();
+    await themes.load();
+    expect(themes.latinNames, LatinNames.original);
+  });
+
+  test('lyrics transliteration: never and no method at first, kept', () async {
+    final themes = ThemeController();
+    await themes.load();
+    expect(themes.lyricsTransliteration, LyricsTransliteration.never);
+    expect(themes.transliterationMethod, TransliterationMethod.none);
+    await themes.setLyricsTransliteration(LyricsTransliteration.onRequest);
+    final restarted = ThemeController();
+    await restarted.load();
+    expect(restarted.lyricsTransliteration, LyricsTransliteration.onRequest);
   });
 
   test('each filter keeps its own intensity', () async {

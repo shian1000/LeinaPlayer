@@ -8,7 +8,6 @@ import 'package:share_plus/share_plus.dart';
 
 import '../app_name.dart';
 import '../data/album_covers.dart';
-import '../data/latin_names.dart';
 import '../data/listening_stats.dart';
 import '../data/listening_summary.dart';
 import '../l10n.dart';
@@ -433,7 +432,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
   }
 
   static String _name(BuildContext context, StatsEntry e) =>
-      showsLatinNames(context) ? withLatin(e.name, e.latin) : e.name;
+      latinNamesOf(context).show(e.name, e.latin);
 
   static String _playsLine(int plays, Duration listened) =>
       l10n.listeningSummaryScreenPlaysAndTime(plays, minutesLabel(listened));

@@ -339,3 +339,8 @@ class _TextInputDialogState extends State<TextInputDialog> {
 String dayMonthLabel(DateTime d, {bool year = false}) => year
     ? l10n.dateDayMonthYear(d.day, '${d.month}', d.year)
     : l10n.dateDayMonth(d.day, '${d.month}');
+
+/// "Work in progress :)" for an option that isn't built yet but was asked to be shown.
+void showWorkInProgress(BuildContext context) => ScaffoldMessenger.of(context)
+  ..hideCurrentSnackBar()
+  ..showSnackBar(SnackBar(content: Text(l10n.commonWorkInProgress)));

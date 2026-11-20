@@ -28,6 +28,10 @@ class Lyrics {
   final String source;
 
   bool get isEmpty => !instrumental && synced.isEmpty && (plain ?? '').isEmpty;
+
+  /// The words, as the card shows them: the synced lines when there are any.
+  String? get text =>
+      synced.isEmpty ? plain : synced.map((line) => line.text).join('\n');
 }
 
 /// Parses LRC ("[01:23.45] text") into lines in time order; lines without a time are left out.

@@ -1,5 +1,5 @@
 /// Latin forms of names written in another alphabet ("Кино (Kino)") — Ustawienia › Wygląd ›
-/// "Nazwy w alfabecie łacińskim".
+/// "Nazwy w alfabecie łacińskim" ([LatinNames]).
 ///
 /// The forms come from music.db, where the owner keeps them by hand (`songs.title_latin`,
 /// `artists.name_latin`, `albums.title_latin` — see the hand-off
@@ -37,3 +37,26 @@ String? latinSynonym(String? synonyms) {
 /// "Кино (Kino)", or just [text] without a [latin] form.
 String withLatin(String text, String? latin) =>
     latin == null ? text : '$text ($latin)';
+
+/// How names in another alphabet are shown (Ustawienia › Wygląd › "Nazwy w alfabecie
+/// łacińskim").
+enum LatinNames {
+  /// "Кино": the Latin form isn't shown.
+  original,
+
+  /// "Кино (Kino)".
+  inBrackets,
+
+  /// "Kino": the Latin form in place of the name, the name itself where there's none.
+  instead;
+
+  /// [text] as this setting shows it, with its Latin form [latin] (`null`: none).
+  String show(String text, String? latin) => switch (this) {
+    original => text,
+    inBrackets => withLatin(text, latin),
+    instead => latin ?? text,
+  };
+
+  /// Whether the Latin form is shown at all (a cover's credit takes it then).
+  bool get shown => this != original;
+}

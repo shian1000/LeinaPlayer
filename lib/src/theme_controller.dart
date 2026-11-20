@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'data/latin_names.dart';
+import 'data/lyrics_transliteration.dart';
 import 'data/text_normalizer.dart';
 import 'data/theme_repository.dart';
 import 'l10n.dart';
@@ -54,7 +56,11 @@ class ThemeController extends ChangeNotifier {
   static const _monochromeColorKey = 'appearance.monochrome_color';
   static const _monochromeBackgroundKey = 'appearance.monochrome_background';
   static const _savedColorsKey = 'appearance.saved_colors';
-  static const _latinNamesKey = 'appearance.latin_names';
+  // A bool before the three ways of LatinNames (true: in brackets).
+  static const _oldLatinNamesKey = 'appearance.latin_names';
+  static const _latinNamesKey = 'appearance.latin_names_mode';
+  static const _lyricsTransliterationKey = 'appearance.lyrics_transliteration';
+  static const _transliterationMethodKey = 'appearance.transliteration_method';
   static const _languageKey = 'appearance.language';
   static const maxSavedColors = 8;
   static String _strengthKey(CoverFilter f) =>
@@ -74,11 +80,19 @@ class ThemeController extends ChangeNotifier {
   Map<CoverFilter, double> _strengths = const {};
   Color? _monochromeBackground;
   List<Color> _savedColors = const [];
-  bool _latinNames = true;
+  LatinNames _latinNames = LatinNames.inBrackets;
+  LyricsTransliteration _lyricsTransliteration = LyricsTransliteration.never;
+  TransliterationMethod _transliterationMethod = TransliterationMethod.none;
 
-  /// "Nazwy w alfabecie łacińskim": names in another alphabet followed by their Latin form
-  /// from music.db, "Кино (Kino)" (`latin_names.dart`).
-  bool get latinNames => _latinNames;
+  /// "Nazwy w alfabecie łacińskim": names in another alphabet with their Latin form from
+  /// music.db, "Кино (Kino)" (`latin_names.dart`).
+  LatinNames get latinNames => _latinNames;
+
+  /// "Transliteracja tekstów piosenek" (`lyrics_transliteration.dart`).
+  LyricsTransliteration get lyricsTransliteration => _lyricsTransliteration;
+
+  /// "Metoda transliteracji".
+  TransliterationMethod get transliterationMethod => _transliterationMethod;
 
   CoverFilter get coverFilter => _coverFilter;
 
@@ -170,7 +184,22 @@ class ThemeController extends ChangeNotifier {
     await Future.wait([_loadFonts(_light), _loadFonts(_dark)]);
     _darkMode = prefs.getBool(_darkModeKey) ?? _darkMode;
     _followSystem = prefs.getBool(_followSystemKey) ?? _followSystem;
-    _latinNames = prefs.getBool(_latinNamesKey) ?? _latinNames;
+    _latinNames =
+        LatinNames.values.asNameMap()[prefs.getString(_latinNamesKey)] ??
+        switch (prefs.getBool(_oldLatinNamesKey)) {
+          false => LatinNames.original,
+          _ => _latinNames,
+        };
+    _lyricsTransliteration =
+        LyricsTransliteration.values.asNameMap()[prefs.getString(
+          _lyricsTransliterationKey,
+        )] ??
+        _lyricsTransliteration;
+    _transliterationMethod =
+        TransliterationMethod.values.asNameMap()[prefs.getString(
+          _transliterationMethodKey,
+        )] ??
+        _transliterationMethod;
     _coverFilter =
         CoverFilter.values
             .where((f) => f.name == prefs.getString(_coverFilterKey))
@@ -392,12 +421,30 @@ class ThemeController extends ChangeNotifier {
     );
   }
 
-  Future<void> setLatinNames(bool value) async {
+  Future<void> setLatinNames(LatinNames value) async {
     _latinNames = value;
     notifyListeners();
-    await (await SharedPreferences.getInstance()).setBool(
+    await (await SharedPreferences.getInstance()).setString(
       _latinNamesKey,
-      value,
+      value.name,
+    );
+  }
+
+  Future<void> setLyricsTransliteration(LyricsTransliteration value) async {
+    _lyricsTransliteration = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setString(
+      _lyricsTransliterationKey,
+      value.name,
+    );
+  }
+
+  Future<void> setTransliterationMethod(TransliterationMethod value) async {
+    _transliterationMethod = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setString(
+      _transliterationMethodKey,
+      value.name,
     );
   }
 

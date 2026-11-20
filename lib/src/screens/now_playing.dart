@@ -10,7 +10,9 @@ import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../l10n.dart';
+import '../data/latin_names.dart';
 import '../data/lyrics.dart';
+import '../data/lyrics_transliteration.dart';
 import '../data/source_settings.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
@@ -19,6 +21,7 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../playback/youtube_playback.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
 import '../widgets/menu_sheet.dart';
 import '../widgets/queue_toast.dart';
 import '../theme_controller.dart';
@@ -1023,14 +1026,35 @@ class _LyricsCardState extends State<_LyricsCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              l10n.nowPlayingLyrics,
-              style: const TextStyle(
-                fontSize: AppFontSize.listTitle,
-                fontWeight: FontWeight.bold,
-              ),
+          SizedBox(
+            height: 40,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.nowPlayingLyrics,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.listTitle,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (ThemeScope.maybeOf(context)?.lyricsTransliteration ==
+                    LyricsTransliteration.onRequest)
+                  FutureBuilder<Lyrics?>(
+                    future: _lyrics,
+                    builder: (context, snapshot) =>
+                        hasNonLatinLetters(snapshot.data?.text)
+                        ? IconButton(
+                            icon: const Icon(Icons.translate),
+                            tooltip: l10n.nowPlayingLyricsTransliterate,
+                            // No transliteration method is built yet
+                            // (lyrics_transliteration.dart).
+                            onPressed: () => showWorkInProgress(context),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+              ],
             ),
           ),
           Expanded(

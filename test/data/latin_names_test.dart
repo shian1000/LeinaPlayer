@@ -33,4 +33,11 @@ void main() {
     expect(withLatin('Кино', 'Kino'), 'Кино (Kino)');
     expect(withLatin('Кино', null), 'Кино');
   });
+
+  test('each of the three ways', () {
+    expect(LatinNames.original.show('Кино', 'Kino'), 'Кино');
+    expect(LatinNames.inBrackets.show('Кино', 'Kino'), 'Кино (Kino)');
+    expect(LatinNames.instead.show('Кино', 'Kino'), 'Kino');
+    expect(LatinNames.instead.show('Кино', null), 'Кино');
+  });
 }

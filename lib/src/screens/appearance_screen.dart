@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../data/latin_names.dart';
+import '../data/lyrics_transliteration.dart';
 import '../l10n.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
+import '../widgets/common.dart';
 import '../widgets/theme_swatch.dart';
 import 'cover_filter_screen.dart';
 import 'language_screen.dart';
@@ -106,17 +109,120 @@ class AppearanceScreen extends StatelessWidget {
             onChanged: themes.setFollowSystem,
           ),
           const Divider(height: 24),
-          SwitchListTile(
-            secondary: const Icon(Icons.translate),
-            title: Text(l10n.appearanceLatinNames),
-            subtitle: Text(l10n.appearanceLatinNamesSubtitle),
-            value: themes.latinNames,
-            onChanged: themes.setLatinNames,
+          SectionTitle(l10n.appearanceLatinNames),
+          RadioGroup<LatinNames>(
+            groupValue: themes.latinNames,
+            onChanged: (value) {
+              if (value != null) themes.setLatinNames(value);
+            },
+            child: Column(
+              children: [
+                for (final (value, title, example) in [
+                  (
+                    LatinNames.original,
+                    l10n.appearanceLatinNamesOriginal,
+                    l10n.appearanceLatinNamesOriginalExample,
+                  ),
+                  (
+                    LatinNames.inBrackets,
+                    l10n.appearanceLatinNamesInBrackets,
+                    l10n.appearanceLatinNamesInBracketsExample,
+                  ),
+                  (
+                    LatinNames.instead,
+                    l10n.appearanceLatinNamesInstead,
+                    l10n.appearanceLatinNamesInsteadExample,
+                  ),
+                ])
+                  RadioListTile<LatinNames>(
+                    value: value,
+                    title: Text(title),
+                    subtitle: Text(example),
+                  ),
+              ],
+            ),
           ),
+          _Note(l10n.appearanceLatinNamesNote),
+          SectionTitle(l10n.appearanceLyricsTransliteration),
+          RadioGroup<LyricsTransliteration>(
+            groupValue: themes.lyricsTransliteration,
+            onChanged: (value) {
+              if (value != null) themes.setLyricsTransliteration(value);
+            },
+            child: Column(
+              children: [
+                RadioListTile(
+                  value: LyricsTransliteration.never,
+                  title: Text(l10n.appearanceLyricsTransliterationNever),
+                ),
+                RadioListTile(
+                  value: LyricsTransliteration.onRequest,
+                  title: Text(l10n.appearanceLyricsTransliterationOnRequest),
+                  subtitle: Text(
+                    l10n.appearanceLyricsTransliterationOnRequestSubtitle,
+                  ),
+                ),
+                RadioListTile(
+                  value: LyricsTransliteration.always,
+                  title: Text(l10n.appearanceLyricsTransliterationAlways),
+                ),
+              ],
+            ),
+          ),
+          SectionTitle(l10n.appearanceTransliterationMethod),
+          RadioGroup<TransliterationMethod>(
+            groupValue: themes.transliterationMethod,
+            onChanged: (value) {
+              if (value == null) return;
+              if (!value.works) return showWorkInProgress(context);
+              themes.setTransliterationMethod(value);
+            },
+            child: Column(
+              children: [
+                RadioListTile(
+                  value: TransliterationMethod.none,
+                  title: Text(l10n.appearanceTransliterationMethodNone),
+                ),
+                RadioListTile(
+                  value: TransliterationMethod.server,
+                  title: Text(l10n.appearanceTransliterationMethodServer),
+                  subtitle: Text(
+                    l10n.appearanceTransliterationMethodServerSubtitle,
+                  ),
+                ),
+                RadioListTile(
+                  value: TransliterationMethod.onDevice,
+                  title: Text(l10n.appearanceTransliterationMethodOnDevice),
+                  subtitle: Text(
+                    l10n.appearanceTransliterationMethodOnDeviceSubtitle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
+}
+
+class _Note extends StatelessWidget {
+  const _Note(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+    child: Text(
+      text,
+      style: TextStyle(
+        color: context.palette.textSecondary,
+        fontSize: AppFontSize.small,
+      ),
+    ),
+  );
 }
 
 /// List of themes for one slot: "Motyw jasny" ([dark] false) or "Motyw ciemny".

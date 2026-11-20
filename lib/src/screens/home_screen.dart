@@ -11,7 +11,6 @@ import '../data/combined_search.dart';
 import '../data/account.dart';
 import '../data/home_layout.dart';
 import '../data/home_recommendations.dart';
-import '../data/latin_names.dart';
 import '../data/library_folders.dart';
 import '../data/listening_log.dart';
 import '../data/listening_stats.dart';
@@ -1085,9 +1084,7 @@ class _ArtistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final song = artist.song;
-    final name = showsLatinNames(context)
-        ? withLatin(artist.name, artist.latin)
-        : artist.name;
+    final name = latinNamesOf(context).show(artist.name, artist.latin);
     return InkWell(
       onTap: () => openArtistSongs(context, artist.name),
       onLongPress: () => showSongsMenu(

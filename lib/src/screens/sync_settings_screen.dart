@@ -44,12 +44,6 @@ IconData _sourceIcon(SyncSource source) => switch (source) {
   SyncSource.privateServer => Icons.dns_outlined,
 };
 
-void _workInProgress(BuildContext context) => ScaffoldMessenger.of(context)
-  ..hideCurrentSnackBar()
-  ..showSnackBar(
-    SnackBar(content: Text(l10n.syncSettingsScreenWorkInProgress)),
-  );
-
 /// "Ustawienia › Synchronizacja": every function the phone syncs, each opening its own sources.
 class SyncSettingsScreen extends StatelessWidget {
   const SyncSettingsScreen({super.key});
@@ -146,7 +140,7 @@ class SyncSourcesScreen extends StatelessWidget {
   }
 
   void _open(BuildContext context, SyncSource source) {
-    if (!SyncSources.works(feature, source)) return _workInProgress(context);
+    if (!SyncSources.works(feature, source)) return showWorkInProgress(context);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => switch (source) {
@@ -163,7 +157,7 @@ class SyncSourcesScreen extends StatelessWidget {
     SyncSource source,
     bool on,
   ) async {
-    if (!SyncSources.works(feature, source)) return _workInProgress(context);
+    if (!SyncSources.works(feature, source)) return showWorkInProgress(context);
     if (feature == SyncFeature.database && source == SyncSource.gitHub) {
       await sync.setGitHubOn(on);
     } else {
@@ -181,12 +175,12 @@ class SyncSourcesScreen extends StatelessWidget {
     return switch (feature) {
       SyncFeature.database => (
         subtitle: l10n.syncSettingsScreenPhoneDatabase,
-        onTap: () => _workInProgress(context),
+        onTap: () => showWorkInProgress(context),
         info: null,
       ),
       SyncFeature.library => (
         subtitle: l10n.syncSettingsScreenPhoneLibrary,
-        onTap: () => _workInProgress(context),
+        onTap: () => showWorkInProgress(context),
         info: null,
       ),
       SyncFeature.requests => (

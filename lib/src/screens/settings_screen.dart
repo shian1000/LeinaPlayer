@@ -286,6 +286,7 @@ List<(String, List<_SettingsEntry>)> get _sections => [
           l10n.settingsScreenKwDarkTheme,
           l10n.settingsScreenKwSystemDarkMode,
           l10n.settingsScreenKwLatinNames,
+          l10n.settingsScreenKwLyricsTransliteration,
           l10n.settingsScreenKwCoverFilters,
         ],
       ),

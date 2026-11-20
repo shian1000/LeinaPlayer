@@ -60,10 +60,15 @@ year and season (meteorological), the last one shared as a picture. Album covers
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
 (synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Names in another
-alphabet are shown with their Latin form, "Кино (Kino)" (Wygląd › "Nazwy w alfabecie
-łacińskim"): only music.db's `title_latin` / `name_latin` columns or an artist's Latin synonym,
+alphabet are shown with their Latin form, "Кино (Kino)", or by it alone, "Kino" (Wygląd › "Nazwy
+w alfabecie łacińskim", `LatinNames`): only music.db's `title_latin` / `name_latin` columns or an artist's Latin synonym,
 never transliterated on the phone (user's decision); the forms are sent as field corrections
-([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Ustawienia › Synchronizacja gives the catalog, the account's library, requests for
+([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Wygląd also has "Transliteracja
+tekstów piosenek" (Nigdy / Na życzenie — a button in the lyrics card / Zawsze) and "Metoda
+transliteracji" (Brak / Pobierz z serwera / Przelicz na miejscu), with no method built yet
+("Work in progress :)" — `lyrics_transliteration.dart`; the server's waits for a
+[hand-off](docs/handoffs/musicdatabase-lyrics-transliteration.md), the phone's own is an
+[idea](docs/ideas/lyrics-transliteration.md)). Ustawienia › Synchronizacja gives the catalog, the account's library, requests for
 MusicDatabase and problem reports each their own sources, switched and ordered (the private
 server, GitHub for the catalog, a future "Serwer Leina" — "Work in progress :)"), with the
 phone's own data apart ([ADR 0018](docs/decisions/0018-sync-sources.md)). Every cache setting is in one screen, Oszczędzanie
@@ -253,7 +258,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   adding to the queue; `mood_sheet.dart` — "Dodaj do nastroju", "Nastrój dla wszystkich utworów", the "Filtr nastrojów" sheet and `moodIcon` (the crescent moon used for moods everywhere); `SongInfoCard` — everything about a song under the full player (also from a song's menu, `showSongInfoSheet`); `SongCover` — a song's album cover, with the cover
   filters from `cover_filters.dart`; `CollectionCover` — a playlist's or mood's cover (picked or
   collage); `color_picker.dart`; `TextInputDialog` and
-  `dayMonthLabel` (in the app's language) in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
+  `dayMonthLabel` (in the app's language) and `showWorkInProgress` ("Work in progress :)" for an option asked to be shown before it's built) in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
   `ScrollingText` — a text that slides when it does not fit; `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `update_dialog.dart` — "Dostępna nowa wersja"; `feature_info.dart` — the long-press explanation sheet (`showFeatureInfo`, texts in `screens/feature_infos.dart`); `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
 - `lib/src/data/` — data: downloading MusicDatabase's files from a server or GitHub (`database_sync.dart`), each synced function's sources and their order (`sync_sources.dart`), reading
@@ -482,7 +487,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   the Gradle memory precautions; the Huawei is for debugging only, so a build with temporary
   probes may stay on it) or `share-build-tailscale` for the user's Pixel 7a; check screens
   with `adb exec-out screencap`. A green frame around the screen after `input keyevent` / `input
-  text` is Android's focus highlight, not the app; a tap clears it. To check a gesture mid-way, hold it with
+  text` is Android's focus highlight, not the app; a tap clears it. A grey band across a row at the same
+  height in every screenshot is the hover of the mouse cursor resting in scrcpy's window. To check a gesture mid-way, hold it with
   `input motionevent DOWN/MOVE … ` and screenshot before `UP` (each adb call takes ~0.2 s, so
   apps with long-press menus — Spotify — read it as a long press). `uiautomator dump` hangs on screens with running animations
   (e.g. while music plays) — use screenshots there. The Huawei runs Android 10, so background

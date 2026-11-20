@@ -9,10 +9,10 @@ import '../playback/player_controller.dart';
 import '../l10n.dart';
 import '../theme_controller.dart';
 
-/// Whether names in another alphabet get their Latin form after them (Ustawienia › Wygląd ›
-/// "Nazwy w alfabecie łacińskim"); rebuilds [context] when it's switched.
-bool showsLatinNames(BuildContext context) =>
-    ThemeScope.maybeOf(context)?.latinNames ?? false;
+/// How names in another alphabet are shown (Ustawienia › Wygląd › "Nazwy w alfabecie
+/// łacińskim"); rebuilds [context] when it's changed.
+LatinNames latinNamesOf(BuildContext context) =>
+    ThemeScope.maybeOf(context)?.latinNames ?? LatinNames.original;
 
 /// The title a video gets when nothing better is known (`video_link.dart`,
 /// `combined_search.dart`): kept Polish there, as it also goes into match keys and requests.
@@ -33,36 +33,32 @@ String _titleShown(
   CoverOf? covered,
   SongVersion? version,
 ) {
-  final latin = showsLatinNames(context);
+  final latin = latinNamesOf(context);
   title = _placeholderShown(title);
   return titleWithCover(
-    titleWithVersion(latin ? withLatin(title, titleLatin) : title, version),
+    titleWithVersion(latin.show(title, titleLatin), version),
     covered,
-    latin: latin,
+    latin: latin.shown,
   );
 }
 
-/// A song's names as screens show them: "Кино (Kino)" with [showsLatinNames], then a version's
+/// A song's names as screens show them: "Кино (Kino)" as [latinNamesOf] says, then a version's
 /// marker and a cover's credit after the title: "Creep (Live) (Radiohead cover)".
 extension SongNames on SearchHit {
   String shownTitle(BuildContext context) =>
       _titleShown(context, title, titleLatin, coverOf, version);
 
-  String shownArtist(BuildContext context) => showsLatinNames(context)
-      ? withLatin(_placeholderShown(artistLabel), artistLatin)
-      : _placeholderShown(artistLabel);
+  String shownArtist(BuildContext context) =>
+      latinNamesOf(context).show(_placeholderShown(artistLabel), artistLatin);
 
   String? shownAlbum(BuildContext context) =>
-      album == null || !showsLatinNames(context)
-      ? album
-      : withLatin(album!, albumLatin);
+      album == null ? null : latinNamesOf(context).show(album!, albumLatin);
 }
 
 extension NowPlayingNames on NowPlaying {
   String shownTitle(BuildContext context) =>
       _titleShown(context, title, titleLatin, coverOf, version);
 
-  String shownArtist(BuildContext context) => showsLatinNames(context)
-      ? withLatin(_placeholderShown(artist), artistLatin)
-      : _placeholderShown(artist);
+  String shownArtist(BuildContext context) =>
+      latinNamesOf(context).show(_placeholderShown(artist), artistLatin);
 }

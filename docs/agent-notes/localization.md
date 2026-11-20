@@ -41,7 +41,8 @@ Something built once and kept (a `static final` list of labels, a text in a fiel
 - lowerCamelCase, prefixed by the screen or area: `settings…`, `playlist…`, `songMenu…`,
   `privacy…`, `featureInfo…`. Shared, context-free words are `common…` (`commonCancel`,
   `commonSave`, `commonDelete`, `commonUndo`, `commonRetry`, `commonAdd`, `commonPlay`,
-  `commonOk`, `commonClose`); use them only where the word means the same everywhere.
+  `commonOk`, `commonClose`, `commonWorkInProgress` — "Work in progress :)", English on purpose,
+  shown by `showWorkInProgress`); use them only where the word means the same everywhere.
 - Placeholders are `{name}`, declared in `@key` with a `type` (`String`, `int`, `double`).
   Numbers are pasted as they are (`$count`), no locale formatting.
 - Counts are ICU plurals with the number inside, never a word picked in code by the number:
