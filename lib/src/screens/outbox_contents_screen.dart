@@ -14,7 +14,7 @@ import '../widgets/scrolling_text.dart';
 import '../widgets/song_info.dart';
 import '../widgets/song_tile.dart';
 
-/// "Czeka na wysłanie" in Ustawienia › Zgłoszenia poprawek: the songs reported in the
+/// "Czeka na wysłanie" in Zgłoszenia poprawek (Synchronizacja › Prośby do bazy danych › Telefon): the songs reported in the
 /// requests still waiting in the outbox, with the video the phone found instead, the videos found
 /// for songs without a link, the fields the user corrected in "Informacje o utworze", and the
 /// songs played that music.db doesn't have, asked to be added.

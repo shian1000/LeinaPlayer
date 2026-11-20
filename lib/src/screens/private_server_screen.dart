@@ -3,30 +3,28 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../data/database_sync.dart';
 import '../data/server_trust.dart';
+import '../data/sync_sources.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// "Ustawienia › Serwer" — the addresses MusicDatabase's files are downloaded from (remote, and
-/// local for the home Wi-Fi; the GitHub repository when no server answers) and the state of the
-/// last download.
-class DatabaseSourceScreen extends StatefulWidget {
-  const DatabaseSourceScreen({super.key});
+/// "Synchronizacja › … › Prywatny serwer" — the addresses of the user's MusicDatabase server
+/// (remote, and local for the home Wi-Fi) and its certificate; one server for every synced
+/// function, each switching it apart on its own screen.
+class PrivateServerScreen extends StatefulWidget {
+  const PrivateServerScreen({super.key});
 
   static const remoteFieldKey = Key('database.remoteAddress');
   static const localFieldKey = Key('database.localAddress');
-  static const gitHubFieldKey = Key('database.gitHubRepo');
 
   @override
-  State<DatabaseSourceScreen> createState() => _DatabaseSourceScreenState();
+  State<PrivateServerScreen> createState() => _PrivateServerScreenState();
 }
 
-class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
+class _PrivateServerScreenState extends State<PrivateServerScreen> {
   final _remote = TextEditingController();
   final _local = TextEditingController();
-  final _gitHub = TextEditingController();
   String? _remoteError;
   String? _localError;
-  String? _gitHubError;
   bool _initialized = false;
   bool _readingWifi = false;
   bool _searchingServer = false;
@@ -45,7 +43,6 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     final sync = DatabaseSyncScope.of(context);
     _remote.text = sync.remoteUrl?.toString() ?? '';
     _local.text = sync.localUrl?.toString() ?? '';
-    _gitHub.text = sync.gitHubRepo;
   }
 
   @override
@@ -53,7 +50,6 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     _saveOnLeaving();
     _remote.dispose();
     _local.dispose();
-    _gitHub.dispose();
     super.dispose();
   }
 
@@ -66,23 +62,18 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     String shown(Object? value) => value?.toString() ?? '';
     final changed =
         _remote.text.trim() != shown(sync.remoteUrl) ||
-        _local.text.trim() != shown(sync.localUrl) ||
-        _gitHub.text.trim() != sync.gitHubRepo;
+        _local.text.trim() != shown(sync.localUrl);
     if (!changed) return;
-    if (_validate(_remote.text) != null ||
-        _validate(_local.text) != null ||
-        _validateRepo(_gitHub.text) != null) {
+    if (_validate(_remote.text) != null || _validate(_local.text) != null) {
       _noteAfterLeaving('Nie zapisano adresu serwera: jest nieprawidłowy');
       return;
     }
     final remote = _remote.text;
     final local = _local.text;
-    final gitHub = _gitHub.text;
     () async {
       await sync.setRemoteUrl(remote);
       await sync.setLocalUrl(local);
-      await sync.setGitHubRepo(gitHub);
-      if (sync.hasSource) await sync.syncNow();
+      if (sync.usesServer(SyncFeature.database)) await sync.syncNow();
     }();
     _noteAfterLeaving('Zapisano adresy serwera');
   }
@@ -109,51 +100,42 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     }
   }
 
-  static String? _validateRepo(String text) {
-    try {
-      DatabaseSync.normalizeGitHubRepo(text);
-      return null;
-    } on FormatException catch (e) {
-      return e.message;
-    }
-  }
-
   Future<void> _save(DatabaseSync sync) async {
     FocusScope.of(context).unfocus();
     final messenger = ScaffoldMessenger.of(context);
     final remoteError = _validate(_remote.text);
     final localError = _validate(_local.text);
-    final gitHubError = _validateRepo(_gitHub.text);
     setState(() {
       _remoteError = remoteError;
       _localError = localError;
-      _gitHubError = gitHubError;
     });
-    if (remoteError != null || localError != null || gitHubError != null) {
-      return;
-    }
+    if (remoteError != null || localError != null) return;
 
     await sync.setRemoteUrl(_remote.text);
     await sync.setLocalUrl(_local.text);
-    await sync.setGitHubRepo(_gitHub.text);
     setState(() {
       _remote.text = sync.remoteUrl?.toString() ?? '';
       _local.text = sync.localUrl?.toString() ?? '';
-      _gitHub.text = sync.gitHubRepo;
     });
-    if (!sync.hasSource) {
+    if (!sync.hasServer) {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
             sync.localUrl != null
                 ? 'Zapisano. Wybierz jeszcze sieć Wi-Fi albo podaj adres zdalny.'
-                : 'Usunięto adresy, a GitHub jest wyłączony — baza nie będzie pobierana',
+                : 'Usunięto adresy — telefon nie łączy się z prywatnym serwerem',
           ),
         ),
       );
       return;
     }
     if (!await _confirmCertificates([sync.remoteUrl, sync.localUrl])) return;
+    if (!sync.usesServer(SyncFeature.database)) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Zapisano adresy serwera')),
+      );
+      return;
+    }
     // Downloading right away tells the user at once whether the address works, instead of
     // only finding out on tomorrow's automatic run.
     final ok = await sync.syncNow();
@@ -313,14 +295,14 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: palette.surface,
-        title: const Text('Serwer'),
+        title: const Text('Prywatny serwer'),
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           const SectionTitle('Adres serwera (połączenie zdalne)'),
           _addressField(
-            key: DatabaseSourceScreen.remoteFieldKey,
+            key: PrivateServerScreen.remoteFieldKey,
             controller: _remote,
             hint: 'https://serwer:8002/',
             helper:
@@ -331,32 +313,11 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
           ),
           const SectionTitle('Adres serwera (sieć lokalna)'),
           _addressField(
-            key: DatabaseSourceScreen.localFieldKey,
+            key: PrivateServerScreen.localFieldKey,
             controller: _local,
             hint: 'https://192.168.x.x:8002/',
             helper: 'Używany, gdy telefon jest w sieci Wi-Fi wybranej poniżej.',
             error: _localError,
-            onSubmitted: () => _save(sync),
-          ),
-          const SectionTitle('GitHub (publiczna kopia bazy)'),
-          SwitchListTile(
-            secondary: const Icon(Icons.public),
-            title: const Text('Pobieraj z GitHuba'),
-            subtitle: const Text(
-              'Gdy żaden serwer nie jest ustawiony albo nie odpowiada',
-            ),
-            value: sync.gitHubOn,
-            onChanged: sync.downloading ? null : sync.setGitHubOn,
-          ),
-          _addressField(
-            key: DatabaseSourceScreen.gitHubFieldKey,
-            controller: _gitHub,
-            hint: DatabaseSync.defaultGitHubRepo,
-            helper:
-                'Repozytorium (właściciel/nazwa), którego wydanie „database” zawiera '
-                'music.db i tag.db. Puste przywraca domyślne.',
-            error: _gitHubError,
-            enabled: sync.gitHubOn,
             onSubmitted: () => _save(sync),
           ),
           Padding(
@@ -370,7 +331,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
               ),
               onPressed: sync.downloading ? null : () => _save(sync),
               child: const Text(
-                'Zapisz adresy i pobierz bazę',
+                'Zapisz adresy',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -397,7 +358,7 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
             subtitle: Text(
               wifi == null
                   ? 'Bez wybranej sieci używany jest tylko adres zdalny.'
-                  : 'W tej sieci baza jest pobierana z adresu sieci lokalnej.',
+                  : 'W tej sieci telefon łączy się z adresem sieci lokalnej.',
             ),
             trailing: wifi == null
                 ? null
@@ -444,16 +405,14 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
               onPressed: _readingWifi ? null : () => _useCurrentWifi(sync),
             ),
           ),
-          const SectionTitle('Pobieranie'),
-          const DatabaseDownloadTiles(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Text(
-              'Baza jest pobierana automatycznie raz dziennie przy uruchomieniu aplikacji. '
-              'W wybranej sieci Wi-Fi z adresu sieci lokalnej (a gdy ten nie odpowiada — z '
-              'adresu zdalnego), poza nią z adresu zdalnego. Gdy żaden serwer nie odpowiada, '
-              'z GitHuba. Rozpoznanie sieci wymaga '
-              'dostępu do lokalizacji i włączonej lokalizacji w telefonie.',
+              'W wybranej sieci Wi-Fi telefon łączy się z adresem sieci lokalnej (a gdy ten nie '
+              'odpowiada — z adresem zdalnym), poza nią z adresem zdalnym. Rozpoznanie sieci '
+              'wymaga dostępu do lokalizacji i włączonej lokalizacji w telefonie. Z czym się '
+              'synchronizuje, ustawisz w Synchronizacja — osobno dla bazy danych, biblioteki i '
+              'próśb do bazy.',
               style: TextStyle(
                 fontSize: AppFontSize.listSubtitle,
                 color: palette.textSecondary,
@@ -464,122 +423,6 @@ class _DatabaseSourceScreenState extends State<DatabaseSourceScreen> {
       ),
     );
   }
-}
-
-/// "Ostatnie pobranie", the last error, "Serwer udostępnia pustą bazę" and "Pobierz teraz" —
-/// on Serwer and in Konto's "Katalog muzyki".
-class DatabaseDownloadTiles extends StatelessWidget {
-  const DatabaseDownloadTiles({super.key});
-
-  static Future<void> _useEmptyServer(
-    BuildContext context,
-    DatabaseSync sync,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Użyć pustej bazy z serwera?'),
-        content: const Text(
-          'Obecna baza zostanie zastąpiona pustą: wyszukiwanie, radio, Odkrywaj, Przeglądaj '
-          'i rekomendacje będą puste, a nastroje globalne znikną. Grane utwory będą '
-          'wysyłane jako prośby o dodanie do bazy.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Anuluj'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Użyj pustej'),
-          ),
-        ],
-      ),
-    );
-    if (sure != true) return;
-    if (await sync.syncNow(acceptEmptyServer: true)) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Pobrano pustą bazę z serwera')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final sync = DatabaseSyncScope.of(context);
-    final lastSync = sync.lastSync;
-    final error = sync.lastError;
-    final canDownload = sync.hasSource && !sync.downloading;
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.history),
-          title: const Text('Ostatnie pobranie'),
-          subtitle: Text(
-            sync.downloading
-                ? 'Pobieranie…'
-                : lastSync == null
-                ? 'Nigdy'
-                : _describeLastSync(lastSync, sync.lastSource),
-          ),
-          trailing: sync.downloading
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : null,
-        ),
-        if (error != null && !sync.downloading)
-          ListTile(
-            leading: Icon(
-              Icons.error_outline,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            title: const Text('Ostatnia próba się nie udała'),
-            subtitle: Text(error),
-          ),
-        if (sync.serverEmpty && !sync.downloading)
-          ListTile(
-            leading: Icon(Icons.info_outline, color: palette.accent),
-            title: const Text('Serwer udostępnia pustą bazę'),
-            subtitle: Text(
-              sync.lastSource == DatabaseSource.github && error == null
-                  ? 'Jest w niej 0 utworów, więc baza została pobrana z GitHuba.'
-                  : 'Jest w niej 0 utworów, więc telefon został przy dotychczasowej bazie.',
-            ),
-            trailing: TextButton(
-              onPressed: () => _useEmptyServer(context, sync),
-              child: const Text('Użyj pustej'),
-            ),
-          ),
-        ListTile(
-          enabled: canDownload,
-          leading: Icon(Icons.download, color: palette.accent),
-          title: Text(
-            'Pobierz teraz',
-            style: TextStyle(
-              color: canDownload ? palette.accent : palette.textSecondary,
-            ),
-          ),
-          onTap: sync.syncNow,
-        ),
-      ],
-    );
-  }
-}
-
-String _describeLastSync(DateTime d, DatabaseSource? source) {
-  String two(int n) => n.toString().padLeft(2, '0');
-  final when =
-      '${two(d.day)}.${two(d.month)}.${d.year}, ${two(d.hour)}:${two(d.minute)}';
-  return switch (source) {
-    DatabaseSource.local => '$when (sieć lokalna)',
-    DatabaseSource.remote => '$when (połączenie zdalne)',
-    DatabaseSource.github => '$when (GitHub)',
-    null => when,
-  };
 }
 
 /// "Czy to Twój serwer?" with the certificate's code ([certificateCode]) to compare with the

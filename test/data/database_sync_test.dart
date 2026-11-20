@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/database_sync.dart';
+import 'package:music_database_app/src/data/sync_sources.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -531,6 +532,51 @@ void main() {
       expect(sync.lastSource, DatabaseSource.remote);
       expect(gitHubRequests, isEmpty);
     });
+
+    test('GitHub moved above the server is asked first', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
+      await sync.sources.move(SyncFeature.database, 1, 0);
+      expect(await sync.syncNow(), isTrue);
+      expect(sync.lastSource, DatabaseSource.github);
+    });
+
+    test('GitHub first with nothing newer: the server is asked next', () async {
+      final sync = newSync();
+      await sync.load();
+      await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
+      expect(await sync.syncNow(), isTrue);
+      expect(sync.lastSource, DatabaseSource.remote);
+
+      version['published_at'] = '2026-10-01T00:00:00Z';
+      now = now.add(const Duration(days: 1));
+      await sync.sources.move(SyncFeature.database, 1, 0);
+      expect(await sync.syncNow(), isTrue);
+      expect(gitHubRequests, ['version.json']);
+      expect(sync.lastSource, DatabaseSource.remote);
+      expect(sync.lastSync, now);
+    });
+
+    test(
+      'a server switched off for the catalog is left out of it only',
+      () async {
+        final sync = newSync();
+        await sync.load();
+        await sync.setRemoteUrl('http://127.0.0.1:${server.port}');
+        await sync.sources.setOn(
+          SyncFeature.database,
+          SyncSource.privateServer,
+          false,
+        );
+        expect(await sync.syncNow(), isTrue);
+        expect(sync.lastSource, DatabaseSource.github);
+        expect(await sync.serverAddressesFor(SyncFeature.database), isEmpty);
+        expect(await sync.serverAddressesFor(SyncFeature.library), [
+          Uri.parse('http://127.0.0.1:${server.port}/'),
+        ]);
+      },
+    );
 
     test('GitHub instead of a server with an empty music.db', () async {
       final sync = newSync();

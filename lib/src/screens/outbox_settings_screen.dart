@@ -4,11 +4,12 @@ import 'package:share_plus/share_plus.dart';
 import '../data/account.dart';
 import '../data/database_sync.dart';
 import '../data/outbox.dart';
+import '../data/sync_sources.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'outbox_contents_screen.dart';
 
-/// "Ustawienia › Zgłoszenia poprawek": the requests for MusicDatabase waiting in the phone's
+/// "Zgłoszenia poprawek" (Synchronizacja › Prośby do bazy danych › Telefon): the requests for MusicDatabase waiting in the phone's
 /// outbox (e.g. links YouTube no longer plays) and sending them — to the server, or as a package
 /// through the share sheet (ADR 0014).
 class OutboxSettingsScreen extends StatelessWidget {
@@ -143,7 +144,7 @@ class OutboxSettingsScreen extends StatelessWidget {
 }
 
 /// "Czeka na wysłanie", "Ostatnie wysyłanie", "Wyślij teraz", "Wyślij paczkę…" and "Wyeksportuj
-/// ponownie ostatnią paczkę" — on Zgłoszenia poprawek and in Konto's "Zgłoszenia poprawek".
+/// ponownie ostatnią paczkę" — on Zgłoszenia poprawek and at the end of Synchronizacja › Prośby.
 class OutboxSendTiles extends StatelessWidget {
   const OutboxSendTiles({super.key});
 
@@ -154,7 +155,10 @@ class OutboxSendTiles extends StatelessWidget {
     final palette = context.palette;
     final result = outbox.lastSend;
     final canExport = !outbox.sending && outbox.waiting > 0;
-    final canSend = !outbox.sending && outbox.waiting > 0 && sync.hasServer;
+    final canSend =
+        !outbox.sending &&
+        outbox.waiting > 0 &&
+        sync.usesServer(SyncFeature.requests);
     return Column(
       children: [
         ListTile(

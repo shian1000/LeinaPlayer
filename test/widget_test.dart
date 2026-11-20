@@ -5,9 +5,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:music_database_app/main.dart';
+import 'package:music_database_app/src/data/sync_sources.dart';
 import 'package:music_database_app/src/screens/settings_screen.dart';
 import 'package:music_database_app/src/screens/about_screen.dart';
-import 'package:music_database_app/src/screens/database_source_screen.dart';
+import 'package:music_database_app/src/screens/private_server_screen.dart';
+import 'package:music_database_app/src/screens/sync_settings_screen.dart';
 import 'package:music_database_app/src/screens/first_run_screen.dart';
 import 'package:music_database_app/src/theme.dart';
 import 'package:music_database_app/src/theme_controller.dart';
@@ -320,7 +322,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('MusicDatabase'), findsOneWidget);
-    expect(find.text('Serwer'), findsOneWidget);
+    expect(find.text('Synchronizacja'), findsOneWidget);
   });
 
   testWidgets('Wyszukaj ustawienie finds settings on deeper screens too', (
@@ -516,9 +518,8 @@ void main() {
     ]);
   });
 
-  testWidgets('Serwer keeps a typed address when left without "Zapisz"', (
-    tester,
-  ) async {
+  /// Ja › Ustawienia › Synchronizacja › Baza danych › Prywatny serwer.
+  Future<void> openPrivateServer(WidgetTester tester) async {
     await pumpApp(tester);
     await tester.tap(find.text('Ja'));
     await tester.pumpAndSettle();
@@ -526,39 +527,46 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Ustawienia'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Serwer'));
+    await tester.tap(find.text('Synchronizacja'));
     await tester.pumpAndSettle();
-
-    expect(find.text('https://192.168.x.x:8002/'), findsOneWidget);
-    await tester.enterText(
-      find.byKey(DatabaseSourceScreen.localFieldKey),
-      '10.0.0.5:8002',
-    );
-    await tester.pageBack();
+    await tester.tap(find.text('Baza danych'));
     await tester.pumpAndSettle();
-    expect(find.text('Zapisano adresy serwera'), findsOneWidget);
-    final prefs = await SharedPreferences.getInstance();
-    await tester.runAsync(
-      () => waitUntil(() => prefs.getString('database_sync.local_url') != null),
-    );
-    expect(prefs.getString('database_sync.local_url'), 'https://10.0.0.5:8002/');
-  });
+    await tester.tap(find.text('Prywatny serwer'));
+    await tester.pumpAndSettle();
+  }
 
-  testWidgets('Serwer doesn\'t keep an invalid address when left', (
+  testWidgets(
+    'Prywatny serwer keeps a typed address when left without "Zapisz"',
+    (tester) async {
+      await openPrivateServer(tester);
+
+      expect(find.text('https://192.168.x.x:8002/'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(PrivateServerScreen.localFieldKey),
+        '10.0.0.5:8002',
+      );
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Zapisano adresy serwera'), findsOneWidget);
+      final prefs = await SharedPreferences.getInstance();
+      await tester.runAsync(
+        () =>
+            waitUntil(() => prefs.getString('database_sync.local_url') != null),
+      );
+      expect(
+        prefs.getString('database_sync.local_url'),
+        'https://10.0.0.5:8002/',
+      );
+    },
+  );
+
+  testWidgets('Prywatny serwer doesn\'t keep an invalid address when left', (
     tester,
   ) async {
-    await pumpApp(tester);
-    await tester.tap(find.text('Ja'));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
-    await tester.pump();
-    await tester.tap(find.text('Ustawienia'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Serwer'));
-    await tester.pumpAndSettle();
+    await openPrivateServer(tester);
 
     await tester.enterText(
-      find.byKey(DatabaseSourceScreen.localFieldKey),
+      find.byKey(PrivateServerScreen.localFieldKey),
       'ftp://serwer/',
     );
     await tester.pageBack();
@@ -571,34 +579,24 @@ void main() {
     expect(prefs.getString('database_sync.local_url'), isNull);
   });
 
-  testWidgets('database address is validated and saved under Serwer', (
+  testWidgets('database address is validated and saved under Prywatny serwer', (
     tester,
   ) async {
-    await pumpApp(tester);
-
-    await tester.tap(find.text('Ja'));
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
-    await tester.pump();
-    await tester.tap(find.text('Ustawienia'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Serwer'));
-    await tester.pumpAndSettle();
+    await openPrivateServer(tester);
 
     final settingsList = find
         .descendant(
-          of: find.byType(DatabaseSourceScreen),
+          of: find.byType(PrivateServerScreen),
           matching: find.byType(Scrollable),
         )
         .first;
     await tester.scrollUntilVisible(
-      find.text('Nigdy'),
+      find.text('Nie wybrano'),
       200,
       scrollable: settingsList,
     );
     expect(find.text('Wi-Fi sieci lokalnej'), findsOneWidget);
-    expect(find.text('Nie wybrano'), findsOneWidget);
+    expect(find.text('GitHub (publiczna kopia bazy)'), findsNothing);
     await tester.scrollUntilVisible(
       find.text('Adres serwera (połączenie zdalne)'),
       -200,
@@ -608,14 +606,14 @@ void main() {
     expect(find.text('Adres serwera (połączenie zdalne)'), findsOneWidget);
     expect(find.text('Adres serwera (sieć lokalna)'), findsOneWidget);
     await tester.enterText(
-      find.byKey(DatabaseSourceScreen.remoteFieldKey),
+      find.byKey(PrivateServerScreen.remoteFieldKey),
       'ftp://serwer/',
     );
     // Saved with the keyboard's "done": "Zapisz" lands under the bottom bar here.
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.byKey(DatabaseSourceScreen.remoteFieldKey),
+      find.byKey(PrivateServerScreen.remoteFieldKey),
       -200,
       scrollable: settingsList,
     );
@@ -625,23 +623,79 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.enterText(find.byKey(DatabaseSourceScreen.remoteFieldKey), '');
+    await tester.enterText(find.byKey(PrivateServerScreen.remoteFieldKey), '');
     // The keyboard's "done" saves too.
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Usunięto adresy, a GitHub jest wyłączony — baza nie będzie pobierana',
-      ),
+      find.text('Usunięto adresy — telefon nie łączy się z prywatnym serwerem'),
       findsOneWidget,
     );
-    expect(
-      tester
-          .widget<TextField>(find.byKey(DatabaseSourceScreen.gitHubFieldKey))
-          .controller!
-          .text,
-      'shian1000/LeinaMusicDatabase',
+  });
+
+  testWidgets('Synchronizacja switches and moves each function\'s sources', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await tester.tap(find.text('Ja'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Ustawienia'), 200);
+    await tester.pump();
+    await tester.tap(find.text('Ustawienia'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Synchronizacja'));
+    await tester.pumpAndSettle();
+    // GitHub is off in these tests and no server is set.
+    expect(find.text('Tylko telefon'), findsNWidgets(4));
+
+    await tester.tap(find.text('Baza danych'));
+    await tester.pumpAndSettle();
+    Finder switchOf(SyncSource source) => find.descendant(
+      of: find.byKey(SyncSourcesScreen.rowKey(source)),
+      matching: find.byType(Switch),
     );
+    await tester.tap(switchOf(SyncSource.gitHub));
+    await tester.pumpAndSettle();
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('database_sync.github_on'), isTrue);
+
+    await tester.tap(switchOf(SyncSource.leina));
+    await tester.pumpAndSettle();
+    expect(find.text('Work in progress :)'), findsOneWidget);
+    expect(tester.widget<Switch>(switchOf(SyncSource.leina)).value, isFalse);
+
+    double rowTop(SyncSource source) =>
+        tester.getTopLeft(find.byKey(SyncSourcesScreen.rowKey(source))).dy;
+    expect(
+      rowTop(SyncSource.privateServer),
+      lessThan(rowTop(SyncSource.gitHub)),
+    );
+    final handle = find.descendant(
+      of: find.byKey(SyncSourcesScreen.rowKey(SyncSource.gitHub)),
+      matching: find.byIcon(Icons.drag_handle),
+    );
+    final drag = await tester.startGesture(tester.getCenter(handle));
+    for (var i = 0; i < 4; i++) {
+      await drag.moveBy(const Offset(0, -25));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await drag.up();
+    await tester.pumpAndSettle();
+    expect(
+      rowTop(SyncSource.gitHub),
+      lessThan(rowTop(SyncSource.privateServer)),
+    );
+    expect(prefs.getStringList('sync_sources.database.order'), [
+      'gitHub',
+      'privateServer',
+      'leina',
+    ]);
+
+    await tester.scrollUntilVisible(find.text('Pobierz teraz'), 200);
+    expect(find.text('Dane na telefonie'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('GitHub • telefon'), findsOneWidget);
   });
 
   testWidgets('tab titles stay at the same spot on every tab', (tester) async {
@@ -697,13 +751,17 @@ Future<void> scrollSettingsTo(
   WidgetTester tester,
   String label, {
   double delta = 200,
-}) => tester.scrollUntilVisible(
-  find.text(label),
-  delta,
-  scrollable: find
-      .descendant(
-        of: find.byType(SettingsScreen),
-        matching: find.byType(Scrollable),
-      )
-      .first,
-);
+}) async {
+  await tester.scrollUntilVisible(
+    find.text(label),
+    delta,
+    scrollable: find
+        .descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  // scrollUntilVisible draws no frame after its last jump (AGENTS.md).
+  await tester.pump();
+}

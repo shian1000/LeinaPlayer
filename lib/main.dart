@@ -12,6 +12,7 @@ import 'src/data/app_updates.dart';
 import 'src/data/combined_search.dart';
 import 'src/data/custom_covers.dart';
 import 'src/data/database_sync.dart';
+import 'src/data/sync_sources.dart';
 import 'src/data/error_log.dart';
 import 'src/data/incoming_links.dart';
 import 'src/data/home_layout.dart';
@@ -891,7 +892,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   /// Exchanges the account's Biblioteka folders with MusicDatabase.
   Future<void> _syncFolders() async {
     try {
-      await _libraryFolders.sync(await _databaseSync.serverAddresses());
+      await _libraryFolders.sync(
+        await _databaseSync.serverAddressesFor(SyncFeature.library),
+      );
     } catch (e) {
       debugPrint('Syncing folders failed: $e');
     }
@@ -902,7 +905,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   Future<void> _syncSavedSongs() async {
     try {
       await _savedSongsLoaded;
-      await _savedSongsSync.sync(await _databaseSync.serverAddresses());
+      await _savedSongsSync.sync(
+        await _databaseSync.serverAddressesFor(SyncFeature.library),
+      );
     } catch (e) {
       debugPrint('Syncing saved songs failed: $e');
     }
@@ -912,7 +917,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   Future<void> _syncLaterLinks() async {
     try {
       await _laterLinksLoaded;
-      await _laterLinks.sync(await _databaseSync.serverAddresses());
+      await _laterLinks.sync(
+        await _databaseSync.serverAddressesFor(SyncFeature.library),
+      );
     } catch (e) {
       debugPrint('Syncing links saved for later failed: $e');
     }
@@ -921,7 +928,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   /// Exchanges the account's plays (the listening stats) with MusicDatabase.
   Future<void> _syncListens() async {
     try {
-      await _listeningLog.sync(await _databaseSync.serverAddresses());
+      await _listeningLog.sync(
+        await _databaseSync.serverAddressesFor(SyncFeature.library),
+      );
     } catch (e) {
       debugPrint('Syncing listening stats failed: $e');
     }
@@ -947,7 +956,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   /// download; changes that can't go now wait for the next start, return to the app or change.
   Future<void> _syncPlaylists() async {
     try {
-      await _playlistLibrary.sync(await _databaseSync.serverAddresses());
+      await _playlistLibrary.sync(
+        await _databaseSync.serverAddressesFor(SyncFeature.library),
+      );
     } catch (e) {
       debugPrint('Syncing playlists failed: $e');
     }
@@ -958,7 +969,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   /// shows without logging in again.
   Future<void> _syncMoods() async {
     try {
-      final servers = await _databaseSync.serverAddresses();
+      final servers = await _databaseSync.serverAddressesFor(
+        SyncFeature.library,
+      );
       await _account.refreshPermissions(servers);
       await _moodLibrary.sync(servers);
     } catch (e) {
@@ -969,6 +982,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   /// Hands the outbox to MusicDatabase's inbox, over the same addresses as the download;
   /// whatever can't go now waits for the next start, return to the app or new report.
   Future<void> _sendOutbox() async {
+    // Switched off, the requests wait for a package ("Wyślij paczkę…") instead of reporting
+    // that no server answered.
+    if (!_databaseSync.usesServer(SyncFeature.requests)) return;
     try {
       await _outbox.send(await _databaseSync.serverAddresses());
     } catch (e) {

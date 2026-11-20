@@ -155,7 +155,7 @@ abstract class ItemSync extends ChangeNotifier {
   /// The list's name in the answer of `GET` (`{"revision", "<field>": [...]}`).
   final String field;
 
-  /// What the list is, in the genitive, for problems shown in Konto ("…nie obsługuje jeszcze
+  /// What the list is, in the genitive, for problems shown in Synchronizacja › Biblioteka użytkownika ("…nie obsługuje jeszcze
   /// polubionych i zapisanych utworów").
   final String problemNoun;
 

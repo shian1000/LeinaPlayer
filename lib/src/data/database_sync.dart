@@ -11,18 +11,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'server_trust.dart';
+import 'sync_sources.dart';
 
 /// Where a download came from: one of the two server addresses, or the public copy on GitHub.
 enum DatabaseSource { remote, local, github }
 
-/// Keeps a local copy of MusicDatabase's SQLite files, downloaded from the addresses set under
-/// "Ustawienia › Serwer". See `docs/decisions/0002-database-download.md`.
+/// Keeps a local copy of MusicDatabase's SQLite files, downloaded from the sources set under
+/// "Ustawienia › Synchronizacja › Baza danych" in their order ([sources]). See
+/// `docs/decisions/0002-database-download.md`.
 ///
 /// Two addresses can be set: a remote one (reachable from anywhere, e.g. over Tailscale) and a
 /// local one, used only while the phone is on the saved home Wi-Fi ([localWifi]). If the local
-/// server can't be reached there, the remote address is tried as well. When no server is set or
-/// none answers, the catalog comes from a GitHub Release ([gitHubRepo],
-/// `docs/decisions/0014-github-database-and-request-packages.md`).
+/// server can't be reached there, the remote address is tried as well. The catalog can also come
+/// from a GitHub Release ([gitHubRepo],
+/// `docs/decisions/0014-github-database-and-request-packages.md`) — after the server by default.
+///
+/// The same server serves the other synced functions, each switched apart: [serverAddressesFor].
 class DatabaseSync extends ChangeNotifier {
   DatabaseSync({
     Future<Directory> Function()? storageRoot,
@@ -31,12 +35,16 @@ class DatabaseSync extends ChangeNotifier {
     Future<String?> Function()? currentWifiIp,
     Uri Function(String repo)? gitHubRelease,
     Future<int?> Function(File musicDb)? countSongs,
-  }) : _storageRoot = storageRoot ?? getApplicationSupportDirectory,
+    SyncSources? sources,
+  }) : sources = sources ?? SyncSources(),
+       _storageRoot = storageRoot ?? getApplicationSupportDirectory,
        _now = now ?? DateTime.now,
        _currentWifi = currentWifi ?? readCurrentWifiName,
        _currentWifiIp = currentWifiIp ?? readCurrentWifiIp,
        _gitHubRelease = gitHubRelease ?? gitHubReleaseUrl,
-       _countSongs = countSongs ?? countSongsIn;
+       _countSongs = countSongs ?? countSongsIn {
+    this.sources.addListener(notifyListeners);
+  }
 
   static const fileNames = ['music.db', 'tag.db', ...optionalFileNames];
 
@@ -52,6 +60,7 @@ class DatabaseSync extends ChangeNotifier {
   static const _lastSyncKey = 'database_sync.last_sync_ms';
   static const _lastSourceKey = 'database_sync.last_source';
   static const _gitHubRepoKey = 'database_sync.github_repo';
+  // Written by [sources], read here for [needsGitHubChoice].
   static const _gitHubOnKey = 'database_sync.github_on';
   static const _serverEmptyKey = 'database_sync.server_empty';
   static const _catalogAsOfKey = 'database_sync.catalog_as_of_ms';
@@ -75,11 +84,13 @@ class DatabaseSync extends ChangeNotifier {
   final Uri Function(String repo) _gitHubRelease;
   final Future<int?> Function(File musicDb) _countSongs;
 
+  /// Each synced function's sources and their order; loaded by [load].
+  final SyncSources sources;
+
   Uri? _remoteUrl;
   Uri? _localUrl;
   String? _localWifi;
   String _gitHubRepo = defaultGitHubRepo;
-  bool _gitHubOn = true;
   bool _gitHubChosen = true;
   DateTime? _lastSync;
   DatabaseSource? _lastSource;
@@ -101,8 +112,8 @@ class DatabaseSync extends ChangeNotifier {
   /// [gitHubOn] is off).
   String get gitHubRepo => _gitHubRepo;
 
-  /// Whether the catalog may come from GitHub when no server answers.
-  bool get gitHubOn => _gitHubOn;
+  /// Whether the catalog may come from GitHub.
+  bool get gitHubOn => sources.isOn(SyncFeature.database, SyncSource.gitHub);
 
   /// A fresh install that hasn't answered the first start's question about GitHub yet
   /// ([setGitHubOn] answers it); nothing is downloaded on its own until then. A phone that
@@ -113,8 +124,12 @@ class DatabaseSync extends ChangeNotifier {
   bool get hasServer =>
       _remoteUrl != null || (_localUrl != null && _localWifi != null);
 
-  /// Whether any source is usable at all, so "Pobierz teraz" makes sense.
-  bool get hasSource => hasServer || _gitHubOn;
+  /// Whether [feature] syncs with the private server: one is set and switched on for it.
+  bool usesServer(SyncFeature feature) =>
+      hasServer && sources.isOn(feature, SyncSource.privateServer);
+
+  /// Whether any source of the catalog is usable at all, so "Pobierz teraz" makes sense.
+  bool get hasSource => usesServer(SyncFeature.database) || gitHubOn;
 
   /// When both files were last downloaded successfully, and from which address.
   DateTime? get lastSync => _lastSync;
@@ -130,12 +145,12 @@ class DatabaseSync extends ChangeNotifier {
   String? get lastError => _lastError;
 
   Future<void> load() async {
+    await sources.load();
     final prefs = await SharedPreferences.getInstance();
     _remoteUrl = _parse(prefs.getString(_remoteUrlKey));
     _localUrl = _parse(prefs.getString(_localUrlKey));
     _localWifi = prefs.getString(_localWifiKey);
     _gitHubRepo = prefs.getString(_gitHubRepoKey) ?? defaultGitHubRepo;
-    _gitHubOn = prefs.getBool(_gitHubOnKey) ?? true;
     _serverEmpty = prefs.getBool(_serverEmptyKey) ?? false;
     final ms = prefs.getInt(_lastSyncKey);
     _lastSync = ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
@@ -197,9 +212,8 @@ class DatabaseSync extends ChangeNotifier {
   }
 
   Future<void> setGitHubOn(bool on) async {
-    await (await SharedPreferences.getInstance()).setBool(_gitHubOnKey, on);
-    _gitHubOn = on;
     _gitHubChosen = true;
+    await sources.setOn(SyncFeature.database, SyncSource.gitHub, on);
     _lastError = null;
     notifyListeners();
   }
@@ -355,9 +369,10 @@ class DatabaseSync extends ChangeNotifier {
 
   /// Downloads all files; returns whether it succeeded. The previous copy stays in place
   /// until all new files have arrived and look like SQLite databases, so a half-finished
-  /// download never leaves the files out of step with each other. A server comes first (always
-  /// the freshest); GitHub only when no server is set or none answers, and only a publish not
-  /// older than the copy here.
+  /// download never leaves the files out of step with each other. The sources switched on
+  /// under Synchronizacja › Baza danych are tried in their order until one gives the catalog;
+  /// GitHub only gives a publish not older than the copy here — an older one counts as nothing
+  /// new and the next source is asked.
   ///
   /// A server whose `music.db` has no songs (MusicDatabase started "with an empty database")
   /// doesn't replace a copy that has some unless [acceptEmptyServer]: it is passed over like a
@@ -370,41 +385,55 @@ class DatabaseSync extends ChangeNotifier {
     _serverEmpty = false;
     notifyListeners();
     try {
-      final attempts = await _attempts();
-      if (attempts.isEmpty && !_gitHubOn) {
+      Object? serverFailure;
+      Object? gitHubFailure;
+      var noAddressNow = false;
+      var gitHubOlder = false;
+      for (final source in sources.enabled(SyncFeature.database)) {
+        if (source == SyncSource.privateServer && hasServer) {
+          final attempts = await _attempts();
+          if (attempts.isEmpty) noAddressNow = true;
+          for (final (source, url) in attempts) {
+            try {
+              final asOf = _now().toUtc();
+              await _downloadAll(url, acceptEmpty: acceptEmptyServer);
+              await _succeeded(source, asOf);
+              return true;
+            } on _EmptyServer {
+              _serverEmpty = true;
+            } catch (e) {
+              serverFailure = e;
+            }
+          }
+        } else if (source == SyncSource.gitHub) {
+          try {
+            final (:older, :publishedAt) = await _downloadFromGitHub(
+              _gitHubRepo,
+            );
+            if (!older) {
+              await _succeeded(DatabaseSource.github, publishedAt);
+              return true;
+            }
+            gitHubOlder = true;
+          } catch (e) {
+            gitHubFailure = e;
+          }
+        }
+      }
+      // Nothing newer than the phone's copy anywhere: not a failure, and not today's download.
+      if (gitHubOlder) return true;
+      if (serverFailure == null && gitHubFailure == null) {
+        // The phone keeps its copy on purpose; the screen explains it through [serverEmpty].
+        if (_serverEmpty || !noAddressNow) return false;
         throw const _SyncFailure(
           'Telefon nie jest w sieci lokalnej, a adres zdalny nie jest ustawiony',
         );
       }
-      Object? serverFailure;
-      for (final (source, url) in attempts) {
-        try {
-          final asOf = _now().toUtc();
-          await _downloadAll(url, acceptEmpty: acceptEmptyServer);
-          await _succeeded(source, asOf);
-          return true;
-        } on _EmptyServer {
-          _serverEmpty = true;
-        } catch (e) {
-          serverFailure = e;
-        }
-      }
-      if (!_gitHubOn) {
-        // The phone keeps its copy on purpose; the screen explains it through [serverEmpty].
-        if (_serverEmpty) return false;
-        throw serverFailure!;
-      }
-      try {
-        final (:older, :publishedAt) = await _downloadFromGitHub(_gitHubRepo);
-        if (!older) await _succeeded(DatabaseSource.github, publishedAt);
-        return true;
-      } catch (e) {
-        _lastError = [
-          if (serverFailure != null) _describe(serverFailure),
-          'GitHub: ${_describeGitHub(e)}',
-        ].join(' · ');
-        return false;
-      }
+      _lastError = [
+        if (serverFailure != null) _describe(serverFailure),
+        if (gitHubFailure != null) 'GitHub: ${_describeGitHub(gitHubFailure)}',
+      ].join(' · ');
+      return false;
     } catch (e) {
       _lastError = _describe(e);
       return false;
@@ -472,11 +501,16 @@ class DatabaseSync extends ChangeNotifier {
     ];
   }
 
-  /// MusicDatabase's server as the download reaches it now, best address first (e.g. for
-  /// sending the outbox).
+  /// MusicDatabase's server as the download reaches it now, best address first — for what
+  /// isn't one of the synced functions (playing its files, lyrics, logging in).
   Future<List<Uri>> serverAddresses() async => [
     for (final (_, url) in await _attempts()) url,
   ];
+
+  /// [serverAddresses] for [feature], none while its private server is switched off under
+  /// Synchronizacja — the syncs then do nothing.
+  Future<List<Uri>> serverAddressesFor(SyncFeature feature) async =>
+      usesServer(feature) ? serverAddresses() : const [];
 
   Future<void> _downloadAll(Uri base, {required bool acceptEmpty}) async {
     final parts = <File>[];
@@ -723,8 +757,8 @@ class DatabaseSync extends ChangeNotifier {
 
   static String _describe(Object e) => switch (e) {
     _SyncFailure(:final message) => message,
-    // A certificate the phone doesn't trust (yet): ServerTrust, confirmed on Ustawienia › Serwer.
-    HandshakeException() => 'Nieznany certyfikat serwera — potwierdź go w Ustawienia › Serwer („Zapisz adresy”)',
+    // A certificate the phone doesn't trust (yet): ServerTrust, confirmed on Prywatny serwer.
+    HandshakeException() => 'Nieznany certyfikat serwera — potwierdź go w Synchronizacja › Prywatny serwer („Zapisz adresy”)',
     SocketException() => 'Nie można połączyć się z serwerem',
     TimeoutException() => 'Serwer nie odpowiada',
     HttpException() => 'Przerwane połączenie z serwerem',

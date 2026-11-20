@@ -36,7 +36,7 @@ The app is called **Leina Player** on the phone (`lib/src/app_name.dart`; packag
 A fresh install (no catalog downloaded, "Pobieraj z GitHuba" never set) opens over `AppShell` a
 full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?", without a way back:
 - **Tak, pobieraj z GitHuba** — the switch stays on, the catalog downloads at once.
-- **Nie, bez GitHuba** — Ustawienia › Serwer › "Pobieraj z GitHuba" is switched off.
+- **Nie, bez GitHuba** — Ustawienia › Synchronizacja › Baza danych › GitHub is switched off.
 
 ## Player (`lib/src/screens/now_playing.dart`, `lib/src/playback/player_controller.dart`)
 
@@ -289,77 +289,112 @@ import, Wyświetlanie, Dane, Aplikacja.
 
 ### MusicDatabase
 
-- Konto **→ Konto** (`account_screen.dart`) — **implemented**: logging in with a MusicDatabase
+- Konto **→ Konto** (`account_screen.dart`) — **implemented**, only the two accounts (user's
+  decision, 2026-11-20; the sync tiles moved to Synchronizacja): logging in with a MusicDatabase
   user ("Nazwa użytkownika", "Hasło", "Zaloguj"; checked by the server, which hands back a
   token), or the logged-in user and "Wyloguj" (asks first)
-  ([ADR 0006](decisions/0006-musicdatabase-login.md)). On top, **"Synchronizuj wszystko"**
-  (logged in or not): the account's sync, then "Pobierz teraz" of the catalog, "Wyślij teraz"
-  of the waiting requests (with a server) and the update check (in builds that know their
-  releases), one after another — "Synchronizowanie…", then the time or which of them failed.
-  Below the account, sections with the very same tiles as their own screens (shared widgets):
-  *Katalog muzyki* (`DatabaseDownloadTiles` — Serwer's "Pobieranie"), *Zgłoszenia poprawek*
-  (`OutboxSendTiles` — from "Czeka na wysłanie" to "Wyeksportuj ponownie ostatnią paczkę") and
-  *Aktualizacje* (`updateCheckTile` — Informacje i pomoc's tile); the switches and addresses
-  stay on those screens. Logged in, one row **"Synchronizuj konto"**
-  covers everything that syncs with the account — playlists, moods (and global-mood changes),
-  folders, listening stats, liked and saved songs, links saved for later — showing "Wszystko
-  zsynchronizowane (najpóźniej o HH:MM)", "Synchronizowanie…" or which part failed and why, with
-  ⟳ "Synchronizuj teraz" syncing all of it; a long press explains what syncs where. Right after
-  logging in, phone-only playlists, moods and folders are offered to the account ("Dodać
-  playlisty z telefonu do konta?" — Nie teraz / Dodaj), and while any are left rows "Playlisty /
-  Nastroje / Foldery tylko na tym telefonie: N" add them when tapped ([ADR 0007](decisions/0007-playlist-sync.md),
-  [0008](decisions/0008-moods.md), [0011](decisions/0011-folder-sync.md)); liked and saved songs
-  and later links join the account by themselves ([ADR 0013](decisions/0013-saved-songs-sync.md)).
-  Below everything, once signed in for "Utwórz na YouTube": "Konto Google (playlisty na
-  YouTube)" — the Google account's e-mail with **Wyloguj** (the next playlist asks for an
-  account again).
-- Serwer **→ Serwer** (`database_source_screen.dart`) — **implemented**:
-  - "Adres serwera (połączenie zdalne)" and "Adres serwera (sieć lokalna)" — two addresses of
-    MusicDatabase's `music.db` / `tag.db` / `files.db` (the server's music files, ADR 0010),
-    validated and saved with "Zapisz adresy i pobierz bazę" (saving downloads
-    right away). An address without a scheme is `https://`; an HTTPS server showing a
-    certificate the phone doesn't trust yet first gets "Czy to Twój serwer?" with the
-    certificate's code to compare with MusicDatabase's ("Tak, to mój serwer" pins it — ADR 0015).
-  - "Certyfikat serwera" (only once one is pinned) — "Zaufany certyfikat zapamiętany" with
-    "Zapomnij" (after a confirmation), for a server that made a new certificate.
-  - "Wi-Fi sieci lokalnej" — the saved home Wi-Fi name (× clears it) and "Użyj bieżącego
-    połączenia", which asks for location permission (Android's requirement for reading the
-    SSID), saves the current Wi-Fi, then scans the phone's /24 subnet for a server answering
-    `music.db` (SQLite) on the remote address's scheme (HTTPS when none), port and path, asks
-    about its certificate as above, and saves the first hit as the local address
-    (`DatabaseSync.discoverLocalServer`).
-  - "GitHub (publiczna kopia bazy)" — "Pobieraj z GitHuba" (switch, on by default) and the
-    repository `<owner>/<repo>` (default `shian1000/LeinaMusicDatabase`; a pasted repository
-    link is accepted, empty brings the default back; saved with "Zapisz adresy i pobierz bazę"). Only `music.db` /
-    `tag.db`, never `files.db`.
-  - "Ostatnie pobranie" (with which source was used: sieć lokalna / połączenie zdalne / GitHub),
-    the last error if any, "Serwer udostępnia pustą bazę" when the server's music.db has no songs
-    and the phone kept its own (or GitHub's) — with "Użyj pustej" (after a confirmation) to take
-    it anyway, "Pobierz teraz".
+  ([ADR 0006](decisions/0006-musicdatabase-login.md)). Right after logging in, phone-only
+  playlists, moods and folders are offered to the account ("Dodać playlisty z telefonu do
+  konta?" — Nie teraz / Dodaj). Below, once signed in for "Utwórz na YouTube": "Konto Google
+  (playlisty na YouTube)" — the Google account's e-mail with **Wyloguj** (the next playlist asks
+  for an account again).
+- Synchronizacja **→ Synchronizacja** (`sync_settings_screen.dart`, state in `SyncSources` —
+  `data/sync_sources.dart`, owned by `DatabaseSync`) — **implemented**: every function the phone
+  syncs, each with its own sources (user's decision, 2026-11-20), the subtitle showing the ones it
+  tries now ("Prywatny serwer → GitHub • telefon", "Tylko telefon"). On top **"Synchronizuj
+  wszystko"** (`SyncEverythingTile` in `sync_tiles.dart`, moved from Konto): the account's library
+  (logged in, server switched on for it), the catalog, "Wyślij teraz" of the waiting requests
+  (server switched on for them) and the update check (in builds that know their releases), one
+  after another — "Synchronizowanie…", then the time or which function failed. Then **Baza danych**, **Biblioteka
+  użytkownika**, **Prośby do bazy danych** (long press: the outbox's explanation), **Raportowanie
+  błędów**. Each **→ `SyncSourcesScreen`**: a short intro, *Źródła* — rows with a switch and a
+  ≡ handle to drag them into the order they are tried (`SliverReorderableList`, one scrollable
+  with the page), then *Dane na telefonie* — "Telefon" (no switch, no order: the phone always
+  keeps its data), and at the very end
+  *Ostatnia synchronizacja* (not for Raportowanie błędów), the very tiles of the function's own
+  screens: Baza danych — `DatabaseDownloadTiles`; Biblioteka użytkownika — logged in, one row
+  **"Synchronizuj konto"** (`AccountSyncTile`: playlists, moods and global-mood changes, folders,
+  listening stats, liked and saved songs, links saved for later — "Wszystko zsynchronizowane
+  (najpóźniej o HH:MM)", "Synchronizowanie…" or which part failed and why, ⟳ "Synchronizuj
+  teraz", a long press explains it) and rows "Playlisty / Nastroje / Foldery tylko na tym
+  telefonie: N" that add them when tapped ([ADR 0007](decisions/0007-playlist-sync.md),
+  [0008](decisions/0008-moods.md), [0011](decisions/0011-folder-sync.md),
+  [0013](decisions/0013-saved-songs-sync.md)); logged out, "Nie zalogowano" → Konto; Prośby do
+  bazy danych — `OutboxSendTiles` (from "Czeka na wysłanie" to "Wyeksportuj ponownie ostatnią
+  paczkę").
+  - Sources: Baza danych — Prywatny serwer, GitHub, Serwer Leina (default order); the other three
+    — Prywatny serwer, Serwer Leina. **Serwer Leina** doesn't exist yet: off, its switch and row
+    show "Work in progress :)" (user's text); so does Raportowanie błędów › Prywatny serwer —
+    MusicDatabase has no place for problem reports (`SyncSources.works`).
+  - What the switches do: Baza danych tries its switched-on sources top down until one gives the
+    catalog (GitHub giving nothing newer than the phone's copy counts as nothing and the next is
+    asked). Biblioteka użytkownika's Prywatny serwer off — the account's playlists, moods,
+    folders, liked / saved songs, later links and plays don't sync (they stay on the phone);
+    Prośby do bazy danych's off — the outbox isn't sent to the server ("Wyślij teraz" disabled),
+    only "Wyślij paczkę…". `DatabaseSync.serverAddressesFor(feature)` gives no addresses then;
+    playing the server's files, lyrics and logging in use the server whatever the switches.
+  - **GitHub → GitHub** (`github_source_screen.dart`): the repository `<owner>/<repo>` (default
+    `shian1000/LeinaMusicDatabase`; a pasted repository link is accepted, empty brings the
+    default back), saved with the keyboard's "done" or on leaving. Only `music.db` / `tag.db`,
+    never `files.db`. Its switch keeps the old key `database_sync.github_on` (the first start's
+    question).
+  - **Prywatny serwer → Prywatny serwer** (`private_server_screen.dart`; the same screen from all
+    four; long press on the row: the server's explanation):
+    - "Adres serwera (połączenie zdalne)" and "Adres serwera (sieć lokalna)" — two addresses of
+      MusicDatabase's `music.db` / `tag.db` / `files.db` (the server's music files, ADR 0010),
+      validated and saved with "Zapisz adresy" (which also downloads the catalog right away
+      while Baza danych uses the server). An address without a scheme is `https://`; an HTTPS
+      server showing a certificate the phone doesn't trust yet first gets "Czy to Twój serwer?"
+      with the certificate's code to compare with MusicDatabase's ("Tak, to mój serwer" pins it
+      — ADR 0015).
+    - "Certyfikat serwera" (only once one is pinned) — "Zaufany certyfikat zapamiętany" with
+      "Zapomnij" (after a confirmation), for a server that made a new certificate.
+    - "Wi-Fi sieci lokalnej" — the saved home Wi-Fi name (× clears it) and "Użyj bieżącego
+      połączenia", which asks for location permission (Android's requirement for reading the
+      SSID), saves the current Wi-Fi, then scans the phone's /24 subnet for a server answering
+      `music.db` (SQLite) on the remote address's scheme (HTTPS when none), port and path, asks
+      about its certificate as above, and saves the first hit as the local address
+      (`DatabaseSync.discoverLocalServer`).
 
-  On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
-  answer), elsewhere the remote one; when no server is set or none answers, GitHub (reads
-  `version.json`, downloads only changed files, checks size + SHA-256 before swapping). The
-  download also runs automatically once a day on start — see
-  [`decisions/0002-database-download.md`](decisions/0002-database-download.md) and
-  [`decisions/0014-github-database-and-request-packages.md`](decisions/0014-github-database-and-request-packages.md).
-  Leaving the screen also saves the typed addresses when all are valid ("Zapisano adresy
-  serwera"), else keeps the old ones ("Nie zapisano adresu serwera: jest nieprawidłowy").
-- Zgłoszenia poprawek **→ Zgłoszenia poprawek** (`outbox_settings_screen.dart`) — **implemented**:
-  "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by default), "Czeka na wysłanie"
-  (requests in the outbox; tapped, the reported songs with the phone's replacement —
-  `outbox_contents_screen.dart`; a waiting artist rename that doesn't look like a spelling fix
-  says so, with "Tak, tylko ten utwór" turning it into the `songs.artist_id` correction of the
-  song it was made from, when that artist is the song's own; then the songs played that
-  music.db doesn't have, asked to be added — `song_requests.dart`), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
-  jutro" after the server refused), "Wyślij teraz" (needs a server), "Wyślij paczkę…" (the
-  waiting requests as a `.zip` through the share sheet; asks once for "Podpis paczek" when not
-  logged in; afterwards they count as sent — closing the sheet without sharing takes it back),
-  "Wyeksportuj ponownie ostatnią paczkę" (only after one; rebuilt from `outbox/sent/`), "Podpis
-  paczek" (the account's name when logged in, else the typed one, cleaned to MusicDatabase's
-  username pattern; empty — unsigned)
-  ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md),
-  [ADR 0014](decisions/0014-github-database-and-request-packages.md)).
+    On the saved Wi-Fi the local address is used (falling back to the remote one if it doesn't
+    answer), elsewhere the remote one. Leaving the screen also saves the typed addresses when
+    all are valid ("Zapisano adresy serwera"), else keeps the old ones ("Nie zapisano adresu
+    serwera: jest nieprawidłowy").
+  - Baza danych's *Ostatnia synchronizacja* (`DatabaseDownloadTiles` in
+    `database_download_tiles.dart`; once a row "Pobierz bazę danych" of its own, removed as a
+    duplicate — user's decision, 2026-11-20): "Ostatnie pobranie" (with which source was used:
+    sieć lokalna / połączenie zdalne / GitHub), the last error if any, "Serwer udostępnia pustą
+    bazę" when the server's music.db has no songs and the phone kept its own (or GitHub's) — with
+    "Użyj pustej" (after a confirmation) to take it anyway, "Pobierz teraz". GitHub reads
+    `version.json`, downloads only changed files, checks size + SHA-256 before swapping. The
+    download also runs automatically once a day on start — see
+    [`decisions/0002-database-download.md`](decisions/0002-database-download.md),
+    [`decisions/0014-github-database-and-request-packages.md`](decisions/0014-github-database-and-request-packages.md)
+    and [`decisions/0018-sync-sources.md`](decisions/0018-sync-sources.md).
+  - **Telefon**: Baza danych and Biblioteka użytkownika — "Work in progress :)" for now (user's
+    decision: nothing to show there yet); Prośby do bazy danych **→ Zgłoszenia poprawek**;
+    Raportowanie błędów **→ Problemy** (`problems_screen.dart`).
+  - Zgłoszenia poprawek (`outbox_settings_screen.dart`) — **implemented**:
+    "Wysyłaj zgłoszenia poprawek automatycznie" (switch, on by default), "Czeka na wysłanie"
+    (requests in the outbox; tapped, the reported songs with the phone's replacement —
+    `outbox_contents_screen.dart`; a waiting artist rename that doesn't look like a spelling fix
+    says so, with "Tak, tylko ten utwór" turning it into the `songs.artist_id` correction of the
+    song it was made from, when that artist is the song's own; then the songs played that
+    music.db doesn't have, asked to be added — `song_requests.dart`), "Ostatnie wysyłanie" (sent / refused / why not, "kolejna próba
+    jutro" after the server refused), "Wyślij teraz" (needs the server, switched on for Prośby),
+    "Wyślij paczkę…" (the
+    waiting requests as a `.zip` through the share sheet; asks once for "Podpis paczek" when not
+    logged in; afterwards they count as sent — closing the sheet without sharing takes it back),
+    "Wyeksportuj ponownie ostatnią paczkę" (only after one; rebuilt from `outbox/sent/`), "Podpis
+    paczek" (the account's name when logged in, else the typed one, cleaned to MusicDatabase's
+    username pattern; empty — unsigned)
+    ([ADR 0005](decisions/0005-outbox-for-musicdatabase.md),
+    [ADR 0014](decisions/0014-github-database-and-request-packages.md)).
+  - Problemy (`problems_screen.dart`): **Zgłoś problem** (`problem_report_screen.dart`: "Co się
+    stało?" field, a note on what the report holds, "Wyślij" → a `.txt` through "Udostępnij",
+    "Podgląd raportu" — version, build, commit, small/large APK, phone model, Android, the
+    description, the error log) and **Dziennik błędów** (`error_log_screen.dart`: the last 14
+    days newest first, "Wyczyść" after asking; subtitle "Wpisów: N" or "Pusty").
 
 ### Słuchanie
 
@@ -568,11 +603,8 @@ import, Wyświetlanie, Dane, Aplikacja.
   użytku prywatnego" (YouTube terms, never in an app store, may share with friends together with
   the source), licence GPLv3, "Kod źródłowy" (opens the GitHub repo; copy button), "Licencje
   bibliotek" (Flutter's licence page). See [ADR 0004](decisions/0004-license-and-distribution.md).
-  Section "Problemy": **Zgłoś problem** (`problem_report_screen.dart`: "Co się stało?" field, a
-  note on what the report holds, "Wyślij" → a `.txt` through "Udostępnij", "Podgląd raportu" —
-  version, build, commit, small/large APK, phone model, Android, the description, the error log)
-  and **Dziennik błędów** (`error_log_screen.dart`: the last 14 days newest first, "Wyczyść" after
-  asking; subtitle "Wpisów: N" or "Pusty"). Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków, and "Rozmiar
+  "Zgłoś problem" and "Dziennik błędów" moved to Synchronizacja › Raportowanie błędów › Telefon ›
+  Problemy (2026-11-20). Also "Linki z YouTube i Spotify": a pointer to Ustawienia › Otwieranie linków, and "Rozmiar
   aplikacji" (the APK holds three CPU builds, ~22 MB each in use; the cache takes the
   most while used) with "Pamięć podręczna — Zajęte X MB" → Pamięć podręczna.
 
@@ -581,8 +613,9 @@ import, Wyświetlanie, Dane, Aplikacja.
 A long press on these opens a sheet — what it is, what it's for, how it works, libraries, what it
 connects to, buttons (Prywatność i połączenia; Wyloguj z Google; Konto): the bottom bar's Home
 and Odkrywaj; a song menu's "Przejdź do radia utworu" (`MenuSheetEntry.onLongPress`);
-Ustawienia › Konto › the Google account's e-mail and "Synchronizuj konto"; Ja › Statystyki słuchania;
-Ustawienia › Serwer and › Zgłoszenia poprawek; Sposoby odtwarzania YouTube › NewPipeExtractor and
+Ustawienia › Konto › the Google account's e-mail; Synchronizacja › Biblioteka użytkownika › "Synchronizuj konto"; Ja › Statystyki słuchania;
+Synchronizacja › Prośby do bazy danych and each Prywatny serwer row (and the Telefon row to
+Zgłoszenia poprawek); Sposoby odtwarzania YouTube › NewPipeExtractor and
 youtube_explode; YouTube › NewPipeExtractor, youtube_explode and "Korzystaj z API"; Spotify ›
 Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce").
 
@@ -630,7 +663,7 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   **implemented**: searches as you type, over the fields chosen in "Szukaj w", in both the
   downloaded `music.db` and the phone's own `local.db` (`combined_search.dart`): MusicDatabase
   songs plus phone files not in MusicDatabase. Accents and case are ignored, like MusicDatabase's
-  search. Shows a hint with a link to the "Serwer" settings when there's nothing to search.
+  search. Shows a hint with a link to Synchronizacja › Baza danych when there's nothing to search.
   - Each result has one icon on the right (`SourceIcons`, in a slot of cover height and half its
     width): where tapping it plays from first — the first switched-on source in "Kolejność
     odtwarzania" that has the song (phone `smartphone`, server `dns`, YouTube `smart_display`;

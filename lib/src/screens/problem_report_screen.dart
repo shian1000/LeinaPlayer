@@ -8,7 +8,7 @@ import '../data/problem_report.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// "Informacje i pomoc › Zgłoś problem": what happened (optional), the report as it will be sent
+/// "Problemy › Zgłoś problem" (Synchronizacja › Raportowanie błędów › Telefon): what happened (optional), the report as it will be sent
 /// — version, phone, the error log — and "Wyślij", which hands a `.txt` to "Udostępnij". Nothing
 /// is sent by the app itself.
 class ProblemReportScreen extends StatefulWidget {

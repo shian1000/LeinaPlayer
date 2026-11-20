@@ -12,6 +12,7 @@ import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
 import '../data/song_catalog.dart';
 import '../data/source_settings.dart';
+import '../data/sync_sources.dart';
 import '../data/youtube_library.dart';
 import '../data/video_link.dart';
 import '../data/youtube_search.dart';
@@ -23,9 +24,9 @@ import '../widgets/scrolling_text.dart';
 import '../widgets/song_selection.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/swipe_actions.dart';
-import 'database_source_screen.dart';
 import 'playlist_screen.dart';
 import 'search_fields_sheet.dart';
+import 'sync_settings_screen.dart';
 import '../data/album_covers.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/song_names.dart';
@@ -311,7 +312,7 @@ class _Results extends StatelessWidget {
             icon: Icons.storage_outlined,
             title: 'Brak pobranej bazy danych',
             details: !sync.hasSource
-                ? 'Ustaw adres bazy w Ustawienia › Serwer.'
+                ? 'Włącz źródło bazy w Ustawienia › Synchronizacja › Baza danych.'
                 : (sync.lastError ?? 'Baza nie została jeszcze pobrana.'),
             action: _OpenDatabaseSettings(),
           );
@@ -839,7 +840,10 @@ class _OpenDatabaseSettings extends StatelessWidget {
         shape: context.palette.pillShape,
       ),
       onPressed: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const DatabaseSourceScreen()),
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              const SyncSourcesScreen(feature: SyncFeature.database),
+        ),
       ),
       child: const Text('Ustawienia bazy danych'),
     );

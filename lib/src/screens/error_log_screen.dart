@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/error_log.dart';
 import '../theme.dart';
 
-/// "Informacje i pomoc › Dziennik błędów": what went wrong lately (newest first), kept only on
+/// "Problemy › Dziennik błędów" (Synchronizacja › Raportowanie błędów › Telefon): what went wrong lately (newest first), kept only on
 /// the phone ([ErrorLog]), with "Wyczyść".
 class ErrorLogScreen extends StatelessWidget {
   const ErrorLogScreen({super.key, this.log});

@@ -7,6 +7,7 @@ import '../data/outbox.dart';
 import '../data/playlist_library.dart';
 import '../data/song_catalog.dart';
 import '../data/song_requests.dart';
+import '../data/sync_sources.dart';
 import '../data/youtube_library.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
@@ -56,7 +57,7 @@ class MissingTracksScreen extends StatelessWidget {
       case CatalogStatus.noDatabase:
         summary =
             'Baza danych nie jest jeszcze pobrana (Ustawienia › '
-            'Serwer), więc żaden utwór nie został rozpoznany.';
+            'Synchronizacja › Baza danych), więc żaden utwór nie został rozpoznany.';
       case CatalogStatus.error:
         summary = 'Nie udało się wczytać bazy danych.';
       case CatalogStatus.notLoaded || CatalogStatus.loading:
@@ -155,7 +156,7 @@ class _RequestMissingButtonState extends State<_RequestMissingButton> {
           asked++;
         }
       }
-      if (sync == null || !sync.hasServer) {
+      if (sync == null || !sync.usesServer(SyncFeature.requests)) {
         sent = 'Wyślą się, gdy telefon połączy się z serwerem.';
       } else {
         final result = await outbox.send(

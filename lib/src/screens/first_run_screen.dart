@@ -4,8 +4,8 @@ import '../app_name.dart';
 import '../data/database_sync.dart';
 import '../theme.dart';
 
-/// The first start's question: may the music catalog come from GitHub? "Tak" leaves Ustawienia ›
-/// Serwer › "Pobieraj z GitHuba" on and downloads it at once, "Nie" switches it off. Shown by
+/// The first start's question: may the music catalog come from GitHub? "Tak" leaves
+/// Synchronizacja › Baza danych › GitHub on and downloads it at once, "Nie" switches it off. Shown by
 /// `AppShell` while [DatabaseSync.needsGitHubChoice]; it can't be dismissed without an answer.
 class FirstRunScreen extends StatelessWidget {
   const FirstRunScreen({super.key});
@@ -74,8 +74,8 @@ class FirstRunScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 'Bez niego aplikacja odtwarza muzykę z telefonu i z YouTube, a bazę może pobrać '
-                'z Twojego serwera. Zmienisz to później w Ustawienia › Serwer › „Pobieraj z '
-                'GitHuba”.',
+                'z Twojego serwera. Zmienisz to później w Ustawienia › Synchronizacja › Baza '
+                'danych › GitHub.',
                 style: body(palette.textSecondary),
               ),
               const SizedBox(height: 32),

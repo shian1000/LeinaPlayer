@@ -91,7 +91,7 @@ look?) before changing anything.
 
 - The Huawei shows no app logs. Temporary `debugPrint('STARTUP …ms: …')` marks (a top-level
   `Stopwatch` started in `main`) land in the app's own error log; read it with `uiautomator dump`
-  (Informacje i pomoc › Dziennik błędów), newest first, so take a run's lines up to its `main`.
+  (Synchronizacja › Raportowanie błędów › Telefon › Dziennik błędów), newest first, so take a run's lines up to its `main`.
   Never commit the marks.
 - Useful probes: a 250 ms `Timer.periodic` printing its lateness (main isolate blocked) and the
   time a `SELECT 1` on local.db takes (sqflite queue busy). For one screen's jank:

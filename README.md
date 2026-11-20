@@ -131,7 +131,8 @@ flutter test
 ## Running your own MusicDatabase server
 
 Optional. See [LeinaMusicDatabase](https://github.com/shian1000/LeinaMusicDatabase); in the app,
-enter its address under Ustawienia › Serwer.
+enter its address under Ustawienia › Synchronizacja › Prywatny serwer, and choose there which
+functions (the catalog, your library, correction requests) sync with it.
 
 ## Libraries
 

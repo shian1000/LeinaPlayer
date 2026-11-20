@@ -4,6 +4,7 @@ import '../data/account.dart';
 import '../data/app_updates.dart';
 import '../data/database_sync.dart';
 import '../data/source_settings.dart';
+import '../data/sync_sources.dart';
 import '../data/youtube_account.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -12,7 +13,8 @@ import 'account_screen.dart';
 import 'cache_settings_screen.dart';
 import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
-import 'database_source_screen.dart';
+import 'private_server_screen.dart';
+import 'sync_settings_screen.dart';
 import 'playback_order_screen.dart';
 import 'spotify_source_screen.dart';
 import 'youtube_source_screen.dart';
@@ -132,7 +134,14 @@ class PrivacyScreen extends StatelessWidget {
                     false,
                     'nie łączy się — żaden serwer nie jest ustawiony',
                   ),
-          goTo('Serwer: adresy', () => const DatabaseSourceScreen()),
+          goTo(
+            'Synchronizacja › Prywatny serwer: adresy',
+            () => const PrivateServerScreen(),
+          ),
+          goTo(
+            'Synchronizacja: co łączy się z serwerem',
+            () => const SyncSettingsScreen(),
+          ),
           goTo('Konto: logowanie i wylogowanie', () => const AccountScreen()),
 
           const SectionTitle('GitHub'),
@@ -149,8 +158,8 @@ class PrivacyScreen extends StatelessWidget {
                 'aktualizacje',
             ]),
           goTo(
-            'Serwer › Pobieraj z GitHuba',
-            () => const DatabaseSourceScreen(),
+            'Synchronizacja › Baza danych › GitHub',
+            () => const SyncSourcesScreen(feature: SyncFeature.database),
           ),
           if (updates != null && updates.configured)
             goTo(

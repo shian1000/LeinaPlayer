@@ -54,10 +54,10 @@ abstract final class FeatureInfos {
   static final server = FeatureInfo(
     title: 'Serwer MusicDatabase',
     what: 'Adres Twojego serwera MusicDatabase — programu, który prowadzi bazę utworów i Twoją bibliotekę muzyki.',
-    why: 'Jeśli jest to skonfigurowane, to z serwera telefon pobiera bazę utworów (raz dziennie), odtwarza pliki z Twojej biblioteki (źródło „Serwer”), wysyła zgłoszenia poprawek i — po zalogowaniu — synchronizuje Bibliotekę i statystyki. Bez serwera aplikacja wciąż działa: bazę pobiera z GitHuba, a reszta zostaje na telefonie.',
-    how: 'Można wpisać dwa adresy: zdalny (np. przez Tailscale) i domowy, z nazwą domowej sieci Wi-Fi — w domu telefon próbuje najpierw adresu domowego. Rozpoznanie sieci Wi-Fi wymaga zgody na lokalizację (zasada Androida). „Użyj bieżącego połączenia” sam szuka serwera w sieci. Gdy żaden serwer nie odpowiada, baza przychodzi z GitHuba. Pusta baza z serwera (0 utworów) nie zastępuje bez pytania tej, którą telefon już ma.',
+    why: 'Jeśli jest to skonfigurowane, to z serwera telefon pobiera bazę utworów (raz dziennie), odtwarza pliki z Twojej biblioteki (źródło „Serwer”), wysyła zgłoszenia poprawek i — po zalogowaniu — synchronizuje Bibliotekę i statystyki. Co z tego robi, wybierasz w Synchronizacja — osobno dla bazy danych, biblioteki i próśb do bazy. Bez serwera aplikacja wciąż działa: bazę pobiera z GitHuba, a reszta zostaje na telefonie.',
+    how: 'Można wpisać dwa adresy: zdalny (np. przez Tailscale) i domowy, z nazwą domowej sieci Wi-Fi — w domu telefon próbuje najpierw adresu domowego. Rozpoznanie sieci Wi-Fi wymaga zgody na lokalizację (zasada Androida). „Użyj bieżącego połączenia” sam szuka serwera w sieci. Bazę telefon pobiera ze źródeł w kolejności ustawionej w Synchronizacja › Baza danych (domyślnie najpierw serwer, potem GitHub). Pusta baza z serwera (0 utworów) nie zastępuje bez pytania tej, którą telefon już ma.',
     libraries: 'HttpClient (Dart), network_info_plus, permission_handler',
-    connects: 'Wpisane adresy serwera; GitHub, gdy serwer nie odpowiada (wyłączalne).',
+    connects: 'Wpisane adresy serwera; GitHub dla bazy (wyłączalny, w ustawionej kolejności).',
     actions: [_privacy],
   );
 
@@ -65,9 +65,9 @@ abstract final class FeatureInfos {
     title: 'Zgłoszenia poprawek',
     what: 'Skrzynka z rzeczami, które telefon zgłasza do MusicDatabase.',
     why: 'Telefon zauważa brakujące lub niepoprawne informacje: martwe linki YouTube (z filmem zastępczym), Twoje poprawki pól (ołówek w „Informacjach o utworze”), filmy znalezione dla utworów bez linku i odtworzone utwory, których nie ma w bazie. Serwer je przegląda i poprawia bazę — poprawki wracają z następną aktualizacją bazy.',
-    how: 'Zgłoszenia czekają na telefonie w małych plikach. Gdy serwer jest ustawiony, wysyłają się same (albo „Wyślij teraz”). Bez serwera: „Wyślij paczkę…” pakuje je w plik .zip, który wysyłasz poprzez opcje „Udostępnij” (np. komunikatorem), podpisany Twoją nazwą. Do czasu decyzji serwera, telefon pokazuje wartość z bazy, nie Twoją.',
+    how: 'Zgłoszenia czekają na telefonie w małych plikach. Gdy serwer jest ustawiony i włączony w Synchronizacja › Prośby do bazy danych, wysyłają się same (albo „Wyślij teraz”). Bez serwera: „Wyślij paczkę…” pakuje je w plik .zip, który wysyłasz poprzez opcje „Udostępnij” (np. komunikatorem), podpisany Twoją nazwą. Do czasu decyzji serwera, telefon pokazuje wartość z bazy, nie Twoją.',
     libraries: 'sqflite (pliki zgłoszeń), archive (paczka .zip), share_plus („Udostępnij”)',
-    connects: 'Serwer MusicDatabase (PUT /inbox) — gdy jest ustawiony. Paczka: nic, idzie przez aplikację wybraną w „Udostępnij”.',
+    connects: 'Serwer MusicDatabase (PUT /inbox) — gdy jest ustawiony i włączony dla próśb. Paczka: nic, idzie przez aplikację wybraną w „Udostępnij”.',
     actions: [_privacy],
   );
 
@@ -138,7 +138,7 @@ abstract final class FeatureInfos {
     what: 'Wymiana Twoich danych między telefonem a kontem na serwerze MusicDatabase.',
     why: 'Dzięki niej dane są takie same na wszystkich Twoich telefonach i wracają po reinstalacji albo na nowym telefonie.',
     how: 'Synchronizują się: playlisty (z wybranymi okładkami), nastroje (i zmiany nastrojów globalnych, jeśli masz do tego uprawnienie), foldery Biblioteki, statystyki słuchania (każde odtworzenie), polubione utwory, utwory i linki zapisane „Na później”. Działa samo — przy starcie, przy powrocie do aplikacji i kilka sekund po zmianie — a ⟳ uruchamia ją od razu. Gdy serwer nie odpowiada, zmiany czekają na telefonie. Playlisty, nastroje i foldery utworzone przed zalogowaniem dodaje się do konta wierszami „… tylko na tym telefonie”.',
-    connects: 'Serwer MusicDatabase z Ustawienia › Serwer, na koncie, na które jesteś zalogowany.',
+    connects: 'Serwer MusicDatabase z Synchronizacja › Prywatny serwer, na koncie, na które jesteś zalogowany.',
     actions: [_privacy],
   );
 

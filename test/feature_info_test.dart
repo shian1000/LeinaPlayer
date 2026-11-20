@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
+import 'package:music_database_app/src/data/sync_sources.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
 import 'package:music_database_app/src/data/youtube_search.dart';
 import 'package:music_database_app/src/screens/privacy_screen.dart';
-import 'package:music_database_app/src/screens/settings_screen.dart';
+import 'package:music_database_app/src/screens/sync_settings_screen.dart';
 import 'package:music_database_app/src/screens/spotify_source_screen.dart';
 import 'package:music_database_app/src/screens/youtube_playback_screen.dart';
 import 'package:music_database_app/src/screens/youtube_source_screen.dart';
@@ -27,11 +29,17 @@ void main() {
     await tester.pumpWidget(
       SourceSettingsScope(
         notifier: settings,
-        child: YouTubeScope(
-          search: YouTubeSearch(),
-          audio: YouTubeAudio(newPipeAvailable: true),
-          playlists: YouTubePlaylists(newPipeAvailable: false),
-          child: MaterialApp(theme: buildAppTheme(dummifyTheme), home: screen),
+        child: DatabaseSyncScope(
+          notifier: DatabaseSync(),
+          child: YouTubeScope(
+            search: YouTubeSearch(),
+            audio: YouTubeAudio(newPipeAvailable: true),
+            playlists: YouTubePlaylists(newPipeAvailable: false),
+            child: MaterialApp(
+              theme: buildAppTheme(dummifyTheme),
+              home: screen,
+            ),
+          ),
         ),
       ),
     );
@@ -42,11 +50,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Ustawienia › Serwer explains itself and leads to privacy', (
+  testWidgets('Prywatny serwer explains itself and leads to privacy', (
     tester,
   ) async {
-    await show(tester, const SettingsScreen());
-    await longPress(tester, 'Serwer');
+    await show(tester, const SyncSourcesScreen(feature: SyncFeature.database));
+    await longPress(tester, 'Prywatny serwer');
 
     expect(find.text('Serwer MusicDatabase'), findsOneWidget);
     for (final section in [
@@ -64,9 +72,9 @@ void main() {
     expect(find.byType(PrivacyScreen), findsOneWidget);
   });
 
-  testWidgets('Zgłoszenia poprawek explains itself', (tester) async {
-    await show(tester, const SettingsScreen());
-    await longPress(tester, 'Zgłoszenia poprawek');
+  testWidgets('Prośby do bazy danych explain themselves', (tester) async {
+    await show(tester, const SyncSettingsScreen());
+    await longPress(tester, 'Prośby do bazy danych');
     expect(find.text('Jak działa'), findsOneWidget);
     expect(find.textContaining('Wyślij paczkę'), findsOneWidget);
   });

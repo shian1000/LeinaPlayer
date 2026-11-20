@@ -87,7 +87,7 @@ class Account extends ChangeNotifier {
   ) async {
     if (_busy) return 'Logowanie już trwa';
     if (servers.isEmpty) {
-      return 'Najpierw ustaw adres serwera (Ustawienia › Serwer)';
+      return 'Najpierw ustaw adres serwera (Ustawienia › Synchronizacja › Prywatny serwer)';
     }
     _busy = true;
     notifyListeners();

@@ -62,7 +62,10 @@ playlists and moods show a collage of their songs' covers or a picture the user 
 alphabet are shown with their Latin form, "Кино (Kino)" (Wygląd › "Nazwy w alfabecie
 łacińskim"): only music.db's `title_latin` / `name_latin` columns or an artist's Latin synonym,
 never transliterated on the phone (user's decision); the forms are sent as field corrections
-([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Every cache setting is in one screen, Oszczędzanie
+([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Ustawienia › Synchronizacja gives the catalog, the account's library, requests for
+MusicDatabase and problem reports each their own sources, switched and ordered (the private
+server, GitHub for the catalog, a future "Serwer Leina" — "Work in progress :)"), with the
+phone's own data apart ([ADR 0018](docs/decisions/0018-sync-sources.md)). Every cache setting is in one screen, Oszczędzanie
 danych i tryb offline › Pamięć podręczna. YouTube: searching it on request, showing which songs
 MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
 audio on Android through NewPipeExtractor, with a cache of played songs — see
@@ -204,7 +207,7 @@ phone (`library_folders.dart`), not synced. Liked songs and songs saved "Na pó�
 time ([ADR 0013](docs/decisions/0013-saved-songs-sync.md); server side in a
 [hand-off](docs/handoffs/musicdatabase-saved-songs.md)). Without a server: the catalog also comes from a GitHub
 Release (`https://github.com/<owner>/<repo>/releases/download/database/` — `version.json` +
-`music.db` / `tag.db`; a server first, GitHub second, never a publish older than the phone's copy; default repo `shian1000/LeinaMusicDatabase`)
+`music.db` / `tag.db`; in the order set under Ustawienia › Synchronizacja — a server first by default —, never a publish older than the phone's copy; default repo `shian1000/LeinaMusicDatabase`)
 and the outbox's files go as a `.zip` package through the share sheet, counting as sent
 ([ADR 0014](docs/decisions/0014-github-database-and-request-packages.md); the contract is
 MusicDatabase's `docs/handoffs/public-database-for-musicdatabaseapp.md`).
@@ -252,7 +255,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `dayMonthLabel` in `common.dart`; `listening_charts.dart` — the stats' hour and month charts;
   `ScrollingText` — a text that slides when it does not fit; `showShareSheet` in `share_sheet.dart`; `sleep_timer_sheet.dart` — "Wyłącznik czasowy"; `update_dialog.dart` — "Dostępna nowa wersja"; `feature_info.dart` — the long-press explanation sheet (`showFeatureInfo`, texts in `screens/feature_infos.dart`); `song_names.dart` — `shownTitle` / `shownArtist` /
   `shownAlbum`, a song's names as screens show them, with the Latin form when switched on).
-- `lib/src/data/` — data: downloading MusicDatabase's files from a server or GitHub (`database_sync.dart`), reading
+- `lib/src/data/` — data: downloading MusicDatabase's files from a server or GitHub (`database_sync.dart`), each synced function's sources and their order (`sync_sources.dart`), reading
   `music.db` and `files.db` (`song_catalog.dart`), the phone's `local.db` and folder scan (`local_library.dart`),
   search over both (`combined_search.dart`), requests for MusicDatabase waiting to be sent, and their `.zip` packages
   (`outbox.dart`), the logged-in MusicDatabase user (`account.dart`), YouTube and Spotify links given to the app
@@ -360,11 +363,18 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Anything new the phone stores to work offline (a cache) gets its settings in the
   `cache_settings_screen.dart` ("Pamięć podręczna" — the only name for it in the UI, not
   "cache"), not on the screen of the feature that fills it (user's decision).
-- Ustawienia › Konto gathers everything the phone syncs (the account, the catalog, the outbox,
-  app updates), each with the very widget its own screen uses (`DatabaseDownloadTiles`,
-  `OutboxSendTiles`, `updateCheckTile`), plus "Synchronizuj wszystko" running them in turn
-  (user's decision): something new that syncs gets a shared tile there and a step in
-  `_SyncEverythingTile`; its switches stay on its own screen.
+- Ustawienia › Konto holds only the MusicDatabase and Google accounts (user's decision,
+  2026-11-20). How each synced function last synced is at the end of its Synchronizacja screen
+  ("Ostatnia synchronizacja"), with the very widget its own screen uses (`DatabaseDownloadTiles`,
+  `AccountSyncTile`, `OutboxSendTiles`), and "Synchronizuj wszystko" on top of Synchronizacja
+  runs them in turn (`sync_tiles.dart`): something new that syncs gets a shared tile there and a
+  step in `SyncEverythingTile`.
+- Each synced function chooses its own sources on Ustawienia › Synchronizacja (user's rule —
+  [ADR 0018](docs/decisions/0018-sync-sources.md)): its sync takes the server's addresses from
+  `DatabaseSync.serverAddressesFor(<its SyncFeature>)`, never the bare `serverAddresses()` — that
+  one is only for what isn't synced (the server's files, lyrics, logging in). A new kind of
+  synced data belongs to one of the `SyncFeature`s (or gets one, with its screen). The phone's
+  own data is "Dane na telefonie", never a source with a switch.
 - A `SnackBar` with an `action` stays until closed by hand in this Flutter version (`persist`
   defaults to true) and floats over whatever is pushed on top — pass `persist: false`. Notes about
   the queue use `QueueToast` above the mini player instead (Spotify-like, user's choice).
@@ -495,7 +505,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `input swipe 540 1800 540 600 300` rather than waiting for the user. It also shows no app logs
   (`logcat -s flutter` stays empty) — diagnose there from the screen. On the Pixel the `main`
   logcat buffer keeps only a few minutes, so a problem from earlier is gone from it: read the
-  app's own log (Informacje i pomoc › Dziennik błędów, `uiautomator dump` gives its text) and
+  app's own log (Synchronizacja › Raportowanie błędów › Telefon › Dziennik błędów, `uiautomator dump` gives its text) and
   the sharing server's journal (`journalctl --user -u musicdatabase-share.service`), which shows
   what the phone asked for (`HEAD` + `GET /library/<id>` = the song streamed; two `GET` 206 alone
   = only its cover read); `dumpsys media_session` and `dumpsys audio` (players created and

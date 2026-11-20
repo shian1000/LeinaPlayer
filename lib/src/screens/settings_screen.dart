@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_name.dart';
+import '../data/sync_sources.dart';
 import '../data/text_normalizer.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -11,7 +12,7 @@ import 'backup_screen.dart';
 import 'cache_settings_screen.dart';
 import 'cover_sources_screen.dart';
 import 'data_saver_screen.dart';
-import 'database_source_screen.dart';
+import 'github_source_screen.dart';
 import 'history_settings_screen.dart';
 import 'link_settings_screen.dart';
 import 'local_music_screen.dart';
@@ -19,6 +20,9 @@ import 'outbox_settings_screen.dart';
 import 'playback_settings_screen.dart';
 import 'feature_infos.dart';
 import 'privacy_screen.dart';
+import 'private_server_screen.dart';
+import 'problems_screen.dart';
+import 'sync_settings_screen.dart';
 import '../widgets/feature_info.dart';
 import 'spotify_source_screen.dart';
 import 'youtube_source_screen.dart';
@@ -61,43 +65,117 @@ const _sections = <(String, List<_SettingsEntry>)>[
       _SettingsEntry(
         Icons.account_circle_outlined,
         'Konto',
-        'Logowanie • Synchronizuj wszystko • Konto Google',
+        'Logowanie • Konto Google',
         _openAccount,
         keywords: [
           'Konto MusicDatabase',
-          'Synchronizuj wszystko',
-          'Synchronizuj konto',
-          'Katalog muzyki',
-          'Zgłoszenia poprawek',
-          'Aktualizacje',
           'Zaloguj się',
           'Wyloguj',
           'Konto Google (playlisty na YouTube)',
-          'Statystyki słuchania',
         ],
       ),
       _SettingsEntry(
-        Icons.storage,
-        'Serwer',
-        'Adresy serwera • Wi-Fi sieci lokalnej • Pobieranie bazy',
-        _openServer,
-        info: _serverInfo,
+        Icons.sync,
+        'Synchronizacja',
+        'Baza danych • Biblioteka użytkownika • Prośby do bazy danych • '
+            'Raportowanie błędów',
+        _openSync,
         keywords: [
-          'Adres serwera (połączenie zdalne)',
-          'Adres serwera (sieć lokalna)',
-          'Pobieranie',
-          'Ostatnie pobranie',
+          'Synchronizuj wszystko',
+          'Ostatnia synchronizacja',
+          'Źródła synchronizacji',
+          'Kolejność źródeł',
+          'Serwer Leina',
+          'Prywatny serwer',
+          'Telefon',
+          'Dane na telefonie',
         ],
-      ),
-      _SettingsEntry(
-        Icons.forward_to_inbox_outlined,
-        'Zgłoszenia poprawek',
-        'Wysyłanie automatyczne • Czeka na wysłanie',
-        _openOutbox,
-        info: _outboxInfo,
-        keywords: [
-          'Wysyłaj zgłoszenia poprawek automatycznie',
-          'Ostatnie wysyłanie',
+        deeper: [
+          _SettingsEntry(
+            Icons.storage,
+            'Baza danych',
+            'GitHub • Prywatny serwer • Ostatnie pobranie • Pobierz teraz',
+            _openSyncDatabase,
+            keywords: [
+              'Pobieraj z GitHuba',
+              'Katalog muzyki',
+              'Pobierz bazę danych',
+              'Pusta baza z serwera',
+            ],
+            deeper: [
+              _SettingsEntry(
+                Icons.public,
+                'GitHub',
+                'Repozytorium z publiczną kopią bazy',
+                _openGitHub,
+                keywords: ['Repozytorium GitHuba', 'Publiczna kopia bazy'],
+              ),
+              _SettingsEntry(
+                Icons.dns_outlined,
+                'Prywatny serwer',
+                'Adresy serwera • Wi-Fi sieci lokalnej • Certyfikat',
+                _openPrivateServer,
+                info: _serverInfo,
+                keywords: [
+                  'Serwer',
+                  'Serwer MusicDatabase',
+                  'Adres serwera (połączenie zdalne)',
+                  'Adres serwera (sieć lokalna)',
+                  'Certyfikat serwera',
+                  'Użyj bieżącego połączenia',
+                ],
+              ),
+            ],
+          ),
+          _SettingsEntry(
+            Icons.library_music_outlined,
+            'Biblioteka użytkownika',
+            'Serwer Leina • Prywatny serwer • Telefon',
+            _openSyncLibrary,
+            keywords: [
+              'Synchronizuj konto',
+              'Statystyki słuchania',
+              'Synchronizacja playlist',
+              'Synchronizacja nastrojów',
+              'Synchronizacja statystyk słuchania',
+            ],
+          ),
+          _SettingsEntry(
+            Icons.forward_to_inbox_outlined,
+            'Prośby do bazy danych',
+            'Serwer Leina • Prywatny serwer • Telefon',
+            _openSyncRequests,
+            info: _outboxInfo,
+            deeper: [
+              _SettingsEntry(
+                Icons.forward_to_inbox_outlined,
+                'Zgłoszenia poprawek',
+                'Wysyłanie automatyczne • Czeka na wysłanie',
+                _openOutbox,
+                info: _outboxInfo,
+                keywords: [
+                  'Wysyłaj zgłoszenia poprawek automatycznie',
+                  'Ostatnie wysyłanie',
+                  'Wyślij paczkę',
+                ],
+              ),
+            ],
+          ),
+          _SettingsEntry(
+            Icons.bug_report_outlined,
+            'Raportowanie błędów',
+            'Serwer Leina • Prywatny serwer • Telefon',
+            _openSyncErrorReports,
+            deeper: [
+              _SettingsEntry(
+                Icons.bug_report_outlined,
+                'Problemy',
+                'Zgłoś problem • Dziennik błędów',
+                _openProblems,
+                keywords: ['Raport problemu', 'Błędy'],
+              ),
+            ],
+          ),
         ],
       ),
     ],
@@ -274,8 +352,6 @@ const _sections = <(String, List<_SettingsEntry>)>[
         _openAbout,
         keywords: [
           'Wersja aplikacji',
-          'Zgłoś problem',
-          'Dziennik błędów',
           'Aktualizacje',
           'Sprawdzaj aktualizacje automatycznie',
           'Licencje bibliotek',
@@ -288,7 +364,25 @@ const _sections = <(String, List<_SettingsEntry>)>[
 
 Widget _openAccount(BuildContext context) => const AccountScreen();
 
-Widget _openServer(BuildContext context) => const DatabaseSourceScreen();
+Widget _openSync(BuildContext context) => const SyncSettingsScreen();
+
+Widget _openSyncDatabase(BuildContext context) =>
+    const SyncSourcesScreen(feature: SyncFeature.database);
+
+Widget _openSyncLibrary(BuildContext context) =>
+    const SyncSourcesScreen(feature: SyncFeature.library);
+
+Widget _openSyncRequests(BuildContext context) =>
+    const SyncSourcesScreen(feature: SyncFeature.requests);
+
+Widget _openSyncErrorReports(BuildContext context) =>
+    const SyncSourcesScreen(feature: SyncFeature.errorReports);
+
+Widget _openGitHub(BuildContext context) => const GitHubSourceScreen();
+
+Widget _openPrivateServer(BuildContext context) => const PrivateServerScreen();
+
+Widget _openProblems(BuildContext context) => const ProblemsScreen();
 
 Widget _openOutbox(BuildContext context) => const OutboxSettingsScreen();
 
