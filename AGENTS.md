@@ -133,7 +133,7 @@ decade; `song_radio.dart`), "Pobierz" for a song or playlist (kept offline for g
 storage or a folder the user picked, as "Artist - Title" — Oszczędzanie danych › Miejsce na
 pobrane utwory, `download_files.dart`; re-encoded as MP3 256 kbps unless "Pobieraj jako MP3" is off —
 `mp3_conversion.dart`, [`local-library.md`](docs/agent-notes/local-library.md)), "Ukryj utwór"
-(phone only), scheduled music (Ja › Zaplanowane uruchomienie muzyki: once or on chosen weekdays, at a set time and volume, starting the
+(phone only), scheduled music (Ja › Zaplanowana muzyka › Zaplanowane uruchomienie: once or on chosen weekdays, at a set time and volume, starting the
 app if needed and playing a song, a playlist or the last queue; Zaplanowane wyłączenie: fades the
 music out — Android's `setAlarmClock` in `ScheduledMusic.kt`, `playback/scheduled_music.dart`). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
 Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.

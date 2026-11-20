@@ -21,7 +21,7 @@ import 'recents_screen.dart';
 import 'scheduled_music_screen.dart';
 import 'settings_screen.dart';
 
-/// The "Ja" tab: the profile, the MusicDatabase account, then history, "Na później"
+/// The "Ja" tab: the profile (the MusicDatabase account), then history, "Na później"
 /// and settings — what used to hide behind the avatar in the top corner, now down by the thumb
 /// (Juxtopposed's Spotify redesign).
 class ProfileScreen extends StatelessWidget {
@@ -129,35 +129,6 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          _Card(
-            color: palette.accent.withValues(alpha: 0.18),
-            onTap: () => push(const AccountScreen()),
-            child: Row(
-              children: [
-                Icon(Icons.dns_outlined, color: palette.accent),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Konto MusicDatabase'),
-                      Text(
-                        loggedIn
-                            ? 'Playlisty i nastroje synchronizują się z serwerem'
-                            : 'Tylko na tym telefonie',
-                        style: TextStyle(
-                          color: palette.accent,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-          ),
           const SizedBox(height: 8),
           _Row(
             icon: Icons.history,
@@ -181,20 +152,13 @@ class ProfileScreen extends StatelessWidget {
             onLongPress: () =>
                 showFeatureInfo(context, FeatureInfos.listeningStats),
           ),
-          if (scheduled != null) ...[
+          if (scheduled != null)
             _Row(
               icon: Icons.alarm,
-              label: 'Zaplanowane uruchomienie muzyki',
-              subtitle: scheduledLabel(scheduled.timeOf(ScheduleKind.start)),
-              onTap: () => push(const ScheduledStartScreen()),
+              label: 'Zaplanowana muzyka',
+              subtitle: scheduledSummary(scheduled),
+              onTap: () => push(const ScheduledMusicScreen()),
             ),
-            _Row(
-              icon: Icons.alarm_off,
-              label: 'Zaplanowane wyłączenie',
-              subtitle: scheduledLabel(scheduled.timeOf(ScheduleKind.stop)),
-              onTap: () => push(const ScheduledStopScreen()),
-            ),
-          ],
           _Row(
             icon: Icons.settings_outlined,
             label: 'Ustawienia',

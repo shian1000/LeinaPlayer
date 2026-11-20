@@ -49,6 +49,56 @@ String scheduledLabel(ScheduledTime time) {
   return '$days • następnie $day o ${time.label}';
 }
 
+/// Ja's "Zaplanowana muzyka" row: "Uruchomienie o 07:00 • wyłączenie o 23:00" / "Wyłączone".
+String scheduledSummary(ScheduledMusic scheduled) {
+  bool on(ScheduledTime time) => time.enabled && time.nextAt != null;
+  final start = scheduled.timeOf(ScheduleKind.start);
+  final stop = scheduled.timeOf(ScheduleKind.stop);
+  final parts = [
+    if (on(start)) 'uruchomienie o ${start.label}',
+    if (on(stop)) 'wyłączenie o ${stop.label}',
+  ];
+  if (parts.isEmpty) return 'Wyłączone';
+  final text = parts.join(' • ');
+  return '${text[0].toUpperCase()}${text.substring(1)}';
+}
+
+/// Ja › Zaplanowana muzyka: the scheduled start and stop.
+class ScheduledMusicScreen extends StatelessWidget {
+  const ScheduledMusicScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheduled = ScheduledMusicScope.of(context);
+    void push(Widget screen) =>
+        Navigator.of(context)
+            .push(MaterialPageRoute<void>(builder: (_) => screen));
+    return Scaffold(
+      appBar: AppBar(title: const Text('Zaplanowana muzyka')),
+      body: ListView(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.alarm, size: 26),
+            title: const Text('Zaplanowane uruchomienie'),
+            subtitle: Text(
+              scheduledLabel(scheduled.timeOf(ScheduleKind.start)),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => push(const ScheduledStartScreen()),
+          ),
+          ListTile(
+            leading: const Icon(Icons.alarm_off, size: 26),
+            title: const Text('Zaplanowane wyłączenie'),
+            subtitle: Text(scheduledLabel(scheduled.timeOf(ScheduleKind.stop))),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => push(const ScheduledStopScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Which weekdays a scheduled start or stop repeats on; none ticked: once.
 class _DayPicker extends StatelessWidget {
   const _DayPicker({required this.kind});
@@ -244,7 +294,7 @@ class _TimeTile extends StatelessWidget {
   }
 }
 
-/// Ja › Zaplanowane wyłączenie.
+/// Ja › Zaplanowana muzyka › Zaplanowane wyłączenie.
 class ScheduledStopScreen extends StatelessWidget {
   const ScheduledStopScreen({super.key});
 
@@ -267,7 +317,7 @@ class ScheduledStopScreen extends StatelessWidget {
   );
 }
 
-/// Ja › Zaplanowane uruchomienie muzyki: when, how loud, and what plays.
+/// Ja › Zaplanowana muzyka › Zaplanowane uruchomienie: when, how loud, and what plays.
 class ScheduledStartScreen extends StatefulWidget {
   const ScheduledStartScreen({super.key});
 

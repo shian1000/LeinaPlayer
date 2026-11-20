@@ -188,7 +188,7 @@ class ScheduledTime {
   }
 }
 
-/// Ja › Zaplanowane uruchomienie muzyki / Zaplanowane wyłączenie: each at the set time, once or on
+/// Ja › Zaplanowana muzyka › Zaplanowane uruchomienie / Zaplanowane wyłączenie: each at the set time, once or on
 /// the chosen weekdays. Android starts the app if it isn't running ([ScheduledMusicPlatform]) and the music plays
 /// with the phone's music volume set as asked; nothing has to be confirmed.
 class ScheduledMusic extends ChangeNotifier {

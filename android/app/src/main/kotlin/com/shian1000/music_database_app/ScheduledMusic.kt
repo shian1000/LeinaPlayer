@@ -23,7 +23,7 @@ import java.util.Calendar
 import kotlin.math.roundToInt
 
 /**
- * "Zaplanowane uruchomienie muzyki" and "Zaplanowane wyłączenie" (Ja): Android keeps the times, so
+ * "Zaplanowane uruchomienie" and "Zaplanowane wyłączenie" (Ja › Zaplanowana muzyka): Android keeps the times, so
  * the music starts with the app closed. What plays is decided in Dart
  * (`lib/src/playback/scheduled_music.dart`), which runs once [MainActivity] has been brought up.
  */

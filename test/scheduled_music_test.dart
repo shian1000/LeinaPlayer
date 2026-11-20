@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/playback/scheduled_music.dart';
+import 'package:music_database_app/src/screens/scheduled_music_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakePlatform implements ScheduledMusicPlatform {
@@ -132,6 +133,20 @@ void main() {
     final music = make();
     expect(await music.setEnabled(ScheduleKind.stop, true), isFalse);
     expect(music.timeOf(ScheduleKind.stop).enabled, isFalse);
+  });
+
+  test('Ja\'s summary names what is switched on', () async {
+    final music = make();
+    expect(scheduledSummary(music), 'Wyłączone');
+    await music.setTime(ScheduleKind.stop, 23, 0);
+    await music.setEnabled(ScheduleKind.stop, true);
+    expect(scheduledSummary(music), 'Wyłączenie o 23:00');
+    await music.setTime(ScheduleKind.start, 7, 5);
+    await music.setEnabled(ScheduleKind.start, true);
+    expect(
+      scheduledSummary(music),
+      'Uruchomienie o 07:05 • wyłączenie o 23:00',
+    );
   });
 
   test('settings come back after a restart', () async {
