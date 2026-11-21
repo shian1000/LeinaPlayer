@@ -23,22 +23,23 @@ import java.util.Calendar
 import kotlin.math.roundToInt
 
 /**
- * "Zaplanowane uruchomienie" and "Zaplanowane wyłączenie" (Ja › Zaplanowana muzyka): Android keeps the times, so
- * the music starts with the app closed. What plays is decided in Dart
+ * "Zaplanowane uruchomienie" (several, like alarms) and "Zaplanowane wyłączenie" (Ja › Zaplanowana
+ * muzyka): Android keeps the times, so the music starts with the app closed. Each time has a key
+ * given by Dart: [STOP], "start" or "start_<id>". What plays is decided in Dart
  * (`lib/src/playback/scheduled_music.dart`), which runs once [MainActivity] has been brought up.
  */
 object ScheduledMusic {
-    enum class Kind(val key: String, val action: String, val requestCode: Int) {
-        START("start", "com.shian1000.music_database_app.SCHEDULED_START", 0),
-        STOP("stop", "com.shian1000.music_database_app.SCHEDULED_STOP", 1);
+    const val START_ACTION = "com.shian1000.music_database_app.SCHEDULED_START"
+    const val STOP_ACTION = "com.shian1000.music_database_app.SCHEDULED_STOP"
+    const val STOP = "stop"
+    const val EXTRA_KEY = "key"
 
-        companion object {
-            fun of(key: String?) = entries.first { it.key == key }
-        }
-    }
+    /** The keys of times kept in [PREFS]; "start" alone was the only start of older versions. */
+    private val TIME_KEY = Regex("stop|start(_\\d+)?")
 
     private const val PREFS = "scheduled_music"
     private const val KEY_STARTED = "started_at"
+    private const val KEY_STARTED_KEY = "started_key"
     private const val START_WITHIN_MS = 15 * 60 * 1000L
     private const val CHANNEL_ID = "com.shian1000.music_database_app.scheduled"
     private const val NOTIFICATION_ID = 7301
@@ -53,7 +54,7 @@ object ScheduledMusic {
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private fun startIntent(context: Context) = Intent(context, MainActivity::class.java)
-        .setAction(Kind.START.action)
+        .setAction(START_ACTION)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
     private fun openApp(context: Context) = PendingIntent.getActivity(
@@ -63,18 +64,29 @@ object ScheduledMusic {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun receiver(context: Context, kind: Kind) = PendingIntent.getBroadcast(
+    /** Kept as older versions had them: "start" 0, [STOP] 1, so their alarms are the same ones. */
+    private fun requestCode(key: String) = when (key) {
+        "start" -> 0
+        STOP -> 1
+        else -> key.removePrefix("start_").toInt() + 1
+    }
+
+    private fun receiver(context: Context, key: String) = PendingIntent.getBroadcast(
         context,
-        kind.requestCode,
-        Intent(context, ScheduledMusicReceiver::class.java).setAction(kind.action),
+        requestCode(key),
+        Intent(context, ScheduledMusicReceiver::class.java)
+            .setAction(if (key == STOP) STOP_ACTION else START_ACTION)
+            .putExtra(EXTRA_KEY, key),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun daysKey(kind: Kind) = "${kind.key}_days"
+    private fun daysKey(key: String) = "${key}_days"
 
-    /** The weekdays [kind] repeats on, as Dart's `DateTime.weekday`. */
-    private fun days(context: Context, kind: Kind): List<Int> =
-        prefs(context).getString(daysKey(kind), "")!!.split(",").mapNotNull { it.toIntOrNull() }
+    /** The weekdays [key] repeats on, as Dart's `DateTime.weekday`. */
+    private fun days(context: Context, key: String): List<Int> =
+        prefs(context).getString(daysKey(key), "")!!.split(",").mapNotNull { it.toIntOrNull() }
+
+    private fun timeKeys(context: Context) = prefs(context).all.keys.filter { TIME_KEY.matches(it) }
 
     /** The first repeat of [at] still to come, by the calendar (clock changes keep the hour). */
     private fun nextAfter(at: Long, days: List<Int>): Long {
@@ -87,29 +99,29 @@ object ScheduledMusic {
         return next.timeInMillis
     }
 
-    /** What comes after [kind]'s time passed: its next day, or nothing. */
-    private fun moveOn(context: Context, kind: Kind) {
-        val at = prefs(context).getLong(kind.key, 0)
-        val days = days(context, kind)
+    /** What comes after [key]'s time passed: its next day, or nothing. */
+    private fun moveOn(context: Context, key: String) {
+        val at = prefs(context).getLong(key, 0)
+        val days = days(context, key)
         if (at != 0L && days.isNotEmpty()) {
-            schedule(context, kind, nextAfter(at, days), days)
+            schedule(context, key, nextAfter(at, days), days)
         } else {
-            prefs(context).edit().remove(kind.key).apply()
+            prefs(context).edit().remove(key).remove(daysKey(key)).apply()
         }
     }
 
     /** Whether Android took it: the exact-alarm permission can be taken away on Android 12. */
-    fun schedule(context: Context, kind: Kind, at: Long, days: List<Int>): Boolean {
+    fun schedule(context: Context, key: String, at: Long, days: List<Int>): Boolean {
         val alarms = context.getSystemService(AlarmManager::class.java)
         return try {
             // setAlarmClock, unlike the other kinds, goes off on time in Doze.
             alarms.setAlarmClock(
                 AlarmManager.AlarmClockInfo(at, openApp(context)),
-                receiver(context, kind),
+                receiver(context, key),
             )
             prefs(context).edit()
-                .putLong(kind.key, at)
-                .putString(daysKey(kind), days.joinToString(","))
+                .putLong(key, at)
+                .putString(daysKey(key), days.joinToString(","))
                 .apply()
             true
         } catch (e: SecurityException) {
@@ -118,47 +130,54 @@ object ScheduledMusic {
         }
     }
 
-    fun cancel(context: Context, kind: Kind) {
-        context.getSystemService(AlarmManager::class.java).cancel(receiver(context, kind))
-        prefs(context).edit().remove(kind.key).apply()
+    fun cancel(context: Context, key: String) {
+        context.getSystemService(AlarmManager::class.java).cancel(receiver(context, key))
+        prefs(context).edit().remove(key).remove(daysKey(key)).apply()
+    }
+
+    fun cancelAllBut(context: Context, keys: Collection<String>) {
+        for (key in timeKeys(context)) if (key !in keys) cancel(context, key)
     }
 
     /** Android forgets these when the phone restarts and when the app is updated. */
     fun rearm(context: Context) {
-        for (kind in Kind.entries) {
-            val at = prefs(context).getLong(kind.key, 0)
+        for (key in timeKeys(context)) {
+            val at = prefs(context).getLong(key, 0)
             if (at == 0L) continue
             if (at > System.currentTimeMillis()) {
-                schedule(context, kind, at, days(context, kind))
+                schedule(context, key, at, days(context, key))
             } else {
-                moveOn(context, kind)
+                moveOn(context, key)
             }
         }
     }
 
-    fun takeStarted(context: Context): Boolean {
+    /** The key of the start that went off, if it did recently. */
+    fun takeStarted(context: Context): String? {
         val startedAt = prefs(context).getLong(KEY_STARTED, 0)
-        if (startedAt == 0L) return false
-        prefs(context).edit().remove(KEY_STARTED).apply()
+        if (startedAt == 0L) return null
+        val key = prefs(context).getString(KEY_STARTED_KEY, null) ?: "start"
+        prefs(context).edit().remove(KEY_STARTED).remove(KEY_STARTED_KEY).apply()
         // Opened hours later (the app couldn't be brought up): music now would be a surprise.
         val recent = System.currentTimeMillis() - startedAt < START_WITHIN_MS
         if (!recent) finishStarting(context)
-        return recent
+        return if (recent) key else null
     }
 
-    fun fire(context: Context, kind: Kind) {
-        if (kind == Kind.STOP) {
-            moveOn(context, kind)
+    fun fire(context: Context, key: String) {
+        if (key == STOP) {
+            moveOn(context, key)
             // No engine means no music playing, so nothing to stop.
-            bridge?.fired(kind)
+            bridge?.fired(key)
             return
         }
         // commit: the process may be gone right after this receiver.
         prefs(context).edit()
             .putLong(KEY_STARTED, System.currentTimeMillis())
+            .putString(KEY_STARTED_KEY, key)
             .commit()
-        moveOn(context, kind)
-        bridge?.fired(kind)
+        moveOn(context, key)
+        bridge?.fired(key)
         // Android 10+ refuses activities started from the background, except through a
         // full-screen notification; the direct start covers older phones and an unlocked screen.
         showNotification(context)
@@ -230,9 +249,12 @@ class ScheduledMusicReceiver : BroadcastReceiver() {
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED ->
                 ScheduledMusic.rearm(context)
-            else -> ScheduledMusic.Kind.entries
-                .firstOrNull { it.action == intent.action }
-                ?.let { ScheduledMusic.fire(context, it) }
+            ScheduledMusic.STOP_ACTION -> ScheduledMusic.fire(context, ScheduledMusic.STOP)
+            // An alarm set by an older version carries no key: it was the only start.
+            ScheduledMusic.START_ACTION -> ScheduledMusic.fire(
+                context,
+                intent.getStringExtra(ScheduledMusic.EXTRA_KEY) ?: "start",
+            )
         }
     }
 }
@@ -246,8 +268,8 @@ class ScheduledMusicBridge(val messenger: BinaryMessenger, private val context: 
         channel.setMethodCallHandler(this)
     }
 
-    fun fired(kind: ScheduledMusic.Kind) {
-        channel.invokeMethod("fired", kind.key)
+    fun fired(key: String) {
+        channel.invokeMethod("fired", key)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -255,13 +277,18 @@ class ScheduledMusicBridge(val messenger: BinaryMessenger, private val context: 
             "schedule" -> result.success(
                 ScheduledMusic.schedule(
                     context,
-                    ScheduledMusic.Kind.of(call.argument<String>("kind")),
+                    call.argument<String>("key")!!,
                     call.argument<Number>("at")!!.toLong(),
                     call.argument<List<Int>>("days")!!,
                 ),
             )
             "cancel" -> {
-                ScheduledMusic.cancel(context, ScheduledMusic.Kind.of(call.arguments as String))
+                ScheduledMusic.cancel(context, call.arguments as String)
+                result.success(null)
+            }
+            "cancelAllBut" -> {
+                @Suppress("UNCHECKED_CAST")
+                ScheduledMusic.cancelAllBut(context, call.arguments as List<String>)
                 result.success(null)
             }
             "takeStarted" -> result.success(ScheduledMusic.takeStarted(context))

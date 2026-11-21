@@ -13,7 +13,7 @@ This app is a Flutter client, targeting Android first, with iOS support kept bui
 Everything on GitHub (README, PRIVACY.md, docs) is in English; the app's UI is written in Polish
 (user's rule) and translated (Ustawienia › Wygląd › Język, default the phone's language —
 [`localization.md`](docs/agent-notes/localization.md)). The public README doesn't mention playing audio from YouTube or name the YouTube
-libraries (user's choice; the add-ons, sharing checklist 8.3, will document them). It is for
+libraries (user's choice; YouTube as a separate add-on was dropped — sharing checklist 8.3). It is for
 private use only and is never published in an app store; the app is GPLv3
 ([ADR 0004](docs/decisions/0004-license-and-distribution.md)). It uses MusicDatabase's data and
 supports MusicDatabase: when something is missing there (so far: YouTube links), the phone may
@@ -139,7 +139,7 @@ decade; `song_radio.dart`), "Pobierz" for a song or playlist (kept offline for g
 storage or a folder the user picked, as "Artist - Title" — Oszczędzanie danych › Miejsce na
 pobrane utwory, `download_files.dart`; re-encoded as MP3 256 kbps unless "Pobieraj jako MP3" is off —
 `mp3_conversion.dart`, [`local-library.md`](docs/agent-notes/local-library.md)), "Ukryj utwór"
-(phone only), scheduled music (Ja › Zaplanowana muzyka › Zaplanowane uruchomienie: once or on chosen weekdays, at a set time and volume, starting the
+(phone only), scheduled music (Ja › Zaplanowana muzyka › Zaplanowane uruchomienie: several, like the phone's alarms, each once or on chosen weekdays, at a set time and volume, starting the
 app if needed and playing a song, a playlist or the last queue; Zaplanowane wyłączenie: fades the
 music out — Android's `setAlarmClock` in `ScheduledMusic.kt`, `playback/scheduled_music.dart`). Every saved playlist: Dodaj, Sortuj; made on the phone: Edytuj.
 Ustawienia has a search; Biblioteka a grid view; Home's recommendation rows come from the stats.
@@ -308,7 +308,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `MainActivity.kt` (extends `AudioServiceActivity` for background playback; `LinksBridge`:
   incoming YouTube/Spotify links and opening the YouTube app by package),
   `LinkChooserActivity.kt` (the "Otwórz w…" sheet for tapped links, "Jak odtworzyć?" for shared ones), `LinkTargets.kt`,
-  `LaterLinks.kt` (links saved for later), `ScheduledMusic.kt` (the times of a scheduled start / stop; it also moves a repeating one to its next day itself, as a stop finds no Dart running when the app is closed), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `Mp3Encoder.kt` ("Pobieraj jako MP3": MediaCodec + jump3r), `DownloadService.kt` (the "Pobieranie utworów"
+  `LaterLinks.kt` (links saved for later), `ScheduledMusic.kt` (the times of the scheduled starts / stop, each by the key Dart gives it; it also moves a repeating one to its next day itself, as a stop finds no Dart running when the app is closed), `VolumeLeveling.kt` (DynamicsProcessing for "Wyrównywanie głośności"), `LoudnessMeter.kt` (a file's EBU R128 loudness), `Mp3Encoder.kt` ("Pobieraj jako MP3": MediaCodec + jump3r), `DownloadService.kt` (the "Pobieranie utworów"
   foreground service while "Pobierz" works — Dart's `download_notification.dart`),
   `android/app/proguard-rules.pro` and `android/app/src/main/res/raw/keep.xml`.
 - `third_party/audio_service/` — a patched copy of audio_service 0.18.19 (`dependency_overrides`
@@ -395,6 +395,11 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   card), where a moment of the slide would be captured. It animates only while its route and
   tab are shown, so an `IndexedStack` keeping something hidden needs `TickerMode` around that
   child (`app_shell.dart`), or hidden texts keep asking for frames.
+- A picture the app draws by itself (`RenderRepaintBoundary.toImage`, `Picture.toImage` — not
+  on a tap) waits while the app is hidden / paused: with no window on screen Impeller's OpenGL ES
+  crashes the whole app in its raster thread (`SIGSEGV` in `1.raster`; Home's `_StartupSnapshot`
+  did it ~3 s into a start whenever the screen went off, and after every scheduled start —
+  reproduced on the Huawei by a cold start and `input keyevent KEYCODE_SLEEP` 2–4 s later).
 - `Scrollable.ensureVisible` scrolls every scrollable above the widget too — inside a card that
   scrolls on its own within a page (the lyrics under the full player) it drags the whole page
   along; scroll the inner controller to `RenderAbstractViewport.getOffsetToReveal` instead.

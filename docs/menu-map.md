@@ -241,16 +241,21 @@ system Back closes a sheet, then pops the tab, then goes to Home, then exits.
   queues them), Wykonawcy and Albumy (top 10, sideways, opening the artist's / album's songs),
   Pory dnia (listened time per hour), Dekady, Języki, Kraje wykonawców, Skąd grało (shares).
   Ustawienia **→ Ustawienia**.
-- Zaplanowana muzyka ("Uruchomienie o 07:00 • wyłączenie o 23:00", or "Wyłączone") **→**
-  `ScheduledMusicScreen` (`scheduled_music_screen.dart`), with two rows:
-  - Zaplanowane uruchomienie (when, or "Wyłączone") **→** `ScheduledStartScreen` — **implemented**:
-    the time (tap: picker, which also switches it on) with a switch, days to repeat on (Pn–Nd;
-    none ticked: once), Głośność (5–100%, sets the phone's music volume and leaves it there), Co
-    ma zagrać: Utwór (→ search, a tap picks) / Playlista (→ list) / Ostatnia kolejka; the app
-    starts if it isn't running and the music plays, nothing to confirm. Under the time, while
-    it's on and Android 14+ doesn't let the app open itself: "Muzyka nie włączy się sama" (tap:
-    Android's "Powiadomienia pełnoekranowe" screen for the app; switching it on asks the same in
-    a dialog, "Pozwól otwierać aplikację").
+- Zaplanowana muzyka ("Uruchomienie o 07:00 • wyłączenie o 23:00", "Uruchomienia o 07:00, 09:30 •
+  …", or "Wyłączone") **→** `ScheduledMusicScreen` (`scheduled_music_screen.dart`), with two rows:
+  - Zaplanowane uruchomienie (the one switched on — when —, several by their times, or
+    "Wyłączone") **→** `ScheduledStartsScreen` — **implemented**, like the phone's alarms: every
+    start by the time of day (its time, when it comes next, "<volume>% • <what plays>", a switch;
+    dragged left: deleted, "Cofnij" in the snackbar), + "Dodaj uruchomienie" (the time picker,
+    the new start switched on), "Nie masz jeszcze zaplanowanych uruchomień…" with none. A tap
+    **→** `ScheduledStartScreen` for that start: 🗑 "Usuń uruchomienie" in the app bar, the time
+    (tap: picker, which also switches it on) with a switch, days to repeat on (Pn–Nd; none
+    ticked: once), Głośność (5–100%, sets the phone's music volume and leaves it there), Co ma
+    zagrać: Utwór (→ search, a tap picks) / Playlista (→ list) / Ostatnia kolejka; the app
+    starts if it isn't running and the music plays, nothing to confirm. On both screens, while a
+    start is on and Android 14+ doesn't let the app open itself: "Muzyka nie włączy się sama"
+    (tap: Android's "Powiadomienia pełnoekranowe" screen for the app; switching one on asks the
+    same in a dialog, "Pozwól otwierać aplikację").
   - Zaplanowane wyłączenie (when, or "Wyłączone") **→** `ScheduledStopScreen` — **implemented**: the
     time with a switch and the same days; the music fades out and pauses.
 - Ostatnie **→ Ostatnie** (`recents_screen.dart`) — **implemented**, modelled on the reference

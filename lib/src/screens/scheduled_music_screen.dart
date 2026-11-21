@@ -13,6 +13,7 @@ import '../theme.dart';
 import '../widgets/scrolling_text.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_tile.dart';
+import '../widgets/swipe_actions.dart';
 
 List<String> get _dayNames => [
   l10n.scheduledMusicScreenMon,
@@ -62,20 +63,52 @@ String scheduledLabel(ScheduledTime time) {
   return l10n.scheduledMusicScreenRepeating(days, day, time.label);
 }
 
-/// Ja's "Zaplanowana muzyka" row: "Uruchomienie o 07:00 • wyłączenie o 23:00" / "Wyłączone".
+/// Ja's "Zaplanowana muzyka" row: "Uruchomienie o 07:00 • wyłączenie o 23:00" /
+/// "Uruchomienia o 07:00, 09:30 • …" / "Wyłączone".
 String scheduledSummary(ScheduledMusic scheduled) {
-  bool on(ScheduledTime time) => time.enabled && time.nextAt != null;
-  final start = scheduled.timeOf(ScheduleKind.start);
-  final stop = scheduled.timeOf(ScheduleKind.stop);
+  final starts = [
+    for (final start in scheduled.starts)
+      if (start.isOn) start.label,
+  ];
   final parts = [
-    if (on(start)) l10n.scheduledMusicScreenStartAt(start.label),
-    if (on(stop)) l10n.scheduledMusicScreenStopAt(stop.label),
+    if (starts.length == 1) l10n.scheduledMusicScreenStartAt(starts.single),
+    if (starts.length > 1) l10n.scheduledMusicScreenStartsAt(starts.join(', ')),
+    if (scheduled.stopTime.isOn)
+      l10n.scheduledMusicScreenStopAt(scheduled.stopTime.label),
   ];
   if (parts.isEmpty) return l10n.scheduledMusicScreenOff;
   return _capitalized(parts.join(' • '));
 }
 
-/// Ja › Zaplanowana muzyka: the scheduled start and stop.
+/// Zaplanowana muzyka's row for the starts: the one switched on as [scheduledLabel] says, several
+/// by their times.
+String _startsLabel(ScheduledMusic scheduled) {
+  final on = [
+    for (final start in scheduled.starts)
+      if (start.isOn) start,
+  ];
+  if (on.isEmpty) return l10n.scheduledMusicScreenOff;
+  if (on.length == 1) return scheduledLabel(on.single);
+  return on.map((start) => start.label).join(', ');
+}
+
+/// What a start plays, in one line.
+String _sourceLabel(BuildContext context, ScheduledSource source) =>
+    switch (source) {
+      ScheduledSong(:final song) => () {
+        final hit = resolveTrack(
+          song,
+          SongCatalogScope.of(context),
+          LocalLibraryScope.of(context),
+          YouTubeLibraryScope.of(context),
+        );
+        return '${hit.shownArtist(context)} – ${hit.shownTitle(context)}';
+      }(),
+      ScheduledPlaylist(:final name) => name,
+      ScheduledLastQueue() => l10n.scheduledMusicScreenLastQueue,
+    };
+
+/// Ja › Zaplanowana muzyka: the scheduled starts and stop.
 class ScheduledMusicScreen extends StatelessWidget {
   const ScheduledMusicScreen({super.key});
 
@@ -92,16 +125,14 @@ class ScheduledMusicScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.alarm, size: 26),
             title: Text(l10n.scheduledMusicScreenStart),
-            subtitle: Text(
-              scheduledLabel(scheduled.timeOf(ScheduleKind.start)),
-            ),
+            subtitle: Text(_startsLabel(scheduled)),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => push(const ScheduledStartScreen()),
+            onTap: () => push(const ScheduledStartsScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.alarm_off, size: 26),
             title: Text(l10n.scheduledMusicScreenStop),
-            subtitle: Text(scheduledLabel(scheduled.timeOf(ScheduleKind.stop))),
+            subtitle: Text(scheduledLabel(scheduled.stopTime)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => push(const ScheduledStopScreen()),
           ),
@@ -113,15 +144,15 @@ class ScheduledMusicScreen extends StatelessWidget {
 
 /// Which weekdays a scheduled start or stop repeats on; none ticked: once.
 class _DayPicker extends StatelessWidget {
-  const _DayPicker({required this.kind});
+  const _DayPicker({required this.time});
 
-  final ScheduleKind kind;
+  final ScheduledTime time;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final scheduled = ScheduledMusicScope.of(context);
-    final days = scheduled.timeOf(kind).days;
+    final days = time.days;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
       child: Row(
@@ -138,7 +169,7 @@ class _DayPicker extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () => scheduled.setDays(
-                      kind,
+                      time,
                       days.contains(i + 1)
                           ? ({...days}..remove(i + 1))
                           : {...days, i + 1},
@@ -212,47 +243,43 @@ Future<void> _openStartAppSettings(ScheduledMusic scheduled) async {
   }
 }
 
-/// The time of a scheduled start or stop: tapping picks it and switches it on.
-class _TimeTile extends StatelessWidget {
-  const _TimeTile({required this.kind});
-
-  final ScheduleKind kind;
-
-  Future<void> _switchedOn(
-    BuildContext context,
-    ScheduledMusic scheduled,
-    bool accepted,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    if (!accepted) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.scheduledMusicScreenNotAllowed)),
-      );
-      return;
-    }
-    if (kind != ScheduleKind.start) return;
-    var allowed = false;
-    try {
-      allowed = await scheduled.requestNotifications();
-    } catch (e) {
-      debugPrint('Asking for the notification permission failed: $e');
-    }
-    if (!allowed) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.scheduledMusicScreenNoNotifications)),
-      );
-      return;
-    }
-    if (!await _mayStartApp(scheduled) && context.mounted) {
-      await _askToAllowStartingApp(context, scheduled);
-    }
+/// After switching a time on: says when Android refused, and for a start asks for what it needs
+/// to bring the app up.
+Future<void> _switchedOn(
+  BuildContext context,
+  ScheduledMusic scheduled,
+  ScheduledTime time,
+  bool accepted,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  if (!accepted) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.scheduledMusicScreenNotAllowed)),
+    );
+    return;
   }
+  if (time is! ScheduledStart) return;
+  var allowed = false;
+  try {
+    allowed = await scheduled.requestNotifications();
+  } catch (e) {
+    debugPrint('Asking for the notification permission failed: $e');
+  }
+  if (!allowed) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.scheduledMusicScreenNoNotifications)),
+    );
+    return;
+  }
+  if (!await _mayStartApp(scheduled) && context.mounted) {
+    await _askToAllowStartingApp(context, scheduled);
+  }
+}
 
-  Future<void> _pick(BuildContext context, ScheduledMusic scheduled) async {
-    final time = scheduled.timeOf(kind);
-    final picked = await showTimePicker(
+Future<TimeOfDay?> _pickTime(BuildContext context, int hour, int minute) =>
+    showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: time.hour, minute: time.minute),
+      initialTime: TimeOfDay(hour: hour, minute: minute),
       helpText: l10n.scheduledMusicScreenHour,
       cancelText: l10n.commonCancel,
       confirmText: l10n.scheduledMusicScreenSet,
@@ -264,16 +291,31 @@ class _TimeTile extends StatelessWidget {
         child: child!,
       ),
     );
+
+/// The time of a scheduled start or stop: tapping picks it and switches it on.
+class _TimeTile extends StatelessWidget {
+  const _TimeTile({required this.time, this.subtitle, this.onTap});
+
+  final ScheduledTime time;
+
+  /// Under [scheduledLabel]'s line.
+  final String? subtitle;
+
+  /// Instead of picking the time.
+  final VoidCallback? onTap;
+
+  Future<void> _pick(BuildContext context, ScheduledMusic scheduled) async {
+    final picked = await _pickTime(context, time.hour, time.minute);
     if (picked == null) return;
-    final accepted = await scheduled.setTime(kind, picked.hour, picked.minute);
-    if (context.mounted) await _switchedOn(context, scheduled, accepted);
+    final accepted = await scheduled.setTime(time, picked.hour, picked.minute);
+    if (context.mounted) await _switchedOn(context, scheduled, time, accepted);
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final scheduled = ScheduledMusicScope.of(context);
-    final time = scheduled.timeOf(kind);
+    final more = subtitle;
     return ListTile(
       title: Text(
         time.label,
@@ -283,17 +325,73 @@ class _TimeTile extends StatelessWidget {
           color: time.enabled ? palette.accent : palette.textSecondary,
         ),
       ),
-      subtitle: Text(scheduledLabel(time)),
+      subtitle: more == null
+          ? Text(scheduledLabel(time))
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [Text(scheduledLabel(time)), ScrollingText(more)],
+            ),
       trailing: Switch(
         value: time.enabled,
         onChanged: (on) async {
-          final done = await scheduled.setEnabled(kind, on);
+          final done = await scheduled.setEnabled(time, on);
           if (on && context.mounted) {
-            await _switchedOn(context, scheduled, done);
+            await _switchedOn(context, scheduled, time, done);
           }
         },
       ),
-      onTap: () => _pick(context, scheduled),
+      onTap: onTap ?? () => _pick(context, scheduled),
+    );
+  }
+}
+
+/// "Muzyka nie włączy się sama" while [shown] and Android 14+ doesn't let the app open itself;
+/// a tap opens Android's screen for it.
+class _WontStartWarning extends StatefulWidget {
+  const _WontStartWarning({required this.shown});
+
+  final bool shown;
+
+  @override
+  State<_WontStartWarning> createState() => _WontStartWarningState();
+}
+
+class _WontStartWarningState extends State<_WontStartWarning> {
+  bool _canStartApp = true;
+
+  /// The permission is given on Android's own screen: checked again on coming back.
+  late final _lifecycle = AppLifecycleListener(onResume: _check);
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<void> _check() async {
+    if (!mounted) return;
+    final can = await _mayStartApp(ScheduledMusicScope.of(context));
+    if (mounted && can != _canStartApp) setState(() => _canStartApp = can);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.shown || _canStartApp) return const SizedBox.shrink();
+    return ListTile(
+      leading: Icon(
+        Icons.warning_amber_rounded,
+        color: Theme.of(context).colorScheme.error,
+      ),
+      title: Text(l10n.scheduledMusicScreenWontStart),
+      subtitle: Text(l10n.scheduledMusicScreenWontStartHint(appName)),
+      onTap: () => _openStartAppSettings(ScheduledMusicScope.of(context)),
     );
   }
 }
@@ -303,27 +401,119 @@ class ScheduledStopScreen extends StatelessWidget {
   const ScheduledStopScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(l10n.scheduledMusicScreenStop)),
-    body: ListView(
-      children: [
-        const _TimeTile(kind: ScheduleKind.stop),
-        const _DayPicker(kind: ScheduleKind.stop),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Text(
-            l10n.scheduledMusicScreenStopNote,
-            style: TextStyle(color: context.palette.textSecondary),
+  Widget build(BuildContext context) {
+    final stop = ScheduledMusicScope.of(context).stopTime;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.scheduledMusicScreenStop)),
+      body: ListView(
+        children: [
+          _TimeTile(time: stop),
+          _DayPicker(time: stop),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Text(
+              l10n.scheduledMusicScreenStopNote,
+              style: TextStyle(color: context.palette.textSecondary),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
-/// Ja › Zaplanowana muzyka › Zaplanowane uruchomienie: when, how loud, and what plays.
+/// Ja › Zaplanowana muzyka › Zaplanowane uruchomienie: every start, like the phone's alarms — each
+/// switched on and off here, opened to change it, dragged left to delete it; + adds one.
+class ScheduledStartsScreen extends StatelessWidget {
+  const ScheduledStartsScreen({super.key});
+
+  Future<void> _add(BuildContext context, ScheduledMusic scheduled) async {
+    final picked = await _pickTime(context, 7, 0);
+    if (picked == null) return;
+    final (:start, :ok) = await scheduled.addStart(picked.hour, picked.minute);
+    if (context.mounted) await _switchedOn(context, scheduled, start, ok);
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    ScheduledMusic scheduled,
+    ScheduledStart start,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await scheduled.removeStart(start);
+    messenger.showSnackBar(
+      SnackBar(
+        persist: false,
+        content: Text(l10n.scheduledMusicScreenStartDeleted(start.label)),
+        action: SnackBarAction(
+          label: l10n.commonUndo,
+          onPressed: () => scheduled.restoreStart(start),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final scheduled = ScheduledMusicScope.of(context);
+    final starts = scheduled.starts;
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.scheduledMusicScreenStart)),
+      floatingActionButton: FloatingActionButton(
+        tooltip: l10n.scheduledMusicScreenAddStart,
+        backgroundColor: palette.accent,
+        foregroundColor: palette.onAccent,
+        shape: palette.buttonShape,
+        onPressed: () => _add(context, scheduled),
+        child: const Icon(Icons.add),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 88),
+        children: [
+          _WontStartWarning(shown: starts.any((start) => start.enabled)),
+          if (starts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
+              child: Text(
+                l10n.scheduledMusicScreenNoStarts,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textSecondary),
+              ),
+            ),
+          for (final start in starts)
+            SwipeActions(
+              key: ValueKey(start.id),
+              left: SwipeAction(
+                icon: Icons.delete_outline,
+                label: l10n.scheduledMusicScreenDeleteStart,
+                color: Theme.of(context).colorScheme.error,
+                onTriggered: () => _delete(context, scheduled, start),
+              ),
+              child: _TimeTile(
+                time: start,
+                subtitle: l10n.scheduledMusicScreenStartSummary(
+                  start.volume,
+                  _sourceLabel(context, start.source),
+                ),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ScheduledStartScreen(start: start),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One of Zaplanowane uruchomienie's starts: when, how loud, and what plays.
 class ScheduledStartScreen extends StatefulWidget {
-  const ScheduledStartScreen({super.key});
+  const ScheduledStartScreen({super.key, required this.start});
+
+  final ScheduledStart start;
 
   @override
   State<ScheduledStartScreen> createState() => _ScheduledStartScreenState();
@@ -331,35 +521,16 @@ class ScheduledStartScreen extends StatefulWidget {
 
 class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
   int? _draggedVolume;
-  bool _canStartApp = true;
 
-  /// The permission is given on Android's own screen: checked again on coming back.
-  late final _lifecycle = AppLifecycleListener(onResume: _checkCanStartApp);
-
-  @override
-  void initState() {
-    super.initState();
-    _lifecycle;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkCanStartApp());
-  }
-
-  @override
-  void dispose() {
-    _lifecycle.dispose();
-    super.dispose();
-  }
-
-  Future<void> _checkCanStartApp() async {
-    if (!mounted) return;
-    final can = await _mayStartApp(ScheduledMusicScope.of(context));
-    if (mounted && can != _canStartApp) setState(() => _canStartApp = can);
-  }
+  ScheduledStart get _start => widget.start;
 
   Future<void> _pickSong(ScheduledMusic scheduled) async {
     final hit = await Navigator.of(
       context,
     ).push<SearchHit>(MaterialPageRoute(builder: (_) => const _SongPicker()));
-    if (hit != null) await scheduled.setSource(ScheduledSong(TrackRef.of(hit)));
+    if (hit != null) {
+      await scheduled.setSource(_start, ScheduledSong(TrackRef.of(hit)));
+    }
   }
 
   Future<void> _pickPlaylist(ScheduledMusic scheduled) async {
@@ -367,18 +538,28 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
       MaterialPageRoute(builder: (_) => const _PlaylistPicker()),
     );
     if (playlist != null) {
-      await scheduled.setSource(ScheduledPlaylist(playlist.id, playlist.name));
+      await scheduled.setSource(
+        _start,
+        ScheduledPlaylist(playlist.id, playlist.name),
+      );
     }
   }
 
-  String _songLabel(TrackRef ref) {
-    final hit = resolveTrack(
-      ref,
-      SongCatalogScope.of(context),
-      LocalLibraryScope.of(context),
-      YouTubeLibraryScope.of(context),
+  Future<void> _delete(ScheduledMusic scheduled) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    await scheduled.removeStart(_start);
+    navigator.pop();
+    messenger.showSnackBar(
+      SnackBar(
+        persist: false,
+        content: Text(l10n.scheduledMusicScreenStartDeleted(_start.label)),
+        action: SnackBarAction(
+          label: l10n.commonUndo,
+          onPressed: () => scheduled.restoreStart(_start),
+        ),
+      ),
     );
-    return '${hit.shownArtist(context)} – ${hit.shownTitle(context)}';
   }
 
   Widget _option({
@@ -404,25 +585,25 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
   @override
   Widget build(BuildContext context) {
     final scheduled = ScheduledMusicScope.of(context);
-    final source = scheduled.source;
-    final volume = _draggedVolume ?? scheduled.volume;
+    final source = _start.source;
+    final volume = _draggedVolume ?? _start.volume;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.scheduledMusicScreenStart)),
+      appBar: AppBar(
+        title: Text(l10n.scheduledMusicScreenStart),
+        actions: [
+          IconButton(
+            tooltip: l10n.scheduledMusicScreenDeleteStart,
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => _delete(scheduled),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          const _TimeTile(kind: ScheduleKind.start),
-          if (scheduled.timeOf(ScheduleKind.start).enabled && !_canStartApp)
-            ListTile(
-              leading: Icon(
-                Icons.warning_amber_rounded,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              title: Text(l10n.scheduledMusicScreenWontStart),
-              subtitle: Text(l10n.scheduledMusicScreenWontStartHint(appName)),
-              onTap: () => _openStartAppSettings(scheduled),
-            ),
-          const _DayPicker(kind: ScheduleKind.start),
+          _TimeTile(time: _start),
+          _WontStartWarning(shown: _start.enabled),
+          _DayPicker(time: _start),
           const Divider(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -436,7 +617,7 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
             label: '$volume%',
             onChanged: (v) => setState(() => _draggedVolume = v.round()),
             onChangeEnd: (v) async {
-              await scheduled.setVolume(v.round());
+              await scheduled.setVolume(_start, v.round());
               if (mounted) setState(() => _draggedVolume = null);
             },
           ),
@@ -452,7 +633,7 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
             icon: Icons.music_note_outlined,
             label: l10n.scheduledMusicScreenSong,
             subtitle: source is ScheduledSong
-                ? _songLabel(source.song)
+                ? _sourceLabel(context, source)
                 : l10n.scheduledMusicScreenPickSong,
             selected: source is ScheduledSong,
             onTap: () => _pickSong(scheduled),
@@ -471,7 +652,8 @@ class _ScheduledStartScreenState extends State<ScheduledStartScreen> {
             label: l10n.scheduledMusicScreenLastQueue,
             subtitle: l10n.scheduledMusicScreenLastQueueSubtitle,
             selected: source is ScheduledLastQueue,
-            onTap: () => scheduled.setSource(const ScheduledLastQueue()),
+            onTap: () =>
+                scheduled.setSource(_start, const ScheduledLastQueue()),
           ),
         ],
       ),

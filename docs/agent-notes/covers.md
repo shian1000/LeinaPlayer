@@ -84,8 +84,10 @@ Once it has them, the "Prywatny serwer" source should read them too, keyed on `a
   which isn't remembered. Cards with no one file to remember — a playlist's or mood's collage or
   picked cover, an album card — are remembered as a picture of the drawn cover (`_Card.snapshotOf`,
   `_StartupSnapshot`: a `RepaintBoundary` drawn to PNG 3 s after the card settles, once a run per
-  what it shows, saved only when its MD5 differs; `StartupCover.snapshot`, shown without the
-  filter, which it already has). Cleared with the cover cache; its key is in
+  what it shows, saved only when its MD5 differs, and only while the app is shown — `toImage`
+  with no window on screen (the screen switched off during a start, a scheduled start going back
+  under the lock screen) crashed the whole app in Impeller's OpenGL ES raster thread on the
+  Huawei; `StartupCover.snapshot`, shown without the filter, which it already has). Cleared with the cover cache; its key is in
   `UserBackup.keptKeys`.
 
 ## Playlist and mood covers

@@ -267,6 +267,37 @@ void main() {
     await tester.runAsync(startup.flush);
   });
 
+  testWidgets('a card is not drawn as a picture while the app is hidden', (
+    tester,
+  ) async {
+    await pumpHome(
+      tester,
+      withPlaylists: true,
+      prepare: () async {
+        await playlists!.create('Do auta', const []);
+        await playlists!.load();
+      },
+    );
+    await loadHistory(tester);
+    // As a screen switched off during the start leaves it: Impeller crashed drawing then.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump(const Duration(seconds: 4));
+    await pumpUntil(
+      tester,
+      () => startup.at('home:lib:playlists#0') != null,
+      timeout: const Duration(seconds: 3),
+    );
+    expect(startup.at('home:lib:playlists#0'), isNull);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(seconds: 3));
+    await pumpUntil(tester, () => startup.at('home:lib:playlists#0') != null);
+    expect(startup.at('home:lib:playlists#0')!.snapshot, isTrue);
+    await tester.runAsync(startup.flush);
+  });
+
   testWidgets('a playlist row still being read shows the picture of its card '
       'from last time', (tester) async {
     await pumpHome(

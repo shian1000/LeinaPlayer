@@ -61,7 +61,7 @@ class MainActivity : AudioServiceActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (intent?.action == ScheduledMusic.Kind.START.action) ScheduledMusic.showOverLockScreen(this)
+        if (intent?.action == ScheduledMusic.START_ACTION) ScheduledMusic.showOverLockScreen(this)
         // A new activity on an engine that already runs Dart (music kept it alive) gets the
         // link pushed; on a cold start Dart asks for it once it's ready.
         if (savedInstanceState == null) links?.receive(intent)
@@ -75,7 +75,7 @@ class MainActivity : AudioServiceActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == ScheduledMusic.Kind.START.action) ScheduledMusic.showOverLockScreen(this)
+        if (intent.action == ScheduledMusic.START_ACTION) ScheduledMusic.showOverLockScreen(this)
         links?.receive(intent)
     }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -59,20 +60,23 @@ class ScheduledLastQueue extends ScheduledSource {
   Map<String, Object?> toJson() => {'kind': 'last_queue'};
 }
 
-enum ScheduleKind { start, stop }
-
 /// Android's side (`ScheduledMusic.kt`); a fake in tests.
+///
+/// Each time is known there by its [ScheduledTime.key]: [ScheduledMusic.stopKey] or a start's.
 abstract class ScheduledMusicPlatform {
   /// Whether Android accepted it.
   ///
   /// [days]: the weekdays it comes back on ([DateTime.weekday]); Android moves it on by itself,
   /// as the app may not be running then. Empty: once.
-  Future<bool> schedule(ScheduleKind kind, DateTime at, Set<int> days);
-  Future<void> cancel(ScheduleKind kind);
+  Future<bool> schedule(String key, DateTime at, Set<int> days);
+  Future<void> cancel(String key);
 
-  /// Whether a scheduled start went off, recently, since this was last asked.
-  Future<bool> takeStarted();
-  set onFired(void Function(ScheduleKind)? callback);
+  /// Cancels every time Android keeps but [keys] (left by a restored backup).
+  Future<void> cancelAllBut(Set<String> keys);
+
+  /// The key of a scheduled start that went off, recently, since this was last asked.
+  Future<String?> takeStarted();
+  set onFired(void Function(String key)? callback);
 
   /// Whether the user allowed the notification that brings the app up.
   Future<bool> requestNotifications();
@@ -92,30 +96,30 @@ class ChannelScheduledMusicPlatform implements ScheduledMusicPlatform {
   static const _channel = MethodChannel('music_database_app/scheduled_music');
 
   @override
-  Future<bool> schedule(ScheduleKind kind, DateTime at, Set<int> days) async =>
+  Future<bool> schedule(String key, DateTime at, Set<int> days) async =>
       await _channel.invokeMethod<bool>('schedule', {
-        'kind': kind.name,
+        'key': key,
         'at': at.millisecondsSinceEpoch,
         'days': days.toList(),
       }) ??
       false;
 
   @override
-  Future<void> cancel(ScheduleKind kind) =>
-      _channel.invokeMethod('cancel', kind.name);
+  Future<void> cancel(String key) => _channel.invokeMethod('cancel', key);
 
   @override
-  Future<bool> takeStarted() async =>
-      await _channel.invokeMethod<bool>('takeStarted') ?? false;
+  Future<void> cancelAllBut(Set<String> keys) =>
+      _channel.invokeMethod('cancelAllBut', keys.toList());
 
   @override
-  set onFired(void Function(ScheduleKind)? callback) =>
+  Future<String?> takeStarted() => _channel.invokeMethod<String>('takeStarted');
+
+  @override
+  set onFired(void Function(String key)? callback) =>
       _channel.setMethodCallHandler(
         callback == null
             ? null
-            : (call) async => callback(
-                ScheduleKind.values.byName(call.arguments as String),
-              ),
+            : (call) async => callback(call.arguments as String),
       );
 
   @override
@@ -157,8 +161,10 @@ DateTime nextScheduledTime(
 
 /// A scheduled start's or stop's time.
 class ScheduledTime {
-  ScheduledTime(this.hour, this.minute);
+  ScheduledTime(this.key, this.hour, this.minute);
 
+  /// What Android knows it by.
+  final String key;
   bool enabled = false;
   int hour;
   int minute;
@@ -169,6 +175,8 @@ class ScheduledTime {
 
   String get label =>
       '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+
+  bool get isOn => enabled && nextAt != null;
 
   Map<String, Object?> toJson() => {
     'enabled': enabled,
@@ -188,9 +196,41 @@ class ScheduledTime {
   }
 }
 
-/// Ja › Zaplanowana muzyka › Zaplanowane uruchomienie / Zaplanowane wyłączenie: each at the set time, once or on
-/// the chosen weekdays. Android starts the app if it isn't running ([ScheduledMusicPlatform]) and the music plays
-/// with the phone's music volume set as asked; nothing has to be confirmed.
+/// One of the scheduled starts, like one of the phone's alarms: its time, how loud and what plays.
+class ScheduledStart extends ScheduledTime {
+  // The first start keeps the key the single start of older versions had, so Android's alarm
+  // set by them is this one, not a second.
+  ScheduledStart(this.id, int hour, int minute)
+    : super(id == 0 ? 'start' : 'start_$id', hour, minute);
+
+  final int id;
+
+  /// Percent of the phone's music volume.
+  int volume = 50;
+  ScheduledSource source = const ScheduledLastQueue();
+
+  @override
+  Map<String, Object?> toJson() => {
+    ...super.toJson(),
+    'id': id,
+    'volume': volume,
+    'source': source.toJson(),
+  };
+
+  @override
+  void read(Map<String, Object?> json) {
+    super.read(json);
+    volume = json['volume'] as int? ?? volume;
+    source = ScheduledSource.fromJson(
+      (json['source'] as Map? ?? const {}).cast<String, Object?>(),
+    );
+  }
+}
+
+/// Ja › Zaplanowana muzyka › Zaplanowane uruchomienie (several, like the phone's alarms) /
+/// Zaplanowane wyłączenie: each at the set time, once or on the chosen weekdays. Android starts
+/// the app if it isn't running ([ScheduledMusicPlatform]) and the music plays with the phone's
+/// music volume set as asked; nothing has to be confirmed.
 class ScheduledMusic extends ChangeNotifier {
   ScheduledMusic({
     required this.platform,
@@ -200,6 +240,7 @@ class ScheduledMusic extends ChangeNotifier {
   });
 
   static const _key = 'scheduled_music';
+  static const stopKey = 'stop';
   static const minVolume = 5;
 
   final ScheduledMusicPlatform platform;
@@ -209,31 +250,41 @@ class ScheduledMusic extends ChangeNotifier {
   /// How long the app stays over the lock screen at most, while the music starts.
   final Duration startTimeout;
 
-  final _times = {
-    ScheduleKind.start: ScheduledTime(7, 0),
-    ScheduleKind.stop: ScheduledTime(23, 0),
-  };
-  int _volume = 50;
-  ScheduledSource _source = const ScheduledLastQueue();
+  final _starts = <ScheduledStart>[];
+  final stopTime = ScheduledTime(stopKey, 23, 0);
   bool _started = false;
 
-  ScheduledTime timeOf(ScheduleKind kind) => _times[kind]!;
+  /// By the time of day, as the phone's alarms are listed.
+  List<ScheduledStart> get starts => [..._starts]
+    ..sort((a, b) {
+      final byTime = (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute);
+      return byTime != 0 ? byTime : a.id.compareTo(b.id);
+    });
 
-  /// Percent of the phone's music volume.
-  int get volume => _volume;
-  ScheduledSource get source => _source;
+  Iterable<ScheduledTime> get _times => [..._starts, stopTime];
 
   Future<void> load() async {
     final raw = (await SharedPreferences.getInstance()).getString(_key);
     if (raw == null) return;
     final json = (jsonDecode(raw) as Map).cast<String, Object?>();
-    for (final kind in ScheduleKind.values) {
-      _times[kind]!.read((json[kind.name] as Map? ?? const {}).cast());
+    stopTime.read((json[stopKey] as Map? ?? const {}).cast());
+    _starts.clear();
+    final starts = json['starts'] as List?;
+    if (starts != null) {
+      for (final raw in starts) {
+        final start = (raw as Map).cast<String, Object?>();
+        _starts.add(ScheduledStart(start['id'] as int, 7, 0)..read(start));
+      }
+    } else if (json['start'] is Map) {
+      // Older versions had one start, with its volume and source beside it.
+      _starts.add(
+        ScheduledStart(0, 7, 0)..read({
+          ...(json['start'] as Map).cast<String, Object?>(),
+          'volume': json['volume'],
+          'source': json['source'],
+        }),
+      );
     }
-    _volume = json['volume'] as int? ?? _volume;
-    _source = ScheduledSource.fromJson(
-      (json['source'] as Map? ?? const {}).cast<String, Object?>(),
-    );
     notifyListeners();
   }
 
@@ -243,21 +294,20 @@ class ScheduledMusic extends ChangeNotifier {
   Future<void> start() async {
     if (_started || kIsWeb || !Platform.isAndroid) return;
     _started = true;
-    platform.onFired = (kind) => unawaited(
-      fired(kind).catchError(
-        (Object e) => debugPrint('Scheduled ${kind.name} failed: $e'),
-      ),
+    platform.onFired = (key) => unawaited(
+      fired(key)
+          .catchError((Object e) => debugPrint('Scheduled $key failed: $e')),
     );
-    await fired(ScheduleKind.start);
+    await _startFired();
+    await platform.cancelAllBut({for (final time in _times) time.key});
     var changed = false;
-    for (final kind in ScheduleKind.values) {
-      final time = timeOf(kind);
+    for (final time in _times) {
       final at = time.nextAt;
       if (!time.enabled || at == null) continue;
       if (at.isAfter(DateTime.now())) {
-        await platform.schedule(kind, at, time.days);
+        await platform.schedule(time.key, at, time.days);
       } else {
-        await _afterItsTime(kind);
+        await _afterItsTime(time);
         changed = true;
       }
     }
@@ -267,11 +317,10 @@ class ScheduledMusic extends ChangeNotifier {
     }
   }
 
-  /// [kind]'s time has passed: on to its next day, or off.
-  Future<void> _afterItsTime(ScheduleKind kind) async {
-    final time = timeOf(kind);
+  /// [time]'s time has passed: on to its next day, or off.
+  Future<void> _afterItsTime(ScheduledTime time) async {
     if (time.days.isNotEmpty) {
-      await _arm(kind);
+      await _arm(time);
     } else {
       time
         ..enabled = false
@@ -279,38 +328,64 @@ class ScheduledMusic extends ChangeNotifier {
     }
   }
 
-  Future<bool> _arm(ScheduleKind kind) async {
-    final time = timeOf(kind);
+  /// [fired] and any other time that passed meanwhile (two starts at the same minute report one).
+  Future<void> _moveOn(ScheduledTime? fired) async {
+    final now = DateTime.now();
+    for (final time in _times) {
+      final at = time.nextAt;
+      if (!time.enabled) continue;
+      if (time == fired || (at != null && !at.isAfter(now))) {
+        await _afterItsTime(time).catchError(
+          (Object e) => debugPrint('Scheduling the next time failed: $e'),
+        );
+      }
+    }
+    notifyListeners();
+    await _save().catchError(
+      (Object e) => debugPrint('Saving the scheduled music failed: $e'),
+    );
+  }
+
+  Future<bool> _arm(ScheduledTime time) async {
     final at = nextScheduledTime(
       DateTime.now(),
       time.hour,
       time.minute,
       time.days,
     );
-    final done = await platform.schedule(kind, at, time.days);
+    final done = await platform.schedule(time.key, at, time.days);
     time
       ..enabled = done
       ..nextAt = done ? at : null;
     return done;
   }
 
-  /// Android says [kind]'s time has come.
+  /// Android says the time with [key] has come.
   @visibleForTesting
-  Future<void> fired(ScheduleKind kind) async {
-    if (kind == ScheduleKind.start && !await platform.takeStarted()) return;
-    await _afterItsTime(kind).catchError(
-      (Object e) => debugPrint('Scheduling the next time failed: $e'),
-    );
-    notifyListeners();
-    await _save().catchError(
-      (Object e) => debugPrint('Saving the scheduled music failed: $e'),
-    );
-    if (kind == ScheduleKind.stop) return stop();
-    await platform.setVolume(_volume).catchError((Object e) {
+  Future<void> fired(String key) async {
+    if (key != stopKey) return _startFired();
+    await _moveOn(stopTime);
+    await stop();
+  }
+
+  /// Plays what the start Android reports asks for, if it went off.
+  Future<void> _startFired() async {
+    final key = await platform.takeStarted();
+    if (key == null) return;
+    final start = _starts.where((start) => start.key == key).firstOrNull;
+    await _moveOn(start);
+    if (start != null) await _play(start);
+    await platform.finishStarting().catchError((Object e) {
+      debugPrint('Finishing the scheduled start failed: $e');
+    });
+  }
+
+  Future<void> _play(ScheduledStart start) async {
+    await platform.setVolume(start.volume).catchError((Object e) {
       debugPrint('Setting the scheduled volume failed: $e');
     });
     try {
-      if (!await play(_source).timeout(startTimeout)) {
+      if (!await play(start.source).timeout(startTimeout)) {
         debugPrint('The scheduled music could not be played');
       }
     } on TimeoutException {
@@ -318,51 +393,74 @@ class ScheduledMusic extends ChangeNotifier {
     } catch (e) {
       debugPrint('Playing the scheduled music failed: $e');
     }
-    await platform.finishStarting().catchError((Object e) {
-      debugPrint('Finishing the scheduled start failed: $e');
-    });
+  }
+
+  /// A new start at [hour]:[minute], switched on; [ok] says whether Android accepted it.
+  Future<({ScheduledStart start, bool ok})> addStart(
+    int hour,
+    int minute,
+  ) async {
+    final id = _starts.fold(-1, (top, start) => max(top, start.id)) + 1;
+    final start = ScheduledStart(id, hour, minute);
+    _starts.add(start);
+    return (start: start, ok: await setTime(start, hour, minute));
+  }
+
+  Future<void> removeStart(ScheduledStart start) async {
+    _starts.remove(start);
+    await platform.cancel(start.key);
+    notifyListeners();
+    await _save();
+  }
+
+  /// Brings back a start just removed ("Cofnij"), switched on again if it was.
+  Future<void> restoreStart(ScheduledStart start) async {
+    if (_starts.any((other) => other.id == start.id)) return;
+    _starts.add(start);
+    if (start.enabled) await _arm(start);
+    notifyListeners();
+    await _save();
   }
 
   /// Sets the time and switches it on; returns [setEnabled]'s answer.
-  Future<bool> setTime(ScheduleKind kind, int hour, int minute) {
-    timeOf(kind)
+  Future<bool> setTime(ScheduledTime time, int hour, int minute) {
+    time
       ..hour = hour
       ..minute = minute;
-    return setEnabled(kind, true);
+    return setEnabled(time, true);
   }
 
   /// Returns whether it's as asked: Android can refuse.
-  Future<bool> setEnabled(ScheduleKind kind, bool on) async {
-    final time = timeOf(kind);
+  Future<bool> setEnabled(ScheduledTime time, bool on) async {
     var done = true;
     if (on) {
-      done = await _arm(kind);
+      done = await _arm(time);
     } else {
       time.enabled = false;
       time.nextAt = null;
-      await platform.cancel(kind);
+      await platform.cancel(time.key);
     }
     notifyListeners();
     await _save();
     return done;
   }
 
-  /// Which weekdays [kind] repeats on; moves a time that's switched on to the first of them.
-  Future<void> setDays(ScheduleKind kind, Set<int> days) async {
-    final time = timeOf(kind)..days = days;
-    if (time.enabled) await _arm(kind);
+  /// Which weekdays [time] repeats on; moves a time that's switched on to the first of them.
+  Future<void> setDays(ScheduledTime time, Set<int> days) async {
+    time.days = days;
+    if (time.enabled) await _arm(time);
     notifyListeners();
     await _save();
   }
 
-  Future<void> setVolume(int percent) async {
-    _volume = percent;
+  Future<void> setVolume(ScheduledStart start, int percent) async {
+    start.volume = percent;
     notifyListeners();
     await _save();
   }
 
-  Future<void> setSource(ScheduledSource source) async {
-    _source = source;
+  Future<void> setSource(ScheduledStart start, ScheduledSource source) async {
+    start.source = source;
     notifyListeners();
     await _save();
   }
@@ -378,10 +476,8 @@ class ScheduledMusic extends ChangeNotifier {
     await prefs.setString(
       _key,
       jsonEncode({
-        for (final kind in ScheduleKind.values)
-          kind.name: timeOf(kind).toJson(),
-        'volume': _volume,
-        'source': _source.toJson(),
+        'starts': [for (final start in _starts) start.toJson()],
+        stopKey: stopTime.toJson(),
       }),
     );
   }

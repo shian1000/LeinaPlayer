@@ -938,6 +938,7 @@ class _StartupSnapshotState extends State<_StartupSnapshot> {
 
   final _boundary = GlobalKey();
   Timer? _soon;
+  AppLifecycleListener? _untilShown;
 
   String get _key => '${widget.slot}|${widget.what}';
 
@@ -962,10 +963,28 @@ class _StartupSnapshotState extends State<_StartupSnapshot> {
   @override
   void dispose() {
     _soon?.cancel();
+    _untilShown?.dispose();
     super.dispose();
   }
 
   Future<void> _take() async {
+    // Drawn while the app has no window on screen (the screen switched off at start, a
+    // scheduled start going back under the lock screen), Impeller's OpenGL ES crashes the whole
+    // app in its raster thread (seen on the Huawei): wait until it's shown again.
+    if (const {
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.detached,
+    }.contains(WidgetsBinding.instance.lifecycleState)) {
+      _untilShown ??= AppLifecycleListener(
+        onResume: () {
+          _untilShown?.dispose();
+          _untilShown = null;
+          _schedule();
+        },
+      );
+      return;
+    }
     final startup = AlbumCoversScope.maybeOf(context)?.startup;
     final boundary = _boundary.currentContext?.findRenderObject();
     if (startup == null || boundary is! RenderRepaintBoundary) return;

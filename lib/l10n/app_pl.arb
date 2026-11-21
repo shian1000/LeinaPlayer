@@ -3357,6 +3357,38 @@
   "scheduledMusicScreenLastQueue": "Ostatnia kolejka",
   "scheduledMusicScreenLastQueueSubtitle": "Gra dalej od miejsca, w którym została przerwana",
   "scheduledMusicScreenNoPlaylists": "Nie masz jeszcze żadnej playlisty.",
+  "scheduledMusicScreenStartsAt": "uruchomienia o {times}",
+  "@scheduledMusicScreenStartsAt": {
+    "description": "Several starts: times joined by commas; lower case as scheduledMusicScreenStartAt",
+    "placeholders": {
+      "times": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduledMusicScreenNoStarts": "Nie masz jeszcze zaplanowanych uruchomień. Dodaj je przyciskiem +, jak budziki.",
+  "scheduledMusicScreenAddStart": "Dodaj uruchomienie",
+  "scheduledMusicScreenStartSummary": "{volume}% • {what}",
+  "@scheduledMusicScreenStartSummary": {
+    "description": "A start's row: its volume and what it plays",
+    "placeholders": {
+      "volume": {
+        "type": "int"
+      },
+      "what": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduledMusicScreenDeleteStart": "Usuń uruchomienie",
+  "scheduledMusicScreenStartDeleted": "Usunięto uruchomienie o {time}",
+  "@scheduledMusicScreenStartDeleted": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "searchFieldsSheetTitle": "Filtry wyszukiwania",
   "searchFieldsSheetSearchIn": "Szukaj w",
   "searchFieldsSheetRestoreDefaults": "Przywróć domyślne",
