@@ -195,6 +195,13 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     queue of more than one song that playing something else replaced comes back, its song
     playing from where it was; the queue it replaces is kept in its place (swapping back),
     unless it was a single song.
+    A **long press on a song to come** (**implemented**; the song playing and "Poprzednie" keep
+    the long press for the song menu) ticks it, as in any song list: taps then tick / untick,
+    dragging sideways stops (the handle still moves a row), and the ticking bar takes the place
+    of "Losowo" / "Nastroje" with Usuń (out of the queue, "Usunięto z kolejki" with Cofnij), Jako
+    następne, Na koniec (both keep the songs' order in the queue), Do playlisty, Do nastroju and
+    Więcej (only with one song ticked: **→ the song menu**). "Wszystkie" ticks every song to
+    come; a ticked song that starts playing is unticked.
 
 ## Bottom navigation (`lib/src/screens/app_shell.dart`)
 
@@ -789,8 +796,9 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     its songs; `song_list_screen.dart`).
   - **The song menu** (`showSongMenu` in `song_tile.dart`): the same entries as this ⋮ — Dodaj do
     kolejki, Odtwórz jako następny, Dodaj do nastroju, Dodaj do playlisty, the dummies, Udostępnij — open
-    with a long press on song rows outside a selection area (YouTube results, Kolejka
-    `Kolejka › Utwór › Menu (⋮)`, outbox contents), the full player's ⋮ (`Odtwarzacz › Menu
+    with a long press on song rows outside a selection area (YouTube results, Kolejka's
+    current and previous songs `Kolejka › Utwór › Menu (⋮)` — and "Więcej" for one ticked song to
+    come —, outbox contents), the full player's ⋮ (`Odtwarzacz › Menu
     (⋮)`) and a long press on the mini player (`Mini odtwarzacz › Menu utworu`).
   - **Ticking songs** (`SongSelectionArea` in `widgets/song_selection.dart`; song search,
     playlists, moods, Ostatnie, Pamięć podręczna, Pobrane utwory, Utwory spoza bazy danych): a **long press on a
@@ -799,7 +807,8 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
     "Odznacz" (playlists and moods) and Do kolejki, Jako następne, Do playlisty
     (→ "Dodaj do playlisty"), Do nastroju (→ "Nastrój dla wszystkich utworów"); songs go in the
     order they were ticked. Back (and ✕) unticks everything first. In search the ticks stay
-    while the query changes.
+    while the query changes. A list may give the bar buttons of its own
+    (`SongSelectionArea.actions`, `SongSelectionAction`; Kolejka — see there).
   - Gestures on song rows (search results — YouTube ones too —, playlists, Ostatnie, every
     `SongTile`; `SwipeActions` in `swipe_actions.dart`): dragging a row right queues the song,
     like the reference app — "Odtwórz jako następny" by default, or "Dodaj do kolejki" (Ustawienia

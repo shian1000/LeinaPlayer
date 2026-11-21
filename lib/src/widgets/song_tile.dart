@@ -386,23 +386,11 @@ class SongTile extends StatelessWidget {
       selected: ticked,
       selectedTileColor: palette.accent.withValues(alpha: 0.15),
       selectedColor: palette.textPrimary,
-      leading: selecting
-          ? Stack(
-              children: [
-                cover,
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: ticked
-                        ? palette.background.withValues(alpha: 0.55)
-                        : Colors.transparent,
-                    child: ticked
-                        ? Icon(Icons.check_circle, color: palette.accent)
-                        : null,
-                  ),
-                ),
-              ],
-            )
-          : cover,
+      leading: SelectableCover(
+        cover: cover,
+        selecting: selecting,
+        ticked: ticked,
+      ),
       title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
       subtitle: ScrollingText.rich(
         TextSpan(

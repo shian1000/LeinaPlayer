@@ -674,6 +674,100 @@ void main() {
   );
 
   testWidgets(
+    '"Kolejka": a long press ticks songs to come, for the bar\'s moves; '
+    '"Więcej" opens the menu of one of them',
+    (tester) async {
+      await tester.runAsync(
+        () => queue.start([_file('a'), _file('b'), _file('c'), _file('d')], 0),
+      );
+      await showQueue(tester);
+
+      await tester.longPress(find.text('d'));
+      await settle(tester);
+      expect(find.text('Zaznaczono: 1'), findsOneWidget);
+      expect(
+        find.text('Losowo: wył.'),
+        findsNothing,
+        reason: 'the bar replaces it',
+      );
+      await tester.tap(find.text('b'));
+      await settle(tester);
+      expect(find.text('Zaznaczono: 2'), findsOneWidget);
+      expect(backend.opened, [
+        '/music/a.mp3',
+      ], reason: 'a tap ticks, not plays');
+
+      await tester.tap(find.text('Więcej'));
+      await settle(tester);
+      expect(
+        find.text('Zaznaczono: 2'),
+        findsOneWidget,
+        reason: 'one song only',
+      );
+
+      await tester.tap(find.text('Na koniec'));
+      await settle(tester);
+      expect(titles(queue.upcoming), ['c', 'b', 'd']);
+      expect(find.textContaining('Zaznaczono'), findsNothing);
+      expect(find.text('Losowo: wył.'), findsOneWidget);
+
+      await tester.longPress(find.text('d'));
+      await settle(tester);
+      await tester.tap(find.text('b'));
+      await settle(tester);
+      await tester.tap(find.text('Jako następne'));
+      await settle(tester);
+      expect(titles(queue.upcoming), ['b', 'd', 'c'], reason: 'in queue order');
+
+      await tester.longPress(find.text('b'));
+      await settle(tester);
+      await tester.tap(find.text('d'));
+      await settle(tester);
+      await tester.tap(find.text('Usuń'));
+      await settle(tester);
+      expect(titles(queue.upcoming), ['c']);
+      expect(find.text('Usunięto z kolejki: 2 utw.'), findsOneWidget);
+      await tester.tap(find.text('Cofnij'));
+      await settle(tester);
+      expect(titles(queue.upcoming), ['b', 'd', 'c']);
+
+      // Back unticks first.
+      await tester.longPress(find.text('c'));
+      await settle(tester);
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+      expect(find.textContaining('Zaznaczono'), findsNothing);
+      expect(find.text('Kolejka'), findsOneWidget);
+
+      await tester.longPress(find.text('c'));
+      await settle(tester);
+      await tester.tap(find.text('Więcej'));
+      await settle(tester);
+      expect(find.textContaining('Zaznaczono'), findsNothing);
+      expect(find.text('Dodaj do kolejki'), findsOneWidget);
+      Navigator.of(tester.element(find.text('Dodaj do kolejki'))).pop();
+      await settle(tester);
+
+      // A ticked song that starts playing is unticked.
+      await tester.longPress(find.text('b'));
+      await settle(tester);
+      await tester.tap(find.text('c'));
+      await settle(tester);
+      await tester.runAsync(() => queue.jumpTo(queue.upcoming.first));
+      await settle(tester);
+      expect(find.text('Zaznaczono: 1'), findsOneWidget);
+      await tester.tap(find.byTooltip('Anuluj zaznaczanie'));
+      await settle(tester);
+
+      // The song playing isn't ticked: its long press still opens the menu.
+      await tester.longPress(find.text('b'));
+      await settle(tester);
+      expect(find.textContaining('Zaznaczono'), findsNothing);
+      expect(find.text('Dodaj do kolejki'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     '"Kolejka": saved as a playlist — every song listed, the previous ones too',
     (tester) async {
       late Directory root;

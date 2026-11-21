@@ -24,6 +24,9 @@ class SongSelection extends ChangeNotifier {
   /// In the order they were ticked.
   List<SearchHit> get hits => [..._selected.values];
 
+  /// The ticked rows by their keys, in the order they were ticked.
+  Map<Object, SearchHit> get ticked => Map.of(_selected);
+
   bool contains(Object key) => _selected.containsKey(key);
 
   void toggle(Object key, SearchHit hit) {
@@ -34,6 +37,13 @@ class SongSelection extends ChangeNotifier {
   void selectAll(Map<Object, SearchHit> all) {
     _selected.addAll(all);
     notifyListeners();
+  }
+
+  /// Unticks the rows whose keys fail [test] (they left the list).
+  void retainWhere(bool Function(Object key) test) {
+    final before = _selected.length;
+    _selected.removeWhere((key, _) => !test(key));
+    if (_selected.length != before) notifyListeners();
   }
 
   void clear() {
@@ -63,16 +73,91 @@ class SongSelectionScope extends InheritedNotifier<SongSelection> {
       ?.notifier;
 }
 
+/// A button of the bar under a [SongSelectionArea].
+class SongSelectionAction {
+  const SongSelectionAction({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.onlyOne = false,
+  });
+
+  final IconData icon;
+  final String label;
+
+  /// Gets the ticked rows (keyed as the list keys them, in the order they were ticked) and a
+  /// context that outlives the bar, which goes as soon as the songs are unticked.
+  final void Function(BuildContext context, Map<Object, SearchHit> ticked)
+  onPressed;
+
+  /// Works on one song: greyed out while more are ticked.
+  final bool onlyOne;
+
+  /// What any song list offers: queue, play next, playlist, mood.
+  static List<SongSelectionAction> defaults(BuildContext context) => [
+    SongSelectionAction(
+      icon: Icons.queue_music,
+      label: l10n.songSelectionToQueue,
+      onPressed: (context, ticked) =>
+          queueSongs(context, [...ticked.values], next: false),
+    ),
+    SongSelectionAction(
+      icon: Icons.playlist_play,
+      label: l10n.songSelectionPlayNext,
+      onPressed: (context, ticked) =>
+          queueSongs(context, [...ticked.values], next: true),
+    ),
+    ?toPlaylist(context),
+    ?toMood(context),
+  ];
+
+  /// "Do playlisty"; `null` without Biblioteka's playlists.
+  static SongSelectionAction? toPlaylist(BuildContext context) =>
+      PlaylistLibraryScope.maybeOf(context) == null
+      ? null
+      : SongSelectionAction(
+          icon: Icons.playlist_add,
+          label: l10n.songSelectionToPlaylist,
+          onPressed: (context, ticked) =>
+              showAddToPlaylistSheet(context, [...ticked.values]),
+        );
+
+  /// "Do nastroju"; `null` without moods.
+  static SongSelectionAction? toMood(BuildContext context) =>
+      MoodLibraryScope.maybeOf(context) == null
+      ? null
+      : SongSelectionAction(
+          icon: moodIcon,
+          label: l10n.songSelectionToMood,
+          onPressed: (context, ticked) => showMoodPickerForAll(context, [
+            ...ticked.values,
+          ], title: l10n.songsCount(ticked.length)),
+        );
+}
+
 /// Lets the [SongTile]s in [child] be ticked: a long press on one starts it, and while any is
-/// ticked a bar under the list offers what can be done to all of them (queue, playlist, mood).
-/// Back unticks them all before leaving the screen.
+/// ticked a bar under the list offers what can be done to all of them ([actions]; queue,
+/// playlist, mood by default). Back unticks them all before leaving the screen.
 class SongSelectionArea extends StatefulWidget {
-  const SongSelectionArea({super.key, required this.child, this.all});
+  const SongSelectionArea({
+    super.key,
+    required this.child,
+    this.all,
+    this.actions,
+    this.untickGone = false,
+  });
 
   final Widget child;
 
   /// Every row of the list, keyed like its [SongTile]s, for "Zaznacz wszystkie".
   final Map<Object, SearchHit> Function()? all;
+
+  /// Rows that leave [all] are unticked when the list is built again (Kolejka: a ticked song
+  /// that started playing). Not for search, where ticked songs outlive a new query.
+  final bool untickGone;
+
+  /// The bar's buttons instead of [SongSelectionAction.defaults].
+  final List<SongSelectionAction> Function(BuildContext context)? actions;
 
   @override
   State<SongSelectionArea> createState() => _SongSelectionAreaState();
@@ -88,6 +173,19 @@ class _SongSelectionAreaState extends State<SongSelectionArea> {
   void initState() {
     super.initState();
     _selection.addListener(_onChanged);
+  }
+
+  @override
+  void didUpdateWidget(SongSelectionArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final all = widget.all;
+    if (!widget.untickGone || all == null || !_selection.active) return;
+    // Not while building: unticking the last one also takes Back's entry off the route.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final keys = all().keys.toSet();
+      _selection.retainWhere(keys.contains);
+    });
   }
 
   @override
@@ -125,6 +223,9 @@ class _SongSelectionAreaState extends State<SongSelectionArea> {
                 ? _SelectionBar(
                     selection: _selection,
                     all: widget.all,
+                    actions: (widget.actions ?? SongSelectionAction.defaults)(
+                      context,
+                    ),
                     actionContext: this.context,
                   )
                 : const SizedBox.shrink(),
@@ -139,22 +240,26 @@ class _SelectionBar extends StatelessWidget {
   const _SelectionBar({
     required this.selection,
     required this.all,
+    required this.actions,
     required this.actionContext,
   });
 
   final SongSelection selection;
   final Map<Object, SearchHit> Function()? all;
+  final List<SongSelectionAction> actions;
 
   /// Outlives the bar, which goes as soon as the songs are unticked.
   final BuildContext actionContext;
 
   /// Runs [action] on the ticked songs and unticks them.
-  VoidCallback _forAll(Future<void> Function(List<SearchHit> hits) action) =>
-      () {
-        final hits = selection.hits;
-        selection.clear();
-        action(hits);
-      };
+  VoidCallback? _run(SongSelectionAction action) =>
+      action.onlyOne && selection.count != 1
+      ? null
+      : () {
+          final ticked = selection.ticked;
+          selection.clear();
+          action.onPressed(actionContext, ticked);
+        };
 
   @override
   Widget build(BuildContext context) {
@@ -163,8 +268,11 @@ class _SelectionBar extends StatelessWidget {
     final allTicked =
         all != null && all.keys.every((key) => selection.contains(key));
     final count = selection.count;
-    Widget action(IconData icon, String label, VoidCallback onPressed) =>
-        Expanded(
+    Widget button(SongSelectionAction action) {
+      final onPressed = _run(action);
+      return Expanded(
+        child: Opacity(
+          opacity: onPressed == null ? 0.38 : 1,
           child: InkWell(
             onTap: onPressed,
             borderRadius: BorderRadius.circular(8),
@@ -172,10 +280,10 @@ class _SelectionBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 children: [
-                  Icon(icon, color: palette.textPrimary),
+                  Icon(action.icon, color: palette.textPrimary),
                   const SizedBox(height: 4),
                   ScrollingText(
-                    label,
+                    action.label,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: AppFontSize.navLabel,
@@ -186,82 +294,86 @@ class _SelectionBar extends StatelessWidget {
               ),
             ),
           ),
-        );
+        ),
+      );
+    }
 
     return Material(
       color: palette.surfaceHigh,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  tooltip: l10n.songSelectionCancelSelection,
-                  icon: const Icon(Icons.close),
-                  onPressed: selection.clear,
-                ),
-                Expanded(
-                  child: Text(
-                    l10n.songSelectionSelected(count),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+      // Under a screen of its own (Kolejka) the bar is the bottom of the window.
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: l10n.songSelectionCancelSelection,
+                    icon: const Icon(Icons.close),
+                    onPressed: selection.clear,
                   ),
-                ),
-                if (all != null && all.isNotEmpty)
-                  TextButton(
-                    onPressed: allTicked
-                        ? selection.clear
-                        : () => selection.selectAll(all),
+                  Expanded(
                     child: Text(
-                      allTicked
-                          ? l10n.songSelectionUntick
-                          : l10n.songSelectionTickAll,
+                      l10n.songSelectionSelected(count),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
-              ],
-            ),
-            Row(
-              children: [
-                action(
-                  Icons.queue_music,
-                  l10n.songSelectionToQueue,
-                  _forAll(
-                    (hits) => queueSongs(actionContext, hits, next: false),
-                  ),
-                ),
-                action(
-                  Icons.playlist_play,
-                  l10n.songSelectionPlayNext,
-                  _forAll(
-                    (hits) => queueSongs(actionContext, hits, next: true),
-                  ),
-                ),
-                if (PlaylistLibraryScope.maybeOf(context) != null)
-                  action(
-                    Icons.playlist_add,
-                    l10n.songSelectionToPlaylist,
-                    _forAll(
-                      (hits) => showAddToPlaylistSheet(actionContext, hits),
-                    ),
-                  ),
-                if (MoodLibraryScope.maybeOf(context) != null)
-                  action(
-                    moodIcon,
-                    l10n.songSelectionToMood,
-                    _forAll(
-                      (hits) => showMoodPickerForAll(
-                        actionContext,
-                        hits,
-                        title: l10n.songsCount(hits.length),
+                  if (all != null && all.isNotEmpty)
+                    TextButton(
+                      onPressed: allTicked
+                          ? selection.clear
+                          : () => selection.selectAll(all),
+                      child: Text(
+                        allTicked
+                            ? l10n.songSelectionUntick
+                            : l10n.songSelectionTickAll,
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ],
+                ],
+              ),
+              Row(children: [for (final action in actions) button(action)]),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// A song row's cover, ticked or not while songs are being ticked.
+class SelectableCover extends StatelessWidget {
+  const SelectableCover({
+    super.key,
+    required this.cover,
+    required this.selecting,
+    required this.ticked,
+  });
+
+  final Widget cover;
+  final bool selecting;
+  final bool ticked;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!selecting) return cover;
+    final palette = context.palette;
+    return Stack(
+      children: [
+        cover,
+        Positioned.fill(
+          child: ColoredBox(
+            color: ticked
+                ? palette.background.withValues(alpha: 0.55)
+                : Colors.transparent,
+            child: ticked
+                ? Icon(Icons.check_circle, color: palette.accent)
+                : null,
+          ),
+        ),
+      ],
     );
   }
 }

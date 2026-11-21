@@ -249,7 +249,7 @@ part of `version:` in `pubspec.yaml` is bumped by hand; leave its `+1` alone.
   `showSongMenu` — a song's menu, opened by ⋮ (and a long press outside a selection area);
   `SongSelectionArea` in `song_selection.dart` — wrap a song list's body in it and a long press on
   a `SongTile` starts ticking songs, with a bar of actions for all of them (new song lists should
-  use it); `showAddToPlaylistSheet` in `playlist_picker.dart`; `youtube_export_dialog.dart` — "Utwórz na YouTube"; `folder_sheet.dart` — "Przenieś do
+  use it; a list with moves of its own gives the bar its own `SongSelectionAction`s — Kolejka); `showAddToPlaylistSheet` in `playlist_picker.dart`; `youtube_export_dialog.dart` — "Utwórz na YouTube"; `folder_sheet.dart` — "Przenieś do
   folderu" for Biblioteka;
   `PlayingBars` — the animated "playing" mark; `SwipeActions` — a row dragged sideways (right
   queues a song — `queueSwipe`, as `SourceSettings.swipePlaysNext` says —, left takes it out —

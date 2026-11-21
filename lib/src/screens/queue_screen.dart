@@ -19,14 +19,17 @@ import '../widgets/song_cover.dart';
 import '../widgets/swipe_actions.dart';
 import 'playlist_screen.dart';
 import '../widgets/song_names.dart';
+import '../widgets/song_selection.dart';
 
 /// "Kolejka", opened from the full player: the last few songs before the current one (above,
 /// scrolled to; tapping one goes back to it), the song playing, then everything after it, under
 /// a heading for each run of songs queued from the same place — songs added one by one, a
 /// playlist added as a whole, the playlist / results the queue was filled with. Tapping a song
 /// plays it (skipping the ones before it); the handle moves it; dragging a row left takes it out,
-/// right makes it play next or moves it to the end ([SourceSettings.swipePlaysNext]). The queue
-/// that playing something else replaced comes back with "Przywróć poprzednią kolejkę".
+/// right makes it play next or moves it to the end ([SourceSettings.swipePlaysNext]). A long
+/// press ticks songs to come, for the bar of what can be done to all of them — the queue's own
+/// moves, and "Więcej", the menu a long press opens on the other rows. The queue that playing
+/// something else replaced comes back with "Przywróć poprzednią kolejkę".
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
 
@@ -114,6 +117,90 @@ class QueueScreen extends StatelessWidget {
       );
   }
 
+  /// Takes [entries] out of the queue, with "Cofnij" in the note.
+  static void _remove(
+    BuildContext context,
+    PlaybackQueue queue,
+    List<QueueEntry> entries,
+  ) {
+    final removed = [
+      for (final entry in entries)
+        if (queue.remove(entry) case final at when at >= 0) (entry, at),
+    ];
+    if (removed.isEmpty) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            removed.length == 1
+                ? l10n.queueScreenRemoved(removed.single.$1.hit.title)
+                : l10n.queueScreenRemovedCount(removed.length),
+          ),
+          // With an action a SnackBar otherwise stays until closed by hand.
+          persist: false,
+          action: SnackBarAction(
+            label: l10n.commonUndo,
+            onPressed: () {
+              for (final (entry, at) in removed.reversed) {
+                queue.reinsert(entry, at);
+              }
+            },
+          ),
+        ),
+      );
+  }
+
+  /// The bar under ticked songs: moves within the queue instead of queueing them once more.
+  static List<SongSelectionAction> _selectionActions(
+    BuildContext context,
+    PlaybackQueue queue,
+  ) {
+    // In the queue's order, whatever order they were ticked in.
+    List<QueueEntry> entries(Map<Object, SearchHit> ticked) => [
+      for (final entry in queue.upcoming)
+        if (ticked.containsKey(entry.key)) entry,
+    ];
+    return [
+      SongSelectionAction(
+        icon: Icons.playlist_remove,
+        label: l10n.queueScreenTickedRemove,
+        onPressed: (context, ticked) =>
+            _remove(context, queue, entries(ticked)),
+      ),
+      SongSelectionAction(
+        icon: Icons.playlist_play,
+        label: l10n.songSelectionPlayNext,
+        onPressed: (context, ticked) {
+          for (final entry in entries(ticked).reversed) {
+            queue.move(entry, 0);
+          }
+        },
+      ),
+      SongSelectionAction(
+        icon: Icons.low_priority,
+        label: l10n.queueScreenTickedToEnd,
+        onPressed: (context, ticked) {
+          for (final entry in entries(ticked)) {
+            queue.move(entry, queue.upcoming.length);
+          }
+        },
+      ),
+      ?SongSelectionAction.toPlaylist(context),
+      ?SongSelectionAction.toMood(context),
+      SongSelectionAction(
+        icon: Icons.more_vert,
+        label: l10n.queueScreenTickedMore,
+        onlyOne: true,
+        onPressed: (context, ticked) => showSongMenu(
+          context,
+          ticked.values.single,
+          idPrefix: 'Kolejka › Utwór › Menu (⋮)',
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -149,207 +236,196 @@ class QueueScreen extends StatelessWidget {
     // Its own messenger: "Usunięto z kolejki" goes when the screen closes, instead of covering
     // the full player's buttons.
     return ScaffoldMessenger(
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: palette.surface,
-          title: Text(l10n.queueScreenTitle),
-          actions: [
-            if (queue.replaced case final replaced?)
-              IconButton(
-                tooltip: l10n.queueScreenRestorePrevious(
-                  [
-                    ?replaced.name,
-                    trackCountLabel(replaced.songCount),
-                  ].join(', '),
+      child: SongSelectionArea(
+        all: () => {for (final entry in queue.upcoming) entry.key: entry.hit},
+        untickGone: true,
+        actions: (context) => _selectionActions(context, queue),
+        child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: palette.surface,
+            title: Text(l10n.queueScreenTitle),
+            actions: [
+              if (queue.replaced case final replaced?)
+                IconButton(
+                  tooltip: l10n.queueScreenRestorePrevious(
+                    [
+                      ?replaced.name,
+                      trackCountLabel(replaced.songCount),
+                    ].join(', '),
+                  ),
+                  icon: const Icon(Icons.restore),
+                  onPressed: () => runQueueAction(
+                    context,
+                    (onStatus) => queue.playReplaced(onStatus: onStatus),
+                  ),
                 ),
-                icon: const Icon(Icons.restore),
-                onPressed: () => runQueueAction(
-                  context,
-                  (onStatus) => queue.playReplaced(onStatus: onStatus),
+              if (current != null &&
+                  PlaylistLibraryScope.maybeOf(context) != null)
+                // Its context is under the screen's own messenger, which shows the note.
+                Builder(
+                  builder: (context) => IconButton(
+                    tooltip: l10n.queueScreenSaveAsPlaylist,
+                    icon: const Icon(Icons.playlist_add),
+                    onPressed: () => _saveAsPlaylist(context, [
+                      for (final entry in previous.reversed) entry.hit,
+                      current,
+                      for (final entry in upcoming) entry.hit,
+                    ]),
+                  ),
                 ),
-              ),
-            if (current != null &&
-                PlaylistLibraryScope.maybeOf(context) != null)
-              // Its context is under the screen's own messenger, which shows the note.
-              Builder(
-                builder: (context) => IconButton(
-                  tooltip: l10n.queueScreenSaveAsPlaylist,
-                  icon: const Icon(Icons.playlist_add),
-                  onPressed: () => _saveAsPlaylist(context, [
+              if (current != null && MoodLibraryScope.maybeOf(context) != null)
+                IconButton(
+                  tooltip: l10n.queueScreenMoodForAll,
+                  icon: const Icon(moodIcon),
+                  // The songs listed: the ones the mood filter hides stay out.
+                  onPressed: () => showMoodPickerForAll(context, [
                     for (final entry in previous.reversed) entry.hit,
                     current,
                     for (final entry in upcoming) entry.hit,
-                  ]),
+                  ], title: l10n.queueScreenAllVisibleSongs),
                 ),
-              ),
-            if (current != null && MoodLibraryScope.maybeOf(context) != null)
-              IconButton(
-                tooltip: l10n.queueScreenMoodForAll,
-                icon: const Icon(moodIcon),
-                // The songs listed: the ones the mood filter hides stay out.
-                onPressed: () => showMoodPickerForAll(context, [
-                  for (final entry in previous.reversed) entry.hit,
-                  current,
-                  for (final entry in upcoming) entry.hit,
-                ], title: l10n.queueScreenAllVisibleSongs),
-              ),
-          ],
-        ),
-        body: CustomScrollView(
-          // Opens at the song playing; the songs before it are above, scrolled to.
-          center: _nowPlayingKey,
-          slivers: [
-            // Before the centre the list grows upwards: the newest song is first.
-            SliverList.list(
-              children: [
-                for (final entry in previous)
-                  _PreviousRow(key: ValueKey(entry.key), entry: entry),
-                if (queue.hasPrevious) _Heading(l10n.queueScreenPrevious),
-              ],
-            ),
-            SliverToBoxAdapter(
-              key: _nowPlayingKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            ],
+          ),
+          body: CustomScrollView(
+            // Opens at the song playing; the songs before it are above, scrolled to.
+            center: _nowPlayingKey,
+            slivers: [
+              // Before the centre the list grows upwards: the newest song is first.
+              SliverList.list(
                 children: [
-                  _Heading(l10n.queueScreenNowPlaying),
-                  if (current != null)
-                    _QueueRow(hit: current, isCurrent: true)
-                  else
-                    _Empty(l10n.queueScreenNothingPlaying),
-                  if (upcoming.isEmpty && filtering)
-                    _Empty(l10n.queueScreenEndFiltered)
-                  else if (upcoming.isEmpty)
-                    _Empty(l10n.queueScreenEnd),
+                  for (final entry in previous)
+                    _PreviousRow(key: ValueKey(entry.key), entry: entry),
+                  if (queue.hasPrevious) _Heading(l10n.queueScreenPrevious),
                 ],
               ),
-            ),
-            SliverReorderableList(
-              itemCount: items.length,
-              onReorderItem: reorder,
-              proxyDecorator: _liftedRow,
-              itemBuilder: (context, i) {
-                final item = items[i];
-                if (item is QueueEntry) {
-                  return _UpcomingRow(
-                    key: ValueKey(item.key),
-                    entry: item,
-                    index: i,
-                  );
-                }
-                final heading = item as ({String text, bool clear, int at});
-                final origin = upcoming[heading.at].origin;
-                final group = upcoming
-                    .skip(heading.at)
-                    .takeWhile((entry) => identical(entry.origin, origin))
-                    .toList();
-                final playlistGroup = origin?.playlistName != null;
-                void removeGroup() {
-                  final removed = [
-                    for (final entry in group) (entry, queue.remove(entry)),
-                  ];
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          l10n.queueScreenRemovedCount(removed.length),
-                        ),
-                        persist: false,
-                        action: SnackBarAction(
-                          label: l10n.commonUndo,
-                          onPressed: () {
-                            for (final (entry, at) in removed.reversed) {
-                              queue.reinsert(entry, at);
-                            }
-                          },
-                        ),
-                      ),
-                    );
-                }
-
-                final tile = _Heading(
-                  heading.text,
-                  action: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // A playlist's songs as a group of their own: shuffled, played once
-                      // more or taken out at once (Juxtopposed's redesign).
-                      if (playlistGroup) ...[
-                        IconButton(
-                          tooltip: l10n.queueScreenShuffleGroup,
-                          icon: const Icon(Icons.shuffle, size: 20),
-                          onPressed: () => queue.shuffleGroup(group),
-                        ),
-                        IconButton(
-                          tooltip: l10n.queueScreenRepeatGroup,
-                          icon: const Icon(Icons.repeat, size: 20),
-                          onPressed: () => queue.repeatGroup(group),
-                        ),
-                        IconButton(
-                          tooltip: l10n.queueScreenRemoveGroup,
-                          icon: const Icon(Icons.playlist_remove, size: 22),
-                          onPressed: removeGroup,
-                        ),
-                      ],
-                      if (heading.clear)
-                        TextButton(
-                          onPressed: queue.clearAdded,
-                          child: Text(l10n.queueScreenClear),
-                        ),
-                    ],
-                  ),
-                );
-                return KeyedSubtree(
-                  key: ValueKey('heading ${heading.at}'),
-                  child: tile,
-                );
-              },
-            ),
-            const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
-          ],
-        ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TextButton.icon(
-                  onPressed: () => queue.setShuffle(!queue.shuffle),
-                  icon: Icon(
-                    Icons.shuffle,
-                    color: queue.shuffle ? palette.accent : null,
-                  ),
-                  label: Text(
-                    queue.shuffle
-                        ? l10n.queueScreenShuffleOn
-                        : l10n.queueScreenShuffleOff,
-                    style: TextStyle(
-                      color: queue.shuffle
-                          ? palette.accent
-                          : palette.textPrimary,
-                    ),
-                  ),
+              SliverToBoxAdapter(
+                key: _nowPlayingKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _Heading(l10n.queueScreenNowPlaying),
+                    if (current != null)
+                      _QueueRow(hit: current, isCurrent: true)
+                    else
+                      _Empty(l10n.queueScreenNothingPlaying),
+                    if (upcoming.isEmpty && filtering)
+                      _Empty(l10n.queueScreenEndFiltered)
+                    else if (upcoming.isEmpty)
+                      _Empty(l10n.queueScreenEnd),
+                  ],
                 ),
-                if (moodFilter != null)
-                  TextButton.icon(
-                    onPressed: () => showMoodFilterSheet(context),
-                    icon: Icon(
-                      Icons.filter_list,
-                      color: filtering ? palette.accent : null,
+              ),
+              SliverReorderableList(
+                itemCount: items.length,
+                onReorderItem: reorder,
+                proxyDecorator: _liftedRow,
+                itemBuilder: (context, i) {
+                  final item = items[i];
+                  if (item is QueueEntry) {
+                    return _UpcomingRow(
+                      key: ValueKey(item.key),
+                      entry: item,
+                      index: i,
+                    );
+                  }
+                  final heading = item as ({String text, bool clear, int at});
+                  final origin = upcoming[heading.at].origin;
+                  final group = upcoming
+                      .skip(heading.at)
+                      .takeWhile((entry) => identical(entry.origin, origin))
+                      .toList();
+                  final playlistGroup = origin?.playlistName != null;
+                  final tile = _Heading(
+                    heading.text,
+                    action: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // A playlist's songs as a group of their own: shuffled, played once
+                        // more or taken out at once (Juxtopposed's redesign).
+                        if (playlistGroup) ...[
+                          IconButton(
+                            tooltip: l10n.queueScreenShuffleGroup,
+                            icon: const Icon(Icons.shuffle, size: 20),
+                            onPressed: () => queue.shuffleGroup(group),
+                          ),
+                          IconButton(
+                            tooltip: l10n.queueScreenRepeatGroup,
+                            icon: const Icon(Icons.repeat, size: 20),
+                            onPressed: () => queue.repeatGroup(group),
+                          ),
+                          IconButton(
+                            tooltip: l10n.queueScreenRemoveGroup,
+                            icon: const Icon(Icons.playlist_remove, size: 22),
+                            onPressed: () => _remove(context, queue, group),
+                          ),
+                        ],
+                        if (heading.clear)
+                          TextButton(
+                            onPressed: queue.clearAdded,
+                            child: Text(l10n.queueScreenClear),
+                          ),
+                      ],
                     ),
-                    label: Text(
-                      filtering
-                          ? l10n.queueScreenMoodsOn
-                          : l10n.queueScreenMoodsOff,
-                      style: TextStyle(
-                        color: filtering ? palette.accent : palette.textPrimary,
+                  );
+                  return KeyedSubtree(
+                    key: ValueKey('heading ${heading.at}'),
+                    child: tile,
+                  );
+                },
+              ),
+              const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+            ],
+          ),
+          // While songs are ticked their bar takes its place.
+          bottomNavigationBar: Builder(
+            builder: (context) =>
+                (SongSelectionScope.maybeOf(context)?.active ?? false)
+                ? const SizedBox.shrink()
+                : SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => queue.setShuffle(!queue.shuffle),
+                            icon: Icon(
+                              Icons.shuffle,
+                              color: queue.shuffle ? palette.accent : null,
+                            ),
+                            label: Text(
+                              queue.shuffle
+                                  ? l10n.queueScreenShuffleOn
+                                  : l10n.queueScreenShuffleOff,
+                              style: TextStyle(
+                                color: queue.shuffle
+                                    ? palette.accent
+                                    : palette.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (moodFilter != null)
+                            TextButton.icon(
+                              onPressed: () => showMoodFilterSheet(context),
+                              icon: Icon(
+                                Icons.filter_list,
+                                color: filtering ? palette.accent : null,
+                              ),
+                              label: Text(
+                                filtering
+                                    ? l10n.queueScreenMoodsOn
+                                    : l10n.queueScreenMoodsOff,
+                                style: TextStyle(
+                                  color: filtering
+                                      ? palette.accent
+                                      : palette.textPrimary,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-              ],
-            ),
           ),
         ),
       ),
@@ -424,28 +500,31 @@ class _UpcomingRow extends StatelessWidget {
   /// Where the row is in the list, for dragging it by the handle.
   final int index;
 
-  void _remove(BuildContext context, PlaybackQueue queue) {
-    final at = queue.remove(entry);
-    if (at < 0) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(l10n.queueScreenRemoved(entry.hit.title)),
-          // With an action a SnackBar otherwise stays until closed by hand.
-          persist: false,
-          action: SnackBarAction(
-            label: l10n.commonUndo,
-            onPressed: () => queue.reinsert(entry, at),
-          ),
-        ),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
     final queue = PlaybackQueueScope.of(context);
     final next = SourceSettingsScope.maybeOf(context)?.swipePlaysNext ?? true;
+    final row = _QueueRow(
+      hit: entry.hit,
+      selectionKey: entry.key,
+      onTap: () => runQueueAction(
+        context,
+        (onStatus) => queue.jumpTo(entry, onStatus: onStatus),
+      ),
+      trailing: ReorderableDragStartListener(
+        index: index,
+        // No tooltip: its long press took the drag over when the finger rested first.
+        child: Semantics(
+          label: l10n.queueScreenDragToReorder,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Icon(Icons.drag_handle),
+          ),
+        ),
+      ),
+    );
+    // As in other lists: no dragging sideways while songs are ticked.
+    if (SongSelectionScope.maybeOf(context)?.active ?? false) return row;
     return SwipeActions(
       right: SwipeAction(
         icon: next ? Icons.playlist_play : Icons.queue_music,
@@ -455,26 +534,9 @@ class _UpcomingRow extends StatelessWidget {
       left: removeSwipe(
         context,
         l10n.queueScreenRemoveFromQueue,
-        () => _remove(context, queue),
+        () => QueueScreen._remove(context, queue, [entry]),
       ),
-      child: _QueueRow(
-        hit: entry.hit,
-        onTap: () => runQueueAction(
-          context,
-          (onStatus) => queue.jumpTo(entry, onStatus: onStatus),
-        ),
-        trailing: ReorderableDragStartListener(
-          index: index,
-          // No tooltip: its long press took the drag over when the finger rested first.
-          child: Semantics(
-            label: l10n.queueScreenDragToReorder,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Icon(Icons.drag_handle),
-            ),
-          ),
-        ),
-      ),
+      child: row,
     );
   }
 }
@@ -483,12 +545,16 @@ class _QueueRow extends StatelessWidget {
   const _QueueRow({
     required this.hit,
     this.isCurrent = false,
+    this.selectionKey,
     this.onTap,
     this.trailing,
   });
 
   final SearchHit hit;
   final bool isCurrent;
+
+  /// A song to come, ticked with a long press; the others open the song's menu.
+  final Object? selectionKey;
   final VoidCallback? onTap;
   final Widget? trailing;
 
@@ -497,9 +563,21 @@ class _QueueRow extends StatelessWidget {
     final trailing = this.trailing;
     // The queue holds songs as they were when it was filled; caching ahead finds videos later.
     final hit = withPhoneYouTube(this.hit, YouTubeLibraryScope.of(context));
+    final key = selectionKey;
+    final selection = key == null ? null : SongSelectionScope.maybeOf(context);
+    final selecting = selection?.active ?? false;
+    final ticked = selecting && selection!.contains(key!);
+    final palette = context.palette;
     return ListTile(
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
-      leading: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),
+      selected: ticked,
+      selectedTileColor: palette.accent.withValues(alpha: 0.15),
+      selectedColor: palette.textPrimary,
+      leading: SelectableCover(
+        cover: SongCover(cover: CoverRequest.of(hit), size: SongTile.coverSize),
+        selecting: selecting,
+        ticked: ticked,
+      ),
       title: CurrentTitle(text: hit.shownTitle(context), isCurrent: isCurrent),
       subtitle: ScrollingText(hit.shownArtist(context)),
       trailing: Row(
@@ -509,9 +587,18 @@ class _QueueRow extends StatelessWidget {
           trailing ?? const SizedBox(width: 12),
         ],
       ),
-      onTap: onTap,
-      onLongPress: () =>
-          showSongMenu(context, hit, idPrefix: 'Kolejka › Utwór › Menu (⋮)'),
+      onTap: selection != null && selecting
+          ? () => selection.toggle(key!, hit)
+          : onTap,
+      onLongPress: selection != null
+          ? () => selecting
+                ? selection.toggle(key!, hit)
+                : startSelection(selection, key!, hit)
+          : () => showSongMenu(
+              context,
+              hit,
+              idPrefix: 'Kolejka › Utwór › Menu (⋮)',
+            ),
     );
   }
 }
