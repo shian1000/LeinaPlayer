@@ -113,6 +113,9 @@ class _Song {
             : '${target.title} (${target.version})',
       ),
       core = _padded(target.title.replaceAll(_brackets, ' ')),
+      marked =
+          target.version != null ||
+          _brackets.hasMatch(target.title.replaceAll(_sourceCredit, ' ')),
       mainArtists = [
         for (final a in target.mainArtists) [for (final n in a.names) _norm(n)],
       ],
@@ -128,6 +131,10 @@ class _Song {
   /// Title without bracketed parts ("(Remix)", "[Live]"), which candidates often drop.
   final String core;
 
+  /// Whether the title has a bracketed part that tells a version apart — not just where the song
+  /// comes from.
+  final bool marked;
+
   final List<List<String>> mainArtists;
   final List<List<String>> featArtists;
   final bool fullAlbum;
@@ -141,6 +148,13 @@ const _fullAlbumMinutes = 20;
 const _fullAlbumWords = {'full album', 'caly album'};
 
 final _brackets = RegExp(r'[\(\[][^\)\]]*[\)\]]');
+
+/// Spotify's soundtrack credit, "(from Cyberpunk: Edgerunners Season 2)": every upload of the
+/// song copies it, a game's or fan's video too, so matching it says nothing of the version.
+final _sourceCredit = RegExp(
+  r'[\(\[]\s*from\s[^\)\]]*[\)\]]',
+  caseSensitive: false,
+);
 
 // "&" is dropped by normalization, so "Rock & Roll" and "Rock and Roll" only meet without "and".
 String _norm(String text) =>
@@ -257,6 +271,10 @@ const _video = [
 ];
 
 const _official = [
+  'original soundtrack',
+  'original series soundtrack',
+  'original motion picture soundtrack',
+  'original game soundtrack',
   'official audio',
   'audio',
   'official',
@@ -303,7 +321,7 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
   if (_hasWord(title, song.title.trim())) {
     // Matching the bracketed part too ("(Instrumental)", "(Remix X)") is the strongest sign
     // of the right version.
-    score += song.title == song.core ? 1 : 3;
+    score += song.marked ? 3 : 1;
   } else if (!_hasWord(title, song.core.trim())) {
     return reject('tytuł');
   }
@@ -318,9 +336,11 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
   if (mainFound == 0) return reject('wykonawca');
   score += mainFound - 1;
   score += 0.5 * song.featArtists.where(present).length;
-  if (song.mainArtists.any(
-    (names) => names.any((n) => n.isNotEmpty && channel == _collapsed(n)),
-  )) {
+  // The artist's own channel, or a label's VEVO one (soundtracks are often uploaded there).
+  if (channelNorm.endsWith('vevo') ||
+      song.mainArtists.any(
+        (names) => names.any((n) => n.isNotEmpty && channel == _collapsed(n)),
+      )) {
     score += 1;
   }
 

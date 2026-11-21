@@ -179,6 +179,34 @@ void main() {
     );
   });
 
+  test('a soundtrack credit in brackets is not a version', () {
+    expect(
+      pickYouTubeVideo(
+        _song(
+          'Rico Nasty',
+          "You Can't Run From Me (from Cyberpunk: Edgerunners Season 2)",
+        ),
+        [
+          _v(
+            'game',
+            "DEAD AS DISCO Rico Nasty - You Can't Run From Me "
+                '(from Cyberpunk: Edgerunners Season 2)',
+            'Cross-Ribbons',
+            views: 500000,
+          ),
+          _v(
+            'ost',
+            "Rico Nasty - You Can't Run From Me | Cyberpunk: Edgerunners 2 "
+                '(Original Series Soundtrack)',
+            'SonySoundtracksVEVO',
+            views: 200000,
+          ),
+        ],
+      )?.id,
+      'ost',
+    );
+  });
+
   test('"&" and "and" are the same', () {
     expect(
       pickYouTubeVideo(_song('Fandango', 'Autos, Moda Y Rock & Roll'), [

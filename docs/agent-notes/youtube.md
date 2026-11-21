@@ -33,7 +33,11 @@ words, bracketed part optional but worth +3), artist gate (main artist or synony
 the channel name), rejects (karaoke, reaction, behind the scenes, <45 s or ≥20 min, ...), and
 points for Topic channels / "official audio", minus for live, remixes, videos/lyrics. Keyword
 lists are normalized (`normalizeForSearch`, no diacritics); a keyword in the song's own title
-never counts against a candidate. Returns `null` rather than a doubtful pick. A full album
+never counts against a candidate. A bracket that only says where the song comes from —
+Spotify's "(from Cyberpunk: Edgerunners Season 2)" — isn't a version marker and earns no +3: a
+game's or fan's video copies it word for word (a "DEAD AS DISCO" gameplay upload beat the
+official one that way); a label's VEVO channel counts like the artist's own (+1), and "Original
+(Series) Soundtrack" like "official". Returns `null` rather than a doubtful pick. A full album
 (`MatchTarget.fullAlbum`, music.db's `songs.kind`) is the other way round: the query gets
 "full album", only videos of ≥20 min with a known duration pass, and "full album" in the title
 is a plus (hand-off [`musicdatabase-song-kind.md`](../handoffs/musicdatabase-song-kind.md)).
