@@ -694,6 +694,12 @@ Spotify API (both APIs marked "W budowie — jeszcze nie sprawdzone w praktyce")
   downloaded `music.db` and the phone's own `local.db` (`combined_search.dart`): MusicDatabase
   songs plus phone files not in MusicDatabase. Accents and case are ignored, like MusicDatabase's
   search. Shows a hint with a link to Synchronizacja › Baza danych when there's nothing to search.
+  - "Ostatnie wyszukiwania" (`search_history.dart`, phone only — Spotify/YouTube-like): with
+    the field empty, the last 10 queries, newest first (one per query regardless of case and
+    accents). A query is kept once it's used — submitted with the keyboard, a result tapped
+    (anything in the results: a touch that doesn't scroll), the online button or "Utwórz kolejkę
+    z wyników" — never just typed. Tapping one puts it in the field; ✕ or dragging the row left
+    forgets it; "Wyczyść historię wyszukiwania" at the end forgets all.
   - Each result has one icon on the right (`SourceIcons`, in a slot of cover height and half its
     width): where tapping it plays from first — the first switched-on source in "Kolejność
     odtwarzania" that has the song (phone `smartphone`, server `dns`, YouTube `smart_display`;

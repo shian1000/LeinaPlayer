@@ -4074,6 +4074,9 @@
       }
     }
   },
+  "songSearchScreenRecentSearches": "Ostatnie wyszukiwania",
+  "songSearchScreenRemoveRecent": "Usuń z historii",
+  "songSearchScreenClearRecent": "Wyczyść historię wyszukiwania",
   "songSearchScreenTypeHint": "Wpisz tytuł utworu albo wykonawcę.",
   "songSearchScreenNoResultsFor": "Brak wyników dla „{query}”",
   "@songSearchScreenNoResultsFor": {

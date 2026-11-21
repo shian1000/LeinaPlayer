@@ -6,6 +6,7 @@ import 'package:music_database_app/src/data/database_sync.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/playlist_search.dart';
+import 'package:music_database_app/src/data/search_history.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/spotify_playlist.dart';
@@ -91,6 +92,7 @@ void main() {
     WidgetTester tester, {
     bool youTube = true,
     bool spotifyPlaylists = false,
+    SearchHistory? history,
   }) async {
     await tester.runAsync(() async {
       storage = await Directory.systemTemp.createTemp('song_search_test');
@@ -194,9 +196,12 @@ void main() {
                           call: spotify.call,
                         ),
                         audio: audio,
-                        child: MaterialApp(
-                          theme: buildAppTheme(dummifyTheme),
-                          home: const SongSearchScreen(),
+                        child: SearchHistoryScope(
+                          notifier: history ?? SearchHistory(),
+                          child: MaterialApp(
+                            theme: buildAppTheme(dummifyTheme),
+                            home: const SongSearchScreen(),
+                          ),
                         ),
                       ),
                     ),
@@ -479,6 +484,44 @@ void main() {
       expect(find.text('Zapisz w Bibliotece'), findsNothing);
       // The saved playlist's chips; an imported one is sorted, not edited.
       expect(find.text('Sortuj'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a query used is kept in the recent searches under the empty field',
+    (tester) async {
+      final history = SearchHistory();
+      await pumpSearch(tester, history: history);
+      expect(find.text('Ostatnie wyszukiwania'), findsNothing);
+
+      // Typing alone keeps nothing; tapping a result does.
+      await type(tester, 'Californ');
+      await type(tester, 'Małomiasteczkowy');
+      await tester.tap(row('Małomiasteczkowy'));
+      await settle(tester, until: () => backend.opened.isNotEmpty);
+      await type(tester, 'California');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(history.queries, ['California', 'Małomiasteczkowy']);
+
+      await type(tester, '');
+      expect(find.text('Ostatnie wyszukiwania'), findsOneWidget);
+      await tester.tap(find.text('Małomiasteczkowy'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'Małomiasteczkowy',
+      );
+      expect(history.queries, ['Małomiasteczkowy', 'California']);
+
+      await type(tester, '');
+      await tester.tap(find.byTooltip('Usuń z historii').last);
+      await tester.pumpAndSettle();
+      expect(history.queries, ['Małomiasteczkowy']);
+      await tester.tap(find.text('Wyczyść historię wyszukiwania'));
+      await tester.pumpAndSettle();
+      expect(history.queries, isEmpty);
+      expect(find.text('Ostatnie wyszukiwania'), findsNothing);
     },
   );
 }

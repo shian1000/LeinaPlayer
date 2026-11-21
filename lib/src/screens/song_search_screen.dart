@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../data/combined_search.dart';
@@ -7,6 +8,7 @@ import '../data/database_sync.dart';
 import '../data/local_library.dart';
 import '../data/playlist_library.dart';
 import '../data/playlist_search.dart';
+import '../data/search_history.dart';
 import '../data/spotify_playlist.dart';
 import '../playback/playback_queue.dart';
 import '../playback/player_controller.dart';
@@ -55,6 +57,26 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
   /// "Całe albumy" ticked: only full albums (music.db's `songs.kind`) among the songs found.
   bool _onlyFullAlbums = false;
 
+  /// Where the last touch on the results started, to tell a tap from a scroll.
+  Offset? _touchDown;
+
+  /// Keeps the query in the history once the user does something with it — submits it, taps
+  /// a result, searches online — not on every keystroke (YouTube and Spotify alike).
+  void _remember() => SearchHistoryScope.maybeOf(context)
+      ?.add(_query.text)
+      .catchError(
+        (Object e) => debugPrint('Saving the search history failed: $e'),
+      );
+
+  void _useRecent(String query) {
+    _query.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    _onQueryChanged();
+    _remember();
+  }
+
   void _onQueryChanged() {
     setState(() {
       if (_online?.query != _query.text.trim()) _online = null;
@@ -67,6 +89,7 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
     final query = _query.text.trim();
     if (query.isEmpty) return;
     FocusScope.of(context).unfocus();
+    _remember();
     final search = YouTubeScope.searchOf(context);
     final spotify = YouTubeScope.spotifyOf(context);
     final settings = SourceSettingsScope.of(context);
@@ -145,12 +168,14 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
             border: InputBorder.none,
           ),
           onChanged: (_) => _onQueryChanged(),
+          onSubmitted: (_) => _remember(),
         ),
         actions: [
           if (_query.text.trim().isNotEmpty)
             _QueueResultsButton(
               query: _query.text.trim(),
               onlyFullAlbums: _onlyFullAlbums,
+              onQueued: _remember,
             ),
           const SearchFieldsButton(),
           if (_query.text.isNotEmpty)
@@ -164,13 +189,24 @@ class _SongSearchScreenState extends State<SongSearchScreen> {
             ),
         ],
       ),
-      body: SongSelectionArea(
-        child: _Results(
-          query: _query.text,
-          online: _online,
-          onSearchOnline: _searchOnline,
-          onlyFullAlbums: _onlyFullAlbums,
-          onOnlyFullAlbums: (on) => setState(() => _onlyFullAlbums = on),
+      body: Listener(
+        onPointerDown: (event) => _touchDown = event.position,
+        onPointerUp: (event) {
+          final down = _touchDown;
+          _touchDown = null;
+          if (down != null && (event.position - down).distance < kTouchSlop) {
+            _remember();
+          }
+        },
+        child: SongSelectionArea(
+          child: _Results(
+            query: _query.text,
+            online: _online,
+            onSearchOnline: _searchOnline,
+            onlyFullAlbums: _onlyFullAlbums,
+            onOnlyFullAlbums: (on) => setState(() => _onlyFullAlbums = on),
+            onRecent: _useRecent,
+          ),
         ),
       ),
     );
@@ -205,10 +241,12 @@ class _QueueResultsButton extends StatelessWidget {
   const _QueueResultsButton({
     required this.query,
     required this.onlyFullAlbums,
+    required this.onQueued,
   });
 
   final String query;
   final bool onlyFullAlbums;
+  final VoidCallback onQueued;
 
   @override
   Widget build(BuildContext context) {
@@ -234,6 +272,7 @@ class _QueueResultsButton extends StatelessWidget {
             );
           return;
         }
+        onQueued();
         final queue = PlaybackQueueScope.of(context);
         runQueueAction(
           context,
@@ -275,6 +314,7 @@ class _Results extends StatelessWidget {
     required this.onSearchOnline,
     required this.onlyFullAlbums,
     required this.onOnlyFullAlbums,
+    required this.onRecent,
   });
 
   final String query;
@@ -282,6 +322,9 @@ class _Results extends StatelessWidget {
   final VoidCallback onSearchOnline;
   final bool onlyFullAlbums;
   final ValueChanged<bool> onOnlyFullAlbums;
+
+  /// A query from the history tapped: it goes into the field.
+  final ValueChanged<String> onRecent;
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +373,10 @@ class _Results extends StatelessWidget {
     }
 
     if (query.trim().isEmpty) {
+      if (SearchHistoryScope.maybeOf(context) case final history?
+          when history.queries.isNotEmpty) {
+        return _RecentSearches(history: history, onTap: onRecent);
+      }
       final total = (mainReady ? catalog.songCount : 0) + library.pendingCount;
       return _Message(
         icon: Icons.search,
@@ -563,6 +610,65 @@ class _OnlineSection extends StatelessWidget {
       else
         ...found(value),
     ];
+  }
+}
+
+/// The last queries under the empty field: a tap searches again, ✕ or a drag to the left
+/// forgets one, the button at the end all of them.
+class _RecentSearches extends StatelessWidget {
+  const _RecentSearches({required this.history, required this.onTap});
+
+  final SearchHistory history;
+  final ValueChanged<String> onTap;
+
+  void _forget(Future<void> Function() change) => change().catchError(
+    (Object e) => debugPrint('Saving the search history failed: $e'),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return ListView(
+      children: [
+        _SectionLabel(l10n.songSearchScreenRecentSearches),
+        for (final query in history.queries)
+          SwipeActions(
+            key: ValueKey(query),
+            left: removeSwipe(
+              context,
+              l10n.songSearchScreenRemoveRecent,
+              () => _forget(() => history.remove(query)),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.only(left: 16, right: 4),
+              leading: Icon(Icons.history, color: palette.textSecondary),
+              title: ScrollingText(query),
+              trailing: IconButton(
+                tooltip: l10n.songSearchScreenRemoveRecent,
+                icon: Icon(Icons.close, color: palette.textSecondary),
+                onPressed: () => _forget(() => history.remove(query)),
+              ),
+              onTap: () => onTap(query),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: palette.textPrimary,
+                shape: palette.pillShape,
+                side: BorderSide(
+                  color: palette.outline ?? palette.textSecondary,
+                ),
+              ),
+              onPressed: () => _forget(history.clear),
+              child: Text(l10n.songSearchScreenClearRecent),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
