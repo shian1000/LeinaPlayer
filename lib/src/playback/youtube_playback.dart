@@ -20,6 +20,10 @@ enum YouTubePlayedVia {
 
   /// Handed to the YouTube app (or the browser): playing outside this app.
   youtubeApp,
+
+  /// Handed to the YouTube app after a streaming method met YouTube's age check, which only a
+  /// signed-in app can pass.
+  youtubeAppAgeRestricted,
 }
 
 /// Why no switched-on method could play a video; [message] is shown to the user as is.
@@ -106,6 +110,7 @@ class YouTubePlayback {
   }) async {
     final errors = <String>[];
     var offline = false;
+    var ageRestricted = false;
     var connecting = false;
     void connect() {
       if (connecting) return;
@@ -133,7 +138,9 @@ class YouTubePlayback {
           if (await _openExternal(externalUri ?? youTubeWatchUri(videoId))) {
             // The video plays elsewhere now; don't play something else on top of it.
             if (player.playing) await player.togglePlay();
-            return YouTubePlayedVia.youtubeApp;
+            return ageRestricted
+                ? YouTubePlayedVia.youtubeAppAgeRestricted
+                : YouTubePlayedVia.youtubeApp;
           }
           errors.add(l10n.youtubePlaybackAppFailed);
         case YouTubePlaybackMethod.newPipe ||
@@ -178,6 +185,7 @@ class YouTubePlayback {
               }
               errors.add(e.message);
               offline |= e.offline;
+              ageRestricted |= e.ageRestricted;
               break;
             }
           }

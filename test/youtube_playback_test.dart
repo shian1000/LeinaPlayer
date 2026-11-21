@@ -162,6 +162,31 @@ void main() {
     expect(connecting, 1);
   });
 
+  test(
+    'an age-restricted video opens in the YouTube app, saying why',
+    () async {
+      final playback = YouTubePlayback(
+        audio: YouTubeAudio(
+          newPipeAvailable: true,
+          newPipe: (id) async =>
+              throw PlatformException(code: 'AgeRestrictedContentException'),
+        ),
+        library: library,
+        settings: settings,
+        player: player,
+        openExternal: (uri) async {
+          opened.add(uri);
+          return true;
+        },
+      );
+      expect(
+        await playback.play('v', track),
+        YouTubePlayedVia.youtubeAppAgeRestricted,
+      );
+      expect(opened, [Uri.parse('https://www.youtube.com/watch?v=v')]);
+    },
+  );
+
   test('nothing switched on that works: the reasons are listed', () async {
     newPipeFails = true;
     await settings.setPlaybackMethod(YouTubePlaybackMethod.youtubeApp, false);

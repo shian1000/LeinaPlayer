@@ -74,6 +74,12 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 - YouTube regularly answers 403 for one video's stream address for a while (seen often, also
   after many requests for the same video from one IP) while a freshly resolved address works:
   `YouTubePlayback` resolves and tries once more before giving up. Test with varied videos.
+- Age-restricted videos (NewPipe's `AgeRestrictedContentException`, `isAgeRestricted`) can't
+  be streamed without a signed-in Google account, and NewPipe has no login: yt-dlp with every
+  player client (embedded, TV, iOS, VR, creator…) got the same "Sign in to confirm your age"
+  (2026-11, Russell Nash - Tuono). They fall to the next method, the YouTube app, and its note
+  says why (`YouTubePlayedVia.youtubeAppAgeRestricted`) — user's decision to keep it so; such a
+  song plays in the app only from a file (the server's library or the phone).
 
 ## What the phone remembers (`youtube_library.dart`, tables in `local.db` v2, v6, v7)
 

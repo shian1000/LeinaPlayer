@@ -43,6 +43,7 @@ class YouTubeAudioException implements Exception {
     this.message, {
     this.offline = false,
     this.gone = false,
+    this.ageRestricted = false,
   });
 
   final String message;
@@ -52,6 +53,9 @@ class YouTubeAudioException implements Exception {
 
   /// YouTube says the video isn't there any more ([isVideoGone]).
   final bool gone;
+
+  /// YouTube plays the video only to a signed-in adult ([isAgeRestricted]).
+  final bool ageRestricted;
 
   @override
   String toString() => message;
@@ -68,6 +72,11 @@ bool isVideoGone(Object error) => switch (error) {
   }.contains(code),
   _ => '$error'.contains('VideoUnavailableException'),
 };
+
+/// Whether [error] is YouTube asking to sign in to confirm the viewer's age, which no method
+/// here can do. NewPipe errors arrive by Java class name (`NewPipeBridge.kt`).
+bool isAgeRestricted(Object error) =>
+    error is PlatformException && error.code == 'AgeRestrictedContentException';
 
 typedef AudioStreamsFn = Future<List<YouTubeAudioStream>> Function(
   String videoId,
@@ -155,6 +164,7 @@ class YouTubeAudio {
             : '$name: ${e is PlatformException ? e.code : l10n.youtubeAudioError}',
         offline: isNetworkError(e),
         gone: isVideoGone(e),
+        ageRestricted: isAgeRestricted(e),
       );
     }
   }

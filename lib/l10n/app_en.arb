@@ -1333,6 +1333,7 @@
   "trackPlayerNoConfidentMatch": "Couldn’t find a confident match for this song on YouTube.",
   "trackPlayerConnectingYouTube": "Connecting to YouTube…",
   "trackPlayerOpenedInYouTubeApp": "Opened in the YouTube app.",
+  "trackPlayerOpenedInYouTubeAppAgeRestricted": "Opened in the YouTube app: the video is age-restricted, and YouTube plays it only when signed in.",
   "trackPlayerFromYouTube": "From YouTube: “{title}” ({channel})",
   "updateDialogTitle": "New version {version} available",
   "updateDialogWhatsNew": "What’s new",

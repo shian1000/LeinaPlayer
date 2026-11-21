@@ -804,8 +804,14 @@ class TrackPlayer {
         allowExternal: allowExternal,
         externalUri: externalUri,
       );
-      if (via == YouTubePlayedVia.youtubeApp) {
-        return PlayOutcome.external(l10n.trackPlayerOpenedInYouTubeApp);
+      switch (via) {
+        case YouTubePlayedVia.youtubeApp:
+          return PlayOutcome.external(l10n.trackPlayerOpenedInYouTubeApp);
+        case YouTubePlayedVia.youtubeAppAgeRestricted:
+          return PlayOutcome.external(
+            l10n.trackPlayerOpenedInYouTubeAppAgeRestricted,
+          );
+        case YouTubePlayedVia.cache || YouTubePlayedVia.stream:
       }
       // The phone picked this video itself, so say which one it is.
       return PlayOutcome.played(

@@ -4550,6 +4550,7 @@
   "trackPlayerNoConfidentMatch": "Nie znaleziono na YouTube pewnego dopasowania tego utworu.",
   "trackPlayerConnectingYouTube": "Łączę z YouTube…",
   "trackPlayerOpenedInYouTubeApp": "Otwarto w aplikacji YouTube.",
+  "trackPlayerOpenedInYouTubeAppAgeRestricted": "Otwarto w aplikacji YouTube, bo film ma ograniczenie wiekowe — YouTube odtwarza go tylko po zalogowaniu.",
   "trackPlayerFromYouTube": "Z YouTube: „{title}” ({channel})",
   "@trackPlayerFromYouTube": {
     "placeholders": {
