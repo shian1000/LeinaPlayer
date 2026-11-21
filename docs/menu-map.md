@@ -141,6 +141,12 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     the other fields the phone uses the new link at once (see `youtube.md`). Once music.db has
     `songs.kind`, "To jest cały album" is a switch instead of a pencil: a `kind` correction of
     `full_album` or empty (hand-off [`musicdatabase-song-kind.md`](handoffs/musicdatabase-song-kind.md)).
+    Once music.db has `songs.covered_artist_id`, "Cover utworu wykonawcy" (whose song this is a
+    cover of, "—" when none) has a pencil too: "Czyj to cover?" sends a `covered_artist_id`
+    correction with the typed name, empty = not a cover of an artist, the song's own artist
+    refused (MusicDatabase can't store it); "Tytuł oryginału"
+    (`covered_title`) is an ordinary text field (hand-off
+    [`musicdatabase-cover-songs.md`](handoffs/musicdatabase-cover-songs.md)).
     A version of another song (music.db's `songs.version_kind`) shows "Wersja" (its kind and
     `version_label`; not editable — MusicDatabase marks versions itself) and, when music.db has
     its original or other versions (`version_of`), a section **Inne wersje**: the original and

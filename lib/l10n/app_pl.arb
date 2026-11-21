@@ -2289,6 +2289,14 @@
       }
     }
   },
+  "outboxContentsScreenCoveredArtist": "Cover utworu wykonawcy: {artist}",
+  "@outboxContentsScreenCoveredArtist": {
+    "placeholders": {
+      "artist": {
+        "type": "String"
+      }
+    }
+  },
   "outboxContentsScreenFieldOf": "{field} ({owner})",
   "@outboxContentsScreenFieldOf": {
     "placeholders": {
@@ -3758,6 +3766,9 @@
   "@songInfoCoverOf": {
     "description": "Label: the artist whose song this one is a cover of"
   },
+  "songInfoCoverOfTitle": "Czyj to cover?",
+  "songInfoCoverOfHint": "Wykonawca oryginału. Puste: to nie jest cover.",
+  "songInfoCoverOfOwnArtist": "To wykonawca tego utworu — cover musi być utworem innego wykonawcy.",
   "songInfoVersion": "Wersja",
   "songInfoFormerId": "Dawne ID",
   "songInfoFormerIdUntil": "{id} (do {date})",

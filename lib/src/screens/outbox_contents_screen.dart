@@ -246,9 +246,11 @@ class _CorrectionTile extends StatelessWidget {
     return ListTile(
       leading: const Icon(Icons.edit_outlined),
       title: ScrollingText(
-        // old_value is an artists.id there; the song's artist is in the subtitle.
+        // old_value is an artists.id in both; the song's artist is in the subtitle.
         c.table == 'songs' && c.column == 'artist_id'
             ? l10n.outboxContentsScreenOtherArtist(shown(c.newValue))
+            : c.table == 'songs' && c.column == 'covered_artist_id'
+            ? l10n.outboxContentsScreenCoveredArtist(shown(c.newValue))
             : l10n.outboxContentsScreenCorrection(
                 where == null
                     ? fieldLabel(c.table, c.column)

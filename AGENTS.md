@@ -107,9 +107,10 @@ Full albums — music.db rows that are a whole album in one recording (`songs.ki
 Odkrywaj and Przeglądaj's lists, are looked for on YouTube only as long "full album" videos,
 and are marked from Informacje o utworze ([hand-off](docs/handoffs/musicdatabase-song-kind.md)).
 Covers (`songs.covered_artist_id` or `covered_title`, `CatalogSong.coverOf`; MusicDatabase's
-`cover-songs-for-musicdatabaseapp.md`) are shown "Title (Covered cover)" and looked for on YouTube
-with the credit; `cover_credit.dart` adds it for display, never to `songs.title`, and a video
-title's credit only matches a row marked as a cover — a fan's "Radiohead - Creep (cover)" isn't
+`cover-songs-for-musicdatabaseapp.md`) are shown "Title (Covered cover)", looked for on YouTube
+with the credit and marked from Informacje o utworze
+([hand-off](docs/handoffs/musicdatabase-cover-songs.md)); `cover_credit.dart` adds the credit for
+display, never to `songs.title`, and a video title's credit only matches a row marked as a cover — a fan's "Radiohead - Creep (cover)" isn't
 Radiohead's own song.
 Versions — live, remix, acoustic… as rows of their own (`songs.version_kind` / `version_label` /
 `version_of`, `CatalogSong.version`; MusicDatabase's ADR-0007 and

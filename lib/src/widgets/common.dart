@@ -282,12 +282,16 @@ class TextInputDialog extends StatefulWidget {
     required this.hint,
     required this.initial,
     this.number = false,
+    this.helper,
   });
 
   final String title;
   final String hint;
   final String initial;
   final bool number;
+
+  /// A line under the field, for what doesn't fit in [hint].
+  final String? helper;
 
   @override
   State<TextInputDialog> createState() => _TextInputDialogState();
@@ -317,6 +321,8 @@ class _TextInputDialogState extends State<TextInputDialog> {
             : null,
         decoration: InputDecoration(
           hintText: widget.hint,
+          helperText: widget.helper,
+          helperMaxLines: 3,
           border: const OutlineInputBorder(),
         ),
         onSubmitted: (text) => Navigator.of(context).pop(text),

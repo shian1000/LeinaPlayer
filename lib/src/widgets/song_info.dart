@@ -187,7 +187,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
           _songKindField(song)
         else if (!shownElsewhere.contains(key))
           _editableField('songs', song, key, _songLabels[key] ?? key),
-      _Field(l10n.songInfoCoverOf, details.coveredArtist),
+      _coveredArtistField(details),
       if (widget.hit.version case final version?)
         _Field(
           l10n.songInfoVersion,
@@ -204,6 +204,94 @@ class _SongInfoCardState extends State<SongInfoCard> {
                 ),
         ),
     ]);
+  }
+
+  /// `songs.covered_artist_id`: whose song this one is a cover of. Corrected like the song's own
+  /// artist, with a name — empty when it's no cover of an artist; MusicDatabase finds the artist
+  /// or makes one (hand-off `musicdatabase-cover-songs.md`). A traditional song with no artist to
+  /// name has only `covered_title`, a field of its own.
+  Widget _coveredArtistField(SongDetails details) {
+    final song = details.song;
+    final outbox = OutboxScope.maybeOf(context);
+    final catalogSong = widget.hit.mainSong;
+    final songId = song['id'];
+    final stored = song['covered_artist_id'];
+    final name = details.coveredArtist;
+    if (outbox == null ||
+        catalogSong == null ||
+        songId is! int ||
+        !song.containsKey('covered_artist_id')) {
+      return _Field(l10n.songInfoCoverOf, name);
+    }
+    final correction = outbox.correctionOf(
+      'songs',
+      songId,
+      'covered_artist_id',
+      stored,
+    );
+    final shown = correction == null ? name : _text(correction.newValue);
+    return _Field(
+      l10n.songInfoCoverOf,
+      name ?? '—',
+      correction: correction == null
+          ? null
+          : _correctionNote(correction, shown ?? l10n.songInfoEmptyValue),
+      onEdit: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        final text = await showDialog<String>(
+          context: context,
+          builder: (_) => TextInputDialog(
+            title: l10n.songInfoCoverOfTitle,
+            hint: l10n.songInfoArtistName,
+            helper: l10n.songInfoCoverOfHint,
+            initial: shown ?? '',
+          ),
+        );
+        if (text == null || !mounted) return;
+        final typed = text.trim();
+        // The covered artist typed differently is the same artist: taken back.
+        final value = typed.isEmpty
+            ? null
+            : name != null && _sameArtistName(typed, name)
+            ? name
+            : typed;
+        if (value == null
+            ? shown == null
+            : shown != null && _sameArtistName(value, shown)) {
+          return;
+        }
+        // MusicDatabase can't store the song's own artist as the covered one.
+        if (value != null &&
+            details.artists.any(
+              (a) =>
+                  a.artist['id'] == song['artist_id'] &&
+                  _sameArtistName(a.artist['name'], value),
+            )) {
+          messenger.showSnackBar(
+            SnackBar(content: Text(l10n.songInfoCoverOfOwnArtist)),
+          );
+          return;
+        }
+        await outbox.correctField(
+          table: 'songs',
+          rowId: songId,
+          column: 'covered_artist_id',
+          oldValue: stored,
+          newValue: value,
+          oldAsValue: name,
+          song: catalogSong,
+        );
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              _sameValue(value, name)
+                  ? l10n.songInfoCorrectionWithdrawn
+                  : l10n.songInfoCorrectionQueued,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// "Inne wersje": the original and its versions (`songs.version_of`), as song rows to play.
@@ -1084,6 +1172,7 @@ const _editable = {
     'track_number': _Kind.number,
     'disc_number': _Kind.number,
     'title_latin': _Kind.text,
+    'covered_title': _Kind.text,
   },
   'artists': {
     'name': _Kind.required,
@@ -1108,6 +1197,7 @@ String? _text(Object? value) => switch (value) {
 Map<String, String> get _songLabels => {
   'id': l10n.songInfoLabelMusicDatabaseId,
   'artist_id': l10n.songInfoLabelSongArtist,
+  'covered_artist_id': l10n.songInfoCoverOf,
   'title': l10n.songInfoLabelTitle,
   'title_latin': l10n.songInfoLabelTitleLatin,
   'covered_title': l10n.songInfoLabelCoveredTitle,

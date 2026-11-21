@@ -581,6 +581,137 @@ void main() {
     await tester.runAsync(() => root.delete(recursive: true));
   });
 
+  testWidgets('"Cover utworu wykonawcy": a songs.covered_artist_id correction '
+      'with the name, emptied it says the song is no cover', (tester) async {
+    databaseFactory = databaseFactoryFfi;
+    SharedPreferences.setMockInitialValues({});
+    late Directory root;
+    late DatabaseSync sync;
+    late Outbox outbox;
+    await tester.runAsync(() async {
+      root = await Directory.systemTemp.createTemp('song_info_test');
+      sync = DatabaseSync(storageRoot: () async => root);
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute(
+        'ALTER TABLE songs ADD COLUMN covered_artist_id INTEGER',
+      );
+      await db.execute('ALTER TABLE songs ADD COLUMN covered_title TEXT');
+      await db.rawUpdate('UPDATE songs SET covered_artist_id = 1 WHERE id = 5');
+      await db.close();
+      outbox = Outbox(
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
+    });
+
+    Future<void> setCover(String name) async {
+      final row = find.ancestor(
+        of: find.text('Cover utworu wykonawcy'),
+        matching: find.byType(Row),
+      );
+      await tester.tap(
+        find.descendant(
+          of: row.first,
+          matching: find.byIcon(Icons.edit_outlined),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Czyj to cover?'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), name);
+      await tester.tap(find.text('Zapisz'));
+    }
+
+    // Not a cover yet: marked as a cover of Led Zeppelin.
+    await tester.pumpWidget(
+      app(
+        SongInfoCard(
+          hit: SearchHit.main(
+            CatalogSong(id: 3, title: 'Pay Your Respect', artistLabel: 'Afina'),
+            const [],
+          ),
+        ),
+        sync: sync,
+        outbox: outbox,
+      ),
+    );
+    await pumpUntil(
+      tester,
+      () => find.text('Cover utworu wykonawcy').evaluate().isNotEmpty,
+    );
+    expect(find.text('Tytuł oryginału'), findsOneWidget);
+    await setCover('afina');
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'To wykonawca tego utworu — cover musi być utworem innego wykonawcy.',
+      ),
+      findsOneWidget,
+    );
+    expect(await tester.runAsync(outbox.pending), isEmpty);
+    await setCover('Led Zeppelin');
+    await pumpUntil(
+      tester,
+      () => find
+          .text('Poprawka czeka na wysłanie: Led Zeppelin')
+          .evaluate()
+          .isNotEmpty,
+    );
+    var corrections = await tester.runAsync(
+      () async => outbox.waitingCorrections,
+    );
+    expect(corrections!.single.rowId, 3);
+    expect(corrections.single.column, 'covered_artist_id');
+    expect(corrections.single.oldValue, isNull);
+    expect(corrections.single.newValue, 'Led Zeppelin');
+
+    // A cover of Dawid Podsiadło: emptied, it's no cover; the same name again takes it back.
+    await tester.pumpWidget(
+      app(
+        SongInfoCard(
+          hit: SearchHit.main(
+            CatalogSong(
+              id: 5,
+              title: 'California Dreaming',
+              artistLabel: 'Led Zeppelin',
+            ),
+            const [],
+          ),
+        ),
+        sync: sync,
+        outbox: outbox,
+      ),
+    );
+    await pumpUntil(
+      tester,
+      () => find.text('Dawid Podsiadło').evaluate().isNotEmpty,
+    );
+    await setCover('');
+    await pumpUntil(
+      tester,
+      () => find
+          .text('Poprawka czeka na wysłanie: (puste)')
+          .evaluate()
+          .isNotEmpty,
+    );
+    corrections = await tester.runAsync(() async => outbox.waitingCorrections);
+    final notACover = corrections!.singleWhere((c) => c.rowId == 5);
+    expect(notACover.oldValue, 1);
+    expect(notACover.newValue, isNull);
+
+    await setCover('dawid podsiadlo');
+    await pumpUntil(
+      tester,
+      () => find.textContaining('(puste)').evaluate().isEmpty,
+    );
+    corrections = await tester.runAsync(() async => outbox.waitingCorrections);
+    expect(corrections!.map((c) => c.rowId), [3]);
+
+    sync.dispose();
+    await tester.runAsync(() => root.delete(recursive: true));
+  });
+
   testWidgets('no Latin form fields for names in Latin letters', (
     tester,
   ) async {
