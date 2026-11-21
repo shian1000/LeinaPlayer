@@ -125,6 +125,11 @@ writing: a single terse subject line, English, clauses joined by `" - "` (e.g. `
 run-on-physical-phone`), no body, no Conventional Commits prefix, no trailer. Follow the user's own
 recent commits if they visibly drift from that.
 
+One language throughout (user's rule, since the UI got its English version): name screens,
+settings and texts by their English labels from `lib/l10n/app_en.arb` (Settings › Appearance ›
+Language, "Opened in the YouTube app"), never the Polish ones — older commits quoting Polish
+labels predate the rule.
+
 Keep it under 400 characters. If everything won't fit, lead with the most significant behavioral
 change and drop the rest — don't compress into cryptic abbreviations.
 
