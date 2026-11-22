@@ -39,6 +39,18 @@ void main() {
     expect(fromVideo.youtubeVideoId, 'v1');
     expect(fromVideo.artist, 'Elise Trouw');
 
+    // A playlist video's length goes with it, so MusicDatabase sees a long mix for what it is.
+    final mix = SongRequest.of(
+      SearchHit.youTubeOnly(
+        title: 'After Dark',
+        artistLabel: 'Songs that actually match the vibe of Mr. Kitty',
+        videoId: 'bHU-MASMBjM',
+        duration: const Duration(seconds: 1939),
+      ),
+    )!;
+    expect(mix.duration, const Duration(seconds: 1939));
+    expect(fromVideo.duration, isNull);
+
     final fromSpotify = SongRequest.of(
       SearchHit.youTubeOnly(
         title: 'Unseen',
@@ -92,6 +104,30 @@ void main() {
     );
   });
 
+  test('the video length is written as duration_s and read back', () async {
+    final outbox = newOutbox();
+    await outbox.requestSong(
+      SongRequest.of(
+        SearchHit.youTubeOnly(
+          title: 'Mix',
+          artistLabel: 'cinemArt',
+          videoId: 'm1',
+          duration: const Duration(minutes: 32, seconds: 19),
+        ),
+      )!,
+    );
+    final [file] = await outbox.pending();
+    final db = await databaseFactoryFfi.openDatabase(file.path);
+    try {
+      final [row] = await db.query('song_requests');
+      expect(row['duration_s'], 1939);
+    } finally {
+      await db.close();
+    }
+    final [waiting] = await outbox.waitingSongRequests();
+    expect(waiting.duration, const Duration(seconds: 1939));
+  });
+
   test('a song is asked for once, by name or by its video', () async {
     final outbox = newOutbox();
 
@@ -127,6 +163,7 @@ void main() {
     try {
       final rows = await db.query('song_requests', orderBy: 'rowid');
       expect([for (final r in rows) r['title']], ['Unseen', 'Chromatic']);
+      expect(rows.first['duration_s'], isNull);
       expect(rows.first['source'], 'youtube');
       expect(rows.first['requested_at'], startsWith('2026-10-18T09:30:00'));
     } finally {

@@ -38,6 +38,7 @@ String? extractPlaylistId(String raw) {
 /// channel name. "Title - Lyric Video (English / French)" — junk only after the separator — is
 /// the left part by the channel. Real version markers (Remix, Live, feat., …) are kept, with the
 /// rest of their bracket: "(Live @ Odra, Wrocław / ZORZA 2025)" isn't junk for its year.
+/// An event's "`<event 2018> | <artist> | <song> | <channel>`" reads as that artist and song.
 /// "Artist- Title", the dash glued to the artist, splits too, and a title in quotes
 /// (`''Aniolek''`, „…”) loses them.
 ({String artist, String title}) parseYouTubeTrack(
@@ -51,7 +52,8 @@ String? extractPlaylistId(String raw) {
 /// Other readings of a video whose artist [parseYouTubeTrack] could only take from the channel,
 /// for when its reading names no song — a lite part of MusicDatabase's title parsing (ADR 0003):
 /// the title starting with a whole artist name ("renata przemyk bo jesli tak ma byc" by
-/// "thericeburner" is "bo jesli tak ma byc" by Renata Przemyk), longest name first, and an
+/// "thericeburner" is "bo jesli tak ma byc" by Renata Przemyk), longest name first, also past a
+/// second artist joined to it ("Łona i Webber Wyślij sobie pocztówkę" by a label), and an
 /// artist in the trailing bracket ("Wonderful Life (Smith & Burrows)" by "Peaky Blinders").
 /// [artistNamed] says which artist goes by a name (`SongCatalog.artistNamed`): only a name
 /// music.db knows counts, so a title's first words aren't taken for an artist otherwise.
@@ -66,7 +68,17 @@ List<({String artist, String title})> channelVideoReadings(
   final words = read.title.split(' ');
   for (var i = words.length - 1; i > 0; i--) {
     if (artistNamed(words.take(i).join(' ')) case final artist?) {
-      readings.add((artist: artist, title: words.skip(i).join(' ')));
+      final rest = words.skip(i).toList();
+      // "Łona i Webber Wyślij sobie pocztówkę": a second artist joined to the first one.
+      if (rest.length > 2 && _artistJoiner.hasMatch(rest.first)) {
+        for (var j = rest.length - 1; j > 1; j--) {
+          if (artistNamed(rest.sublist(1, j).join(' ')) != null) {
+            readings.add((artist: artist, title: rest.skip(j).join(' ')));
+            break;
+          }
+        }
+      }
+      readings.add((artist: artist, title: rest.join(' ')));
     }
   }
   final bracket = _trailingBracket.firstMatch(read.title);
@@ -85,7 +97,11 @@ List<({String artist, String title})> channelVideoReadings(
   String videoTitle,
   String channel,
 ) {
-  var title = videoTitle.replaceAll(_pipeSuffix, '');
+  var title = videoTitle;
+  if (_splitEventPipes(title, channel) case (final artist, final song)) {
+    title = '$artist - $song';
+  }
+  title = title.replaceAll(_pipeSuffix, '');
   title = title.replaceAllMapped(
     _anyBracket,
     (m) =>
@@ -132,6 +148,34 @@ List<({String artist, String title})> channelVideoReadings(
 }
 
 final _pipeSuffix = RegExp(r'\s+\|.*$');
+final _pipe = RegExp(r'\s+\|\s+');
+final _year = RegExp(r'\b(?:19|20)\d{2}\b');
+
+/// A word joining two artists' names at a title's start ([channelVideoReadings]).
+final _artistJoiner = RegExp(r'^(?:i|x|&|\+|and|oraz|feat\.?|ft\.?)$', caseSensitive: false);
+
+/// Artist and song of an event's video, "`<event with its year> | <artist> | <song>`", the last
+/// part the channel's own name ("FRYDERYKI 2018 | Daria Zawiałow & Krzysztof Zalewski |
+/// Malinowy chruśniak + Polsko | Gala Fryderyk"), where [_pipeSuffix] alone would leave only the
+/// event. `null` for any other title: with a " - ", or not exactly those three parts. MusicDatabase's
+/// `split_event_pipes()` (`src/utils/common/sanitize/text.py`) reads it the same way, but with no
+/// channel to compare it drops any fourth part.
+(String, String)? _splitEventPipes(String title, String channel) {
+  if (_splitSpaced(title) != null) return null;
+  final parts = title.split(_pipe).map((p) => p.trim()).toList();
+  final name = normalizeForSearch(_cleanChannel(channel)).replaceAll(' ', '');
+  if (parts.length == 4 &&
+      name.isNotEmpty &&
+      normalizeForSearch(parts.last).replaceAll(' ', '') == name) {
+    parts.removeLast();
+  }
+  if (parts.length != 3 ||
+      parts.any((p) => p.isEmpty) ||
+      !_year.hasMatch(parts.first)) {
+    return null;
+  }
+  return (parts[1], parts[2]);
+}
 final _hashtag = RegExp(r'#\S+');
 final _spaces = RegExp(r'\s+');
 final _anyBracket = RegExp(r'[\(\[【]([^()\[\]【】]*)[\)\]】]');

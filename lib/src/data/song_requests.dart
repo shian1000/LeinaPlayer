@@ -16,6 +16,7 @@ class SongRequest {
     this.year,
     this.youtubeVideoId,
     this.spotifyTrackId,
+    this.duration,
   });
 
   /// What [hit] would be asked as; `null` for a song music.db has, or one with no title.
@@ -45,6 +46,7 @@ class SongRequest {
       year: hit.year,
       youtubeVideoId: file != null ? null : videoId,
       spotifyTrackId: hit.spotifyTrackId,
+      duration: hit.duration,
     );
   }
 
@@ -60,6 +62,9 @@ class SongRequest {
   final int? year;
   final String? youtubeVideoId;
   final String? spotifyTrackId;
+
+  /// The video's length, when the phone knows it (`duration_s`).
+  final Duration? duration;
 
   /// Same song: same artist and title, as search compares them.
   String get key => songRequestKey(artist, title);

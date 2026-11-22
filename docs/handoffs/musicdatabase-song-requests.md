@@ -21,7 +21,7 @@ CREATE TABLE song_requests (
   artist TEXT,                  -- as the phone shows it, or music.db's name when that is one of an artist's synonyms (a channel: "familyboombox" -> "Бумбокс"); NULL = it knows none
   album TEXT,                   -- a phone file's tags
   year INTEGER,
-  duration_s INTEGER,           -- not filled yet (NULL)
+  duration_s INTEGER,           -- a playlist video's length when the phone knows it (since 2026-11-21), else NULL
   youtube_video_id TEXT,        -- the playlist's / shared video, or the phone's match
   spotify_track_id TEXT,        -- the Spotify playlist's track
   source TEXT NOT NULL,         -- 'youtube' | 'spotify' | 'phone_file'

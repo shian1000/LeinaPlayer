@@ -34,6 +34,7 @@ class SearchHit {
     this.notFoundOnYouTube = false,
   }) : mainSong = song,
        mainVideoRemoved = false,
+       duration = null,
        title = song.title,
        artistLabel = song.artistLabel,
        album = song.album,
@@ -48,6 +49,7 @@ class SearchHit {
     this.playlistVideoId,
     this.spotifyTrackId,
     this.notFoundOnYouTube = false,
+    this.duration,
   }) : mainSong = null,
        mainVideoRemoved = false,
        phoneFiles = const [],
@@ -62,6 +64,7 @@ class SearchHit {
       playlistVideoId = null,
       spotifyTrackId = null,
       notFoundOnYouTube = false,
+      duration = null,
       phoneFiles = [file],
       title = file.title,
       artistLabel = file.artist ?? 'Nieznany wykonawca',
@@ -97,6 +100,10 @@ class SearchHit {
   final String? album;
   final int? year;
 
+  /// The playlist's video length, for a track music.db doesn't have (sent with its song request,
+  /// so MusicDatabase sees a 30-minute mix for what it is); `null` when not known.
+  final Duration? duration;
+
   bool get inMainDatabase => mainSong != null;
 
   /// A whole album in one recording (music.db's `songs.kind`).
@@ -130,7 +137,8 @@ class SearchHit {
        title = hit.title,
        artistLabel = hit.artistLabel,
        album = hit.album,
-       year = hit.year;
+       year = hit.year,
+       duration = hit.duration;
 
   /// The same song, marked as searched on YouTube without result (or, with `false`, not).
   SearchHit withNotFoundOnYouTube([bool notFound = true]) =>
@@ -435,6 +443,7 @@ SearchHit playlistHit(
       videoId: videoId,
       playlistVideoId: videoId,
       spotifyTrackId: track.spotifyTrackId,
+      duration: track.duration,
     ),
     youTube,
   );

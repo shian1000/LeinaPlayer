@@ -51,6 +51,33 @@ void main() {
     ({String artist, String title}) p(String title, String channel) =>
         parseYouTubeTrack(title, channel);
 
+    test('an event\'s "<event year> | <artist> | <song> | <channel>"', () {
+      expect(
+        p(
+          'FRYDERYKI 2018 | Daria Zawiałow & Krzysztof Zalewski | '
+              'Malinowy chruśniak + Polsko | Gala Fryderyk',
+          'Gala Fryderyk',
+        ),
+        (
+          artist: 'Daria Zawiałow & Krzysztof Zalewski',
+          title: 'Malinowy chruśniak + Polsko',
+        ),
+      );
+      expect(p('Opole 2017 | Kayah | Testosteron', 'TVP'), (
+        artist: 'Kayah',
+        title: 'Testosteron',
+      ));
+      // No year in the first part, or not three parts: still a "| suffix".
+      expect(p('Testosteron | Kayah | TVP Rozrywka', 'x'), (
+        artist: 'x',
+        title: 'Testosteron',
+      ));
+      expect(p('Live 2018 | Kayah | Testosteron | Opole', 'TVP'), (
+        artist: 'TVP',
+        title: 'Live 2018',
+      ));
+    });
+
     test('"Artist - Title" with junk brackets, hashtags and a pipe suffix', () {
       expect(
         p(
@@ -172,6 +199,8 @@ void main() {
       'renata przemyk': 'Renata Przemyk',
       'smith burrows': 'Smith & Burrows',
       'renata': 'Renata',
+      'lona': 'Łona',
+      'webber': 'Webber',
     }[normalizeForSearch(name)];
 
     test('the title starting with an artist music.db knows, longest first', () {
@@ -193,6 +222,25 @@ void main() {
       expect(channelVideoReadings('Renata Przemyk', 'x', artistNamed), [
         (artist: 'Renata', title: 'Przemyk'),
       ]);
+    });
+
+    test('past a second artist joined to the first', () {
+      expect(
+        channelVideoReadings(
+          'Łona i Webber Wyślij sobie pocztówkę',
+          'Dobrzewiesz Nagrania',
+          artistNamed,
+        ),
+        [
+          (artist: 'Łona', title: 'Wyślij sobie pocztówkę'),
+          (artist: 'Łona', title: 'i Webber Wyślij sobie pocztówkę'),
+        ],
+      );
+      // A joining word only between two names music.db knows.
+      expect(
+        channelVideoReadings('Łona i ja na rowerze', 'x', artistNamed),
+        [(artist: 'Łona', title: 'i ja na rowerze')],
+      );
     });
 
     test('the artist in a trailing bracket', () {

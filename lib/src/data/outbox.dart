@@ -217,6 +217,7 @@ class Outbox extends ChangeNotifier {
       'artist': song.artist,
       'album': song.album,
       'year': song.year,
+      'duration_s': song.duration?.inSeconds,
       'youtube_video_id': song.youtubeVideoId,
       'spotify_track_id': song.spotifyTrackId,
       'source': song.source.code,
@@ -262,6 +263,9 @@ class Outbox extends ChangeNotifier {
     year: row['year'] as int?,
     youtubeVideoId: row['youtube_video_id'] as String?,
     spotifyTrackId: row['spotify_track_id'] as String?,
+    duration: row['duration_s'] == null
+        ? null
+        : Duration(seconds: row['duration_s']! as int),
   );
 
   Future<bool> _songRequested(SongRequest song) async {
