@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
+import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.search.SearchInfo
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubePlaylistLinkHandlerFactory
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
@@ -77,7 +78,8 @@ class NewPipeBridge(val messenger: BinaryMessenger) : MethodChannel.MethodCallHa
                     result.error("bad_args", "playlistId missing", null)
                     return
                 }
-                runInBackground(result) { playlist(playlistId) }
+                val language = call.argument<String>("language")
+                runInBackground(result) { playlist(playlistId, language) }
             }
             else -> result.notImplemented()
         }
@@ -179,15 +181,23 @@ class NewPipeBridge(val messenger: BinaryMessenger) : MethodChannel.MethodCallHa
             }
     }
 
-    /** Name, owner and every video of a playlist (all pages, at most [MAX_PLAYLIST_VIDEOS]). */
-    private fun playlist(playlistId: String): Map<String, Any?> {
+    /**
+     * Name, owner and every video of a playlist (all pages, at most [MAX_PLAYLIST_VIDEOS]). With
+     * [language] YouTube is asked in that language instead of NewPipe's default (en-GB): it gives
+     * video titles translated into the language asked for when the uploader (or YouTube) has a
+     * translation, so Dart compares two languages to find them (`youtube_titles.dart`).
+     */
+    private fun playlist(playlistId: String, language: String?): Map<String, Any?> {
         val youtube = ServiceList.YouTube
         val url = "https://www.youtube.com/playlist?list=$playlistId"
-        val info = PlaylistInfo.getInfo(youtube, url)
+        val extractor = youtube.getPlaylistExtractor(url)
+        if (language != null) extractor.forceLocalization(Localization(language))
+        extractor.fetchPage()
+        val info = PlaylistInfo.getInfo(extractor)
         val items = info.relatedItems.toMutableList()
         var page = info.nextPage
         while (Page.isValid(page) && items.size < MAX_PLAYLIST_VIDEOS) {
-            val more = PlaylistInfo.getMoreItems(youtube, url, page)
+            val more = extractor.getPage(page)
             items += more.items
             page = more.nextPage
         }

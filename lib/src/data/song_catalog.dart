@@ -298,8 +298,8 @@ class CatalogSong {
   final String? albumLatin;
 
   /// `songs.other_titles` (MusicDatabase's migration 0023): the title in other languages, a
-  /// wrong title people know it by. So far only [SongCatalog.findByName]'s soundtrack-work step
-  /// counts them; empty before the column.
+  /// wrong title people know it by. [SongCatalog.findByName] counts them (with [titleLatin]) after
+  /// the song's own title; empty before the column.
   final List<String> otherTitles;
 
   /// What this song is a cover of, `null` for most songs. A covered artist is never one of
@@ -373,11 +373,16 @@ class CatalogSong {
   late final Set<String> _normalizedArtists =
       _fromMusicDb?._normalizedArtists ?? _artistTexts(_names!);
 
+  // `artists.synonyms` is comma-separated: "Tiesto, DJ TI¨STO" is two names, and only one of
+  // them matches a credit naming "Tiësto" (#1439 "Secrets").
   Set<String> _artistTexts(_SearchNames names) => {
     normalizeForSearch(artistLabel),
-    for (final name in [...names.artistNames, ...names.synonyms])
-      normalizeForSearch(name),
-  };
+    for (final name in names.artistNames) normalizeForSearch(name),
+    for (final synonyms in names.synonyms) ...[
+      normalizeForSearch(synonyms),
+      for (final synonym in synonyms.split(',')) normalizeForSearch(synonym),
+    ],
+  }..remove('');
 
   /// Normalized text of each [SearchField], indexed by `SearchField.index`.
   late final List<String> _fieldTexts =
@@ -1181,16 +1186,30 @@ class SongCatalog extends ChangeNotifier {
   /// only such a song: "Radiohead - Creep (cover)" uploaded by a fan isn't Radiohead's row.
   /// Versions are kept apart as [_titled] says: "Boję się (Live)" is only a live "Boję się".
   /// Only songs of [project] count (`null`: of no project) — [findByName] reads it from the names.
+  /// Only the song's own title counts here (a file's tags are exact); [findByName] also tries
+  /// the Latin form and other titles, after every reading of the main one.
   CatalogSong? findExact({
     required String title,
     required String artist,
     String? project,
+  }) => _exact(title, artist, project);
+
+  CatalogSong? _exact(
+    String title,
+    String artist,
+    String? project, {
+    bool everyTitle = false,
   }) {
     final normalizedArtist = normalizeForSearch(artist);
     if (normalizedArtist.isEmpty) return null;
     bool byArtist(CatalogSong s) =>
         s._normalizedArtists.contains(normalizedArtist);
-    if (_titled(title, project).where(byArtist).firstOrNull case final exact?) {
+    if (_titled(
+          title,
+          project,
+          everyTitle: everyTitle,
+        ).where(byArtist).firstOrNull
+        case final exact?) {
       return exact;
     }
     final credit = readCoverCredit(title);
@@ -1198,7 +1217,7 @@ class SongCatalog extends ChangeNotifier {
     final performer = credit.performer == null
         ? null
         : normalizeForSearch(credit.performer!);
-    return _titled(credit.title, project)
+    return _titled(credit.title, project, everyTitle: everyTitle)
         .where(
           (s) =>
               s.coverOf != null &&
@@ -1301,61 +1320,82 @@ class SongCatalog extends ChangeNotifier {
   /// marked yet, and nothing in its names tells.
   /// Last, for an artist that is a film, game or anime ([_creditedToWork]): "Nana - Kuroi
   /// Namida" is Anna Tsuchiya's song on "Nana OST".
-  /// A title ending in junk ("… ending theme", "… full song" — [stripTrailingJunkSuffix]) is
-  /// also tried without it, after the title as it is: a playlist track keeps the title it was
-  /// imported with.
+  /// A title with junk left in it ("… ending theme", "Bloom lyrics", "I Follow Rivers
+  /// (Original)", "Czarne lustra prod. White House" — [titlesToMatch]) is also tried without it,
+  /// after the title as it is: a playlist track keeps the title it was imported with.
+  /// Each of those readings is tried with the songs' own titles first, then with their Latin
+  /// forms and `songs.other_titles` too ("Shunkan Sentimental" is "瞬間センチメンタル"), so a
+  /// song whose own title says so wins over one only known by another title.
   CatalogSong? findByName({required String title, required String artist}) {
-    final cut = stripTrailingJunkSuffix(title);
-    return _byArtistName(title, artist) ??
-        (cut == title ? null : _byArtistName(cut, artist)) ??
-        _creditedToWork(title, artist) ??
-        (cut == title ? null : _creditedToWork(cut, artist));
+    final titles = titlesToMatch(title);
+    for (final everyTitle in [false, true]) {
+      for (final title in titles) {
+        if (_byArtistName(title, artist, everyTitle: everyTitle)
+            case final song?) {
+          return song;
+        }
+      }
+    }
+    for (final title in titles) {
+      if (_creditedToWork(title, artist) case final song?) return song;
+    }
+    return null;
   }
 
-  CatalogSong? _byArtistName(String title, String artist) {
+  CatalogSong? _byArtistName(
+    String title,
+    String artist, {
+    bool everyTitle = false,
+  }) {
     final reading = readProject(artist, title, _projects);
     final project = reading?.project.name;
     final pairs = reading == null
         ? [(title, artist), (artist, title)]
         : [(reading.title, reading.artist), (reading.artist, reading.title)];
+    CatalogSong? exact(String title, String artist) =>
+        _exact(title, artist, project, everyTitle: everyTitle);
     for (final (title, artist) in pairs) {
       final bareTitle = withoutFeatCredits(title);
       final bareArtist = withoutFeatCredits(artist);
       final song =
-          findExact(title: title, artist: artist, project: project) ??
-          (bareTitle == null
-              ? null
-              : findExact(
-                  title: bareTitle,
-                  artist: artist,
-                  project: project,
-                )) ??
-          (bareArtist == null
-              ? null
-              : findExact(
-                  title: bareTitle ?? title,
-                  artist: bareArtist,
-                  project: project,
-                )) ??
-          _byEveryArtist(bareTitle ?? title, bareArtist ?? artist, project);
+          exact(title, artist) ??
+          (bareTitle == null ? null : exact(bareTitle, artist)) ??
+          (bareArtist == null ? null : exact(bareTitle ?? title, bareArtist)) ??
+          _byEveryArtist(
+            bareTitle ?? title,
+            bareArtist ?? artist,
+            project,
+            everyTitle: everyTitle,
+          );
       if (song != null) return song;
     }
     return null;
   }
 
-  /// The song a YouTube video's title and channel name: [findByName] on what
+  /// The song a YouTube video's title and channel name: [findByName]'s steps on what
   /// [parseYouTubeTrack] reads, else on its other readings with an artist music.db knows
-  /// ([channelVideoReadings]). The video itself (`songs.youtube_video_id`, a match the phone
-  /// made) is looked up first, by the caller: a name never overrides a song the video names.
+  /// ([channelVideoReadings]) — own titles first, then Latin and other titles. The video itself
+  /// (`songs.youtube_video_id`, a match the phone made) is looked up first, by the caller: a
+  /// name never overrides a song the video names.
   CatalogSong? findByVideoTitle(String videoTitle, String channel) {
-    final parsed = parseYouTubeTrack(videoTitle, channel);
-    return _byArtistName(parsed.title, parsed.artist) ??
-        channelVideoReadings(
-          videoTitle,
-          channel,
-          artistNamed,
-        ).map((r) => _byArtistName(r.title, r.artist)).nonNulls.firstOrNull ??
-        _creditedToWork(parsed.title, parsed.artist);
+    final parsed = parseYouTubeTrack(
+      videoTitle,
+      channel,
+      artistNamed: artistNamed,
+    );
+    final readings = [
+      parsed,
+      ...channelVideoReadings(videoTitle, channel, artistNamed),
+    ];
+    for (final everyTitle in [false, true]) {
+      for (final r in readings) {
+        if (_byArtistName(r.title, r.artist, everyTitle: everyTitle)
+            case final song?) {
+          return song;
+        }
+      }
+    }
+    return _creditedToWork(parsed.title, parsed.artist);
   }
 
   /// For names crediting a film, game or anime instead of who sings it — a listed work, one of
@@ -1399,13 +1439,19 @@ class SongCatalog extends ChangeNotifier {
   /// separator ("Fisz Emade Tworzywo", the trio's channel, is Fisz, Emade and Tworzywo
   /// Sztuczne, "Tworzywo" by its synonym); nothing for a credit of one artist, or naming someone
   /// the song doesn't credit — "Simon & Garfunkel" stays a name of its own.
-  CatalogSong? _byEveryArtist(String title, String artist, String? project) {
+  CatalogSong? _byEveryArtist(
+    String title,
+    String artist,
+    String? project, {
+    bool everyTitle = false,
+  }) {
     final parts = artistCreditParts(artist)?.map(normalizeForSearch).toList();
     if (parts != null) {
       if (parts.any((part) => part.isEmpty)) return null;
       return _titled(
         title,
         project,
+        everyTitle: everyTitle,
       ).where((s) => parts.every(s._normalizedArtists.contains)).firstOrNull;
     }
     final words = normalizeForSearch(artist).split(' ');
@@ -1413,6 +1459,7 @@ class SongCatalog extends ChangeNotifier {
     return _titled(
       title,
       project,
+      everyTitle: everyTitle,
     ).where((s) => _namesInRow(words, s._normalizedArtists)).firstOrNull;
   }
 

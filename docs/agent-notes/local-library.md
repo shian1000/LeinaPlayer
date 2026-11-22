@@ -62,7 +62,12 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   "HD" — MusicDatabase's `TITLE_JUNK_SUFFIXES`, `stripTrailingJunkSuffix` in
   `youtube_playlist.dart`, port of `strip_trailing_junk_suffix()`; a title that is only such a
   phrase stays) is cut by `parseYouTubeTrack`, and `findByName` tries a title without it after
-  the title as it is — playlist tracks keep the title they were imported with.
+  the title as it is — playlist tracks keep the title they were imported with. It also tries
+  `titlesToMatch()`' deeper cut (junk brackets but the edits, "(Original)", "(Version II)",
+  "((Videoclip))", "prod. X", a bare trailing "lyrics" / "official" — matching only), and every
+  reading once more with the songs' `title_latin` / `other_titles` after their own titles
+  ("Shunkan Sentimental" is "瞬間センチメンタル"; `findExact` itself stays own-title only).
+  An artist synonym counts one by one from the comma-separated `artists.synonyms`.
 - Soundtrack works (music.db's `soundtrack_works`, MusicDatabase's migration 0025, hand-off
   `soundtrack-works-for-musicdatabaseapp.md`): uploads and files credit a song to the film,
   game or anime ("Nana - Kuroi Namida" is 土屋アンナ's "黒い涙" on "Nana OST"). When nothing
@@ -70,8 +75,7 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   `SoundtrackWorks` (`soundtrack_works.dart`) whether the artist is a work — a listed name or
   alias as a whole name, a work of a non-single `albums` title ending in a soundtrack word with
   two words or more ("Rio OST" doesn't make "Rio" a film), or a name ending in one — and takes
-  the one song of any artist titled so (`songs.title`, `title_latin` or `other_titles` — only
-  this step counts the latter two so far) whose album or artists' names hold the work as whole
+  the one song of any artist titled so (`songs.title`, `title_latin` or `other_titles`) whose album or artists' names hold the work as whole
   words; several or none: no match. `findByVideoTitle` tries it only after the channel
   readings. Without the table only albums and endings make works.
 - `text_normalizer.dart` mirrors MusicDatabase's `normalize()`. Dart has no Unicode

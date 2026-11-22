@@ -343,8 +343,9 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   category to play through) leaves out full albums (`CatalogSong.isFullAlbum`; `hitsWhere(…,
   fullAlbums: false)`); lists the user built or searched keep them (MusicDatabase's hand-off).
 - A YouTube video turned into a song (`SearchHit`) never takes the raw video title and channel:
-  go through `parseYouTubeTrack()` and the catalog (`hitForVideoLink` / `hitForSearchedVideo`
-  in `video_link.dart`, `PlaylistLibrary`) — otherwise the song request sent to MusicDatabase
+  go through `parseYouTubeTrack()` — with `artistNamed: catalog.artistNamed` wherever names are
+  stored or sent, else a fan channel stays the artist and "Artist: Title" isn't split — and the
+  catalog (`hitForVideoLink` / `hitForSearchedVideo` in `video_link.dart`, `PlaylistLibrary`) — otherwise the song request sent to MusicDatabase
   asks for the channel as artist and the whole video title as title (it happened with search
   results). A video title naming no artist still leaves the channel as the artist: a request
   goes through `SongRequest.of(hit, artistNamed: catalog.artistNamed)`, which turns a name

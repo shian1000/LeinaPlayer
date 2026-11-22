@@ -65,10 +65,16 @@ Future<List<FoundPlaylist>> newPipeSearchPlaylists(String query) async {
   ];
 }
 
-/// Name, owner and every video of a YouTube playlist.
-Future<YouTubePlaylistData> newPipePlaylist(String playlistId) async {
+/// Name, owner and every video of a YouTube playlist, YouTube asked in [language] (a language
+/// code, "pl") or NewPipe's default (en-GB) — titles come translated into it where the video has
+/// a translation (`youtube_titles.dart`).
+Future<YouTubePlaylistData> newPipePlaylist(
+  String playlistId, {
+  String? language,
+}) async {
   final raw = (await _channel.invokeMapMethod<String, Object?>('playlist', {
     'playlistId': playlistId,
+    'language': ?language,
   }))!;
   return YouTubePlaylistData(
     id: playlistId,

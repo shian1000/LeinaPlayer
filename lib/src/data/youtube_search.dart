@@ -14,6 +14,7 @@ import 'source_settings.dart';
 import 'spotify_playlist.dart';
 import 'youtube_audio.dart';
 import 'youtube_playlist.dart';
+import 'youtube_titles.dart';
 import 'youtube_video.dart';
 
 export 'youtube_video.dart';
@@ -386,20 +387,72 @@ typedef YouTubePlaylistFn = Future<YouTubePlaylistData> Function(
   String playlistId,
 );
 
+/// A playlist read with YouTube asked in a language ([newPipePlaylist]'s `language`).
+typedef YouTubePlaylistInFn = Future<YouTubePlaylistData> Function(
+  String playlistId,
+  String language,
+);
+
+/// A video's own, untranslated title ([oEmbedTitle]).
+typedef OriginalTitleFn = Future<String?> Function(String videoId);
+
 /// Fetches a whole YouTube playlist for import, with the search methods switched on
 /// ([YouTubeMethod]): NewPipeExtractor (Android), then youtube_explode.
+///
+/// YouTube translates video titles into the language it's asked in when the video has a
+/// translation (the playlist "Preuzeti (2018.05)" got L.U.C.'s "W związku z tym" as "In relation
+/// to"), and a playlist's page doesn't give the original. So NewPipe's reading is followed by a
+/// second one in [translationCheckLanguage]; the few videos whose titles differ get their own
+/// title from oEmbed ([oEmbedTitle]). When the second reading or oEmbed fails the first reading
+/// stays. youtube_explode asks in English only, so its titles may still come translated.
 class YouTubePlaylists {
   YouTubePlaylists({
     YouTubePlaylistFn? newPipe,
+    YouTubePlaylistInFn? newPipeIn,
+    OriginalTitleFn? originalTitle,
     YouTubePlaylistFn? explode,
     bool? newPipeAvailable,
   }) : _newPipe = newPipe ?? newPipePlaylist,
+       // A test faking NewPipe without a second language doesn't reach the real channel.
+       _newPipeIn =
+           newPipeIn ??
+           (newPipe == null
+               ? (id, language) => newPipePlaylist(id, language: language)
+               : null),
+       _originalTitle = originalTitle ?? oEmbedTitle,
        _explode = explode ?? _fetchWithExplode,
        newPipeAvailable = newPipeAvailable ?? (!kIsWeb && Platform.isAndroid);
 
   final YouTubePlaylistFn _newPipe;
+  final YouTubePlaylistInFn? _newPipeIn;
+  final OriginalTitleFn _originalTitle;
   final YouTubePlaylistFn _explode;
   final bool newPipeAvailable;
+
+  /// [data] (NewPipe's reading) with the titles YouTube translated put back as they are.
+  Future<YouTubePlaylistData> _untranslated(YouTubePlaylistData data) async {
+    final readIn = _newPipeIn;
+    if (readIn == null) return data;
+    final Set<String> translated;
+    try {
+      translated = translatedTitleIds(
+        data,
+        await readIn(data.id, translationCheckLanguage),
+      );
+    } catch (e) {
+      debugPrint('Reading the playlist again for translated titles failed: $e');
+      return data;
+    }
+    final originals = <String, String>{};
+    for (final id in translated) {
+      try {
+        if (await _originalTitle(id) case final title?) originals[id] = title;
+      } catch (e) {
+        debugPrint('Reading the original title of $id failed: $e');
+      }
+    }
+    return withTitles(data, originals);
+  }
 
   /// Throws [YouTubeSearchException] when no method could read the playlist.
   Future<YouTubePlaylistData> fetch(
@@ -415,7 +468,11 @@ class YouTubePlaylists {
             ? _newPipe
             : _explode)(playlistId);
         // youtube_explode has been seen to report a playlist's size but return no videos.
-        if (data.videos.isNotEmpty) return data;
+        if (data.videos.isNotEmpty) {
+          return method == YouTubeMethod.newPipe
+              ? await _untranslated(data)
+              : data;
+        }
         errors.add(
           '${YouTubeSearch._methodName(method)}: ${l10n.youtubeSearchNoVideos}',
         );

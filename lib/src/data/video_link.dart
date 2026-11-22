@@ -62,7 +62,11 @@ Future<SearchHit> hitForVideoLink(
     }
     return hitOf(song);
   }
-  final parsed = parseYouTubeTrack(video.title, video.channel);
+  final parsed = parseYouTubeTrack(
+    video.title,
+    video.channel,
+    artistNamed: catalog.artistNamed,
+  );
   return SearchHit.youTubeOnly(
     title: parsed.title,
     artistLabel: parsed.artist,
@@ -136,7 +140,11 @@ SearchHit hitForSearchedVideo(
       phoneMatch: useVideo ? video.id : null,
     );
   }
-  final parsed = parseYouTubeTrack(video.title, video.channel);
+  final parsed = parseYouTubeTrack(
+    video.title,
+    video.channel,
+    artistNamed: catalog.artistNamed,
+  );
   return SearchHit.youTubeOnly(
     title: parsed.title,
     artistLabel: parsed.artist,

@@ -7,6 +7,7 @@ import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/song_requests.dart';
 import 'package:music_database_app/src/data/text_normalizer.dart';
 import 'package:music_database_app/src/data/version_names.dart';
+import 'package:music_database_app/src/data/youtube_playlist.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -816,6 +817,163 @@ void main() {
       expect(found('One Summer Day', 'Spirited Away'), isNull);
       // The artist's own song still wins.
       expect(found('Starless Night', 'Nana'), 50);
+    });
+
+    test('the playlist "Preuzeti (2018.05)" tracks music.db has: Latin and '
+        'other titles, junk left in stored titles, a joined credit by a '
+        'synonym', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN title_latin VARCHAR');
+      await db.execute('ALTER TABLE songs ADD COLUMN other_titles TEXT');
+      for (final (id, name, synonyms) in [
+        (40, 'SCANDAL', null),
+        (41, 'Lykke Li', null),
+        (42, 'Chambao', null),
+        (43, 'The Paper Kites', null),
+        (44, 'Pokahontaz', null),
+        (45, 'Bob One', null),
+        (46, 'George Harrison', null),
+        (47, 'DJ Tiesto', 'Tiesto, DJ TI¨STO'),
+        (48, 'KSHMR', null),
+        (49, 'The Weeknd', null),
+        (50, 'Kękę', null),
+        (51, 'Sarius', null),
+        (52, 'Fisz', null),
+        (53, 'General Woo', null),
+        (54, 'a‐ha', null),
+      ]) {
+        await db.insert('artists', {
+          'id': id,
+          'name': name,
+          'synonyms': synonyms,
+        });
+      }
+      for (final (id, title, artist, latin, others) in [
+        (3802, '瞬間センチメンタル', 40, 'Shunkan Sentimental', null),
+        (3803, 'Haruka', 40, null, 'Harukaze; Spring Wind'),
+        (1539, 'I Follow Rivers', 41, null, null),
+        (3686, 'Pokito a Poko', 42, null, null),
+        (3758, 'Bloom', 43, null, null),
+        (6943, 'Czarne lustra', 44, null, null),
+        (528, 'Got My Mind Set on You', 46, null, null),
+        (1439, 'Secrets', 47, null, null),
+        (1993, 'Secrets', 49, null, null),
+        (6944, 'Nigdy ponad stan', 50, null, null),
+        (6946, 'Brzmienie', 50, null, null),
+        (6961, 'Przerywamy program', 51, null, null),
+        (6966, 'Na sznurowadle', 52, null, null),
+        (6923, 'U mom zivotu', 53, null, null),
+        (669, 'Take On Me', 54, null, null),
+      ]) {
+        await db.insert('songs', {
+          'id': id,
+          'title': title,
+          'artist_id': artist,
+          'title_latin': latin,
+          'other_titles': others,
+        });
+      }
+      await db.rawInsert(
+        'INSERT INTO additional_song_artists VALUES '
+        "(6943, 45, 'feat'), (1439, 48, 'main')",
+      );
+      await db.close();
+      await catalog.ensureLoaded();
+
+      int? found(String title, String artist) =>
+          catalog.findByName(title: title, artist: artist)?.id;
+      // 1. The Latin form and other titles, after the song's own.
+      expect(found('Shunkan Sentimental', 'SCANDAL'), 3802);
+      expect(found('瞬間センチメンタル', 'SCANDAL'), 3802);
+      expect(found('Spring Wind', 'SCANDAL'), 3803);
+      expect(
+        catalog.findExact(title: 'Shunkan Sentimental', artist: 'SCANDAL'),
+        isNull,
+      );
+      expect(
+        catalog
+            .findByVideoTitle('SCANDAL - Shunkan Sentimental', 'SCANDAL')
+            ?.id,
+        3802,
+      );
+      // 2. Junk the stored titles still have.
+      expect(found('I Follow Rivers (Original)', 'Lykke Li'), 1539);
+      expect(found('Pokito a Poko ((Videoclip))', 'Chambao'), 3686);
+      expect(found('Bloom lyrics', 'The paper kites'), 3758);
+      expect(
+        found('Czarne lustra prod. White House', 'Pokahontaz ft. Bob One'),
+        6943,
+      );
+      expect(found('Nigdy ponad stan prod. Sergiusz', 'KęKę'), 6944);
+      expect(
+        found(
+          'Przerywamy program - feat. O.S.T.R. & Hades - prod. DJ Eprom',
+          'Sarius',
+        ),
+        6961,
+      );
+      expect(found('Brzmienie gość Sarsa', 'KęKę'), 6946);
+      expect(
+        found('Got My Mind Set On You (Version II)', 'George Harrison'),
+        528,
+      );
+      // … while a version marker still keeps a title apart.
+      expect(found('Got My Mind Set On You (Live)', 'George Harrison'), isNull);
+      expect(found('Bloom (Acoustic)', 'The Paper Kites'), isNull);
+      // 3. A joined credit naming an artist by one of its synonyms; the feat. isn't credited.
+      expect(found('Secrets', 'Tiësto & KSHMR feat. Vassy'), 1439);
+      expect(found('Secrets', 'Tiesto'), 1439);
+      expect(found('Secrets', 'DJ TI¨STO'), 1439);
+      expect(found('Secrets', 'Tiësto & The Weeknd'), isNull);
+      // 4. Names read from the videos' titles.
+      expect(
+        catalog
+            .findByVideoTitle(
+              '18.White House Records & Fisz -- Na sznurowadle - KODEX',
+              'White House Records',
+            )
+            ?.id,
+        6966,
+      );
+      expect(
+        catalog
+            .findByVideoTitle(
+              'KęKę - Brzmienie  gość Sarsa, prod. Sondr duet, gitara Paweł '
+                  'Smakulski',
+              'Takie Rzeczy Label',
+            )
+            ?.id,
+        6946,
+      );
+      expect(
+        catalog
+            .findByVideoTitle(
+              'General Woo   U mom zivotu Official',
+              'Black Shadow',
+            )
+            ?.id,
+        6923,
+      );
+      expect(
+        parseYouTubeTrack(
+          'General Woo   U mom zivotu Official',
+          'Black Shadow',
+          artistNamed: catalog.artistNamed,
+        ),
+        (artist: 'General Woo', title: 'U mom zivotu'),
+      );
+      // A cover medley isn't a-ha's own song.
+      expect(
+        catalog
+            .findByVideoTitle(
+              'a-ha - Take On Me in 20 Styles ft. Seth Everman',
+              'Anthony Vincent',
+            )
+            ?.id,
+        isNull,
+      );
     });
 
     test('the playlist "Parsisiųsti (2018.02)" tracks MusicDatabase found: '

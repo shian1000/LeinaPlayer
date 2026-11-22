@@ -194,6 +194,187 @@ void main() {
     });
   });
 
+  group('the playlist "Preuzeti (2018.05)"', () {
+    String? artistNamed(String name) => const {
+      'general woo': 'General Woo',
+      'lona': 'Łona',
+      'the cure': 'The Cure',
+      'paramore': 'Paramore',
+      'fisz': 'Fisz',
+      'soulsearchanddestroy': 'SoulSearchAndDestroy',
+    }[normalizeForSearch(name)];
+    ({String artist, String title}) p(String title, String channel) =>
+        parseYouTubeTrack(title, channel, artistNamed: artistNamed);
+
+    test('a dash inside a bracket does not split', () {
+      expect(
+        p(
+          'Summer Paradise (Future Funk - Vaporwave - Electronic Mix)',
+          'SoulSearchAndDestroy',
+        ),
+        (
+          artist: 'SoulSearchAndDestroy',
+          title: 'Summer Paradise (Future Funk - Vaporwave - Electronic Mix)',
+        ),
+      );
+    });
+
+    test('" -- " splits first; a track number and the label go', () {
+      expect(
+        p(
+          '18.White House Records & Fisz -- Na sznurowadle - KODEX',
+          'White House Records',
+        ),
+        (artist: 'Fisz', title: 'Na sznurowadle'),
+      );
+      // Without the catalog too.
+      expect(
+        parseYouTubeTrack(
+          '18.White House Records & Fisz -- Na sznurowadle - KODEX',
+          'White House Records',
+        ),
+        (artist: 'Fisz', title: 'Na sznurowadle'),
+      );
+    });
+
+    test('"Artist: Title" by the channel or a known artist', () {
+      expect(p('Paramore: crushcrushcrush [OFFICIAL VIDEO]', 'Paramore'), (
+        artist: 'Paramore',
+        title: 'crushcrushcrush',
+      ));
+      expect(
+        parseYouTubeTrack(
+          "dylan.pl: Adam dał imiona zwierzętom (Bob Dylan's 'Man Gave Names "
+              "to All the Animals')",
+          'dylan.pl',
+        ),
+        (artist: 'dylan.pl', title: 'Adam dał imiona zwierzętom'),
+      );
+      // Any other colon stays in the title.
+      expect(parseYouTubeTrack('Intro: The Beginning', 'Somebody'), (
+        artist: 'Somebody',
+        title: 'Intro: The Beginning',
+      ));
+    });
+
+    test('producer and player credits go, a guest joins the artist', () {
+      expect(
+        p('KęKę - Nigdy ponad stan prod. Sergiusz', 'Takie Rzeczy Label'),
+        (artist: 'KęKę', title: 'Nigdy ponad stan'),
+      );
+      expect(p('KęKę - Cesarz prod. Boryrobibity', 'Takie Rzeczy Label'), (
+        artist: 'KęKę',
+        title: 'Cesarz',
+      ));
+      expect(
+        p(
+          'KęKę - Brzmienie  gość Sarsa, prod. Sondr duet, gitara Paweł '
+              'Smakulski',
+          'Takie Rzeczy Label',
+        ),
+        (artist: 'KęKę feat. Sarsa', title: 'Brzmienie'),
+      );
+      expect(
+        p(
+          'Sarius - Przerywamy program - feat. O.S.T.R. & Hades - prod. DJ Eprom',
+          'x',
+        ),
+        (artist: 'Sarius feat. O.S.T.R. & Hades', title: 'Przerywamy program'),
+      );
+      // "Prod" only as a whole word, and a feat. credit not set off by a dash stays.
+      expect(p('The Prodigy - Firestarter', 'x'), (
+        artist: 'The Prodigy',
+        title: 'Firestarter',
+      ));
+      expect(p('Afina - Pay Your Respect ft. CJ Pitts', 'x'), (
+        artist: 'Afina',
+        title: 'Pay Your Respect ft. CJ Pitts',
+      ));
+    });
+
+    test('a fan channel: the known artist the title starts with', () {
+      expect(p('General Woo   U mom zivotu Official', 'Black Shadow'), (
+        artist: 'General Woo',
+        title: 'U mom zivotu',
+      ));
+      // Without the catalog the channel stays the artist, "Official" still goes.
+      expect(
+        parseYouTubeTrack(
+          'General Woo   U mom zivotu Official',
+          'Black Shadow',
+        ),
+        (artist: 'Black Shadow', title: 'General Woo U mom zivotu'),
+      );
+    });
+
+    test('a title of only a known artist takes its hashtag', () {
+      expect(p('Łona #hot16challenge #hot16', 'Dobrzewiesz Nagrania'), (
+        artist: 'Łona',
+        title: 'hot16challenge',
+      ));
+    });
+
+    test(
+      '"Cover by" names the performer; the original title in its alphabet goes',
+      () {
+        expect(
+          p(
+            'NARUTO SHIPPUDEN OP.16 - SILHOUETTE (シルエット)┃Cover by Raon Lee',
+            'Raon',
+          ),
+          (artist: 'Raon', title: 'SILHOUETTE'),
+        );
+        expect(p('Creep | Cover by Somebody Else', 'covers channel'), (
+          artist: 'Somebody Else',
+          title: 'Creep',
+        ));
+        expect(p('The Cure - Lovesong (cover by Adele)', 'x'), (
+          artist: 'Adele',
+          title: 'Lovesong (The Cure cover)',
+        ));
+      },
+    );
+
+    test('a bracket right after the artist at the start is its logo', () {
+      expect(p('alt-J (∆) Breezeblocks', 'alt-J'), (
+        artist: 'alt-J',
+        title: 'Breezeblocks',
+      ));
+    });
+
+    test('several artists between pipes, and a cover medley as it reads', () {
+      expect(
+        p(
+          'The Cure | Talk Talk | Foghorn - muzyka na jesień',
+          'Kawa i Awangarda',
+        ),
+        (artist: 'The Cure, Talk Talk, Foghorn', title: 'muzyka na jesień'),
+      );
+      expect(
+        p('a-ha - Take On Me in 20 Styles ft. Seth Everman', 'Anthony Vincent'),
+        (artist: 'a-ha', title: 'Take On Me in 20 Styles ft. Seth Everman'),
+      );
+    });
+  });
+
+  test('titlesToMatch: junk a stored title still has, cut for matching', () {
+    List<String> t(String title) => titlesToMatch(title);
+    expect(t('I Follow Rivers (Original)').last, 'I Follow Rivers');
+    expect(t('Pokito a Poko ((Videoclip))').last, 'Pokito a Poko');
+    expect(t('Bloom lyrics').last, 'Bloom');
+    expect(t('Czarne lustra prod. White House').last, 'Czarne lustra');
+    expect(
+      t('Got My Mind Set On You (Version II)').last,
+      'Got My Mind Set On You',
+    );
+    expect(t('Brzmienie gość Sarsa').last, 'Brzmienie feat. Sarsa');
+    // The title as it is first; versions and edits stay.
+    expect(t('Bloom lyrics').first, 'Bloom lyrics');
+    expect(t('Boję się (Live)'), ['Boję się (Live)']);
+    expect(t('Boję się (Radio Edit)'), ['Boję się (Radio Edit)']);
+    expect(t('Lyrics'), ['Lyrics']);
+  });
+
   group('channelVideoReadings', () {
     String? artistNamed(String name) => const {
       'renata przemyk': 'Renata Przemyk',
@@ -237,10 +418,9 @@ void main() {
         ],
       );
       // A joining word only between two names music.db knows.
-      expect(
-        channelVideoReadings('Łona i ja na rowerze', 'x', artistNamed),
-        [(artist: 'Łona', title: 'i ja na rowerze')],
-      );
+      expect(channelVideoReadings('Łona i ja na rowerze', 'x', artistNamed), [
+        (artist: 'Łona', title: 'i ja na rowerze'),
+      ]);
     });
 
     test('the artist in a trailing bracket', () {

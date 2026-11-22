@@ -101,6 +101,16 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
 1. Fetch with the search methods switched on: NewPipeExtractor (Android, all pages, at most
    5000 videos), then youtube_explode. youtube_explode was seen returning **zero videos** for a
    playlist it knew had 19 — an empty result counts as that method failing.
+   **Translated titles:** YouTube serves a video's title translated into the language it's asked
+   in whenever the uploader (or YouTube) has a translation — NewPipe's default is en-GB, so
+   L.U.C.'s "W związku z tym" was stored as "In relation to" ("Preuzeti (2018.05)"). Nothing in
+   the playlist page says which title is the original (checked 2026-11-22: same `lockupViewModel`
+   either way; `hl` of zxx/und is refused). So `YouTubePlaylists.fetch` reads a NewPipe playlist
+   a second time in Polish (`translationCheckLanguage`; `NewPipeBridge.playlist(language)` →
+   `forceLocalization`) and for the few videos whose titles differ takes the video's own title
+   from oEmbed (`youtube_titles.dart`; oEmbed and the player endpoint's `videoDetails.title` are
+   never translated). Either step failing keeps the first reading. youtube_explode (the fallback)
+   asks in English only — its titles may still come translated.
 2. Each video → artist/title with `parseYouTubeTrack()`, a lite version of MusicDatabase's
    `build_metadata_from_item()` (Topic channel = artist; "Artist - Title"; junk brackets, pipe
    suffix, hashtags dropped — but a title that is only hashtags keeps their words: YouTube lists
@@ -111,10 +121,33 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    "Renata Przemyk- ''Aniolek''" (the dash glued to the artist) splits too, and a title in quotes
    loses them. An event's "`<event 2018> | <artist> | <song> | <channel>`" (`_splitEventPipes`,
    MusicDatabase's `split_event_pipes()`) is that artist and song, not the event by the channel.
+   A dash inside a bracket never splits ("Summer Paradise (Future Funk - Vaporwave - …)"), " -- "
+   splits first (a label's "18.White House Records & Fisz -- Na sznurowadle - KODEX": track
+   number, the label's own name and the compilation after " - " go), "Artist: Title" when the
+   part before the colon is the channel or a known artist. Trailing credits go: "prod. X"
+   (`withoutProducerCredits`; MusicDatabase's `strip_producer_credit()` only cuts bracketed ones),
+   ", gitara X"; a guest ("gość Sarsa", " - feat. X - ") joins the artist as "feat.". "┃Cover by
+   Raon Lee" names the performer (the channel when it starts that name), "alt-J (∆) Breezeblocks"
+   loses the logo bracket, "SILHOUETTE (シルエット)" the original-alphabet one, "(Bob Dylan's 'Man
+   Gave Names…')" the original song's name. With `artistNamed` (what's stored and requested:
+   `PlaylistLibrary._youTubeTrack`, `video_link.dart`) a title read by a channel music.db doesn't
+   know as an artist takes `channelVideoReadings()`' first reading ("General Woo U mom zivotu" by
+   a fan's channel), a title that is only a known artist its first hashtag ("Łona
+   #hot16challenge" → "hot16challenge", as written), and "The Cure | Talk Talk | Foghorn - muzyka
+   na jesień" names the three artists.
    The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
 3. Recognising the MusicDatabase song (`PlaylistLibrary.matchSong`): **by the video first** —
    music.db's `youtube_video_id`, then a video the phone matched earlier (`youtube_matches`) —
    then title + artist (`SongCatalog.findByVideoTitle` → `findByName`: exact, without feat. credits in the title or the artist, swapped; a "(Live)" only a live version — `local-library.md`).
+   `findByName` tries every reading with the songs' own titles, then again with `title_latin` and
+   `other_titles` ("Shunkan Sentimental" is #3802 "瞬間センチメンタル"; `findExact` stays own-title
+   only, for files' tags), and each stored title also as `titlesToMatch()` cuts it: junk brackets
+   but the edits ("(Radio Edit)" still keeps a title apart), "(Original)", "(Version II)" (a second
+   music video — `readVersion` still reads it as an `other` version, tried first), a doubled
+   "((Videoclip))", "prod. X", a bare trailing "lyrics" / "official" (matching only —
+   MusicDatabase never cuts a bare "lyrics" from a title). An artist's comma-separated
+   `artists.synonyms` count one by one: "Tiësto & KSHMR feat. Vassy" is #1439 by "DJ Tiesto"
+   (synonyms "Tiesto, DJ TI¨STO") and KSHMR.
    When the parse could only take the artist from the channel and names no song,
    `channelVideoReadings()` tries a title starting with a whole artist name music.db knows
    ("renata przemyk bo jesli tak ma byc" by "thericeburner"; `SongCatalog.artistNamed`, longest

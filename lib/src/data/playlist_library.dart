@@ -676,7 +676,11 @@ class PlaylistLibrary extends ChangeNotifier {
   }
 
   _NewTrack _youTubeTrack(YouTubeVideo video) {
-    final parsed = parseYouTubeTrack(video.title, video.channel);
+    final parsed = parseYouTubeTrack(
+      video.title,
+      video.channel,
+      artistNamed: _catalog.artistNamed,
+    );
     return (
       artist: parsed.artist,
       title: parsed.title,
