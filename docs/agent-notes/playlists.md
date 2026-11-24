@@ -110,7 +110,13 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    `forceLocalization`) and for the few videos whose titles differ takes the video's own title
    from oEmbed (`youtube_titles.dart`; oEmbed and the player endpoint's `videoDetails.title` are
    never translated). Either step failing keeps the first reading. youtube_explode (the fallback)
-   asks in English only — its titles may still come translated.
+   asks in English only — its titles may still come translated. Blind spot: a video whose
+   title YouTube translates into Polish too reads the same both times and stays translated.
+   Kept this way because it's cheap (a few page requests + one oEmbed per differing title);
+   the owner wants it reconsidered if it starts missing titles or YouTube changes (e.g. starts
+   translating into Polish more often, or a playlist response grows an original-title field):
+   then switch to asking for every video's own title (oEmbed / player `videoDetails.title`, one
+   request per video — ~115 for a playlist like "Preuzeti") instead of only the differing ones.
 2. Each video → artist/title with `parseYouTubeTrack()`, a lite version of MusicDatabase's
    `build_metadata_from_item()` (Topic channel = artist; "Artist - Title"; junk brackets, pipe
    suffix, hashtags dropped — but a title that is only hashtags keeps their words: YouTube lists
@@ -298,7 +304,10 @@ Tracks not recognised as MusicDatabase songs are listed by the playlist ⋮ › 
 których nie ma w bazie danych" (`missing_tracks_screen.dart`). Its "Poproś MusicDatabase o
 dodanie" asks for all of them at once through the outbox's song requests — the same
 `SongRequest.of` / `Outbox.requestSong` path as playing a song music.db doesn't have, so a song
-already asked for or rejected isn't asked again — and sends the outbox right away. A request
+already asked for or rejected isn't asked again — and sends the outbox right away. Rejected
+tracks (`rejected_song_requests`) are kept out of the screen's list and count, behind a line
+that unfolds them; the list and the button decide it with one helper (`_requestOf`), so they
+agree. A request
 carries the playlist video's length (`duration_s`, from `PlaylistTrack.duration` through
 `SearchHit.duration`), so MusicDatabase sees a 30-minute mix for what it is.
 

@@ -29,6 +29,7 @@ import 'package:music_database_app/src/widgets/playing_bars.dart';
 import 'package:music_database_app/src/widgets/song_tile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'data/fixtures.dart';
 import 'support/waiting.dart';
@@ -89,10 +90,12 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// [before] runs once the libraries are loaded, before Biblioteka is shown.
+  /// [before] runs once the libraries are loaded, before Biblioteka is shown; [editMusicDb]
+  /// changes the fixture's music.db before it's loaded.
   Future<void> pumpLibrary(
     WidgetTester tester, {
     Future<void> Function()? before,
+    void Function(sqlite3.Database db)? editMusicDb,
   }) async {
     await tester.runAsync(() async {
       storage = await Directory.systemTemp.createTemp('playlist_screen_test');
@@ -117,7 +120,16 @@ void main() {
         storageRoot: () async => storage,
         factoryOverride: databaseFactoryFfi,
       );
-      await writeMusicDb((await sync.localFile('music.db')).path);
+      final musicDb = (await sync.localFile('music.db')).path;
+      await writeMusicDb(musicDb);
+      if (editMusicDb != null) {
+        final db = sqlite3.sqlite3.open(musicDb);
+        try {
+          editMusicDb(db);
+        } finally {
+          db.close();
+        }
+      }
       await catalog.ensureLoaded();
       await library.load();
       await youTubeLibrary.load();
@@ -312,6 +324,8 @@ void main() {
     await settle(tester, until: find.text('Poza bazą danych: 1 z 2'));
     expect(find.text('Utwory spoza bazy danych'), findsOneWidget);
     expect(find.text('Poza bazą danych: 1 z 2'), findsOneWidget);
+    // Nothing rejected by MusicDatabase: no line about it.
+    expect(find.textContaining('Baza danych odrzuciła'), findsNothing);
     expect(find.text('Utwór'), findsOneWidget);
     expect(find.text('Małomiasteczkowy'), findsNothing);
 
@@ -390,6 +404,121 @@ void main() {
     await settle(tester, until: find.text('Poza bazą danych: 1 z 3'));
     expect(find.text('Utwór'), findsOneWidget);
     expect(find.text('Pusty'), findsNothing);
+  });
+
+  /// music.db's `rejected_song_requests`, with [rows] of (artist, title, video).
+  void Function(sqlite3.Database) rejecting(
+    List<(String, String, String)> rows,
+  ) => (db) {
+    db.execute(
+      '''
+      CREATE TABLE rejected_song_requests (
+        id INTEGER PRIMARY KEY, artist TEXT, title TEXT NOT NULL,
+        youtube_video_id TEXT, spotify_track_id TEXT, rejected_at TEXT NOT NULL)''',
+    );
+    for (final (artist, title, video) in rows) {
+      db.execute(
+        'INSERT INTO rejected_song_requests '
+        '(artist, title, youtube_video_id, rejected_at) VALUES (?, ?, ?, ?)',
+        [artist, title, video, '2026-11-24'],
+      );
+    }
+  };
+
+  /// [importDoAuta] plus a track MusicDatabase doesn't have, "Ktoś - Odrzucony".
+  Future<void> importDoAutaWithOdrzucony() async {
+    await importDoAuta();
+    await (await library.database()).insert('playlist_tracks', {
+      'playlist_id': playlists.playlists.single.id,
+      'position': 2,
+      'title': 'Odrzucony',
+      'artist': 'Ktoś',
+      'youtube_video_id': 'rj',
+    });
+  }
+
+  Future<void> openMissingTracks(WidgetTester tester, Finder until) async {
+    await tester.tap(find.text('Do auta'));
+    await settle(tester, until: find.text('Odrzucony'));
+    await tester.tap(find.byTooltip('Menu playlisty (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+    );
+    await settle(tester, until: until);
+  }
+
+  testWidgets('a track MusicDatabase rejected is left out of the tracks not in '
+      'the database, behind a line that shows it', (tester) async {
+    await pumpLibrary(
+      tester,
+      before: importDoAutaWithOdrzucony,
+      editMusicDb: rejecting([('Ktoś', 'Odrzucony', 'rj')]),
+    );
+    await openMissingTracks(tester, find.text('Poza bazą danych: 1 z 3'));
+    expect(find.text('Utwór'), findsOneWidget);
+    expect(find.text('Odrzucony'), findsNothing);
+    const show =
+        'Baza danych odrzuciła 1 utwór z tej playlisty. Kliknij, by wyświetlić';
+    const hide =
+        'Baza danych odrzuciła 1 utwór z tej playlisty. Kliknij, by ukryć';
+    expect(find.text(show), findsOneWidget);
+
+    await tester.tap(find.text(show));
+    await tester.pumpAndSettle();
+    expect(find.text('Odrzucony'), findsOneWidget);
+    expect(find.text(hide), findsOneWidget);
+    // Still out of the count.
+    expect(find.text('Poza bazą danych: 1 z 3'), findsOneWidget);
+    await tester.tap(find.text(hide));
+    await tester.pumpAndSettle();
+    expect(find.text('Odrzucony'), findsNothing);
+    expect(find.text(show), findsOneWidget);
+
+    // The request button asks for the other one and still counts the rejected one.
+    await tester.tap(find.text('Poproś MusicDatabase o dodanie'));
+    await settle(tester, until: find.textContaining('Nowe prośby o dodanie'));
+    expect(
+      find.textContaining(
+        'Nowe prośby o dodanie: 1 · odrzucone przez MusicDatabase: 1',
+      ),
+      findsOneWidget,
+    );
+    final requests = (await tester.runAsync(outbox.waitingSongRequests))!;
+    expect(requests.map((r) => r.title), ['Utwór']);
+  });
+
+  testWidgets('when every track not in the database was rejected, the rest '
+      'are in the database and nothing is left to ask for', (tester) async {
+    await pumpLibrary(
+      tester,
+      before: importDoAutaWithOdrzucony,
+      editMusicDb: rejecting([
+        ('Ktoś', 'Odrzucony', 'rj'),
+        ('Nieznany', 'Utwór', 'nn'),
+      ]),
+    );
+    await openMissingTracks(
+      tester,
+      find.text('Pozostałe utwory tej playlisty są w bazie danych.'),
+    );
+    expect(find.textContaining('Poza bazą danych'), findsNothing);
+    expect(find.text('Poproś MusicDatabase o dodanie'), findsNothing);
+    expect(find.text('Utwór'), findsNothing);
+    await tester.tap(
+      find.text(
+        'Baza danych odrzuciła 2 utwory z tej playlisty. Kliknij, by wyświetlić',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Utwór'), findsOneWidget);
+    expect(find.text('Odrzucony'), findsOneWidget);
   });
 
   testWidgets(

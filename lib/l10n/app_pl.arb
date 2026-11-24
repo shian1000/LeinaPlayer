@@ -1967,6 +1967,28 @@
     }
   },
   "missingTracksScreenRequestButton": "Poproś MusicDatabase o dodanie",
+  "missingTracksScreenRestInDatabase": "Pozostałe utwory tej playlisty są w bazie danych.",
+  "@missingTracksScreenRestInDatabase": {
+    "description": "Utwory spoza bazy danych: every track not in the database is one MusicDatabase rejected; shown above the line about the rejected ones"
+  },
+  "missingTracksScreenRejectedShow": "Baza danych odrzuciła {count, plural, one{{count} utwór} few{{count} utwory} many{{count} utworów} other{{count} utworu}} z tej playlisty. Kliknij, by wyświetlić",
+  "@missingTracksScreenRejectedShow": {
+    "description": "Utwory spoza bazy danych: a tappable line under the summary; tracks whose song request MusicDatabase's owner rejected are hidden until tapped",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "missingTracksScreenRejectedHide": "Baza danych odrzuciła {count, plural, one{{count} utwór} few{{count} utwory} many{{count} utworów} other{{count} utworu}} z tej playlisty. Kliknij, by ukryć",
+  "@missingTracksScreenRejectedHide": {
+    "description": "The same line while the rejected tracks are shown under it; tapping hides them again",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "moodScreenGone": "Tego nastroju już nie ma.",
   "moodScreenSearch": "Szukaj w nastroju",
   "moodScreenCloseSearch": "Zamknij wyszukiwanie",

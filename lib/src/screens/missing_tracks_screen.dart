@@ -18,8 +18,9 @@ import '../widgets/song_names.dart';
 
 /// "Wyświetl utwory, których nie ma w bazie danych" from a playlist's ⋮: its tracks not
 /// recognised as MusicDatabase songs, with "Poproś MusicDatabase o dodanie" asking for all of
-/// them at once ([_RequestMissingButton]).
-class MissingTracksScreen extends StatelessWidget {
+/// them at once ([_RequestMissingButton]). Tracks whose request MusicDatabase's owner rejected
+/// ([_requestOf]) are left out of the list and the count, behind a line that shows them.
+class MissingTracksScreen extends StatefulWidget {
   const MissingTracksScreen({
     super.key,
     required this.playlist,
@@ -35,26 +36,47 @@ class MissingTracksScreen extends StatelessWidget {
   final bool saved;
 
   @override
+  State<MissingTracksScreen> createState() => _MissingTracksScreenState();
+}
+
+class _MissingTracksScreenState extends State<MissingTracksScreen> {
+  bool _showRejected = false;
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final catalog = SongCatalogScope.of(context);
     final library = LocalLibraryScope.of(context);
     final youTube = YouTubeLibraryScope.of(context);
+    final playlist = widget.playlist;
     final hits = [
-      for (final track in tracks) playlistHit(track, catalog, library, youTube),
+      for (final track in widget.tracks)
+        playlistHit(track, catalog, library, youTube),
     ];
     // Positions in the playlist, so a tap plays on through the whole playlist from there.
-    final missing = [
+    final outside = [
       for (final (i, hit) in hits.indexed)
         if (!hit.inMainDatabase) i,
+    ];
+    final ready = catalog.status == CatalogStatus.ready;
+    final rejected = <int>{
+      if (ready)
+        for (final i in outside)
+          if (_requestOf(hits[i], catalog).rejected) i,
+    };
+    final missing = [
+      for (final i in outside)
+        if (!rejected.contains(i)) i,
     ];
 
     final String summary;
     switch (catalog.status) {
       case CatalogStatus.ready:
-        summary = missing.isEmpty
+        summary = missing.isNotEmpty
+            ? l10n.missingTracksScreenOutside(missing.length, hits.length)
+            : rejected.isEmpty
             ? l10n.missingTracksScreenAllInDatabase
-            : l10n.missingTracksScreenOutside(missing.length, hits.length);
+            : l10n.missingTracksScreenRestInDatabase;
       case CatalogStatus.noDatabase:
         summary = l10n.missingTracksScreenNoDatabase;
       case CatalogStatus.error:
@@ -62,6 +84,16 @@ class MissingTracksScreen extends StatelessWidget {
       case CatalogStatus.notLoaded || CatalogStatus.loading:
         summary = l10n.missingTracksScreenLoading;
     }
+
+    Widget row(int i) => SongTile(
+      hit: hits[i],
+      queue: hits,
+      queueIndex: i,
+      playlistId: widget.saved ? playlist.id : null,
+      youTubeListId: playlist.youTubeId,
+      playlistName: playlist.name,
+      subtitle: hits[i].shownArtist(context),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -85,7 +117,12 @@ class MissingTracksScreen extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 24),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                rejected.isEmpty ? 8 : 0,
+              ),
               child: Text(
                 summary,
                 style: TextStyle(
@@ -94,21 +131,49 @@ class MissingTracksScreen extends StatelessWidget {
                 ),
               ),
             ),
-            if (catalog.status == CatalogStatus.ready &&
+            if (rejected.isNotEmpty)
+              InkWell(
+                onTap: () => setState(() => _showRejected = !_showRejected),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ScrollingText(
+                          _showRejected
+                              ? l10n.missingTracksScreenRejectedHide(
+                                  rejected.length,
+                                )
+                              : l10n.missingTracksScreenRejectedShow(
+                                  rejected.length,
+                                ),
+                          maxLines: 2,
+                          style: TextStyle(
+                            color: palette.accent,
+                            fontSize: AppFontSize.small,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        _showRejected ? Icons.expand_less : Icons.expand_more,
+                        size: 20,
+                        color: palette.accent,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_showRejected && rejected.isNotEmpty) ...[
+              for (final i in rejected) row(i),
+              Divider(color: palette.divider, height: 16),
+            ],
+            // The rejected ones go along so the snackbar still counts them.
+            if (ready &&
                 missing.isNotEmpty &&
                 OutboxScope.maybeOf(context) != null)
-              _RequestMissingButton(hits: [for (final i in missing) hits[i]]),
-            if (catalog.status == CatalogStatus.ready)
-              for (final i in missing)
-                SongTile(
-                  hit: hits[i],
-                  queue: hits,
-                  queueIndex: i,
-                  playlistId: saved ? playlist.id : null,
-                  youTubeListId: playlist.youTubeId,
-                  playlistName: playlist.name,
-                  subtitle: hits[i].shownArtist(context),
-                ),
+              _RequestMissingButton(hits: [for (final i in outside) hits[i]]),
+            if (ready)
+              for (final i in missing) row(i),
           ],
         ),
       ),
@@ -116,9 +181,24 @@ class MissingTracksScreen extends StatelessWidget {
   }
 }
 
-/// "Poproś MusicDatabase o dodanie": every listed track goes to the outbox as a song request,
-/// as playing it would ([SongRequest.of]; one already asked for or rejected by MusicDatabase's
-/// owner isn't asked again), then the outbox is sent at once, like "Wyślij teraz".
+/// What [hit] is asked as ([SongRequest.of]; `null` for no title) and whether MusicDatabase's
+/// owner rejected that request — one decision for the screen's list and
+/// [_RequestMissingButton], so they never disagree on which tracks are rejected.
+({SongRequest? request, bool rejected}) _requestOf(
+  SearchHit hit,
+  SongCatalog catalog,
+) {
+  final request = SongRequest.of(hit, artistNamed: catalog.artistNamed);
+  return (
+    request: request,
+    rejected: request != null && catalog.rejectedSongRequests.rejects(request),
+  );
+}
+
+/// "Poproś MusicDatabase o dodanie": every track outside the database goes to the outbox as a
+/// song request, as playing it would ([SongRequest.of]; one already asked for or rejected by
+/// MusicDatabase's owner — [_requestOf] — isn't asked again, only counted), then the outbox is
+/// sent at once, like "Wyślij teraz". Shown only while some track is still to be asked for.
 class _RequestMissingButton extends StatefulWidget {
   const _RequestMissingButton({required this.hits});
 
@@ -144,10 +224,10 @@ class _RequestMissingButtonState extends State<_RequestMissingButton> {
     String sent;
     try {
       for (final hit in widget.hits) {
-        final request = SongRequest.of(hit, artistNamed: catalog.artistNamed);
+        final (:request, rejected: isRejected) = _requestOf(hit, catalog);
         if (request == null) {
           unnamed++;
-        } else if (catalog.rejectedSongRequests.rejects(request)) {
+        } else if (isRejected) {
           rejected++;
         } else if (await outbox.requestSong(request)) {
           added++;
