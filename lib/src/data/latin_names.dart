@@ -60,3 +60,49 @@ enum LatinNames {
   /// Whether the Latin form is shown at all (a cover's credit takes it then).
   bool get shown => this != original;
 }
+
+/// Languages written in an alphabet other than Latin, by music.db's `songs.language` names —
+/// what "Języki wyłączone z transliteracji" offers (the ones music.db has songs in). Languages
+/// written both ways (Serbo-Croatian, Kurdish, Crimean Tatar…) aren't here: their songs are
+/// mostly in Latin letters already.
+const nonLatinLanguages = [
+  'Altai',
+  'Arabic',
+  'Armenian',
+  'Attic Greek',
+  'Belarusian',
+  'Bulgarian',
+  'Cantonese',
+  'Chinese',
+  'Church Slavonic',
+  'Georgian',
+  'Greek',
+  'Hebrew',
+  'Hindi',
+  'Japanese',
+  'Kannada',
+  'Kashmiri',
+  'Kazakh',
+  'Korean',
+  'Macedonian',
+  'Mongolian',
+  'Persian',
+  'Punjabi',
+  'Russian',
+  'Ruthenian',
+  'Serbian',
+  'Tatar',
+  'Tuvan',
+  'Ukrainian',
+  'Yiddish',
+];
+
+/// The languages of a `songs.language` value: "Japanese / English" → Japanese, English.
+List<String> languagesOf(String? language) => [
+  for (final part in (language ?? '').split('/'))
+    if (part.trim() case final name when name.isNotEmpty) name,
+];
+
+/// Whether a song in [language] is left untransliterated: any of its languages is [excluded].
+bool excludedFromTransliteration(String? language, Set<String> excluded) =>
+    excluded.isNotEmpty && languagesOf(language).any(excluded.contains);

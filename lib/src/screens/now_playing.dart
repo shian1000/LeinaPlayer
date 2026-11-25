@@ -1039,8 +1039,10 @@ class _LyricsCardState extends State<_LyricsCard> {
                     ),
                   ),
                 ),
-                if (ThemeScope.maybeOf(context)?.lyricsTransliteration ==
-                    LyricsTransliteration.onRequest)
+                if (ThemeScope.maybeOf(context) case final themes?
+                    when themes.lyricsTransliteration ==
+                            LyricsTransliteration.onRequest &&
+                        themes.transliteratesLyricsOf(_hit?.mainSong?.language))
                   FutureBuilder<Lyrics?>(
                     future: _lyrics,
                     builder: (context, snapshot) =>

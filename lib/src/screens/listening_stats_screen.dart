@@ -407,7 +407,6 @@ class _CoverRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final latin = latinNamesOf(context);
     return SizedBox(
       // Albums: two lines of name and the artist under it.
       height: _cover + (round ? 52 : 92),
@@ -435,7 +434,7 @@ class _CoverRow extends StatelessWidget {
                   round ? ClipOval(child: cover) : cover,
                   const SizedBox(height: 6),
                   ScrollingText(
-                    '${i + 1}. ${latin.show(entry.name, entry.latin)}',
+                    '${i + 1}. ${latinNamesOf(context, language: entry.language).show(entry.name, entry.latin)}',
                     maxLines: round ? 1 : 2,
                     textAlign: round ? TextAlign.center : TextAlign.start,
                     style: const TextStyle(
@@ -543,7 +542,6 @@ class _HighlightRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final latin = latinNamesOf(context);
     return SizedBox(
       height: _cover + 64,
       child: ListView.separated(
@@ -557,7 +555,10 @@ class _HighlightRow extends StatelessWidget {
           final hit = song == null ? null : hitOf(song);
           final artist = h.artist == null
               ? null
-              : latin.show(h.artist!, h.artistLatin);
+              : latinNamesOf(
+                  context,
+                  language: h.artistLanguage,
+                ).show(h.artist!, h.artistLatin);
           final songLine = hit == null
               ? ''
               : l10n.listeningStatsScreenSongLine(

@@ -35,6 +35,7 @@ class Highlight {
     this.song,
     this.artist,
     this.artistLatin,
+    this.artistLanguage,
     this.gap,
   });
 
@@ -48,6 +49,10 @@ class Highlight {
   final StatsSong? song;
   final String? artist;
   final String? artistLatin;
+
+  /// music.db's `songs.language` of the play that made it, for "Języki wyłączone z
+  /// transliteracji".
+  final String? artistLanguage;
   final Duration? gap;
 }
 
@@ -83,7 +88,7 @@ abstract final class ListeningHighlights {
     final lastPlay = <String, DateTime>{};
     final artistPlays = <String, int>{};
     final artistFirst = <String, DateTime>{};
-    final artistNames = <String, (String, String?)>{};
+    final artistNames = <String, (String, String?, String?)>{};
     var total = Duration.zero;
     DateTime? firstPlay;
 
@@ -121,7 +126,10 @@ abstract final class ListeningHighlights {
       lastPlay[id.key] = at;
       for (final (i, name) in id.artists.indexed) {
         final key = IdentifiedListen.artistKey(name);
-        artistNames.putIfAbsent(key, () => (name, id.artistLatin[i]));
+        artistNames.putIfAbsent(
+          key,
+          () => (name, id.artistLatin[i], id.known?.language),
+        );
         artistFirst.putIfAbsent(key, () => at);
         final n = artistPlays[key] = (artistPlays[key] ?? 0) + 1;
         if (!inWeek) continue;
@@ -135,6 +143,7 @@ abstract final class ListeningHighlights {
             song: s,
             artist: name,
             artistLatin: id.artistLatin[i],
+            artistLanguage: id.known?.language,
           );
         }
       }
@@ -180,6 +189,7 @@ abstract final class ListeningHighlights {
               song: weekArtistSong[key],
               artist: artistNames[key]!.$1,
               artistLatin: artistNames[key]!.$2,
+              artistLanguage: artistNames[key]!.$3,
             ),
     ];
 

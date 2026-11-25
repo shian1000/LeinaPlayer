@@ -75,6 +75,25 @@ void main() {
     expect(restarted.lyricsTransliteration, LyricsTransliteration.onRequest);
   });
 
+  test('a language left out of transliteration shows no Latin names', () async {
+    final themes = ThemeController();
+    await themes.load();
+    await themes.setLatinNames(LatinNames.instead);
+    await themes.setLanguageExcluded('Serbian', true);
+    expect(themes.latinNamesFor('Serbian'), LatinNames.original);
+    expect(themes.latinNamesFor('English / Serbian'), LatinNames.original);
+    expect(themes.latinNamesFor('Russian'), LatinNames.instead);
+    expect(themes.latinNamesFor(null), LatinNames.instead);
+    expect(themes.transliteratesLyricsOf('Serbian'), isFalse);
+    expect(themes.transliteratesLyricsOf('Russian'), isTrue);
+
+    final restarted = ThemeController();
+    await restarted.load();
+    expect(restarted.excludedLanguages, {'Serbian'});
+    await restarted.setLanguageExcluded('Serbian', false);
+    expect(restarted.latinNamesFor('Serbian'), LatinNames.instead);
+  });
+
   test('each filter keeps its own intensity', () async {
     final themes = ThemeController();
     await themes.setFilterStrength(CoverFilter.lain, 0.4);

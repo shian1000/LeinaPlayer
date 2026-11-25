@@ -300,8 +300,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   }
 
   /// Takes effect from the next song the notification shows.
-  void _updateNotificationNames() =>
-      widget.mediaSession?.latinNames = _themeController.latinNames;
+  void _updateNotificationNames() => widget.mediaSession
+    ?..latinNames = _themeController.latinNames
+    ..excludedLanguages = _themeController.excludedLanguages;
 
   void _updateNotificationLike() =>
       widget.mediaSession?.liked = switch (_playbackQueue.current) {

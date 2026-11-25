@@ -519,6 +519,8 @@ import, Wyświetlanie, Dane, Aplikacja.
     the system's current mode) while the next switch is on.
   - "Systemowe przełączanie trybu ciemnego" — switch; when on, light/dark follows the phone's
     dark-mode setting.
+  - Transliteracja **→ Transliteracja** (`transliteration_screen.dart`; subtitle: the Latin names
+    choice) — everything about other alphabets on one screen (user's request, 2026-11-25):
   - "Nazwy w alfabecie łacińskim" — three radios (`LatinNames`) for a title, artist or album in
     another alphabet with its Latin form from music.db: "Pokazuj oryginalny alfabet" ("Кино"),
     "Łacinka w nawiasie" ("Кино (Kino)", the default) and "Łacinka zamiast oryginalnego
@@ -534,6 +536,11 @@ import, Wyświetlanie, Dane, Aplikacja.
     the last two only say "Work in progress :)" and stay unpicked (server: hand-off
     [`musicdatabase-lyrics-transliteration.md`](handoffs/musicdatabase-lyrics-transliteration.md);
     phone: [`ideas/lyrics-transliteration.md`](ideas/lyrics-transliteration.md)).
+  - "Języki wyłączone z transliteracji" **→ a checkbox list** (subtitle: the ticked ones or
+    "Żaden") — `nonLatinLanguages` in `latin_names.dart` (music.db's `songs.language` names
+    written in another alphabet) that music.db has songs in, no counts (user's choice); a song with any
+    ticked language ("Japanese / English") shows no Latin form (`ThemeController.latinNamesFor`,
+    also the notification and the stats via the song's language) and no lyrics button.
   - Filtry do albumów **→ Filtry do albumów** (`cover_filter_screen.dart`) — **implemented**: a
     preview on the playing song's cover, then Brak / Lain / Monochromatic (radio); with a filter
     on, "Intensywność" (slider 0–100 % in 5 % steps, default 100 %, kept per filter; the preview

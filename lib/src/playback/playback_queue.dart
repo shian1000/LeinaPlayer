@@ -931,6 +931,7 @@ class PlaybackQueue extends ChangeNotifier {
       artist: hit.artistLabel,
       titleLatin: hit.titleLatin,
       artistLatin: hit.artistLatin,
+      language: hit.mainSong?.language,
       coverOf: hit.coverOf,
       version: hit.version,
       source: hit.onPhone ? hit.phoneFiles.first.filePath : '',

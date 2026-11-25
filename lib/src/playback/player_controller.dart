@@ -29,6 +29,7 @@ class NowPlaying {
     this.streamQuality,
     this.titleLatin,
     this.artistLatin,
+    this.language,
     this.coverOf,
     this.version,
   }) : _givenCover = cover;
@@ -39,6 +40,9 @@ class NowPlaying {
   /// Latin forms of [title] and [artist] from music.db ([SearchHit.titleLatin]).
   final String? titleLatin;
   final String? artistLatin;
+
+  /// music.db's `songs.language`, for "Języki wyłączone z transliteracji".
+  final String? language;
 
   /// Whose song this is a cover of ([SearchHit.coverOf]).
   final CoverOf? coverOf;
@@ -132,8 +136,11 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
     unawaited(AudioSession.instance.then(_followInterruptions));
   }
 
-  /// Ustawienia › Wygląd › "Nazwy w alfabecie łacińskim", for the notification.
+  /// Ustawienia › Wygląd › Transliteracja, for the notification.
   LatinNames latinNames = LatinNames.inBrackets;
+
+  /// "Języki wyłączone z transliteracji": their songs' names go without the Latin form.
+  Set<String> excludedLanguages = const {};
 
   final players = (
     AudioPlayer(handleInterruptions: false),
@@ -213,6 +220,10 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
 
   /// What the notification shows.
   void show(NowPlaying track, Duration? duration, Uri? art) {
+    final latinNames =
+        excludedFromTransliteration(track.language, excludedLanguages)
+        ? LatinNames.original
+        : this.latinNames;
     final item = MediaItem(
       id: track.youtubeVideoId ?? track.source,
       title: titleWithCover(

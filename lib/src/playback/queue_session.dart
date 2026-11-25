@@ -202,6 +202,7 @@ Map<String, Object?> _nowPlayingToJson(NowPlaying track) {
     'artist': track.artist,
     'title_latin': ?track.titleLatin,
     'artist_latin': ?track.artistLatin,
+    'language': ?track.language,
     if (track.coverOf case final covered?)
       'cover_of': {'name': covered.name, 'latin': ?covered.latin},
     if (track.version case final version?)
@@ -237,6 +238,7 @@ NowPlaying _nowPlayingFromJson(Map<String, Object?> json) {
     artist: json['artist']! as String,
     titleLatin: json['title_latin'] as String?,
     artistLatin: json['artist_latin'] as String?,
+    language: json['language'] as String?,
     coverOf: coverOf == null
         ? null
         : CoverOf(coverOf['name']! as String, coverOf['latin'] as String?),

@@ -55,12 +55,16 @@ class StatsSong {
 /// An artist, album, decade, language, country or source of [ListeningStats]: how often and how
 /// long it was heard.
 class StatsEntry {
-  StatsEntry(this.name, {this.latin, this.detail});
+  StatsEntry(this.name, {this.latin, this.language, this.detail});
 
   final String name;
 
   /// The Latin form of [name] (an artist's, from music.db) — shown with the setting on.
   final String? latin;
+
+  /// music.db's `songs.language` of the play that made it, for "Języki wyłączone z
+  /// transliteracji".
+  final String? language;
 
   /// What else says which one it is: an album's artist.
   final String? detail;
@@ -156,7 +160,11 @@ class ListeningStats {
         count(
           artists,
           IdentifiedListen.artistKey(name),
-          () => StatsEntry(name, latin: id.artistLatin[i]),
+          () => StatsEntry(
+            name,
+            latin: id.artistLatin[i],
+            language: known?.language,
+          ),
           played,
           heard,
           s,
@@ -169,6 +177,7 @@ class ListeningStats {
           () => StatsEntry(
             a,
             latin: known?.albumLatin,
+            language: known?.language,
             detail: names.firstOrNull,
           ),
           played,

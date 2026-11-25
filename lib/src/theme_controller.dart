@@ -61,6 +61,8 @@ class ThemeController extends ChangeNotifier {
   static const _latinNamesKey = 'appearance.latin_names_mode';
   static const _lyricsTransliterationKey = 'appearance.lyrics_transliteration';
   static const _transliterationMethodKey = 'appearance.transliteration_method';
+  static const _excludedLanguagesKey =
+      'appearance.transliteration_excluded_languages';
   static const _languageKey = 'appearance.language';
   static const maxSavedColors = 8;
   static String _strengthKey(CoverFilter f) =>
@@ -83,6 +85,7 @@ class ThemeController extends ChangeNotifier {
   LatinNames _latinNames = LatinNames.inBrackets;
   LyricsTransliteration _lyricsTransliteration = LyricsTransliteration.never;
   TransliterationMethod _transliterationMethod = TransliterationMethod.none;
+  Set<String> _excludedLanguages = const {};
 
   /// "Nazwy w alfabecie łacińskim": names in another alphabet with their Latin form from
   /// music.db, "Кино (Kino)" (`latin_names.dart`).
@@ -93,6 +96,20 @@ class ThemeController extends ChangeNotifier {
 
   /// "Metoda transliteracji".
   TransliterationMethod get transliterationMethod => _transliterationMethod;
+
+  /// "Języki wyłączone z transliteracji": music.db's `songs.language` names whose songs show
+  /// neither Latin names nor transliterated lyrics.
+  Set<String> get excludedLanguages => _excludedLanguages;
+
+  /// [latinNames] for a song in [language]: [LatinNames.original] when it's excluded.
+  LatinNames latinNamesFor(String? language) =>
+      excludedFromTransliteration(language, _excludedLanguages)
+      ? LatinNames.original
+      : _latinNames;
+
+  /// Whether lyrics of a song in [language] may be transliterated.
+  bool transliteratesLyricsOf(String? language) =>
+      !excludedFromTransliteration(language, _excludedLanguages);
 
   CoverFilter get coverFilter => _coverFilter;
 
@@ -200,6 +217,7 @@ class ThemeController extends ChangeNotifier {
           _transliterationMethodKey,
         )] ??
         _transliterationMethod;
+    _excludedLanguages = {...?prefs.getStringList(_excludedLanguagesKey)};
     _coverFilter =
         CoverFilter.values
             .where((f) => f.name == prefs.getString(_coverFilterKey))
@@ -445,6 +463,17 @@ class ThemeController extends ChangeNotifier {
     await (await SharedPreferences.getInstance()).setString(
       _transliterationMethodKey,
       value.name,
+    );
+  }
+
+  Future<void> setLanguageExcluded(String language, bool excluded) async {
+    _excludedLanguages = excluded
+        ? {..._excludedLanguages, language}
+        : (_excludedLanguages.toSet()..remove(language));
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setStringList(
+      _excludedLanguagesKey,
+      _excludedLanguages.toList()..sort(),
     );
   }
 

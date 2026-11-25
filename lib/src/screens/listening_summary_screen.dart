@@ -432,7 +432,7 @@ class _ListeningSummaryScreenState extends State<ListeningSummaryScreen> {
   }
 
   static String _name(BuildContext context, StatsEntry e) =>
-      latinNamesOf(context).show(e.name, e.latin);
+      latinNamesOf(context, language: e.language).show(e.name, e.latin);
 
   static String _playsLine(int plays, Duration listened) =>
       l10n.listeningSummaryScreenPlaysAndTime(plays, minutesLabel(listened));

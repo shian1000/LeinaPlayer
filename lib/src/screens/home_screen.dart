@@ -1103,7 +1103,10 @@ class _ArtistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final song = artist.song;
-    final name = latinNamesOf(context).show(artist.name, artist.latin);
+    final name = latinNamesOf(
+      context,
+      language: artist.language,
+    ).show(artist.name, artist.latin);
     return InkWell(
       onTap: () => openArtistSongs(context, artist.name),
       onLongPress: () => showSongsMenu(

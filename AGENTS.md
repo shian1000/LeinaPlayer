@@ -60,10 +60,12 @@ year and season (meteorological), the last one shared as a picture. Album covers
 thumbnail, cached on the phone, with optional cover filters (Wygląd › Filtry do albumów);
 playlists and moods show a collage of their songs' covers or a picture the user picked
 (synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Names in another
-alphabet are shown with their Latin form, "Кино (Kino)", or by it alone, "Kino" (Wygląd › "Nazwy
-w alfabecie łacińskim", `LatinNames`): only music.db's `title_latin` / `name_latin` columns or an artist's Latin synonym,
+alphabet are shown with their Latin form, "Кино (Kino)", or by it alone, "Kino" (Wygląd › Transliteracja ›
+"Nazwy w alfabecie łacińskim", `LatinNames`): only music.db's `title_latin` / `name_latin` columns or an artist's Latin synonym,
 never transliterated on the phone (user's decision); the forms are sent as field corrections
-([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Wygląd also has "Transliteracja
+([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Transliteracja also has "Języki
+wyłączone z transliteracji" (songs in a ticked language keep their original names and lyrics —
+`ThemeController.latinNamesFor`), "Transliteracja
 tekstów piosenek" (Nigdy / Na życzenie — a button in the lyrics card / Zawsze) and "Metoda
 transliteracji" (Brak / Pobierz z serwera / Przelicz na miejscu), with no method built yet
 ("Work in progress :)" — `lyrics_transliteration.dart`; the server's waits for a
@@ -358,7 +360,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
 - Screens show a song's title / artist / album through `shownTitle` / `shownArtist` /
   `shownAlbum` (`song_names.dart`), never `hit.title` directly, so the Latin form setting,
   a version's marker and a cover's credit reach them (something new carrying a song's names to the
-  player passes `version` and `coverOf` along, as `NowPlaying` does); raw values stay for keys, matching, sharing text and requests to MusicDatabase.
+  player passes `version`, `coverOf` and `language` along, as `NowPlaying` does); raw values stay for keys, matching, sharing text and requests to MusicDatabase.
+  A Latin form shown outside them (an artist in the stats, Home's artist cards) goes through
+  `latinNamesOf(context, language: <the song's songs.language>)`, never the bare
+  `ThemeController.latinNames`: "Języki wyłączone z transliteracji" switches it off per language.
 - Lists sorted by a name (playlists, folders, moods, artists, track titles) use `compareNames`
   (`text_normalizer.dart`): numbers by value, so "2. Telefon" comes before "10. Pidvalia" —
   not `normalizeForSearch(a).compareTo(…)` (user's request; numbered names are common there).
