@@ -1,5 +1,6 @@
 import '../l10n.dart';
 import 'album_covers.dart';
+import 'language_codes.dart';
 import 'latin_names.dart';
 import 'listening_log.dart';
 import 'song_catalog.dart';
@@ -198,12 +199,11 @@ class ListeningStats {
           s,
         );
       }
-      // "Unknown" is MusicDatabase's placeholder, not a language.
-      if (known?.language case final language? when language != 'Unknown') {
+      if (known?.language case final language? when isKnownLanguage(language)) {
         count(
           languages,
           language,
-          () => StatsEntry(language),
+          () => StatsEntry(languageNames(language)),
           played,
           heard,
           s,

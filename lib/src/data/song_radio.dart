@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'language_codes.dart';
 import 'song_catalog.dart';
 import 'text_normalizer.dart';
 
@@ -80,7 +81,7 @@ Set<String> _artistsOf(CatalogSong song) => {
 };
 
 String? _language(CatalogSong song) =>
-    const {null, '', 'Unknown'}.contains(song.language) ? null : song.language;
+    isKnownLanguage(song.language) ? song.language : null;
 
 /// The words of a normalized genre name that say something: "drum and bass" and "rhythm and
 /// blues" aren't alike.

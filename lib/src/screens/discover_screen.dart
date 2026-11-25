@@ -7,6 +7,7 @@ import '../data/combined_search.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
 import '../data/hidden_songs.dart';
+import '../data/language_codes.dart';
 import '../data/saved_songs.dart';
 import '../data/song_catalog.dart';
 import '../data/track_ref.dart';
@@ -259,9 +260,8 @@ class _DiscoverCard extends StatelessWidget {
         PlaybackQueueScope.maybeOf(context)?.current?.mainSong?.id == song.id;
     final tags = [
       if (song?.year != null) '${song!.year}',
-      if (song?.language case final language?
-          when language.isNotEmpty && language != 'Unknown')
-        language,
+      if (song?.language case final language? when isKnownLanguage(language))
+        languageNames(language),
       if (song != null)
         ...?MoodLibraryScope.maybeOf(context)?.moodNameListOf(song.id),
     ];

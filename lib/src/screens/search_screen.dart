@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/account.dart';
 import '../data/combined_search.dart';
+import '../data/language_codes.dart';
 import '../data/listening_log.dart';
 import '../data/listening_stats.dart';
 import '../data/local_library.dart';
@@ -138,8 +139,7 @@ List<Widget> _browseGroups(BuildContext context) {
     if (song.year case final year? when year <= DateTime.now().year) {
       decades.update(year ~/ 10 * 10, (n) => n + 1, ifAbsent: () => 1);
     }
-    if (song.language case final language?
-        when language.isNotEmpty && language != 'Unknown') {
+    if (song.language case final language? when isKnownLanguage(language)) {
       languages.update(language, (n) => n + 1, ifAbsent: () => 1);
     }
     for (final country in song.countries) {
@@ -211,11 +211,11 @@ List<Widget> _browseGroups(BuildContext context) {
       group(l10n.searchScreenLanguages, [
         for (final MapEntry(key: language, value: count) in biggest(languages))
           _CategoryTile(
-            name: language,
+            name: languageNames(language),
             count: count,
             onTap: () => SongListScreen.open(
               context,
-              title: language,
+              title: languageNames(language),
               subtitle: l10n.searchScreenLanguageSubtitle,
               songs: (context) => hitsWhere(
                 context,

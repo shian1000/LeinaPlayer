@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../l10n.dart';
 import 'combined_search.dart';
+import 'language_codes.dart';
 import 'server_trust.dart';
 import 'track_ref.dart';
 
@@ -94,7 +95,7 @@ class LyricsFinder {
   ) async {
     final song = hit.mainSong;
     // MusicDatabase never looks these up: there are no words to find.
-    if (song?.language == 'Instrumental') {
+    if (languagesOf(song?.language).contains(noWordsLanguage)) {
       return const Lyrics(instrumental: true, source: 'MusicDatabase');
     }
     if (song != null && servers != null) {

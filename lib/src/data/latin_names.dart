@@ -8,6 +8,8 @@
 /// `artists.synonyms`; a title or album without one shows nothing extra.
 library;
 
+import 'language_codes.dart';
+
 final _nonLatinLetter = RegExp(r'(?!\p{Script=Latin})\p{L}', unicode: true);
 final _letter = RegExp(r'\p{L}', unicode: true);
 
@@ -61,48 +63,16 @@ enum LatinNames {
   bool get shown => this != original;
 }
 
-/// Languages written in an alphabet other than Latin, by music.db's `songs.language` names —
+/// Languages written in an alphabet other than Latin, by music.db's `songs.language` codes —
 /// what "Języki wyłączone z transliteracji" offers (the ones music.db has songs in). Languages
 /// written both ways (Serbo-Croatian, Kurdish, Crimean Tatar…) aren't here: their songs are
 /// mostly in Latin letters already.
-const nonLatinLanguages = [
-  'Altai',
-  'Arabic',
-  'Armenian',
-  'Attic Greek',
-  'Belarusian',
-  'Bulgarian',
-  'Cantonese',
-  'Chinese',
-  'Church Slavonic',
-  'Georgian',
-  'Greek',
-  'Hebrew',
-  'Hindi',
-  'Japanese',
-  'Kannada',
-  'Kashmiri',
-  'Kazakh',
-  'Korean',
-  'Macedonian',
-  'Mongolian',
-  'Persian',
-  'Punjabi',
-  'Russian',
-  'Ruthenian',
-  'Serbian',
-  'Tatar',
-  'Tuvan',
-  'Ukrainian',
-  'Yiddish',
-];
+final nonLatinLanguages =
+    ('alt ara hye grc bel bul yue zho chu kat ell heb hin jpn kan kas kaz kor mkd mon '
+            'fas pan rus rue srp tat tyv ukr yid')
+        .split(' ');
 
-/// The languages of a `songs.language` value: "Japanese / English" → Japanese, English.
-List<String> languagesOf(String? language) => [
-  for (final part in (language ?? '').split('/'))
-    if (part.trim() case final name when name.isNotEmpty) name,
-];
-
-/// Whether a song in [language] is left untransliterated: any of its languages is [excluded].
+/// Whether a song in [language] is left untransliterated: any of its languages is [excluded]
+/// (codes).
 bool excludedFromTransliteration(String? language, Set<String> excluded) =>
     excluded.isNotEmpty && languagesOf(language).any(excluded.contains);

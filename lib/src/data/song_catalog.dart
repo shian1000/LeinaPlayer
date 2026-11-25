@@ -11,6 +11,7 @@ import '../l10n.dart';
 import 'cover_credit.dart';
 import 'database_sync.dart';
 import 'feat_credit.dart';
+import 'language_codes.dart';
 import 'latin_names.dart';
 import 'playlist_library.dart';
 import 'project_names.dart';
@@ -405,8 +406,7 @@ class CatalogSong {
         SearchField.album =>
           album == null ? null : [album, ?names.albumLatin].join(' '),
         SearchField.year => year?.toString(),
-        // "Unknown" is MusicDatabase's placeholder, not a language to find songs by.
-        SearchField.language => language == 'Unknown' ? null : language,
+        SearchField.language => languageSearchText(language),
         SearchField.origin => names.origins.join(' '),
         // Moods change while the song doesn't: SongCatalog adds them when searching.
         SearchField.mood => null,
@@ -875,7 +875,7 @@ class SongCatalog extends ChangeNotifier {
       title: row['title']! as String,
       album: row['album'] as String?,
       year: row['year'] as int?,
-      language: present(row['language'] as String?),
+      language: languageValue(row['language'] as String?),
       genre: row['genre'] as String?,
       kind: SongKind.of(row['kind']),
       youtubeVideoId: (row['youtube_video_id'] as String?)?.trim(),

@@ -83,6 +83,15 @@
       }
     }
   },
+  "languageName": "{code, select, alt{Ałtajski} ara{Arabski} bel{Białoruski} bos{Bośniacki} bre{Bretoński} bul{Bułgarski} cat{Kataloński} ces{Czeski} chu{Cerkiewnosłowiański} ckm{Chorwacki (czakawski)} crh{Krymskotatarski} csb{Kaszubski} cym{Walijski} dan{Duński} deu{Niemiecki} dua{Duala} ell{Grecki} eng{Angielski} est{Estoński} fao{Farerski} fas{Perski} fil{Filipiński} fin{Fiński} fra{Francuski} fro{Starofrancuski} gaa{Ga} gcf{Kreolski gwadelupski} gla{Szkocki gaelicki} gle{Irlandzki} grc{Grecki starożytny} hbs{Serbsko-chorwacki} heb{Hebrajski} hin{Hindi} hrv{Chorwacki} hsb{Górnołużycki} hun{Węgierski} hye{Ormiański} isl{Islandzki} isv{Międzysłowiański} ita{Włoski} jam{Jamajski patois} jpn{Japoński} kan{Kannada} kas{Kaszmirski} kat{Gruziński} kaz{Kazachski} kea{Kreolski Zielonego Przylądka} kjv{Chorwacki (kajkawski)} kor{Koreański} kur{Kurdyjski} lat{Łaciński} lav{Łotewski} lit{Litewski} mkd{Macedoński} mon{Mongolski} mri{Maoryski} nds{Dolnoniemiecki} nld{Niderlandzki} non{Staronordyjski} nor{Norweski} pan{Pendżabski} pcm{Pidżyn nigeryjski} pol{Polski} por{Portugalski} qiv{Wymyślony} qpd{Podlaski} qpl{Pseudołacina} rom{Romski} ron{Rumuński} rue{Rusiński} rus{Rosyjski} sco{Scots} shi{Tachelhit} slk{Słowacki} slv{Słoweński} sot{Sotho} spa{Hiszpański} srp{Serbski} sux{Sumeryjski} swe{Szwedzki} szl{Śląski} tat{Tatarski} tgl{Tagalski} tur{Turecki} twi{Twi} tyv{Tuwiński} ukr{Ukraiński} und{Nieznany} vie{Wietnamski} wol{Wolof} yid{Jidysz} yor{Joruba} yue{Kantoński} zho{Chiński} zul{Zuluski} zxx{Instrumentalny (bez słów)} other{{code}}}",
+  "@languageName": {
+    "description": "A language by its ISO 639-3 code (music.db's songs.language); an unknown code is shown as it is",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "dateDayMonthYear": "{day} {month, select, 1{stycznia} 2{lutego} 3{marca} 4{kwietnia} 5{maja} 6{czerwca} 7{lipca} 8{sierpnia} 9{września} 10{października} 11{listopada} 12{grudnia} other{}} {year}",
   "@dateDayMonthYear": {
     "description": "16 października 2026",
@@ -3430,7 +3439,7 @@
   "searchFieldsSheetRestoreDefaults": "Przywróć domyślne",
   "searchFieldsSheetHelp": "Każde wpisane słowo musi wystąpić w którymś z zaznaczonych pól.",
   "searchFieldsSheetArtistHelp": "Także dodatkowi wykonawcy i inne nazwy wykonawców",
-  "searchFieldsSheetLanguageHelp": "np. Polish, English",
+  "searchFieldsSheetLanguageHelp": "np. polski, jap, eng",
   "searchFieldsSheetMoodHelp": "Nazwa nastroju pokazuje wszystkie jego utwory",
   "searchFieldsSheetSearchPlaylists": "Wyszukuj playlisty",
   "searchFieldsSheetSearchPlaylistsHelp": "W Bibliotece, a przyciskiem wyszukiwania także na YouTube i Spotify",

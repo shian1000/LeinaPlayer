@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../data/language_codes.dart';
 import '../data/latin_names.dart';
 import '../data/lyrics_transliteration.dart';
 import '../data/song_catalog.dart';
+import '../data/text_normalizer.dart';
 import '../l10n.dart';
 import '../theme.dart';
 import '../theme_controller.dart';
@@ -114,7 +116,9 @@ class TransliterationScreen extends StatelessWidget {
             subtitle: Text(
               excluded.isEmpty
                   ? l10n.transliterationExcludedLanguagesNone
-                  : (excluded.toList()..sort()).join(', '),
+                  : (excluded.map(l10n.languageName).toList()
+                          ..sort(compareNames))
+                        .join(', '),
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
@@ -166,7 +170,7 @@ class _ExcludedLanguagesScreen extends StatelessWidget {
             inCatalog.contains(language) ||
             themes.excludedLanguages.contains(language))
           language,
-    ];
+    ]..sort((a, b) => compareNames(l10n.languageName(a), l10n.languageName(b)));
 
     return Scaffold(
       appBar: AppBar(
@@ -181,7 +185,7 @@ class _ExcludedLanguagesScreen extends StatelessWidget {
           for (final language in languages)
             CheckboxListTile(
               value: themes.excludedLanguages.contains(language),
-              title: Text(language),
+              title: Text(l10n.languageName(language)),
               onChanged: (value) =>
                   themes.setLanguageExcluded(language, value ?? false),
             ),

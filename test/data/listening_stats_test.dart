@@ -32,7 +32,7 @@ void main() {
     artistLatin: 'Kino',
     album: 'Чёрный альбом',
     year: 1990,
-    language: 'Russian',
+    language: 'rus',
     origins: ['Russia - Leningrad'],
   );
 
@@ -68,7 +68,7 @@ void main() {
     expect(stats.artists.single.latin, 'Kino');
     expect(stats.albums.single.name, 'Чёрный альбом');
     expect(stats.decades.single.name, 'Lata 90.');
-    expect(stats.languages.single.name, 'Russian');
+    expect(stats.languages.single.name, 'Rosyjski');
     expect(stats.countries.single.name, 'Russia');
   });
 

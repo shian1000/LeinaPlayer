@@ -161,7 +161,7 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
   - Scrolled down: **Tekst** (**implemented**, a card right under the player, scrolling inside
     itself): the lyrics from MusicDatabase's server (`GET /lyrics/<id>`), else LRCLIB
     (`data/lyrics.dart`, kept in memory for the run; ADR 0017; songs whose language is
-    "Instrumental" aren't looked up) — time-synced lines follow the song, the current one
+    `zxx` — no words — aren't looked up) — time-synced lines follow the song, the current one
     bold and kept in view inside the card, tapping a line jumps there; else the plain text;
     "Szukam tekstu…", "Nie znalazłem tekstu tego utworu.", "Utwór instrumentalny." or no
     connection with "Spróbuj ponownie"; "Teksty: <source>" under it ("MusicDatabase (Genius)", "LRCLIB").
@@ -539,9 +539,9 @@ import, Wyświetlanie, Dane, Aplikacja.
     [`musicdatabase-lyrics-transliteration.md`](handoffs/musicdatabase-lyrics-transliteration.md);
     phone: [`ideas/lyrics-transliteration.md`](ideas/lyrics-transliteration.md)).
   - "Języki wyłączone z transliteracji" **→ a checkbox list** (subtitle: the ticked ones or
-    "Żaden") — `nonLatinLanguages` in `latin_names.dart` (music.db's `songs.language` names
-    written in another alphabet) that music.db has songs in, no counts (user's choice); a song with any
-    ticked language ("Japanese / English") shows no Latin form (`ThemeController.latinNamesFor`,
+    "Żaden") — `nonLatinLanguages` in `latin_names.dart` (music.db's `songs.language` codes
+    written in another alphabet, shown by their names and sorted by them) that music.db has songs in, no counts (user's choice); a song with any
+    ticked language ("jpn / eng") shows no Latin form (`ThemeController.latinNamesFor`,
     also the notification and the stats via the song's language) and no lyrics button.
   - Filtry do albumów **→ Filtry do albumów** (`cover_filter_screen.dart`) — **implemented**: a
     preview on the playing song's cover, then Brak / Lain / Monochromatic (radio); with a filter

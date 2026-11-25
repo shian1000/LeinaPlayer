@@ -290,7 +290,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   listened time, synced (`listening_log.dart`), and what's computed from them
   (`listening_stats.dart`, `listening_highlights.dart`, `listening_summary.dart`), music source settings, playback order and
   queue caching (`source_settings.dart`), telling "no connection" from other failures
-  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), the project a song's names say — Tiny Desk, Męskie Granie (`project_names.dart`, lite `read_project()`), the films, games and anime a song may be credited to instead of its singer — "Nana - Kuroi Namida" (`soundtrack_works.dart`, music.db's `soundtrack_works`; lite `match_work()`), and the
+  (`network_errors.dart`), the "Jakość" line of Informacje o utworze (`audio_quality.dart`), what the phone found out about each recording — its loudness for volume leveling and its length (`recordings.dart`), Latin forms of names in other alphabets (`latin_names.dart`), music.db's language codes and their names (`language_codes.dart`), reading a version's marker from a title (`version_names.dart`, lite `read_version()`), the project a song's names say — Tiny Desk, Męskie Granie (`project_names.dart`, lite `read_project()`), the films, games and anime a song may be credited to instead of its singer — "Nana - Kuroi Namida" (`soundtrack_works.dart`, music.db's `soundtrack_works`; lite `match_work()`), and the
   port of MusicDatabase's `normalize()` (`text_normalizer.dart`), lyrics from the server or LRCLIB (`lyrics.dart`), the update check against GitHub releases (`app_updates.dart`), the error log and problem reports (`error_log.dart`, `problem_report.dart`), the backup file ("Kopia zapasowa", `user_backup.dart`), server files kept with "Pobierz" (`server_downloads.dart`), and a song's radio — songs like it, phone-only (`song_radio.dart`).
 - `lib/src/playback/` — `PlayerController` (`just_audio`, one song; two players only while
   crossfading), `PlaybackQueue` (what plays
@@ -364,6 +364,13 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   A Latin form shown outside them (an artist in the stats, Home's artist cards) goes through
   `latinNamesOf(context, language: <the song's songs.language>)`, never the bare
   `ThemeController.latinNames`: "Języki wyłączone z transliteracji" switches it off per language.
+- music.db's `songs.language` holds ISO 639-3 codes ("pol", several as "eng / jpn", `zxx` no
+  words, `und` not known — MusicDatabase's `language-codes-for-musicdatabaseapp.md`), read,
+  compared and shown through `language_codes.dart`: `languagesOf` / `isKnownLanguage` (skips
+  `und`), `languageNames` for screens (`l10n.languageName`, an ICU select in the ARB files — a new
+  code gets its names there, an unknown one shows as the code), `languageValueOfTyped` for a
+  correction. Values from before 2026-11-25 were English names ("Polish"): `languageCode` reads
+  them, so anything the phone kept with a language (a saved queue, a setting) goes through it.
 - Lists sorted by a name (playlists, folders, moods, artists, track titles) use `compareNames`
   (`text_normalizer.dart`): numbers by value, so "2. Telefon" comes before "10. Pidvalia" —
   not `normalizeForSearch(a).compareTo(…)` (user's request; numbered names are common there).

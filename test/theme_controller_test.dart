@@ -74,12 +74,12 @@ void main() {
         themes.transliterationMethods,
         TransliterationMethod.values.toSet(),
       );
-      expect(themes.offersLyricsTransliteration('Russian'), isTrue);
+      expect(themes.offersLyricsTransliteration('rus'), isTrue);
       await themes.setLyricsTransliteration(LyricsTransliteration.never);
       final restarted = ThemeController();
       await restarted.load();
       expect(restarted.lyricsTransliteration, LyricsTransliteration.never);
-      expect(restarted.offersLyricsTransliteration('Russian'), isFalse);
+      expect(restarted.offersLyricsTransliteration('rus'), isFalse);
     },
   );
 
@@ -87,12 +87,12 @@ void main() {
     final themes = ThemeController();
     await themes.load();
     await themes.setTransliterationMethod(TransliterationMethod.server, false);
-    expect(themes.offersLyricsTransliteration('Russian'), isTrue);
+    expect(themes.offersLyricsTransliteration('rus'), isTrue);
     await themes.setTransliterationMethod(
       TransliterationMethod.onDevice,
       false,
     );
-    expect(themes.offersLyricsTransliteration('Russian'), isFalse);
+    expect(themes.offersLyricsTransliteration('rus'), isFalse);
     final restarted = ThemeController();
     await restarted.load();
     expect(restarted.transliterationMethods, isEmpty);
@@ -111,19 +111,37 @@ void main() {
     final themes = ThemeController();
     await themes.load();
     await themes.setLatinNames(LatinNames.instead);
-    await themes.setLanguageExcluded('Serbian', true);
-    expect(themes.latinNamesFor('Serbian'), LatinNames.original);
-    expect(themes.latinNamesFor('English / Serbian'), LatinNames.original);
-    expect(themes.latinNamesFor('Russian'), LatinNames.instead);
+    await themes.setLanguageExcluded('srp', true);
+    expect(themes.latinNamesFor('srp'), LatinNames.original);
+    expect(themes.latinNamesFor('eng / srp'), LatinNames.original);
+    expect(themes.latinNamesFor('rus'), LatinNames.instead);
     expect(themes.latinNamesFor(null), LatinNames.instead);
-    expect(themes.offersLyricsTransliteration('Serbian'), isFalse);
-    expect(themes.offersLyricsTransliteration('Russian'), isTrue);
+    expect(themes.offersLyricsTransliteration('srp'), isFalse);
+    expect(themes.offersLyricsTransliteration('rus'), isTrue);
 
     final restarted = ThemeController();
     await restarted.load();
-    expect(restarted.excludedLanguages, {'Serbian'});
-    await restarted.setLanguageExcluded('Serbian', false);
-    expect(restarted.latinNamesFor('Serbian'), LatinNames.instead);
+    expect(restarted.excludedLanguages, {'srp'});
+    await restarted.setLanguageExcluded('srp', false);
+    expect(restarted.latinNamesFor('srp'), LatinNames.instead);
+  });
+
+  test('languages left out by their old names become codes, kept', () async {
+    SharedPreferences.setMockInitialValues({
+      'appearance.transliteration_excluded_languages': [
+        'Attic Greek',
+        'Serbian',
+      ],
+    });
+    final themes = ThemeController();
+    await themes.load();
+    expect(themes.excludedLanguages, {'grc', 'srp'});
+    expect(themes.latinNamesFor('Serbian'), LatinNames.original);
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getStringList('appearance.transliteration_excluded_languages'),
+      ['grc', 'srp'],
+    );
   });
 
   test('each filter keeps its own intensity', () async {

@@ -1153,11 +1153,16 @@ void main() {
       expect(catalog.search('2018').single.id, 1);
 
       await catalog.setSearchFields({SearchField.language});
-      expect(
-        catalog.search('polish').map((s) => s.id),
-        unorderedEquals([1, 4]),
-      );
-      expect(catalog.search('unknown'), isEmpty);
+      // By the code and by the name in every app language, a part of it is enough.
+      for (final query in ['pol', 'polski', 'Polsk', 'polish']) {
+        expect(
+          catalog.search(query).map((s) => s.id),
+          unorderedEquals([1, 4]),
+          reason: query,
+        );
+      }
+      expect(catalog.search('und'), isEmpty);
+      expect(catalog.search('nieznany'), isEmpty);
 
       await catalog.setSearchFields({SearchField.origin});
       // Origin of an additional artist counts too (CJ Pitts on song 3).

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'data/language_codes.dart';
 import 'data/latin_names.dart';
 import 'data/lyrics_transliteration.dart';
 import 'data/text_normalizer.dart';
@@ -105,7 +106,7 @@ class ThemeController extends ChangeNotifier {
   Set<TransliterationMethod> get transliterationMethods =>
       _transliterationMethods;
 
-  /// "Języki wyłączone z transliteracji": music.db's `songs.language` names whose songs show
+  /// "Języki wyłączone z transliteracji": music.db's `songs.language` codes whose songs show
   /// neither Latin names nor transliterated lyrics.
   Set<String> get excludedLanguages => _excludedLanguages;
 
@@ -232,7 +233,16 @@ class ThemeController extends ChangeNotifier {
       (null, 'none') => {},
       _ => _transliterationMethods,
     };
-    _excludedLanguages = {...?prefs.getStringList(_excludedLanguagesKey)};
+    final excludedLanguages = prefs.getStringList(_excludedLanguagesKey);
+    _excludedLanguages = {...?excludedLanguages?.map(languageCode)};
+    // Saved before music.db's languages became codes (2026-11-25): English names.
+    if (excludedLanguages != null &&
+        !excludedLanguages.every(_excludedLanguages.contains)) {
+      await prefs.setStringList(
+        _excludedLanguagesKey,
+        _excludedLanguages.toList()..sort(),
+      );
+    }
     _coverFilter =
         CoverFilter.values
             .where((f) => f.name == prefs.getString(_coverFilterKey))

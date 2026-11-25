@@ -115,7 +115,7 @@ void main() {
 
     expect(find.text('Gościnnie (feat.)'), findsOneWidget);
     expect(find.text('USA - Ohio'), findsOneWidget);
-    expect(find.text('Unknown'), findsOneWidget);
+    expect(find.text('Nieznany'), findsOneWidget);
     expect(
       find.text('oznaczony jako niedostępny na YouTube (N/A)'),
       findsOneWidget,

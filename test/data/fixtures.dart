@@ -28,11 +28,11 @@ Future<void> writeMusicDb(String path) async {
   );
   await db.rawInsert(
     "INSERT INTO songs VALUES "
-    "(1, 'Małomiasteczkowy', 'Małomiasteczkowy', 2018, 'Polish', 1, 'X2XWBcd5jn0'), "
-    "(2, 'Going to California', 'Led Zeppelin IV', 1971, 'English', 2, NULL), "
-    "(3, 'Pay Your Respect', 'Singles', NULL, 'Unknown', 3, 'N/A'), "
-    "(4, 'Pusty', NULL, 2014, 'Polish', 5, ''), "
-    "(5, 'California Dreaming', 'Covers', 2001, 'English', 2, NULL)",
+    "(1, 'Małomiasteczkowy', 'Małomiasteczkowy', 2018, 'pol', 1, 'X2XWBcd5jn0'), "
+    "(2, 'Going to California', 'Led Zeppelin IV', 1971, 'eng', 2, NULL), "
+    "(3, 'Pay Your Respect', 'Singles', NULL, 'und', 3, 'N/A'), "
+    "(4, 'Pusty', NULL, 2014, 'pol', 5, ''), "
+    "(5, 'California Dreaming', 'Covers', 2001, 'eng', 2, NULL)",
   );
   await db.rawInsert(
     "INSERT INTO additional_song_artists VALUES (3, 4, 'feat'), (4, 6, 'main')",

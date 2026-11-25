@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/album_covers.dart';
 import '../data/combined_search.dart';
 import '../data/cover_credit.dart';
+import '../data/language_codes.dart';
 import '../data/track_ref.dart';
 import '../data/version_names.dart';
 import 'playback_queue.dart';
@@ -238,7 +239,7 @@ NowPlaying _nowPlayingFromJson(Map<String, Object?> json) {
     artist: json['artist']! as String,
     titleLatin: json['title_latin'] as String?,
     artistLatin: json['artist_latin'] as String?,
-    language: json['language'] as String?,
+    language: languageValue(json['language'] as String?),
     coverOf: coverOf == null
         ? null
         : CoverOf(coverOf['name']! as String, coverOf['latin'] as String?),

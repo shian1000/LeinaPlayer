@@ -8,6 +8,7 @@ import '../data/audio_quality.dart';
 import '../data/combined_search.dart';
 import '../data/database_sync.dart';
 import '../data/incoming_links.dart';
+import '../data/language_codes.dart';
 import '../data/latin_names.dart';
 import '../data/local_library.dart';
 import '../data/moods.dart';
@@ -147,7 +148,10 @@ class _SongInfoCardState extends State<SongInfoCard> {
           _Field(l10n.songInfoLabelAlbum, hit.album),
           _Field(l10n.songInfoLabelYear, hit.year?.toString()),
           if (mainSong != null) ...[
-            _Field(l10n.songInfoLabelLanguage, mainSong.language),
+            _Field(
+              l10n.songInfoLabelLanguage,
+              _shown(_Kind.language, mainSong.language),
+            ),
             _Field(l10n.songInfoLabelMusicDatabaseId, '${mainSong.id}'),
           ],
         ])
@@ -731,7 +735,7 @@ class _SongInfoCardState extends State<SongInfoCard> {
         builder: (_) => TextInputDialog(
           title: label,
           hint: kind == _Kind.required ? label : l10n.songInfoEmptyHint,
-          initial: _text(shown) ?? '',
+          initial: _shown(kind, shown) ?? '',
           number: kind == _Kind.number,
         ),
       );
@@ -745,10 +749,13 @@ class _SongInfoCardState extends State<SongInfoCard> {
       }
       value = trimmed.isEmpty
           ? null
-          : kind == _Kind.number
-          ? int.tryParse(trimmed)
-          : trimmed;
+          : switch (kind) {
+              _Kind.number => int.tryParse(trimmed),
+              _Kind.language => languageValueOfTyped(trimmed),
+              _ => trimmed,
+            };
     }
+    if (kind == _Kind.language) shown = languageValue(shown as String?);
     if (_sameValue(value, shown)) return;
     if (table == 'artists' &&
         column == 'name' &&
@@ -1137,10 +1144,12 @@ String? _shown(_Kind? kind, Object? value) => switch (kind) {
         : _text(value) == null
         ? l10n.songInfoNo
         : l10n.songInfoNoWithValue('$value'),
+  _Kind.language => _text(value) == null ? null : languageNames('$value'),
   _ => _text(value),
 };
 
-enum _Kind { text, required, number, albumType, songKind }
+/// [_Kind.language]: music.db's ISO 639-3 codes, shown and typed as names (`language_codes.dart`).
+enum _Kind { text, required, number, albumType, songKind, language }
 
 /// [row] with its Latin form column ([latinColumn] of [column], `latin_names.dart`) only where
 /// it's of use: next to a name in another alphabet — even before music.db has the column, so
@@ -1166,7 +1175,7 @@ const _editable = {
     'title': _Kind.required,
     'album': _Kind.text,
     'year': _Kind.number,
-    'language': _Kind.text,
+    'language': _Kind.language,
     'genre': _Kind.text,
     'kind': _Kind.songKind,
     'track_number': _Kind.number,

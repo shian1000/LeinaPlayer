@@ -49,12 +49,12 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Języki wyłączone z transliteracji'));
     await tester.pumpAndSettle();
-    expect(find.text('Arabic'), findsOneWidget);
-    expect(find.text('Polish'), findsNothing);
+    expect(find.text('Arabski'), findsOneWidget);
+    expect(find.text('Polski'), findsNothing);
 
-    await tester.tap(find.text('Arabic'));
+    await tester.tap(find.text('Arabski'));
     await tester.pump();
-    expect(themes.excludedLanguages, {'Arabic'});
+    expect(themes.excludedLanguages, {'ara'});
   });
 
   testWidgets('Latin names and lyrics transliteration are picked', (
