@@ -1,6 +1,6 @@
 # Transliterating lyrics on the phone ("Przelicz na miejscu")
 
-**Status (2026-11-20):** an idea only. Ustawienia › Wygląd › "Metoda transliteracji" › "Przelicz na
+**Status (2026-11-20):** an idea only. Ustawienia › Wygląd › Transliteracja › "Metoda transliteracji" › "Przelicz na
 miejscu" says "Work in progress :)". Nothing is decided; a choice here gets an ADR.
 
 ## The problem

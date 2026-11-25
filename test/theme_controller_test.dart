@@ -64,15 +64,47 @@ void main() {
     expect(themes.latinNames, LatinNames.original);
   });
 
-  test('lyrics transliteration: never and no method at first, kept', () async {
+  test(
+    'lyrics transliteration: on request from the server at first, kept',
+    () async {
+      final themes = ThemeController();
+      await themes.load();
+      expect(themes.lyricsTransliteration, LyricsTransliteration.onRequest);
+      expect(
+        themes.transliterationMethods,
+        TransliterationMethod.values.toSet(),
+      );
+      expect(themes.offersLyricsTransliteration('Russian'), isTrue);
+      await themes.setLyricsTransliteration(LyricsTransliteration.never);
+      final restarted = ThemeController();
+      await restarted.load();
+      expect(restarted.lyricsTransliteration, LyricsTransliteration.never);
+      expect(restarted.offersLyricsTransliteration('Russian'), isFalse);
+    },
+  );
+
+  test('no method ticked offers no lyrics transliteration, kept', () async {
     final themes = ThemeController();
     await themes.load();
-    expect(themes.lyricsTransliteration, LyricsTransliteration.never);
-    expect(themes.transliterationMethod, TransliterationMethod.none);
-    await themes.setLyricsTransliteration(LyricsTransliteration.onRequest);
+    await themes.setTransliterationMethod(TransliterationMethod.server, false);
+    expect(themes.offersLyricsTransliteration('Russian'), isTrue);
+    await themes.setTransliterationMethod(
+      TransliterationMethod.onDevice,
+      false,
+    );
+    expect(themes.offersLyricsTransliteration('Russian'), isFalse);
     final restarted = ThemeController();
     await restarted.load();
-    expect(restarted.lyricsTransliteration, LyricsTransliteration.onRequest);
+    expect(restarted.transliterationMethods, isEmpty);
+  });
+
+  test('"Brak" picked before both could be ticked stays none', () async {
+    SharedPreferences.setMockInitialValues({
+      'appearance.transliteration_method': 'none',
+    });
+    final themes = ThemeController();
+    await themes.load();
+    expect(themes.transliterationMethods, isEmpty);
   });
 
   test('a language left out of transliteration shows no Latin names', () async {
@@ -84,8 +116,8 @@ void main() {
     expect(themes.latinNamesFor('English / Serbian'), LatinNames.original);
     expect(themes.latinNamesFor('Russian'), LatinNames.instead);
     expect(themes.latinNamesFor(null), LatinNames.instead);
-    expect(themes.transliteratesLyricsOf('Serbian'), isFalse);
-    expect(themes.transliteratesLyricsOf('Russian'), isTrue);
+    expect(themes.offersLyricsTransliteration('Serbian'), isFalse);
+    expect(themes.offersLyricsTransliteration('Russian'), isTrue);
 
     final restarted = ThemeController();
     await restarted.load();

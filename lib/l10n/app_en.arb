@@ -25,7 +25,6 @@
   "appearanceLyricsTransliterationOnRequestSubtitle": "A button by the lyrics under the player switches them to Latin letters",
   "appearanceLyricsTransliterationAlways": "Always",
   "appearanceTransliterationMethod": "Transliteration method",
-  "appearanceTransliterationMethodNone": "None",
   "appearanceTransliterationMethodServer": "Download from the server",
   "appearanceTransliterationMethodServerSubtitle": "A transliteration from MusicDatabase, with the lyrics",
   "appearanceTransliterationMethodOnDevice": "Work it out on the phone",

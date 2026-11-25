@@ -528,12 +528,14 @@ import, Wyświetlanie, Dane, Aplikacja.
     menus, the mini/full player, the stats and the notification (`latin_names.dart`,
     `song_names.dart`; hand-off [`musicdatabase-latin-names.md`](handoffs/musicdatabase-latin-names.md)).
     A switch until 2026-11 (`appearance.latin_names`; off is read as the first radio).
-  - "Transliteracja tekstów piosenek" — radios Nigdy (default) / Na życzenie (a "Transliteruj
+  - "Transliteracja tekstów piosenek" — radios Nigdy / Na życzenie (default; a "Transliteruj
     tekst" button in the lyrics card's header, for lyrics with a non-Latin letter) / Zawsze
     (`lyrics_transliteration.dart`). No method is built yet: the button says "Work in
     progress :)".
-  - "Metoda transliteracji" — radios Brak (default) / Pobierz z serwera / Przelicz na miejscu;
-    the last two only say "Work in progress :)" and stay unpicked (server: hand-off
+  - "Metoda transliteracji" — two checkboxes, Pobierz z serwera / Przelicz na miejscu, any of
+    them or none, both ticked by default (user's choice, 2026-11-25; `transliteration_methods`,
+    an old "none" from the radios before is read as none ticked). None ticked: no button in the
+    lyrics card. Neither is built yet — the button says "Work in progress :)" (server: hand-off
     [`musicdatabase-lyrics-transliteration.md`](handoffs/musicdatabase-lyrics-transliteration.md);
     phone: [`ideas/lyrics-transliteration.md`](ideas/lyrics-transliteration.md)).
   - "Języki wyłączone z transliteracji" **→ a checkbox list** (subtitle: the ticked ones or

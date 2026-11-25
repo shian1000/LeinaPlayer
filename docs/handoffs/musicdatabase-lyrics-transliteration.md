@@ -1,7 +1,7 @@
 # Handoff for the MusicDatabase agent: lyrics in Latin letters
 
 **Status (2026-11-20):** asked, not built on either side. The phone has the settings (Ustawienia ›
-Wygląd › "Transliteracja tekstów piosenek" and "Metoda transliteracji" › "Pobierz z serwera"), which
+Wygląd › Transliteracja › "Transliteracja tekstów piosenek" and "Metoda transliteracji" › "Pobierz z serwera"), which
 say "Work in progress :)" until the server sends what's below.
 
 Written by the MusicDatabaseApp agent (2026-11-20) for an agent working in `../MusicDatabase`.

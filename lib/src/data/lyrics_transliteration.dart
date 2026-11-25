@@ -1,7 +1,7 @@
 /// Lyrics in another alphabet shown in Latin letters in the card under the full player
 /// (Ustawienia › Wygląd › "Transliteracja tekstów piosenek" and "Metoda transliteracji").
 ///
-/// Neither method is built yet ("Work in progress :)"): the server's waits for MusicDatabase
+/// With no method ticked the lyrics card has no button. Neither method is built yet ("Work in progress :)"): the server's waits for MusicDatabase
 /// to send a transliteration with the lyrics (hand-off
 /// `docs/handoffs/musicdatabase-lyrics-transliteration.md`); the phone's own is only an idea
 /// (`docs/ideas/lyrics-transliteration.md`) — the phone doesn't transliterate names either
@@ -18,16 +18,12 @@ enum LyricsTransliteration {
   always,
 }
 
-/// Where a transliteration of the lyrics comes from.
+/// Where a transliteration of the lyrics may come from — any of them, both by default; none
+/// ticked means no transliteration at all.
 enum TransliterationMethod {
-  none,
-
   /// From MusicDatabase's server, with the lyrics (`GET /lyrics/<songs.id>`).
   server,
 
-  /// Worked out on the phone.
-  onDevice;
-
-  /// Whether it can be chosen yet.
-  bool get works => this == none;
+  /// Worked out on the phone; does nothing yet.
+  onDevice,
 }

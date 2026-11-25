@@ -72,26 +72,26 @@ void main() {
     await tester.pump();
     expect(themes.latinNames, LatinNames.instead);
 
-    await tester.scrollUntilVisible(find.text('Na życzenie'), 200);
+    await tester.scrollUntilVisible(find.text('Zawsze'), 200);
     await tester.pump();
-    await tester.tap(find.text('Na życzenie'));
+    await tester.tap(find.text('Zawsze'));
     await tester.pump();
-    expect(themes.lyricsTransliteration, LyricsTransliteration.onRequest);
+    expect(themes.lyricsTransliteration, LyricsTransliteration.always);
   });
 
-  testWidgets('a transliteration method not built yet stays unpicked', (
-    tester,
-  ) async {
+  testWidgets('both transliteration methods are ticked at first, '
+      'each can be unticked', (tester) async {
     final themes = ThemeController();
     await tester.pumpWidget(app(themes, home: const TransliterationScreen()));
 
-    for (final method in ['Pobierz z serwera', 'Przelicz na miejscu']) {
-      await tester.scrollUntilVisible(find.text(method), 200);
-      await tester.pump();
-      await tester.tap(find.text(method));
-      await tester.pump();
-      expect(find.text('Work in progress :)'), findsOneWidget);
-      expect(themes.transliterationMethod, TransliterationMethod.none);
-    }
+    expect(themes.transliterationMethods, TransliterationMethod.values.toSet());
+    await tester.scrollUntilVisible(find.text('Przelicz na miejscu'), 200);
+    await tester.pump();
+    await tester.tap(find.text('Przelicz na miejscu'));
+    await tester.pump();
+    expect(themes.transliterationMethods, {TransliterationMethod.server});
+    await tester.tap(find.text('Pobierz z serwera'));
+    await tester.pump();
+    expect(themes.transliterationMethods, isEmpty);
   });
 }

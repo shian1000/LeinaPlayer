@@ -12,7 +12,6 @@ import '../data/database_sync.dart';
 import '../l10n.dart';
 import '../data/latin_names.dart';
 import '../data/lyrics.dart';
-import '../data/lyrics_transliteration.dart';
 import '../data/source_settings.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
@@ -1039,10 +1038,10 @@ class _LyricsCardState extends State<_LyricsCard> {
                     ),
                   ),
                 ),
-                if (ThemeScope.maybeOf(context) case final themes?
-                    when themes.lyricsTransliteration ==
-                            LyricsTransliteration.onRequest &&
-                        themes.transliteratesLyricsOf(_hit?.mainSong?.language))
+                if (ThemeScope.maybeOf(
+                      context,
+                    )?.offersLyricsTransliteration(_hit?.mainSong?.language) ??
+                    false)
                   FutureBuilder<Lyrics?>(
                     future: _lyrics,
                     builder: (context, snapshot) =>

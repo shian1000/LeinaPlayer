@@ -88,36 +88,25 @@ class TransliterationScreen extends StatelessWidget {
             ),
           ),
           SectionTitle(l10n.appearanceTransliterationMethod),
-          RadioGroup<TransliterationMethod>(
-            groupValue: themes.transliterationMethod,
-            onChanged: (value) {
-              if (value == null) return;
-              if (!value.works) return showWorkInProgress(context);
-              themes.setTransliterationMethod(value);
-            },
-            child: Column(
-              children: [
-                RadioListTile(
-                  value: TransliterationMethod.none,
-                  title: Text(l10n.appearanceTransliterationMethodNone),
-                ),
-                RadioListTile(
-                  value: TransliterationMethod.server,
-                  title: Text(l10n.appearanceTransliterationMethodServer),
-                  subtitle: Text(
-                    l10n.appearanceTransliterationMethodServerSubtitle,
-                  ),
-                ),
-                RadioListTile(
-                  value: TransliterationMethod.onDevice,
-                  title: Text(l10n.appearanceTransliterationMethodOnDevice),
-                  subtitle: Text(
-                    l10n.appearanceTransliterationMethodOnDeviceSubtitle,
-                  ),
-                ),
-              ],
+          for (final (method, title, subtitle) in [
+            (
+              TransliterationMethod.server,
+              l10n.appearanceTransliterationMethodServer,
+              l10n.appearanceTransliterationMethodServerSubtitle,
             ),
-          ),
+            (
+              TransliterationMethod.onDevice,
+              l10n.appearanceTransliterationMethodOnDevice,
+              l10n.appearanceTransliterationMethodOnDeviceSubtitle,
+            ),
+          ])
+            CheckboxListTile(
+              value: themes.transliterationMethods.contains(method),
+              title: Text(title),
+              subtitle: Text(subtitle),
+              onChanged: (value) =>
+                  themes.setTransliterationMethod(method, value ?? false),
+            ),
           const Divider(height: 24),
           ListTile(
             leading: const Icon(Icons.block),

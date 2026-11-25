@@ -67,7 +67,7 @@ never transliterated on the phone (user's decision); the forms are sent as field
 wyłączone z transliteracji" (songs in a ticked language keep their original names and lyrics —
 `ThemeController.latinNamesFor`), "Transliteracja
 tekstów piosenek" (Nigdy / Na życzenie — a button in the lyrics card / Zawsze) and "Metoda
-transliteracji" (Brak / Pobierz z serwera / Przelicz na miejscu), with no method built yet
+transliteracji" (Pobierz z serwera / Przelicz na miejscu, both, one or none ticked), with no method built yet
 ("Work in progress :)" — `lyrics_transliteration.dart`; the server's waits for a
 [hand-off](docs/handoffs/musicdatabase-lyrics-transliteration.md), the phone's own is an
 [idea](docs/ideas/lyrics-transliteration.md)). Ustawienia › Synchronizacja gives the catalog, the account's library, requests for

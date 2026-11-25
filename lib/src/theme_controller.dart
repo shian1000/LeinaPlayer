@@ -60,7 +60,11 @@ class ThemeController extends ChangeNotifier {
   static const _oldLatinNamesKey = 'appearance.latin_names';
   static const _latinNamesKey = 'appearance.latin_names_mode';
   static const _lyricsTransliterationKey = 'appearance.lyrics_transliteration';
-  static const _transliterationMethodKey = 'appearance.transliteration_method';
+  // One method or "none" before both could be ticked.
+  static const _oldTransliterationMethodKey =
+      'appearance.transliteration_method';
+  static const _transliterationMethodsKey =
+      'appearance.transliteration_methods';
   static const _excludedLanguagesKey =
       'appearance.transliteration_excluded_languages';
   static const _languageKey = 'appearance.language';
@@ -83,8 +87,11 @@ class ThemeController extends ChangeNotifier {
   Color? _monochromeBackground;
   List<Color> _savedColors = const [];
   LatinNames _latinNames = LatinNames.inBrackets;
-  LyricsTransliteration _lyricsTransliteration = LyricsTransliteration.never;
-  TransliterationMethod _transliterationMethod = TransliterationMethod.none;
+  LyricsTransliteration _lyricsTransliteration =
+      LyricsTransliteration.onRequest;
+  Set<TransliterationMethod> _transliterationMethods = TransliterationMethod
+      .values
+      .toSet();
   Set<String> _excludedLanguages = const {};
 
   /// "Nazwy w alfabecie łacińskim": names in another alphabet with their Latin form from
@@ -94,8 +101,9 @@ class ThemeController extends ChangeNotifier {
   /// "Transliteracja tekstów piosenek" (`lyrics_transliteration.dart`).
   LyricsTransliteration get lyricsTransliteration => _lyricsTransliteration;
 
-  /// "Metoda transliteracji".
-  TransliterationMethod get transliterationMethod => _transliterationMethod;
+  /// "Metoda transliteracji": the ticked ones.
+  Set<TransliterationMethod> get transliterationMethods =>
+      _transliterationMethods;
 
   /// "Języki wyłączone z transliteracji": music.db's `songs.language` names whose songs show
   /// neither Latin names nor transliterated lyrics.
@@ -107,8 +115,11 @@ class ThemeController extends ChangeNotifier {
       ? LatinNames.original
       : _latinNames;
 
-  /// Whether lyrics of a song in [language] may be transliterated.
-  bool transliteratesLyricsOf(String? language) =>
+  /// Whether the lyrics card offers to transliterate the lyrics of a song in [language]: "Na
+  /// życzenie", a method other than "Brak", and a language not left out.
+  bool offersLyricsTransliteration(String? language) =>
+      _lyricsTransliteration == LyricsTransliteration.onRequest &&
+      _transliterationMethods.isNotEmpty &&
       !excludedFromTransliteration(language, _excludedLanguages);
 
   CoverFilter get coverFilter => _coverFilter;
@@ -212,11 +223,15 @@ class ThemeController extends ChangeNotifier {
           _lyricsTransliterationKey,
         )] ??
         _lyricsTransliteration;
-    _transliterationMethod =
-        TransliterationMethod.values.asNameMap()[prefs.getString(
-          _transliterationMethodKey,
-        )] ??
-        _transliterationMethod;
+    final byName = TransliterationMethod.values.asNameMap();
+    _transliterationMethods = switch ((
+      prefs.getStringList(_transliterationMethodsKey),
+      prefs.getString(_oldTransliterationMethodKey),
+    )) {
+      (final names?, _) => {for (final name in names) ?byName[name]},
+      (null, 'none') => {},
+      _ => _transliterationMethods,
+    };
     _excludedLanguages = {...?prefs.getStringList(_excludedLanguagesKey)};
     _coverFilter =
         CoverFilter.values
@@ -457,12 +472,20 @@ class ThemeController extends ChangeNotifier {
     );
   }
 
-  Future<void> setTransliterationMethod(TransliterationMethod value) async {
-    _transliterationMethod = value;
+  Future<void> setTransliterationMethod(
+    TransliterationMethod method,
+    bool on,
+  ) async {
+    _transliterationMethods = on
+        ? {..._transliterationMethods, method}
+        : (_transliterationMethods.toSet()..remove(method));
     notifyListeners();
-    await (await SharedPreferences.getInstance()).setString(
-      _transliterationMethodKey,
-      value.name,
+    await (await SharedPreferences.getInstance()).setStringList(
+      _transliterationMethodsKey,
+      [
+        for (final m in TransliterationMethod.values)
+          if (_transliterationMethods.contains(m)) m.name,
+      ],
     );
   }
 
