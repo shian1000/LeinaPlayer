@@ -352,7 +352,8 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   results). A video title naming no artist still leaves the channel as the artist: a request
   goes through `SongRequest.of(hit, artistNamed: catalog.artistNamed)`, which turns a name
   that is one of an artist's `artists.synonyms` / `name_latin` into music.db's name
-  ("familyboombox" → "Бумбокс").
+  ("familyboombox" → "Бумбокс"), and which asks for a YouTube track's title without the junk
+  an older import may have stored in it (`requestTitleOfVideo`).
 - Which moods a song shown on screen is in goes by the hit (`Mood.has`, `moodKeysOfHit`,
   `moodNameListOfHit`, changes through `setHits`), not `hit.mainSong!.id`: a user's mood also holds
   songs music.db doesn't have (`Mood.tracks`). Only a list made of music.db songs (a radio) may use

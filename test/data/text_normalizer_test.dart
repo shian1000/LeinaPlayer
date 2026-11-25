@@ -14,6 +14,29 @@ void main() {
     },
   );
 
+  test('normalizeForSearch drops combining marks and voiced kana marks as '
+      'normalize() does', () {
+    // Values from MusicDatabase's normalize().
+    expect(normalizeForSearch('レイディ・ブルース.'), 'レイティ フルース');
+    expect(normalizeForSearch('レイテ\u3099ィ・フ\u3099ルース'), 'レイティ フルース');
+    expect(normalizeForSearch('Cafe\u0301 Cz\u200bôrny'), 'cafe czorny');
+    expect(normalizeForSearch('ゆらゆら'), 'ゆらゆら');
+    expect(normalizeForSearch('ポップ'), 'ホッフ');
+  });
+
+  test('normalizeWithAnd reads "&" and "+" as "and"', () {
+    expect(
+      normalizeWithAnd('Florence + the Machine'),
+      'florence and the machine',
+    );
+    expect(normalizeWithAnd('The Ball&Chain'), 'the ball and chain');
+    expect(normalizeWithAnd('The Ball And Chain'), 'the ball and chain');
+    expect(
+      normalizeForSearch('Florence + the Machine'),
+      'florence the machine',
+    );
+  });
+
   test('compareNames orders numbers by value', () {
     final names = [
       '10. Pidvalia',

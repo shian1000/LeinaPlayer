@@ -104,6 +104,51 @@ void main() {
     );
   });
 
+  test('a video\'s title stored with junk by an older import is asked for '
+      'without it (the playlist "Скачать (2018.06)")', () {
+    String? artistNamed(String name) =>
+        name == 'nipplepeople' ? 'Nipplepeople' : null;
+    expect(
+      SongRequest.of(
+        video('ゆらゆら（Official Music Video）', 'YeYe', 'StkLx0e4f6c'),
+      )!.title,
+      'ゆらゆら',
+    );
+    final frka = SongRequest.of(
+      video('FRKA , Kire Mitrev, Slavica Maras', 'nipplepeople', '2pfLE5YJ1Fo'),
+      artistNamed: artistNamed,
+    )!;
+    // Stored before the credits were cut: nothing marks them any more, so the title stays.
+    expect(frka.title, 'FRKA , Kire Mitrev, Slavica Maras');
+    expect(frka.artist, 'Nipplepeople');
+    expect(
+      SongRequest.of(
+        video('FRKA (Official video), Kire Mitrev', 'nipplepeople', 'v2'),
+        artistNamed: artistNamed,
+      )!.title,
+      'FRKA',
+    );
+    // Versions and a phone file's tags stay.
+    expect(
+      SongRequest.of(video('ゆらゆら (Live)', 'YeYe', 'v3'))!.title,
+      'ゆらゆら (Live)',
+    );
+    expect(
+      SongRequest.of(
+        SearchHit.phoneOnly(
+          LocalSong(
+            id: 2,
+            filePath: '/music/x.mp3',
+            title: 'Song (Official Video)',
+            artist: 'X',
+            pending: true,
+          ),
+        ),
+      )!.title,
+      'Song (Official Video)',
+    );
+  });
+
   test('the video length is written as duration_s and read back', () async {
     final outbox = newOutbox();
     await outbox.requestSong(

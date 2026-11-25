@@ -376,13 +376,16 @@ class CatalogSong {
 
   // `artists.synonyms` is comma-separated: "Tiesto, DJ TI¨STO" is two names, and only one of
   // them matches a credit naming "Tiësto" (#1439 "Secrets").
+  // Each name also with "&" / "+" read as "and" ([normalizeWithAnd]).
   Set<String> _artistTexts(_SearchNames names) => {
-    normalizeForSearch(artistLabel),
-    for (final name in names.artistNames) normalizeForSearch(name),
-    for (final synonyms in names.synonyms) ...[
-      normalizeForSearch(synonyms),
-      for (final synonym in synonyms.split(',')) normalizeForSearch(synonym),
-    ],
+    for (final name in [
+      artistLabel,
+      ...names.artistNames,
+      for (final synonyms in names.synonyms) ...[
+        synonyms,
+        ...synonyms.split(','),
+      ],
+    ]) ...[normalizeForSearch(name), normalizeWithAnd(name)],
   }..remove('');
 
   /// Normalized text of each [SearchField], indexed by `SearchField.index`.
@@ -1180,7 +1183,8 @@ class SongCatalog extends ChangeNotifier {
 
   /// The song with exactly this title and artist (both compared after normalization, so case,
   /// accents and punctuation don't matter), or `null`. The artist may be any of the song's
-  /// artists, the whole "A, B feat. C" label, or one of the artists' other names. Names read
+  /// artists, the whole "A, B feat. C" label, or one of the artists' other names, "&" and "+"
+  /// read as "and" too ("Florence and the Machine" is "Florence + the Machine"). Names read
   /// from elsewhere go through [findByName], which tries this first. A title with a cover credit
   /// ("Creep (Radiohead cover)") is also a song music.db marks as a cover, titled without it —
   /// only such a song: "Radiohead - Creep (cover)" uploaded by a fan isn't Radiohead's row.
@@ -1202,8 +1206,10 @@ class SongCatalog extends ChangeNotifier {
   }) {
     final normalizedArtist = normalizeForSearch(artist);
     if (normalizedArtist.isEmpty) return null;
+    final withAnd = normalizeWithAnd(artist);
     bool byArtist(CatalogSong s) =>
-        s._normalizedArtists.contains(normalizedArtist);
+        s._normalizedArtists.contains(normalizedArtist) ||
+        s._normalizedArtists.contains(withAnd);
     if (_titled(
           title,
           project,

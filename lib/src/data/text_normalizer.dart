@@ -6,9 +6,10 @@ library;
 
 // Dart has no Unicode decomposition, so letters whose NFKD form is "ASCII letter + combining
 // marks" (or, like "ſ" and "ϐ", one other letter) are listed here, generated from Python's
-// `unicodedata` (Latin-1 Supplement, Latin Extended-A/B, Latin Extended Additional, Greek and
-// Cyrillic: "Вахтёрам" is "вахтерам", "Летний" "летнии"). Index i of [_accented] maps to index i
-// of [_plain].
+// `unicodedata` (Latin-1 Supplement, Latin Extended-A/B, Latin Extended Additional, Greek,
+// Cyrillic and kana: "Вахтёрам" is "вахтерам", "Летний" "летнии", "ブルース" "フルース" — so a
+// title with the voiced mark as a combining U+3099, "フ\u3099ルース" as YouTube sent LUCKY TAPES'
+// "レイディ・ブルース", is the same title). Index i of [_accented] maps to index i of [_plain].
 const _accented =
     'ÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝàáâãäåçèéêëìíîïñòóôõöùúûüýÿĀāĂăĄąĆ'
     'ćĈĉĊċČčĎďĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĨĩĪīĬĭĮįİĴĵĶķĹĺĻļĽľŃńŅņŇňŌōŎŏŐő'
@@ -20,7 +21,9 @@ const _accented =
     'ẴẵẶặẸẹẺẻẼẽẾếỀềỂểỄễỆệỈỉỊịỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữ'
     'ỰựỲỳỴỵỶỷỸỹ'
     'ΆΈΉΊΌΎΏΐΪΫάέήίΰϊϋόύώϐϑϒϓϔϕϖϰϱϲϴϵϹЀЁЃЇЌЍЎЙй'
-    'ѐёѓїќѝўѶѷӁӂӐӑӒӓӖӗӚӛӜӝӞӟӢӣӤӥӦӧӪӫӬӭӮӯӰӱӲӳӴӵӸӹ';
+    'ѐёѓїќѝўѶѷӁӂӐӑӒӓӖӗӚӛӜӝӞӟӢӣӤӥӦӧӪӫӬӭӮӯӰӱӲӳӴӵӸӹ'
+    'がぎぐげござじずぜぞだぢづでどばぱびぴぶぷべぺぼぽゔゞ'
+    'ガギグゲゴザジズゼゾダヂヅデドバパビピブプベペボポヴヷヸヹヺヾ';
 const _plain =
     'AAAAAACEEEEIIIINOOOOOUUUUYaaaaaaceeeeiiiinooooouuuuyyAaAaAaC'
     'cCcCcCcDdEeEeEeEeEeGgGgGgGgHhIiIiIiIiIJjKkLlLlLlNnNnNnOoOoOo'
@@ -32,7 +35,9 @@ const _plain =
     'AaAaEeEeEeEeEeEeEeEeIiIiOoOoOoOoOoOoOoOoOoOoOoOoUuUuUuUuUuUu'
     'UuYyYyYyYy'
     'ΑΕΗΙΟΥΩιΙΥαεηιυιυουωβθΥΥΥφπκρςΘεΣЕЕГІКИУИи'
-    'еегікиуѴѵЖжАаАаЕеӘәЖжЗзИиИиОоӨөЭэУуУуУуЧчЫы';
+    'еегікиуѴѵЖжАаАаЕеӘәЖжЗзИиИиОоӨөЭэУуУуУуЧчЫы'
+    'かきくけこさしすせそたちつてとははひひふふへへほほうゝ'
+    'カキクケコサシスセソタチツテトハハヒヒフフヘヘホホウワヰヱヲヽ';
 
 /// Letters that don't decompose; same table as `_SPECIAL_REPLACEMENTS` in normalizer.py.
 const _special = {
@@ -57,6 +62,9 @@ final _letterMap = <int, String>{
 final _apostrophes = RegExp(
   '[\'`\u00b4\u02b9\u02bc\u02bb\u02bd\u0374\uff07\u2018\u2019\u201a\u201b\u2032\u2035]',
 );
+// Dropped, not turned into spaces, as normalize.py drops what NFKD leaves combining and the
+// invisible format characters: "ブ" may come as "フ" + U+3099, "é" as "e" + U+0301.
+final _marks = RegExp(r'[\p{Mn}\p{Me}\p{Cf}]', unicode: true);
 final _punctuation = RegExp(r'[^\p{L}\p{N}_\s]', unicode: true);
 final _spaces = RegExp(r'\s+');
 
@@ -73,12 +81,21 @@ String normalizeForSearch(String? text) {
   }
   return buffer
       .toString()
+      .replaceAll(_marks, '')
       .replaceAll(_apostrophes, '')
       .replaceAll(_punctuation, ' ')
       .replaceAll(_spaces, ' ')
       .trim()
       .toLowerCase();
 }
+
+final _andSign = RegExp(r'\s*[&+]\s*');
+
+/// [name] normalised with "&" and "+" read as "and": another key for an artist's name, so
+/// "Florence and the Machine" is music.db's "Florence + the Machine" and "The Ball And Chain"
+/// "The Ball & Chain" ([normalizeForSearch] alone turns the signs into spaces and keeps "and").
+String normalizeWithAnd(String? name) =>
+    normalizeForSearch(name?.replaceAll(_andSign, ' and '));
 
 final _digitRuns = RegExp(r'\d+|\D+');
 

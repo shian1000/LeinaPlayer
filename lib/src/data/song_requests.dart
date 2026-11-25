@@ -2,6 +2,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import 'combined_search.dart';
 import 'text_normalizer.dart';
+import 'youtube_playlist.dart';
 
 /// A song the phone plays that music.db doesn't have, asked to be added to MusicDatabase
 /// (the outbox's `song_requests`, hand-off `docs/handoffs/musicdatabase-song-requests.md`).
@@ -23,6 +24,7 @@ class SongRequest {
   /// [artistNamed] (`SongCatalog.artistNamed`) gives music.db's name of an artist known by
   /// another name: a video's channel or a file's tag may be one of its `artists.synonyms`
   /// ("familyboombox" is "Бумбокс"), and the request then asks for the artist music.db has.
+  /// A video's title loses the junk an older import left in it ([requestTitleOfVideo]).
   static SongRequest? of(
     SearchHit hit, {
     String? Function(String name)? artistNamed,
@@ -34,14 +36,17 @@ class SongRequest {
         ? null
         : artistNamed?.call(shown) ?? shown;
     final videoId = hit.playlistVideoId ?? hit.youtubeVideoId;
+    final source = file != null
+        ? SongRequestSource.phoneFile
+        : videoId == null && hit.spotifyTrackId != null
+        ? SongRequestSource.spotify
+        : SongRequestSource.youtube;
     return SongRequest(
-      title: hit.title,
+      title: source == SongRequestSource.youtube
+          ? requestTitleOfVideo(hit.title)
+          : hit.title,
       artist: artist,
-      source: file != null
-          ? SongRequestSource.phoneFile
-          : videoId == null && hit.spotifyTrackId != null
-          ? SongRequestSource.spotify
-          : SongRequestSource.youtube,
+      source: source,
       album: hit.album,
       year: hit.year,
       youtubeVideoId: file != null ? null : videoId,

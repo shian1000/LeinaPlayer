@@ -47,7 +47,8 @@ String? extractPlaylistId(String raw) {
 /// year. An event's "`<event 2018> | <artist> | <song> | <channel>`" reads as that artist and
 /// song. "Artist- Title", the dash glued to the artist, splits too, and a title in quotes
 /// (`''Aniolek''`, „…”) loses them. Credits after the title go: a producer's ("prod. Sergiusz",
-/// [withoutProducerCredits]) and players' (", gitara …"); a guest ("gość Sarsa", " - feat. X -")
+/// [withoutProducerCredits]) and players' (", gitara …"), and names listed after a junk bracket
+/// ("FRKA (Official video), Kire Mitrev, Slavica Maras"); a guest ("gość Sarsa", " - feat. X -")
 /// joins the artist as "feat.". "┃Cover by Raon Lee" names the performer (the channel when it is
 /// that name's start). A bracket right after the artist's name at the start is its logo ("alt-J
 /// (∆) Breezeblocks"), one in another alphabet after a Latin title its original ("SILHOUETTE
@@ -142,14 +143,7 @@ _readYouTubeTrack(
     title = _pipedArtists(title, artistNamed) ?? title;
   }
   title = title.replaceAll(_pipeSuffix, '');
-  title = title.replaceAllMapped(
-    _anyBracket,
-    (m) =>
-        _junkAnywhere.hasMatch(m.group(1)!) &&
-            !_versionMarker.hasMatch(m.group(1)!)
-        ? ' '
-        : m.group(0)!,
-  );
+  title = _withoutJunkBrackets(title);
   final withHashtags = title;
   final hashtags = [
     for (final tag in _hashtag.allMatches(withHashtags))
@@ -257,6 +251,37 @@ final _playerCredit = RegExp(
 final _guestCredit = RegExp(
   r'(?:\s+gość\s+|\s+[-–—]\s+(?:feat\.?|ft\.?|featuring)\s+)(.+)$',
   caseSensitive: false,
+);
+bool _isJunkBracket(String bracket) =>
+    _junkAnywhere.hasMatch(bracket) && !_versionMarker.hasMatch(bracket);
+
+/// [title] without its junk brackets ([_junkAnywhere], not a version's) and the credits listed
+/// after one ([_creditsAfterJunk]); the brackets become spaces.
+String _withoutJunkBrackets(String title) {
+  if (_creditsAfterJunk.firstMatch(title) case final credits?
+      when credits.start > 0 && _isJunkBracket(credits.group(1)!)) {
+    title = title.substring(0, credits.start);
+  }
+  return title.replaceAllMapped(
+    _anyBracket,
+    (m) => _isJunkBracket(m.group(1)!) ? ' ' : m.group(0)!,
+  );
+}
+
+/// A playlist track's stored [title] cleaned as [parseYouTubeTrack] now cleans a video's, for
+/// what is asked of MusicDatabase ([SongRequest.of]): a track imported before a fix to the
+/// parser keeps its title until the next import ("ゆらゆら（Official Music Video）" from before
+/// full-width brackets were read), and the request shouldn't ask for the junk. Only the junk
+/// brackets and the credits after one go; [title] itself when nothing would be left.
+String requestTitleOfVideo(String title) {
+  final cut = _withoutJunkBrackets(title).replaceAll(_spaces, ' ').trim();
+  return cut.isEmpty ? title : cut;
+}
+
+// "nipplepeople FRKA (Official video), Kire Mitrev, Slavica Maras": names listed after the junk
+// bracket that ends the title proper are its credits (the songwriters), not part of it.
+final _creditsAfterJunk = RegExp(
+  r'\s*[(\[【（［]([^()\[\]【】（）［］]*)[)\]】）］]\s*,\s*[^()\[\]【】（）［］|]+$',
 );
 // "General Woo U mom zivotu Official": the word alone at the end.
 final _trailingOfficial = RegExp(r'(?<=\S)\s+official$', caseSensitive: false);
@@ -490,8 +515,9 @@ final _leadingBracket = RegExp(r'^[(\[【（［][^()\[\]【】（）［］]*[)\]
 
 final _hashtag = RegExp(r'#\S+');
 final _spaces = RegExp(r'\s+');
-final _anyBracket = RegExp(r'[\(\[【]([^()\[\]【】]*)[\)\]】]');
-final _trailingBracket = RegExp(r'\s*[\(\[【]([^()\[\]【】]*)[\)\]】]\s*$');
+// Full-width brackets too: "ゆらゆら（Official Music Video）" by YeYe.
+final _anyBracket = RegExp(r'[\(\[【（［]([^()\[\]【】（）［］]*)[\)\]】）］]');
+final _trailingBracket = RegExp(r'\s*[\(\[【（［]([^()\[\]【】（）［］]*)[\)\]】）］]\s*$');
 final _doubleQuotes = RegExp(r'["“”„‟『』]');
 final _quoted = RegExp(r"^(?:''|[‘’'«»])(.+?)(?:''|[‘’'«»])$");
 final _gluedDash = RegExp(r'(?<=\S)[-–—]\s+');

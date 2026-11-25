@@ -1045,8 +1045,10 @@ mood; a ticked mood that's gone doesn't count. "Utwór dodany spoza filtra": **W
   danych." — and a small accent line under the summary, "Baza danych odrzuciła X utworów z tej
   playlisty. Kliknij, by wyświetlić" (implemented), unfolds them in place under it, same rows,
   tapping one plays as above; tapped again ("… Kliknij, by ukryć") it folds them back;
-  **Poproś MusicDatabase o dodanie** (implemented; shown only while some track is still to be
-  asked for) puts every track outside the database into the outbox as a song request, as playing
+  **Poproś MusicDatabase o dodanie** (implemented; shown only while some track not rejected is
+  still to be asked for — none of the outbox's request files, waiting, sent or refused, asks for
+  it by name or video: `Outbox.allSongsRequested`, checked again when the outbox changes, so
+  after the tap and on the screen opened again it's gone) puts every track outside the database into the outbox as a song request, as playing
   it would — not again when already asked for or rejected — then sends the outbox at once like
   "Wyślij teraz", a snackbar counting new / already-asked / rejected requests and saying whether
   they were sent), Dodaj do innej playlisty

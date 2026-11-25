@@ -132,7 +132,11 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    number, the label's own name and the compilation after " - " go), "Artist: Title" when the
    part before the colon is the channel or a known artist. Trailing credits go: "prod. X"
    (`withoutProducerCredits`; MusicDatabase's `strip_producer_credit()` only cuts bracketed ones),
-   ", gitara X"; a guest ("gość Sarsa", " - feat. X - ") joins the artist as "feat.". "┃Cover by
+   ", gitara X", and names listed after a junk bracket ("nipplepeople FRKA (Official video), Kire
+   Mitrev, Slavica Maras" — songwriters — is "FRKA" by the channel, whose name in front goes as
+   `_stripArtist` cuts it; not after a bracket that is part of the title or a version's); a
+   guest ("gość Sarsa", " - feat. X - ") joins the artist as "feat.". Brackets are ASCII,
+   【】 and the full-width （） / ［］ ("ゆらゆら（Official Music Video）" by YeYe). "┃Cover by
    Raon Lee" names the performer (the channel when it starts that name), "alt-J (∆) Breezeblocks"
    loses the logo bracket, "SILHOUETTE (シルエット)" the original-alphabet one, "(Bob Dylan's 'Man
    Gave Names…')" the original song's name. With `artistNamed` (what's stored and requested:
@@ -142,6 +146,10 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    #hot16challenge" → "hot16challenge", as written), and "The Cure | Talk Talk | Foghorn - muzyka
    na jesień" names the three artists.
    The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
+   A track's stored title changes only by a re-import, so `SongRequest.of` asks for a YouTube
+   track's title through `requestTitleOfVideo()` — the junk brackets and the credits after one
+   cut as the parse now does — rather than asking MusicDatabase for "ゆらゆら（Official Music
+   Video）" stored before full-width brackets were read.
 3. Recognising the MusicDatabase song (`PlaylistLibrary.matchSong`): **by the video first** —
    music.db's `youtube_video_id`, then a video the phone matched earlier (`youtube_matches`) —
    then title + artist (`SongCatalog.findByVideoTitle` → `findByName`: exact, without feat. credits in the title or the artist, swapped; a "(Live)" only a live version — `local-library.md`).
@@ -153,7 +161,13 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    "((Videoclip))", "prod. X", a bare trailing "lyrics" / "official" (matching only —
    MusicDatabase never cuts a bare "lyrics" from a title). An artist's comma-separated
    `artists.synonyms` count one by one: "Tiësto & KSHMR feat. Vassy" is #1439 by "DJ Tiesto"
-   (synonyms "Tiesto, DJ TI¨STO") and KSHMR.
+   (synonyms "Tiesto, DJ TI¨STO") and KSHMR. An artist's name also matches with "&" / "+" read
+   as "and" (`normalizeWithAnd`): "Florence and the Machine" is "Florence + the Machine", "The
+   Ball And Chain" "The Ball & Chain" (`normalizeForSearch` turns the signs into spaces but keeps
+   "and"). `normalizeForSearch` drops combining marks as MusicDatabase's NFKD does and folds kana
+   with a voiced mark to the plain one: YouTube sent LUCKY TAPES' "レイディ・ブルース" with
+   "デ" / "ブ" as "テ" / "フ" + U+3099, which turned into spaces and missed #277 (playlist
+   "Скачать (2018.06)", 2026-11-25).
    When the parse could only take the artist from the channel and names no song,
    `channelVideoReadings()` tries a title starting with a whole artist name music.db knows
    ("renata przemyk bo jesli tak ma byc" by "thericeburner"; `SongCatalog.artistNamed`, longest

@@ -1018,6 +1018,61 @@ void main() {
       expect(found('Ending Theme', 'Cowboy Bebop'), isNull);
     });
 
+    test('the playlist "Скачать (2018.06)" tracks music.db has: "+" / "&" '
+        'read as "and", full-width junk brackets, kana with a combining voiced '
+        'mark', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE songs ADD COLUMN title_latin VARCHAR');
+      for (final (id, name) in [
+        (75, 'Florence + the Machine'),
+        (1248, 'The Ball & Chain'),
+        (1249, 'The Ball And Chain'),
+        (227, 'YeYe'),
+        (209, 'LUCKY TAPES'),
+      ]) {
+        await db.insert('artists', {'id': id, 'name': name});
+      }
+      for (final (id, title, artist, latin) in [
+        (106, 'Drumming Song', 75, null),
+        (107, 'Girl With One Eye', 75, null),
+        (241, "Don't Tell Me Everything", 1248, null),
+        (242, 'Another One', 1249, null),
+        (299, 'ゆらゆら', 227, 'Yurayura'),
+        (277, 'レイディ・ブルース.', 209, 'Lady blues.'),
+        (274, 'MOON', 209, null),
+        (291, '贅沢な罠', 209, null),
+      ]) {
+        await db.insert('songs', {
+          'id': id,
+          'title': title,
+          'artist_id': artist,
+          'title_latin': latin,
+        });
+      }
+      await db.close();
+      await catalog.ensureLoaded();
+
+      int? found(String title, String artist) =>
+          catalog.findByName(title: title, artist: artist)?.id;
+      expect(found('Girl With One Eye', 'Florence + the Machine'), 107);
+      expect(found('Drumming Song', 'Florence and the Machine'), 106);
+      expect(found('Drumming Song', 'Florence & the Machine'), 106);
+      expect(found("Don't Tell Me Everything", 'The Ball And Chain'), 241);
+      expect(found("Don't Tell Me Everything", 'The Ball & Chain'), 241);
+      expect(found('Another One', 'The Ball & Chain'), 242);
+      expect(found('ゆらゆら（Official Music Video）', 'YeYe'), 299);
+      expect(found('ゆらゆら [Official Video]', 'YeYe'), 299);
+      expect(found('レイディ・ブルース', 'LUCKY TAPES'), 277);
+      // As YouTube sent the title: "デ" and "ブ" as "テ" / "フ" + U+3099.
+      expect(found('レイテ\u3099ィ・フ\u3099ルース', 'LUCKY TAPES'), 277);
+      expect(found('Lady blues', 'LUCKY TAPES'), 277);
+      expect(found('MOON', 'LUCKY TAPES'), 274);
+      expect(found('贅沢な罠', 'LUCKY TAPES'), 291);
+      expect(found("Don't Tell Me Everything", 'The Ball'), isNull);
+    });
+
     test(
       'without soundtrack_works only the albums say what a work is',
       () async {

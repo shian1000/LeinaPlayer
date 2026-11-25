@@ -12,6 +12,7 @@ import 'package:music_database_app/src/data/playlist_bookmarks.dart';
 import 'package:music_database_app/src/data/playlist_library.dart';
 import 'package:music_database_app/src/data/saved_songs.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
+import 'package:music_database_app/src/data/song_requests.dart';
 import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/youtube_account.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
@@ -87,6 +88,15 @@ void main() {
   /// suite running in parallel); spinners never settle, so only pump meanwhile.
   Future<void> settle(WidgetTester tester, {required Finder until}) async {
     await pumpUntil(tester, () => until.evaluate().isNotEmpty);
+    await tester.pumpAndSettle();
+  }
+
+  /// Waits until the outbox has done what was asked of it so far — the request button's check
+  /// whether every track was asked for among it ([Outbox.allSongsRequested] runs in turn).
+  Future<void> outboxChecked(WidgetTester tester) async {
+    var done = false;
+    unawaited(outbox.allSongsRequested(const []).then((_) => done = true));
+    await pumpUntil(tester, () => done);
     await tester.pumpAndSettle();
   }
 
@@ -329,20 +339,38 @@ void main() {
     expect(find.text('Utwór'), findsOneWidget);
     expect(find.text('Małomiasteczkowy'), findsNothing);
 
-    // Asking MusicDatabase for them: the unrecognised track goes to the outbox once.
+    // Asking MusicDatabase for them: the unrecognised track goes to the outbox once. The
+    // button shows once the outbox says the track wasn't asked for yet.
+    await settle(tester, until: find.text('Poproś MusicDatabase o dodanie'));
     await tester.tap(find.text('Poproś MusicDatabase o dodanie'));
     await settle(tester, until: find.textContaining('Nowe prośby o dodanie'));
     expect(find.textContaining('Nowe prośby o dodanie: 1'), findsOneWidget);
+    // The button's own check of the outbox first: the outbox works in turn, and a call in
+    // runAsync would wait for that check, which moves only while frames are pumped.
+    await outboxChecked(tester);
     final requests = (await tester.runAsync(outbox.waitingSongRequests))!;
     expect(requests.map((r) => (r.artist, r.title, r.youtubeVideoId)), [
       ('Nieznany', 'Utwór', 'nn'),
     ]);
-    await tester.tap(find.text('Poproś MusicDatabase o dodanie'));
-    await settle(
-      tester,
-      until: find.textContaining('Nowe prośby o dodanie: 0'),
+    // Every track asked for: no button any more, nor on the screen opened again.
+    expect(find.text('Poproś MusicDatabase o dodanie'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Menu playlisty (⋮)'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+      200,
+      scrollable: find.byType(Scrollable).last,
     );
-    expect(find.textContaining('zgłoszone już wcześniej: 1'), findsOneWidget);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Wyświetl utwory, których nie ma w bazie danych'),
+    );
+    await settle(tester, until: find.text('Poza bazą danych: 1 z 2'));
+    await outboxChecked(tester);
+    expect(find.text('Utwór'), findsOneWidget);
+    expect(find.text('Poproś MusicDatabase o dodanie'), findsNothing);
   });
 
   /// A Biblioteka playlist of the two songs in [pumpLibrary]'s YouTube playlist.
@@ -482,6 +510,7 @@ void main() {
     expect(find.text(show), findsOneWidget);
 
     // The request button asks for the other one and still counts the rejected one.
+    await settle(tester, until: find.text('Poproś MusicDatabase o dodanie'));
     await tester.tap(find.text('Poproś MusicDatabase o dodanie'));
     await settle(tester, until: find.textContaining('Nowe prośby o dodanie'));
     expect(
@@ -490,6 +519,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    await outboxChecked(tester);
     final requests = (await tester.runAsync(outbox.waitingSongRequests))!;
     expect(requests.map((r) => r.title), ['Utwór']);
   });
@@ -519,6 +549,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Utwór'), findsOneWidget);
     expect(find.text('Odrzucony'), findsOneWidget);
+  });
+
+  testWidgets('"Poproś MusicDatabase o dodanie" is shown while a track not '
+      'rejected is still to be asked for, and counts the ones asked '
+      'before', (tester) async {
+    await pumpLibrary(
+      tester,
+      before: () async {
+        await importDoAutaWithOdrzucony();
+        // "Utwór" asked for before, by its video, e.g. by playing it.
+        await outbox.requestSong(
+          const SongRequest(
+            title: 'Utwór',
+            artist: 'Nieznany',
+            source: SongRequestSource.youtube,
+            youtubeVideoId: 'nn',
+          ),
+        );
+      },
+    );
+    await openMissingTracks(tester, find.text('Poza bazą danych: 2 z 3'));
+    await settle(tester, until: find.text('Poproś MusicDatabase o dodanie'));
+    await tester.tap(find.text('Poproś MusicDatabase o dodanie'));
+    await settle(tester, until: find.textContaining('Nowe prośby o dodanie'));
+    expect(
+      find.textContaining(
+        'Nowe prośby o dodanie: 1 · zgłoszone już wcześniej: 1',
+      ),
+      findsOneWidget,
+    );
+    await outboxChecked(tester);
+    expect(find.text('Poproś MusicDatabase o dodanie'), findsNothing);
+  });
+
+  testWidgets('with every track not rejected asked for already, no button', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      before: () async {
+        await importDoAutaWithOdrzucony();
+        await outbox.requestSong(
+          const SongRequest(
+            title: 'Utwór',
+            artist: 'Nieznany',
+            source: SongRequestSource.youtube,
+          ),
+        );
+      },
+      editMusicDb: rejecting([('Ktoś', 'Odrzucony', 'rj')]),
+    );
+    await openMissingTracks(tester, find.text('Poza bazą danych: 1 z 3'));
+    await outboxChecked(tester);
+    expect(find.text('Utwór'), findsOneWidget);
+    expect(find.text('Poproś MusicDatabase o dodanie'), findsNothing);
   });
 
   testWidgets(

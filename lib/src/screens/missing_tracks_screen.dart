@@ -198,7 +198,9 @@ class _MissingTracksScreenState extends State<MissingTracksScreen> {
 /// "Poproś MusicDatabase o dodanie": every track outside the database goes to the outbox as a
 /// song request, as playing it would ([SongRequest.of]; one already asked for or rejected by
 /// MusicDatabase's owner — [_requestOf] — isn't asked again, only counted), then the outbox is
-/// sent at once, like "Wyślij teraz". Shown only while some track is still to be asked for.
+/// sent at once, like "Wyślij teraz". Shown only while some track not rejected is still to be
+/// asked for ([Outbox.allSongsRequested], checked again whenever the outbox changes) — once all
+/// are in the outbox, waiting or sent, the screen opened again has no button.
 class _RequestMissingButton extends StatefulWidget {
   const _RequestMissingButton({required this.hits});
 
@@ -210,6 +212,43 @@ class _RequestMissingButton extends StatefulWidget {
 
 class _RequestMissingButtonState extends State<_RequestMissingButton> {
   bool _busy = false;
+
+  /// `null` until the outbox has been checked: no button meanwhile, so it doesn't flash.
+  bool? _allAsked;
+  int _check = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkAsked();
+  }
+
+  @override
+  void didUpdateWidget(_RequestMissingButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.hits != widget.hits) _checkAsked();
+  }
+
+  Future<void> _checkAsked() async {
+    final outbox = OutboxScope.of(context);
+    final catalog = SongCatalogScope.of(context);
+    final check = ++_check;
+    final requests = [
+      for (final hit in widget.hits)
+        if (_requestOf(hit, catalog) case (
+          request: final request?,
+          rejected: false,
+        ))
+          request,
+    ];
+    try {
+      final asked = await outbox.allSongsRequested(requests);
+      if (mounted && check == _check) setState(() => _allAsked = asked);
+    } catch (e) {
+      debugPrint('Checking the asked-for songs failed: $e');
+      if (mounted && check == _check) setState(() => _allAsked = false);
+    }
+  }
 
   Future<void> _request() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -263,20 +302,22 @@ class _RequestMissingButtonState extends State<_RequestMissingButton> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: FilledButton.icon(
-        icon: _busy
-            ? const SizedBox.square(
-                dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.playlist_add_check),
-        label: Text(l10n.missingTracksScreenRequestButton),
-        onPressed: _busy ? null : _request,
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => _allAsked != false && !_busy
+      ? const SizedBox.shrink()
+      : Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              icon: _busy
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.playlist_add_check),
+              label: Text(l10n.missingTracksScreenRequestButton),
+              onPressed: _busy ? null : _request,
+            ),
+          ),
+        );
 }

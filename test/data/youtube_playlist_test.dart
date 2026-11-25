@@ -357,6 +357,57 @@ void main() {
     });
   });
 
+  group('the playlist "Скачать (2018.06)"', () {
+    String? artistNamed(String name) => const {
+      'nipplepeople': 'Nipplepeople',
+      'yeye': 'YeYe',
+    }[normalizeForSearch(name)];
+    ({String artist, String title}) p(String title, String channel) =>
+        parseYouTubeTrack(title, channel, artistNamed: artistNamed);
+
+    test('the channel\'s name in front, credits after the junk bracket', () {
+      expect(
+        p(
+          'nipplepeople FRKA (Official video), Kire Mitrev, Slavica Maras',
+          'nipplepeople',
+        ),
+        (artist: 'nipplepeople', title: 'FRKA'),
+      );
+      expect(
+        parseYouTubeTrack(
+          'Nipplepeople - FRKA (Official video), Kire Mitrev, Slavica Maras',
+          'x',
+        ),
+        (artist: 'Nipplepeople', title: 'FRKA'),
+      );
+      // Not after a bracket that is part of the title, nor a version's.
+      expect(p('Grad (Zagreb), Split, Rijeka', 'nipplepeople'), (
+        artist: 'nipplepeople',
+        title: 'Grad (Zagreb), Split, Rijeka',
+      ));
+      expect(p('Nipplepeople - FRKA (Live), Tvornica', 'x'), (
+        artist: 'Nipplepeople',
+        title: 'FRKA (Live), Tvornica',
+      ));
+    });
+
+    test('full-width junk brackets go, as ASCII ones do', () {
+      expect(p('ゆらゆら（Official Music Video）', 'YeYe'), (
+        artist: 'YeYe',
+        title: 'ゆらゆら',
+      ));
+      expect(p('YeYe - ゆらゆら［MV］（Official Video）', 'x'), (
+        artist: 'YeYe',
+        title: 'ゆらゆら［MV］',
+      ));
+      expect(p('YeYe - ゆらゆら（Live）', 'x'), (
+        artist: 'YeYe',
+        title: 'ゆらゆら（Live）',
+      ));
+      expect(titlesToMatch('ゆらゆら（Official Music Video）').last, 'ゆらゆら');
+    });
+  });
+
   test('titlesToMatch: junk a stored title still has, cut for matching', () {
     List<String> t(String title) => titlesToMatch(title);
     expect(t('I Follow Rivers (Original)').last, 'I Follow Rivers');

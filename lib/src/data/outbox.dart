@@ -268,9 +268,23 @@ class Outbox extends ChangeNotifier {
         : Duration(seconds: row['duration_s']! as int),
   );
 
-  Future<bool> _songRequested(SongRequest song) async {
+  /// Whether every one of [songs] was asked for already, by name or by its video, in a request
+  /// waiting, sent or refused — as [requestSong] decides; `true` for none. "Poproś MusicDatabase
+  /// o dodanie" is shown only while it isn't.
+  Future<bool> allSongsRequested(Iterable<SongRequest> songs) =>
+      _inTurn(() async {
+        final asked = await _askedSongs();
+        return songs.every(asked.has);
+      });
+
+  Future<bool> _songRequested(SongRequest song) async =>
+      (await _askedSongs()).has(song);
+
+  Future<_AskedSongs> _askedSongs() async {
     final dir = await directory();
     final factory = factoryOverride ?? databaseFactory;
+    final keys = <String>{};
+    final videos = <String>{};
     for (final folder in _numbered(dir)) {
       if (!await folder.exists()) continue;
       await for (final f in folder.list()) {
@@ -280,18 +294,15 @@ class Outbox extends ChangeNotifier {
           if (!await _hasTable(db, _songRequests)) continue;
           for (final row in await db.query(_songRequests)) {
             final asked = _songRequestOf(row);
-            if (asked.key == song.key ||
-                (song.youtubeVideoId != null &&
-                    asked.youtubeVideoId == song.youtubeVideoId)) {
-              return true;
-            }
+            keys.add(asked.key);
+            if (asked.youtubeVideoId case final video?) videos.add(video);
           }
         } finally {
           await db.close();
         }
       }
     }
-    return false;
+    return _AskedSongs(keys, videos);
   }
 
   /// The links found for songs without one in the requests waiting to be sent, in the order
@@ -1108,6 +1119,18 @@ class Outbox extends ChangeNotifier {
 
 /// How one [Outbox.send] went; [problem] (Polish, for display) says why something is still
 /// waiting, `null` when everything went.
+/// The songs asked for in the outbox's request files, by [SongRequest.key] and by video.
+class _AskedSongs {
+  const _AskedSongs(this.keys, this.videos);
+
+  final Set<String> keys;
+  final Set<String> videos;
+
+  bool has(SongRequest song) =>
+      keys.contains(song.key) ||
+      (song.youtubeVideoId != null && videos.contains(song.youtubeVideoId));
+}
+
 class OutboxSendResult {
   const OutboxSendResult({
     required this.sent,
