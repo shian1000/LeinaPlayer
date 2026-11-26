@@ -71,10 +71,7 @@ void main() {
     var taps = 0;
     await tester.pumpWidget(
       _boxed(
-        GestureDetector(
-          onTap: () => taps++,
-          child: const ScrollingText(_long),
-        ),
+        GestureDetector(onTap: () => taps++, child: const ScrollingText(_long)),
       ),
     );
     await tester.pump();

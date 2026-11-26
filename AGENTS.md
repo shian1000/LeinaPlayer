@@ -67,10 +67,11 @@ never transliterated on the phone (user's decision); the forms are sent as field
 wyłączone z transliteracji" (songs in a ticked language keep their original names and lyrics —
 `ThemeController.latinNamesFor`), "Transliteracja
 tekstów piosenek" (Nigdy / Na życzenie — a button in the lyrics card / Zawsze) and "Metoda
-transliteracji" (Pobierz z serwera / Przelicz na miejscu, both, one or none ticked), with no method built yet
-("Work in progress :)" — `lyrics_transliteration.dart`; the server's waits for a
-[hand-off](docs/handoffs/musicdatabase-lyrics-transliteration.md), the phone's own is an
-[idea](docs/ideas/lyrics-transliteration.md)). Ustawienia › Synchronizacja gives the catalog, the account's library, requests for
+transliteracji" (Pobierz z serwera / Przelicz na miejscu, both, one or none ticked): the server's
+Latin text comes with the lyrics (`Lyrics.latin` / `latinAlternatives`, `lyrics_transliteration.dart`,
+[hand-off](docs/handoffs/musicdatabase-lyrics-transliteration.md)), "Alternatywne metody
+transliteracji › Ukraiński" picks Narodowa (the server's usual one, the national system of 2010) or Słowiańska (its `uk-slavic`);
+the phone's own is only an [idea](docs/ideas/lyrics-transliteration.md) ("Work in progress :)"). Ustawienia › Synchronizacja gives the catalog, the account's library, requests for
 MusicDatabase and problem reports each their own sources, switched and ordered (the private
 server, GitHub for the catalog, a future "Serwer Leina" — "Work in progress :)"), with the
 phone's own data apart ([ADR 0018](docs/decisions/0018-sync-sources.md)). Every cache setting is in one screen, Oszczędzanie

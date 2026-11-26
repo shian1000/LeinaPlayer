@@ -19,6 +19,8 @@ class Lyrics {
     this.synced = const [],
     this.instrumental = false,
     this.source = 'LRCLIB',
+    this.latin,
+    this.latinAlternatives = const {},
   });
 
   final String? plain;
@@ -27,6 +29,13 @@ class Lyrics {
 
   /// Where the text came from, as the card credits it ("MusicDatabase (Genius)").
   final String source;
+
+  /// The same words in Latin letters, line for line, from MusicDatabase (`plain_latin` /
+  /// `synced_latin`); `null` when it sent none (`lyrics_transliteration.dart`).
+  final Lyrics? latin;
+
+  /// Other Latin texts MusicDatabase sent, by its method name (`"uk-slavic"`).
+  final Map<String, Lyrics> latinAlternatives;
 
   bool get isEmpty => !instrumental && synced.isEmpty && (plain ?? '').isEmpty;
 
@@ -127,17 +136,36 @@ class LyricsFinder {
         continue;
       }
       if (json is! Map) return null;
+      final source = _serverCredit(json['source']);
+      final alternatives = json['latin_alternatives'];
       final lyrics = Lyrics(
         plain: json['plain'] as String?,
         synced: parseLrc(json['synced'] as String? ?? ''),
         instrumental: json['instrumental'] == true,
-        source: _serverCredit(json['source']),
+        source: source,
+        latin: _latinOf(json['plain_latin'], json['synced_latin'], source),
+        latinAlternatives: {
+          if (alternatives is Map)
+            for (final MapEntry(:key, :value) in alternatives.entries)
+              if (key is String && value is Map)
+                key: ?_latinOf(value['plain'], value['synced'], source),
+        },
       );
       // Plain text alone is often on purpose (the synced lines didn't fit the song's
       // video): LRCLIB's synced lines aren't asked for instead.
       return lyrics.isEmpty ? null : lyrics;
     }
     return null;
+  }
+
+  /// A Latin text the server sent, `null` when it's missing (an older server) or empty.
+  static Lyrics? _latinOf(Object? plain, Object? synced, String source) {
+    final latin = Lyrics(
+      plain: plain is String ? plain : null,
+      synced: parseLrc(synced is String ? synced : ''),
+      source: source,
+    );
+    return latin.isEmpty ? null : latin;
   }
 
   static String _serverCredit(Object? source) => switch (source) {

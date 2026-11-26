@@ -166,9 +166,12 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     "Szukam tekstu…", "Nie znalazłem tekstu tego utworu.", "Utwór instrumentalny." or no
     connection with "Spróbuj ponownie"; "Teksty: <source>" under it ("MusicDatabase (Genius)", "LRCLIB").
     Not shown at all (and neither asked) with Oszczędzanie danych › "Pobieraj teksty piosenek" off.
-    With Wygląd › "Transliteracja tekstów piosenek" on "Na życzenie", lyrics with a non-Latin
-    letter get a "Transliteruj tekst" button (translate icon) in the header — "Work in
-    progress :)" for now. Then Informacje o utworze.
+    With Wygląd › "Transliteracja tekstów piosenek" on "Na życzenie" or "Zawsze", lyrics with a
+    non-Latin letter get a "Transliteruj tekst" button (translate icon) in the header: it switches
+    to the Latin text MusicDatabase sent with the lyrics (accent icon, "Pokaż oryginalny tekst")
+    and back; "Zawsze" opens on the Latin text. Ukrainian lyrics in the method of "Alternatywne
+    metody transliteracji › Ukraiński". With no Latin text: "Work in progress :)" when "Przelicz
+    na miejscu" is ticked, else "Serwer nie ma tego tekstu w łacince". Then Informacje o utworze.
   - Kolejka
     (`queue_screen.dart`) — **implemented** (rows show videos found since the queue was filled,
     e.g. by caching ahead): opens at "Teraz odtwarzane"; scrolled up, "Poprzednie" — the last
@@ -530,14 +533,21 @@ import, Wyświetlanie, Dane, Aplikacja.
     A switch until 2026-11 (`appearance.latin_names`; off is read as the first radio).
   - "Transliteracja tekstów piosenek" — radios Nigdy / Na życzenie (default; a "Transliteruj
     tekst" button in the lyrics card's header, for lyrics with a non-Latin letter) / Zawsze
-    (`lyrics_transliteration.dart`). No method is built yet: the button says "Work in
-    progress :)".
+    (`lyrics_transliteration.dart`; the button stays in "Zawsze", to show the original).
   - "Metoda transliteracji" — two checkboxes, Pobierz z serwera / Przelicz na miejscu, any of
     them or none, both ticked by default (user's choice, 2026-11-25; `transliteration_methods`,
     an old "none" from the radios before is read as none ticked). None ticked: no button in the
-    lyrics card. Neither is built yet — the button says "Work in progress :)" (server: hand-off
-    [`musicdatabase-lyrics-transliteration.md`](handoffs/musicdatabase-lyrics-transliteration.md);
-    phone: [`ideas/lyrics-transliteration.md`](ideas/lyrics-transliteration.md)).
+    lyrics card. The server's is built (MusicDatabase's hand-off
+    `lyrics-latin-for-musicdatabaseapp.md`; ours:
+    [`musicdatabase-lyrics-transliteration.md`](handoffs/musicdatabase-lyrics-transliteration.md));
+    the phone's isn't — "Work in progress :)"
+    ([`ideas/lyrics-transliteration.md`](ideas/lyrics-transliteration.md)).
+  - "Alternatywne metody transliteracji" — "Ukraiński" **→ radios** (subtitle: the one picked):
+    Narodowa ("Bazowana na ukraińskim systemie narodowym z 2010 roku", the default: the server's
+    usual `plain_latin`; "ALA-LC" for a day, user's correction 2026-11-26) / Słowiańska ("Bazowana na alfabetach słowiańskich": the server's
+    `latin_alternatives["uk-slavic"]`, "biľšisť, liudy, Ľviv"; songs it didn't send that for keep
+    the usual one) — `UkrainianTransliteration`, `appearance.ukrainian_transliteration`
+    (user's request, 2026-11-26).
   - "Języki wyłączone z transliteracji" **→ a checkbox list** (subtitle: the ticked ones or
     "Żaden") — `nonLatinLanguages` in `latin_names.dart` (music.db's `songs.language` codes
     written in another alphabet, shown by their names and sorted by them) that music.db has songs in, no counts (user's choice); a song with any

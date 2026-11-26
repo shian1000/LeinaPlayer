@@ -83,6 +83,32 @@ void main() {
     },
   );
 
+  test('"Zawsze" offers the button too (for the original)', () async {
+    final themes = ThemeController();
+    await themes.load();
+    await themes.setLyricsTransliteration(LyricsTransliteration.always);
+    expect(themes.offersLyricsTransliteration('ukr'), isTrue);
+  });
+
+  test(
+    'Ukrainian lyrics: the national system at first, the Slavic one kept',
+    () async {
+      final themes = ThemeController();
+      await themes.load();
+      expect(
+        themes.ukrainianTransliteration,
+        UkrainianTransliteration.national,
+      );
+      await themes.setUkrainianTransliteration(UkrainianTransliteration.slavic);
+      final restarted = ThemeController();
+      await restarted.load();
+      expect(
+        restarted.ukrainianTransliteration,
+        UkrainianTransliteration.slavic,
+      );
+    },
+  );
+
   test('no method ticked offers no lyrics transliteration, kept', () async {
     final themes = ThemeController();
     await themes.load();

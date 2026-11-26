@@ -12,6 +12,7 @@ import '../data/database_sync.dart';
 import '../l10n.dart';
 import '../data/latin_names.dart';
 import '../data/lyrics.dart';
+import '../data/lyrics_transliteration.dart';
 import '../data/source_settings.dart';
 import '../data/mood_filter.dart';
 import '../data/moods.dart';
@@ -959,6 +960,10 @@ class _LyricsCardState extends State<_LyricsCard> {
   final _scroll = ScrollController();
   int _shownLine = -1;
 
+  /// The Latin text (true) or the original, as the button last switched it; `null`: as
+  /// "Transliteracja tekstów piosenek" says (Latin with "Zawsze").
+  bool? _latinChosen;
+
   @override
   void dispose() {
     _scroll.dispose();
@@ -975,6 +980,7 @@ class _LyricsCardState extends State<_LyricsCard> {
       _lyrics = LyricsFinder.instance.find(hit, servers: _servers);
       _lineKeys.clear();
       _shownLine = -1;
+      _latinChosen = null;
     }
   }
 
@@ -1000,6 +1006,21 @@ class _LyricsCardState extends State<_LyricsCard> {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final player = PlayerScope.of(context);
+    final themes = ThemeScope.maybeOf(context);
+    final offersLatin =
+        themes?.offersLyricsTransliteration(_hit?.mainSong?.language) ?? false;
+    final showsLatin =
+        _latinChosen ??
+        themes?.lyricsTransliteration == LyricsTransliteration.always;
+    // Only the server's for now: "Przelicz na miejscu" isn't built.
+    Lyrics? latinOf(Lyrics? lyrics) =>
+        offersLatin &&
+            lyrics != null &&
+            themes!.transliterationMethods.contains(
+              TransliterationMethod.server,
+            )
+        ? latinLyrics(lyrics, themes.ukrainianTransliteration)
+        : null;
     Widget note(String text, {Widget? action}) => Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1038,22 +1059,40 @@ class _LyricsCardState extends State<_LyricsCard> {
                     ),
                   ),
                 ),
-                if (ThemeScope.maybeOf(
-                      context,
-                    )?.offersLyricsTransliteration(_hit?.mainSong?.language) ??
-                    false)
+                if (offersLatin)
                   FutureBuilder<Lyrics?>(
                     future: _lyrics,
-                    builder: (context, snapshot) =>
-                        hasNonLatinLetters(snapshot.data?.text)
-                        ? IconButton(
-                            icon: const Icon(Icons.translate),
-                            tooltip: l10n.nowPlayingLyricsTransliterate,
-                            // No transliteration method is built yet
-                            // (lyrics_transliteration.dart).
-                            onPressed: () => showWorkInProgress(context),
-                          )
-                        : const SizedBox.shrink(),
+                    builder: (context, snapshot) {
+                      if (!hasNonLatinLetters(snapshot.data?.text)) {
+                        return const SizedBox.shrink();
+                      }
+                      final latin = latinOf(snapshot.data);
+                      final latinShown = latin != null && showsLatin;
+                      return IconButton(
+                        icon: const Icon(Icons.translate),
+                        color: latinShown ? palette.accent : null,
+                        tooltip: latinShown
+                            ? l10n.nowPlayingLyricsShowOriginal
+                            : l10n.nowPlayingLyricsTransliterate,
+                        onPressed: () {
+                          if (latin != null) {
+                            setState(() => _latinChosen = !latinShown);
+                          } else if (themes!.transliterationMethods.contains(
+                            TransliterationMethod.onDevice,
+                          )) {
+                            showWorkInProgress(context);
+                          } else {
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  content: Text(l10n.nowPlayingLyricsNoLatin),
+                                ),
+                              );
+                          }
+                        },
+                      );
+                    },
                   ),
               ],
             ),
@@ -1080,13 +1119,20 @@ class _LyricsCardState extends State<_LyricsCard> {
                     ),
                   );
                 }
-                final lyrics = snapshot.data;
-                if (lyrics == null) {
+                final found = snapshot.data;
+                if (found == null) {
                   return note(l10n.nowPlayingLyricsNotFound);
                 }
-                if (lyrics.instrumental) {
+                if (found.instrumental) {
                   return note(l10n.nowPlayingLyricsInstrumental);
                 }
+                final latin = showsLatin ? latinOf(found) : null;
+                // A Latin text without the synced lines the original has stays unshown.
+                final lyrics =
+                    latin != null &&
+                        (latin.synced.isNotEmpty || found.synced.isEmpty)
+                    ? latin
+                    : found;
                 if (lyrics.synced.isEmpty) {
                   return SingleChildScrollView(
                     child: Text(

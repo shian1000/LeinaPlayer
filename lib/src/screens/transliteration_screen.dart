@@ -109,6 +109,22 @@ class TransliterationScreen extends StatelessWidget {
               onChanged: (value) =>
                   themes.setTransliterationMethod(method, value ?? false),
             ),
+          SectionTitle(l10n.appearanceAlternativeTransliterations),
+          ListTile(
+            title: Text(l10n.languageName('ukr')),
+            subtitle: Text(switch (themes.ukrainianTransliteration) {
+              UkrainianTransliteration.national =>
+                l10n.appearanceTransliterationNational,
+              UkrainianTransliteration.slavic =>
+                l10n.appearanceTransliterationSlavic,
+            }),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const _UkrainianTransliterationScreen(),
+              ),
+            ),
+          ),
           const Divider(height: 24),
           ListTile(
             leading: const Icon(Icons.block),
@@ -150,6 +166,50 @@ class _Note extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// "Alternatywne metody transliteracji › Ukraiński": which of MusicDatabase's Latin texts
+/// Ukrainian lyrics are shown in ([UkrainianTransliteration]).
+class _UkrainianTransliterationScreen extends StatelessWidget {
+  const _UkrainianTransliterationScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final themes = ThemeScope.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: context.palette.surface,
+        title: Text(l10n.languageName('ukr')),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(top: 12),
+        children: [
+          RadioGroup<UkrainianTransliteration>(
+            groupValue: themes.ukrainianTransliteration,
+            onChanged: (value) {
+              if (value != null) themes.setUkrainianTransliteration(value);
+            },
+            child: Column(
+              children: [
+                RadioListTile(
+                  value: UkrainianTransliteration.national,
+                  title: Text(l10n.appearanceTransliterationNational),
+                  subtitle: Text(
+                    l10n.appearanceTransliterationNationalSubtitle,
+                  ),
+                ),
+                RadioListTile(
+                  value: UkrainianTransliteration.slavic,
+                  title: Text(l10n.appearanceTransliterationSlavic),
+                  subtitle: Text(l10n.appearanceTransliterationSlavicSubtitle),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// "Języki wyłączone z transliteracji": the [nonLatinLanguages] music.db has songs in (all of

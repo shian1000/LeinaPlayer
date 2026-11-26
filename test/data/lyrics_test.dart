@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/lyrics.dart';
+import 'package:music_database_app/src/data/lyrics_transliteration.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 
 void main() {
@@ -69,6 +70,47 @@ void main() {
     expect(lyrics?.plain, 'Raz\nDwa');
     expect(lyrics?.synced, isEmpty);
     expect(lyrics?.source, 'MusicDatabase (Genius)');
+  });
+
+  test('the Latin text and its alternatives come with the lyrics; '
+      'the Slavic one only where the server sent it', () async {
+    final finder = LyricsFinder(
+      getServerJson: (uri) async => uri.path.endsWith('/1')
+          ? {
+              'plain': 'Люди\nЛьвів',
+              'synced': '[00:01.00] Люди',
+              'source': 'lrclib_fetcher',
+              'plain_latin': 'Liudy\nLviv',
+              'synced_latin': '[00:01.00] Liudy',
+              'latin_alternatives': {
+                'uk-slavic': {'plain': 'Liudy\nĽviv', 'synced': null},
+                'unknown': 'not a map',
+              },
+            }
+          : {'plain': 'Кино', 'source': 'lrclib_fetcher'},
+      getJson: (uri) async => fail('LRCLIB asked: $uri'),
+    );
+    final ukrainian = await finder.find(
+      catalogHit(id: 1),
+      servers: () async => [home],
+    );
+    expect(ukrainian?.latin?.plain, 'Liudy\nLviv');
+    expect(ukrainian?.latin?.synced.single.text, 'Liudy');
+    expect(ukrainian?.latinAlternatives.keys, ['uk-slavic']);
+    expect(
+      latinLyrics(ukrainian!, UkrainianTransliteration.slavic)?.plain,
+      'Liudy\nĽviv',
+    );
+    expect(
+      latinLyrics(ukrainian, UkrainianTransliteration.national)?.plain,
+      'Liudy\nLviv',
+    );
+    final older = await finder.find(
+      catalogHit(id: 2),
+      servers: () async => [home],
+    );
+    expect(older?.latin, isNull);
+    expect(latinLyrics(older!, UkrainianTransliteration.slavic), isNull);
   });
 
   test(

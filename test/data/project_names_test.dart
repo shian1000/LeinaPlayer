@@ -137,6 +137,6 @@ void main() {
         'Phoenix',
         'A Take Away Show',
       ));
-      },
+    },
   );
 }

@@ -77,9 +77,8 @@ void main() {
     await local.load();
 
     final db = await local.database();
-    final filesDir = await Directory(
-      '${storage.path}/downloads',
-    ).create(recursive: true);
+    final filesDir = await Directory('${storage.path}/downloads')
+        .create(recursive: true);
     for (final id in [10, 13, 99]) {
       await File('${filesDir.path}/$id.mp3').writeAsBytes(List.filled(50, 1));
       await db.insert('server_downloads', {
@@ -89,9 +88,8 @@ void main() {
         'downloaded_at': 1,
       });
     }
-    final videoDir = await Directory(
-      '${storage.path}/youtube_cache',
-    ).create(recursive: true);
+    final videoDir = await Directory('${storage.path}/youtube_cache')
+        .create(recursive: true);
     await File('${videoDir.path}/$_video.m4a').writeAsBytes(List.filled(50, 1));
     await db.insert('youtube_cache', {
       'video_id': _video,

@@ -176,7 +176,10 @@ void main() {
   test('the APK for this phone\'s CPU, else the universal one', () async {
     latest = release(
       '1.0.0+70',
-      assets: ['LeinaPlayer-1.0.0+70.apk', 'LeinaPlayer-1.0.0+70-arm64-v8a.apk'],
+      assets: [
+        'LeinaPlayer-1.0.0+70.apk',
+        'LeinaPlayer-1.0.0+70-arm64-v8a.apk',
+      ],
     );
     String? apkFor(String? abi) {
       final found = AppRelease.fromGitHub(latest, abi: abi);
@@ -188,7 +191,10 @@ void main() {
     expect(apkFor(null), 'LeinaPlayer-1.0.0+70.apk');
 
     // A release with only a split APK offers nothing to a phone it doesn't fit.
-    latest = release('1.0.0+70', assets: ['LeinaPlayer-1.0.0+70-arm64-v8a.apk']);
+    latest = release(
+      '1.0.0+70',
+      assets: ['LeinaPlayer-1.0.0+70-arm64-v8a.apk'],
+    );
     expect(apkFor('armeabi-v7a'), isNull);
 
     final updates = newUpdates(abi: 'arm64-v8a');

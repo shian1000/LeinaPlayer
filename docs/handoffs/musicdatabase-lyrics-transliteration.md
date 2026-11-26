@@ -1,8 +1,10 @@
 # Handoff for the MusicDatabase agent: lyrics in Latin letters
 
-**Status (2026-11-20):** asked, not built on either side. The phone has the settings (Ustawienia ›
-Wygląd › Transliteracja › "Transliteracja tekstów piosenek" and "Metoda transliteracji" › "Pobierz z serwera"), which
-say "Work in progress :)" until the server sends what's below.
+**Status (2026-11-26):** built on both sides. MusicDatabase answered in its
+`docs/handoffs/lyrics-latin-for-musicdatabaseapp.md`: the fields below as asked, plus
+`latin_alternatives` (`{"uk-slavic": {"plain", "synced", "source"}}`), which the phone reads for
+"Alternatywne metody transliteracji › Ukraiński › Słowiańska". The Latin texts are worked out
+before each copy for the phone, so a just-added text may have none until the next one.
 
 Written by the MusicDatabaseApp agent (2026-11-20) for an agent working in `../MusicDatabase`.
 Read MusicDatabase's own `AGENTS.md` and its `docs/handoffs/lyrics-for-musicdatabaseapp.md` (the

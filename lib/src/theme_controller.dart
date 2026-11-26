@@ -66,6 +66,8 @@ class ThemeController extends ChangeNotifier {
       'appearance.transliteration_method';
   static const _transliterationMethodsKey =
       'appearance.transliteration_methods';
+  static const _ukrainianTransliterationKey =
+      'appearance.ukrainian_transliteration';
   static const _excludedLanguagesKey =
       'appearance.transliteration_excluded_languages';
   static const _languageKey = 'appearance.language';
@@ -93,6 +95,8 @@ class ThemeController extends ChangeNotifier {
   Set<TransliterationMethod> _transliterationMethods = TransliterationMethod
       .values
       .toSet();
+  UkrainianTransliteration _ukrainianTransliteration =
+      UkrainianTransliteration.national;
   Set<String> _excludedLanguages = const {};
 
   /// "Nazwy w alfabecie łacińskim": names in another alphabet with their Latin form from
@@ -106,6 +110,10 @@ class ThemeController extends ChangeNotifier {
   Set<TransliterationMethod> get transliterationMethods =>
       _transliterationMethods;
 
+  /// "Alternatywne metody transliteracji › Ukraiński".
+  UkrainianTransliteration get ukrainianTransliteration =>
+      _ukrainianTransliteration;
+
   /// "Języki wyłączone z transliteracji": music.db's `songs.language` codes whose songs show
   /// neither Latin names nor transliterated lyrics.
   Set<String> get excludedLanguages => _excludedLanguages;
@@ -117,9 +125,9 @@ class ThemeController extends ChangeNotifier {
       : _latinNames;
 
   /// Whether the lyrics card offers to transliterate the lyrics of a song in [language]: "Na
-  /// życzenie", a method other than "Brak", and a language not left out.
+  /// życzenie" or "Zawsze", a method ticked, and a language not left out.
   bool offersLyricsTransliteration(String? language) =>
-      _lyricsTransliteration == LyricsTransliteration.onRequest &&
+      _lyricsTransliteration != LyricsTransliteration.never &&
       _transliterationMethods.isNotEmpty &&
       !excludedFromTransliteration(language, _excludedLanguages);
 
@@ -233,6 +241,11 @@ class ThemeController extends ChangeNotifier {
       (null, 'none') => {},
       _ => _transliterationMethods,
     };
+    _ukrainianTransliteration =
+        UkrainianTransliteration.values.asNameMap()[prefs.getString(
+          _ukrainianTransliterationKey,
+        )] ??
+        _ukrainianTransliteration;
     final excludedLanguages = prefs.getStringList(_excludedLanguagesKey);
     _excludedLanguages = {...?excludedLanguages?.map(languageCode)};
     // Saved before music.db's languages became codes (2026-11-25): English names.
@@ -496,6 +509,17 @@ class ThemeController extends ChangeNotifier {
         for (final m in TransliterationMethod.values)
           if (_transliterationMethods.contains(m)) m.name,
       ],
+    );
+  }
+
+  Future<void> setUkrainianTransliteration(
+    UkrainianTransliteration value,
+  ) async {
+    _ukrainianTransliteration = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setString(
+      _ukrainianTransliterationKey,
+      value.name,
     );
   }
 

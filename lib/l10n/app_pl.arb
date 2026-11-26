@@ -36,6 +36,11 @@
   "appearanceTransliterationMethodServerSubtitle": "Transliteracja z MusicDatabase, razem z tekstem",
   "appearanceTransliterationMethodOnDevice": "Przelicz na miejscu",
   "appearanceTransliterationMethodOnDeviceSubtitle": "Na telefonie, bez połączenia",
+  "appearanceAlternativeTransliterations": "Alternatywne metody transliteracji",
+  "appearanceTransliterationNational": "Narodowa",
+  "appearanceTransliterationNationalSubtitle": "Bazowana na ukraińskim systemie narodowym z 2010 roku",
+  "appearanceTransliterationSlavic": "Słowiańska",
+  "appearanceTransliterationSlavicSubtitle": "Bazowana na alfabetach słowiańskich",
   "transliterationTitle": "Transliteracja",
   "transliterationExcludedLanguages": "Języki wyłączone z transliteracji",
   "transliterationExcludedLanguagesNone": "Żaden",
@@ -2200,6 +2205,8 @@
   "nowPlayingMenu": "Menu odtwarzacza (⋮)",
   "nowPlayingLyrics": "Tekst",
   "nowPlayingLyricsTransliterate": "Transliteruj tekst",
+  "nowPlayingLyricsShowOriginal": "Pokaż oryginalny tekst",
+  "nowPlayingLyricsNoLatin": "Serwer nie ma tego tekstu w łacince",
   "@nowPlayingLyrics": {
     "description": "Song lyrics (card title)"
   },
@@ -3592,6 +3599,7 @@
   "settingsScreenKwSystemDarkMode": "Systemowe przełączanie trybu ciemnego",
   "settingsScreenKwLatinNames": "Nazwy w alfabecie łacińskim",
   "settingsScreenKwLyricsTransliteration": "Transliteracja tekstów piosenek",
+  "settingsScreenKwAlternativeTransliterations": "Alternatywne metody transliteracji",
   "settingsScreenKwExcludedLanguages": "Języki wyłączone z transliteracji",
   "settingsScreenKwCoverFilters": "Filtry do albumów",
   "settingsScreenCoverSources": "Okładki albumów",
