@@ -269,7 +269,7 @@ Covers `lib/src/data/local_library.dart`, `song_catalog.dart`, `combined_search.
   streaming). The cache limit used everywhere is `SourceSettings.cacheKeep` (≥ N + 2), so songs
   cached ahead can't push out the playing one before they're played. It starts 5 s after the
   queue last changed (`PlaybackQueue.prefetchDelay`, user's choice): songs added one after
-  another ("Odtwórz jako następny" puts each at the front) used to start a download each, most
+  another (several "Odtwórz jako następny" in a row) used to start a download each, most
   pushed out of the songs cached ahead by the next one, and the finished ones pushed recently
   played songs out of the cache. A download under way is finished, not broken off (user's
   choice). Tests pass `prefetchDelay: Duration.zero` — then it starts at once, with no `Timer`

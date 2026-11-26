@@ -256,6 +256,36 @@ void main() {
     expect(queue.current?.title, 'n');
   });
 
+  test(
+    'single songs played next line up after each other, a playlist goes ahead',
+    () async {
+      await queue.start([_file('a'), _file('a2')], 0, playlistName: 'P');
+      await queue.add([_file('x')]);
+      await queue.playNext([_file('b')]);
+      await queue.playNext([_file('c')]);
+      expect(titles(queue.upcoming), ['b', 'c', 'a2', 'x']);
+      await queue.playNext([
+        _file('p1'),
+        _file('p2'),
+      ], origin: QueueOrigin(playlistName: 'Q'));
+      expect(titles(queue.upcoming), ['p1', 'p2', 'b', 'c', 'a2', 'x']);
+
+      await queue.next();
+      await queue.next();
+      await queue.next();
+      expect(queue.current?.title, 'b');
+      await queue.playNext([_file('d')]);
+      expect(titles(queue.upcoming), ['c', 'd', 'a2', 'x']);
+
+      final saved = jsonDecode(jsonEncode(queue.snapshot())) as Map;
+      final other = PlaybackQueue(tracks, prefetchDelay: Duration.zero);
+      addTearDown(other.dispose);
+      other.restore(saved.cast(), (ref) => _file(ref.title));
+      await other.playNext([_file('e')]);
+      expect(titles(other.upcoming), ['c', 'd', 'e', 'a2', 'x']);
+    },
+  );
+
   test('adding with nothing playing starts the song', () async {
     expect((await queue.add([_file('x')]))?.played, isTrue);
     expect(backend.opened, ['/music/x.mp3']);

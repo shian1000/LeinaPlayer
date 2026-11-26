@@ -305,9 +305,10 @@ void main() {
       await settings.setQueuePrefetch(1);
       await queue.start(videos(2), 0);
       for (final id in ['x1', 'x2', 'x3']) {
+        // As playlists: each goes to the front, single songs would line up after x1.
         await queue.playNext([
           SearchHit.youTubeOnly(title: id, artistLabel: 'A', videoId: id),
-        ]);
+        ], origin: QueueOrigin(playlistName: id));
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       await waitUntil(() => library.isCached('x3'));

@@ -91,7 +91,9 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     its YouTube list, or a search) — so the full player's "Odtwarzanie z…", the history and
     "Otwórz w YouTube" follow the song playing. A whole playlist added from its ⋮ keeps its
     origin; a single song added from its ⋮ has none, even if it's on a playlist (user's
-    decision). "Odtwórz jako następny" puts songs right after the current one; "Dodaj do
+    decision). "Odtwórz jako następny" puts songs right after the current one — a single song after
+    the ones played next this way before it and not played yet (A playing, B then C: A, B, C;
+    like the reference app, user's request 2026-11-26), a playlist ahead of them; "Dodaj do
     kolejki" at the very end of the queue, whatever it was filled from (user's decision,
     2026-10-31; only a round "Powtarzaj" queued again and not started yet stays after them);
     with nothing playing the first one starts at once. A queue of more than one song that

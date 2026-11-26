@@ -83,6 +83,7 @@ class QueueEntry {
     this.index,
     this.pinned = false,
     this.round,
+    this.playsNext = false,
   }) : key = _nextKey++;
 
   QueueEntry._pinnedFrom(QueueEntry entry)
@@ -91,6 +92,7 @@ class QueueEntry {
       index = entry.index,
       pinned = true,
       round = entry.round,
+      playsNext = entry.playsNext,
       key = entry.key;
 
   static int _nextKey = 0;
@@ -109,6 +111,10 @@ class QueueEntry {
   final int? round;
 
   bool get repeated => round != null;
+
+  /// A single song (no [origin]) queued with "Odtwórz jako następny": the next one queued so
+  /// goes after it, like the reference app's — A playing, B then C played next: A, B, C.
+  final bool playsNext;
   final int key;
 }
 
@@ -595,23 +601,41 @@ class PlaybackQueue extends ChangeNotifier {
     );
   }
 
-  /// "Odtwórz jako następny": [hits] play right after the current song.
+  /// "Odtwórz jako następny": [hits] play right after the current song — single songs (no
+  /// [origin]) after the ones queued this way before them that haven't played yet, a playlist
+  /// ahead of those.
   Future<PlayOutcome?> playNext(
     List<SearchHit> hits, {
     QueueOrigin? origin,
     void Function(String status)? onStatus,
-  }) => _insert(0, hits, origin: origin, onStatus: onStatus);
+  }) {
+    final single = origin == null;
+    final after = _upcoming.indexWhere((e) => !e.playsNext);
+    return _insert(
+      !single ? 0 : (after < 0 ? _upcoming.length : after),
+      hits,
+      origin: origin,
+      playsNext: single,
+      onStatus: onStatus,
+    );
+  }
 
   Future<PlayOutcome?> _insert(
     int at,
     List<SearchHit> hits, {
     QueueOrigin? origin,
+    bool playsNext = false,
     void Function(String status)? onStatus,
   }) async {
     if (hits.isEmpty) return null;
     final entries = [
       for (final (i, hit) in hits.indexed)
-        QueueEntry._(hit, origin: origin, index: origin == null ? null : i),
+        QueueEntry._(
+          hit,
+          origin: origin,
+          index: origin == null ? null : i,
+          playsNext: playsNext,
+        ),
     ];
     if (_current == null) {
       _generation++;
@@ -976,6 +1000,7 @@ class PlaybackQueue extends ChangeNotifier {
       'index': e.index,
       if (e.pinned) 'pinned': true,
       'round': ?e.round,
+      if (e.playsNext) 'plays_next': true,
     };
     final mainOrigin = state.mainOrigin;
     return {
@@ -1008,6 +1033,7 @@ class PlaybackQueue extends ChangeNotifier {
         index: map['index'] as int?,
         pinned: map['pinned'] as bool? ?? false,
         round: map['round'] as int?,
+        playsNext: map['plays_next'] as bool? ?? false,
       );
     }
 
