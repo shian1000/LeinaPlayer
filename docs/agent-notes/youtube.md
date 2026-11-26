@@ -47,6 +47,16 @@ Live") and counts as the bracketed part of the title, so "(Live)" in a video tit
 not the live penalty; without it the search finds the studio original. A cover's credit goes
 into the query the same way (`coverOf`).
 
+Another version the song's title doesn't name (remix, edit, cover, acoustic… — `_otherVersion`)
+is **rejected** when a bracket or the part after the last spaced dash names it, and otherwise
+(a run-on "Song Space Cat Remix") costs −6 and loses the Topic +3. Before 2026-11-25 it cost
+only −3 against the Topic +3, so "Nemreš Bolivit (Space Cat Remix)" by "Renman - Topic" tied with
+the original upload, views decided, and the remix went to MusicDatabase as song #5965's found
+link. Not counted: a release marker ("Radio Edit", "Album Version", "Remastered" —
+`namesRelease()` in `version_names.dart`; still −3 as before), a cover's own credit for a cover
+("Acoustic Cover"), and a word that is only an artist's name ("Dub FX"). The song's album is
+never part of the target, so an album named "… The Remixes" makes no remix acceptable.
+
 Benchmark against MusicDatabase's own picks (plain Dart, no phone; candidates come from
 youtube_explode, whose results look like NewPipe's — both read YouTube's web search):
 
@@ -90,10 +100,18 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 - `youtube_matches` (`main_db_id` → `video_id`): videos the phone matched itself. Kept after the
   file leaves the cache; `SearchHit.youtubeVideoId` prefers music.db's own link. Since
   2026-10-14 (owner's request) a video found for a song music.db has **no** link for goes to the
-  outbox as `found_youtube_links` — when `TrackPlayer._findVideo` finds it, and after each
+  outbox as `found_youtube_links` — when `TrackPlayer.findVideo` finds it, and after each
   music.db load for older or otherwise-made matches (a shared video recognised as a song,
   `video_link.dart`) — see [ADR 0005](../decisions/0005-outbox-for-musicdatabase.md). The phone
   keeps playing its match until music.db settles the song, as before.
+  Before searching, `findVideo` tries the videos Biblioteka's playlists have for the song
+  (`PlaylistLibrary.videosOf`, `TrackPlayer.playlistVideosOf`): the first one not removed, not
+  turned down and accepted by the matcher for the track's stored names ("Artist - Title", no
+  channel — the video's own title isn't kept) is used and reported instead, with
+  `video_title` = those names and `video_channel` NULL. Played from the playlist itself the
+  track's video was always used (`playlistHit` gives it as `phoneMatch`), but a song played
+  from anywhere else (search, a radio, an album) searched afresh — that's how song #5965 got
+  a Topic remix while "ダウンロード (2020.08)" held the original (2026-11-25).
 - `youtube_track_matches` (v6): the same for tracks that aren't MusicDatabase songs (Spotify
   playlists), keyed by normalised artist + title — see [`playlists.md`](playlists.md).
 - `youtube_not_found` (v7): a search that found no sure match (`TrackPlayer._findVideo`; a failed

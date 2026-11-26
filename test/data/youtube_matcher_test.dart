@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/youtube_matcher.dart';
 import 'package:music_database_app/src/data/youtube_video.dart';
 
@@ -124,6 +125,100 @@ void main() {
       ])?.id,
       'orig',
     );
+  });
+
+  group('another version the song title does not name', () {
+    // MusicDatabase song #5965, reviewed on 2026-11-25: the phone reported the Topic remix.
+    final remix = _v(
+      'szXthhpfkzw',
+      'Nemreš Bolivit (Space Cat Remix)',
+      'Renman - Topic',
+      seconds: 289,
+      views: 40000,
+    );
+    final original = _v(
+      '-XS-1zFEytA',
+      'Renman - Nemreš Bolivit',
+      'BalkanHop',
+      seconds: 302,
+      views: 30000,
+    );
+
+    test('a remix in a bracket is rejected, even from a Topic channel', () {
+      final target = _song('Renman', 'Nemreš Bolivit');
+      expect(pickYouTubeVideo(target, [remix, original])?.id, '-XS-1zFEytA');
+      expect(scoreYouTubeVideos(target, [remix]).single.accepted, isFalse);
+      expect(pickYouTubeVideo(target, [remix]), isNull);
+    });
+
+    test('the album "Space Cat, The Remixes" does not make it the song', () {
+      final song = CatalogSong(
+        id: 5965,
+        title: 'Nemreš Bolivit',
+        artistLabel: 'Renman',
+        album: 'Space Cat, The Remixes',
+      );
+      expect(
+        pickYouTubeVideo(song.youTubeTarget, [remix, original])?.id,
+        '-XS-1zFEytA',
+      );
+    });
+
+    test('the remix itself is still found for its version row', () {
+      final target = MatchTarget(
+        title: 'Nemreš Bolivit',
+        mainArtists: [MatchArtist('Renman')],
+        version: 'Space Cat Remix',
+      );
+      expect(pickYouTubeVideo(target, [remix, original])?.id, 'szXthhpfkzw');
+    });
+
+    test('a run-on marker outweighs the Topic bonus', () {
+      expect(
+        pickYouTubeVideo(_song('Renman', 'Nemreš Bolivit'), [
+          _v('topic', 'Nemreš Bolivit Space Cat Remix', 'Renman - Topic'),
+          _v('plain', 'Renman - Nemreš Bolivit', 'Fan uploads', views: 100),
+        ])?.id,
+        'plain',
+      );
+    });
+
+    test('a release marker and an artist name are not another version', () {
+      expect(
+        scoreYouTubeVideos(_song('Kult', 'Arahja'), [
+          _v('radio', 'Arahja (Radio Edit)', 'Kult - Topic'),
+          _v('album', 'Kult - Arahja - Album Version', 'Kult'),
+        ]).map((s) => s.accepted),
+        [true, true],
+      );
+      expect(
+        pickYouTubeVideo(_song('Dub FX', 'Love Someone'), [
+          _v('topic', 'Love Someone', 'Dub FX - Topic'),
+          _v('fan', 'Dub FX - Love Someone', 'Fan uploads', views: 100000),
+        ])?.id,
+        'topic',
+      );
+    });
+
+    test("a cover's own credit is its version", () {
+      final target = MatchTarget(
+        title: 'Creep',
+        mainArtists: [MatchArtist('Postmodern Jukebox')],
+        coverOf: 'Radiohead',
+      );
+      expect(
+        pickYouTubeVideo(target, [
+          _v('c', 'Creep (Acoustic Radiohead Cover)', 'Postmodern Jukebox'),
+        ])?.id,
+        'c',
+      );
+      expect(
+        pickYouTubeVideo(_song('Radiohead', 'Creep'), [
+          _v('c', 'Radiohead - Creep (Acoustic Cover)', 'Fan'),
+        ]),
+        isNull,
+      );
+    });
   });
 
   test('finds the artist through a synonym (channel name)', () {

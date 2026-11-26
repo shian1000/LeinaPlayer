@@ -358,6 +358,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     mp3Converter: platformMp3Converter(),
     coverBytes: (hit) => _albumCovers.coverBytes(CoverRequest.of(hit)),
     onPhoneFileGone: _localLibrary.forgetGone,
+    playlistVideosOf: (id) => _playlistLibrary.videosOf(id),
     serverAddresses: _databaseSync.serverAddresses,
   );
   late final _playbackQueue = PlaybackQueue(

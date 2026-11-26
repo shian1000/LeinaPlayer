@@ -124,6 +124,14 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    skips it) until re-imported; real versions like Remix/Live kept). When the part after " - " is
    junk only ("Glow - Lyric Video (English / French)" by Attic Ocean) the left part is the
    title and the channel (no VEVO) the artist — unless the left part is the channel's own name.
+   An artist taken from the channel (`_channelArtist`) loses "VEVO" and "Official" (prefix or
+   suffix, spaced or CamelCase — "OfficialClutch" is Clutch; never part of a name) always, and a
+   "Music" suffix ("PomplamooseMusic", "Pomplamoose Music") only when music.db knows the shorter
+   name or the video title names it (≥ 4 letters) and music.db doesn't know the channel's whole
+   name; a pipe part "`<artist> ft. <guest>`" adds the guest as feat. ("Les Yeux Noirs (Dark
+   Eyes) | Django Reinhardt | Pomplamoose ft. The Vignes Rooftop Revival" — bug L3, 2026-11-26,
+   whose requests went to MusicDatabase as "PomplamooseMusic" / "OfficialClutch"). Topic
+   channels keep their name as it is.
    "Renata Przemyk- ''Aniolek''" (the dash glued to the artist) splits too, and a title in quotes
    loses them. An event's "`<event 2018> | <artist> | <song> | <channel>`" (`_splitEventPipes`,
    MusicDatabase's `split_event_pipes()`) is that artist and song, not the event by the channel.
@@ -144,7 +152,11 @@ MusicDatabase's `docs/handoffs/playlists-for-musicdatabaseapp.md`.
    know as an artist takes `channelVideoReadings()`' first reading ("General Woo U mom zivotu" by
    a fan's channel), a title that is only a known artist its first hashtag ("Łona
    #hot16challenge" → "hot16challenge", as written), and "The Cure | Talk Talk | Foghorn - muzyka
-   na jesień" names the three artists.
+   na jesień" names the three artists. Emoji and pictographic symbols go from the title and
+   the channel before anything else (`withoutEmoji()`: "ADHD – Dzieci Burzy z Salki ⚡🌩️ |
+   LIVE" is "Dzieci Burzy z Salki"; with their variation selectors, skin tones and the joiners
+   between them, never a letter of any script nor "©", "®", "™", "‼", "⁉" and arrows, which
+   Unicode also counts as pictographic); `requestTitleOfVideo()` drops them from stored titles too.
    The same parse names unknown videos everywhere (search, links, song requests). ADR 0003.
    A track's stored title changes only by a re-import, so `SongRequest.of` asks for a YouTube
    track's title through `requestTitleOfVideo()` — the junk brackets and the credits after one

@@ -200,7 +200,8 @@ class Outbox extends ChangeNotifier {
           'artist': song.artistLabel,
           'video_id': video.id,
           'video_title': video.title,
-          'video_channel': video.channel,
+          // A playlist's video ([TrackPlayer.findVideo]) is known by its track's names only.
+          'video_channel': video.channel.isEmpty ? null : video.channel,
           'found_at': _timestamp(_now()),
         }, conflictAlgorithm: ConflictAlgorithm.ignore),
         unless: () => _reported(_foundLinks, 'video_id', song.id, video.id),

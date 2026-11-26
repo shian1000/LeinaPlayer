@@ -426,6 +426,69 @@ void main() {
     expect(t('Lyrics'), ['Lyrics']);
   });
 
+  group('emoji', () {
+    // Found reviewing the phone's requests on 2026-11-25: the emoji went into the title.
+    test('are dropped from the title, with their variation selectors', () {
+      expect(
+        parseYouTubeTrack(
+          'ADHD – Dzieci Burzy z Salki ⚡🌩️ | LIVE',
+          'Zespół ADHD',
+        ),
+        (artist: 'ADHD', title: 'Dzieci Burzy z Salki'),
+      );
+      expect(parseYouTubeTrack('ADHD - Apokalipsa 🔥', 'Zespół ADHD'), (
+        artist: 'ADHD',
+        title: 'Apokalipsa',
+      ));
+    });
+
+    test('are dropped from the artist and from inside a bracket', () {
+      expect(parseYouTubeTrack('🔥 Kult 🔥 - Arahja (Remix 👨‍👩‍👧)', 'Fan'), (
+        artist: 'Kult',
+        title: 'Arahja (Remix)',
+      ));
+      expect(parseYouTubeTrack('Arahja 🇵🇱 1️⃣', 'Kult - Topic'), (
+        artist: 'Kult',
+        title: 'Arahja',
+      ));
+    });
+
+    test('letters of other scripts and ordinary punctuation stay', () {
+      for (final title in [
+        'Кино - Группа крови',
+        '米津玄師 - ピースサイン',
+        '아이유 - 밤편지',
+        'Café Tacvba - Eres!',
+        'Artist - Rock & Roll™ ↔ Ünïcödé, (Live)',
+      ]) {
+        expect(withoutEmoji(title), title);
+      }
+      expect(parseYouTubeTrack('Кино - Группа крови ⭐', 'Fan'), (
+        artist: 'Кино',
+        title: 'Группа крови',
+      ));
+      expect(parseYouTubeTrack('米津玄師 - ピースサイン 🎵', 'Fan'), (
+        artist: '米津玄師',
+        title: 'ピースサイン',
+      ));
+      // A joiner between letters is a script's, not an emoji's (Malayalam).
+      expect(withoutEmoji('ന്\u200Dറെ 😀'), 'ന്\u200Dറെ');
+    });
+
+    test('a title of nothing but emoji stays as it was', () {
+      expect(withoutEmoji('🔥🔥'), '');
+      expect(parseYouTubeTrack('🔥🔥', 'Kult - Topic').title, '🔥🔥');
+    });
+
+    test('a stored track title loses them in its request', () {
+      expect(
+        requestTitleOfVideo('Dzieci Burzy z Salki ⚡🌩️'),
+        'Dzieci Burzy z Salki',
+      );
+      expect(requestTitleOfVideo('Группа крови'), 'Группа крови');
+    });
+  });
+
   group('channelVideoReadings', () {
     String? artistNamed(String name) => const {
       'renata przemyk': 'Renata Przemyk',
@@ -506,6 +569,84 @@ void main() {
         ),
         isEmpty,
       );
+    });
+  });
+  group('a channel name with an affix (bug L3)', () {
+    String? artistNamed(String name) => const {
+      'clutch': 'Clutch',
+      'pomplamoose': 'Pomplamoose',
+      'music for pleasure': 'Music For Pleasure',
+      'bigmusic': 'BigMusic',
+    }[normalizeForSearch(name)];
+    ({String artist, String title}) p(String title, String channel) =>
+        parseYouTubeTrack(title, channel, artistNamed: artistNamed);
+
+    test(
+      '"Music" goes when the title names the artist, with its ft. guest',
+      () {
+        const title =
+            'Les Yeux Noirs (Dark Eyes) | Django Reinhardt | '
+            'Pomplamoose ft. The Vignes Rooftop Revival';
+        const read = (
+          artist: 'Pomplamoose feat. The Vignes Rooftop Revival',
+          title: 'Les Yeux Noirs (Dark Eyes)',
+        );
+        expect(p(title, 'PomplamooseMusic'), read);
+        // Without music.db too: the title names Pomplamoose.
+        expect(parseYouTubeTrack(title, 'PomplamooseMusic'), read);
+        expect(parseYouTubeTrack(title, 'Pomplamoose Music'), read);
+      },
+    );
+
+    test('"Official" goes in any case, "VEVO" as before', () {
+      const read = (artist: 'Clutch', title: 'Profits of Doom');
+      expect(p('Profits of Doom', 'OfficialClutch'), read);
+      expect(parseYouTubeTrack('Profits of Doom', 'OfficialClutch'), read);
+      expect(parseYouTubeTrack('Profits of Doom', 'Official Clutch'), read);
+      expect(parseYouTubeTrack('Profits of Doom', 'ClutchOfficial'), read);
+      expect(p('Profits of Doom', 'ClutchVEVO'), read);
+      expect(p('Profits of Doom', 'ClutchMusic'), read);
+    });
+
+    test(
+      'a name music.db knows, or one nothing confirms, keeps its "Music"',
+      () {
+        // A real artist's own name.
+        expect(p('Some Song', 'BigMusic').artist, 'BigMusic');
+        expect(
+          p('Some Song', 'Music For Pleasure').artist,
+          'Music For Pleasure',
+        );
+        // Neither music.db nor the title names "Pomplamoose".
+        expect(
+          parseYouTubeTrack('Les Yeux Noirs', 'PomplamooseMusic').artist,
+          'PomplamooseMusic',
+        );
+        // Not glued after a small letter: no CamelCase suffix.
+        expect(parseYouTubeTrack('Song', 'BIGMUSIC').artist, 'BIGMUSIC');
+        // "Officially…" isn't the "Official" prefix.
+        expect(
+          parseYouTubeTrack('Song', 'Officially Yours').artist,
+          'Officially Yours',
+        );
+        // A three-letter name in the title doesn't count.
+        expect(parseYouTubeTrack('The Song', 'TheMusic').artist, 'TheMusic');
+      },
+    );
+
+    test('"- Topic" channels are unaffected', () {
+      expect(
+        p('Profits of Doom', 'Clutch Music - Topic').artist,
+        'Clutch Music',
+      );
+      expect(p('Profits of Doom', 'Official - Topic').artist, 'Official');
+    });
+
+    test('a title naming its artist keeps it', () {
+      expect(p('Clutch - Profits of Doom', 'OfficialClutch'), (
+        artist: 'Clutch',
+        title: 'Profits of Doom',
+      ));
     });
   });
 }

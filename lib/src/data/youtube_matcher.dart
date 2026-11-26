@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'text_normalizer.dart';
+import 'version_names.dart';
 import 'youtube_video.dart';
 
 /// One of a song's artists: the name and its other names (MusicDatabase's comma-separated
@@ -286,6 +287,29 @@ const _official = [
   'hd',
 ];
 
+// " - Acoustic Version" at the end, after a spaced dash.
+final _dashSuffix = RegExp(r'\s[-–—]\s+([^-–—\(\)\[\]]+?)\s*$');
+
+/// The parts of [videoTitle] that may name a version: its brackets and what follows its last
+/// spaced dash.
+List<String> _versionMarkers(String videoTitle) => [
+  for (final m in _brackets.allMatches(videoTitle))
+    m[0]!.substring(1, m[0]!.length - 1),
+  if (_dashSuffix.firstMatch(videoTitle.replaceAll(_brackets, ' '))
+      case final dash?)
+    dash[1]!,
+];
+
+/// [padded] without the artists' names.
+String _withoutArtists(String padded, List<List<String>> artists) {
+  for (final names in artists) {
+    for (final n in names) {
+      if (n.isNotEmpty) padded = padded.replaceAll(' $n ', ' ');
+    }
+  }
+  return padded;
+}
+
 ScoredVideo _score(_Song song, YouTubeVideo video) {
   ScoredVideo reject(String why) => ScoredVideo(video, 0, rejected: why);
 
@@ -344,18 +368,43 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
     score += 1;
   }
 
-  if (isTopic) score += 3;
+  // Another version the song's title doesn't name: rejected when a bracket or the part after a
+  // dash says so ("Nemreš Bolivit (Space Cat Remix)" by "Renman - Topic" for the plain song —
+  // with the Topic bonus it tied with the original upload, and views picked the remix), else
+  // it outweighs the Topic bonus. A release's marker ("Radio Edit", "Album Version") is the
+  // same recording, a cover's own credit ("Acoustic Cover" for a cover) its version, and an
+  // artist's name ("Dub FX") says nothing of it: a word only there costs what it used to.
+  final artists = [...song.mainArtists, ...song.featArtists];
+  final markers = _versionMarkers(video.title);
+  bool neutral(String marker) =>
+      namesRelease(marker) ||
+      (song.isCover && _hasWord(_padded(marker), 'cover'));
+  final named = _padded(markers.where((m) => !neutral(m)).join(' '));
+  var rest = _withoutArtists(title, artists);
+  for (final m in markers.where(neutral)) {
+    rest = rest.replaceAll(' ${_norm(m)} ', ' ');
+  }
+  var otherVersion = false;
+  for (final word in _otherVersion) {
+    if (!_hasWord(title, word)) continue;
+    if (_hasWord(song.title, word) || (song.isCover && word == 'cover')) {
+      score += 2;
+    } else if (_hasWord(named, word)) {
+      return reject('wersja „$word”');
+    } else if (_hasWord(rest, word)) {
+      otherVersion = true;
+      score -= 6;
+    } else if (_hasWord(_withoutArtists(title, artists), word)) {
+      score -= 3;
+    } else {
+      continue;
+    }
+    break;
+  }
+  if (isTopic && !otherVersion) score += 3;
   for (final word in _live) {
     if (_hasWord(title, word) && !_hasWord(song.title, word)) {
       score -= 3;
-      break;
-    }
-  }
-  for (final word in _otherVersion) {
-    if (_hasWord(title, word)) {
-      score += _hasWord(song.title, word) || (song.isCover && word == 'cover')
-          ? 2
-          : -3;
       break;
     }
   }

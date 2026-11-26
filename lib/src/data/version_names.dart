@@ -99,6 +99,11 @@ VersionKind? versionKindOf(String marker) {
   return null;
 }
 
+/// Whether [marker] names only a release of the same recording ("Radio Edit", "Album Version",
+/// "2011 Remaster"), not another version.
+bool namesRelease(String marker) =>
+    _sameRecording.hasMatch(normalizeForSearch(marker));
+
 VersionReading? _reading(String title, int start, int end, String marker) {
   final kind = versionKindOf(marker);
   final rest = '${title.substring(0, start)} ${title.substring(end)}'

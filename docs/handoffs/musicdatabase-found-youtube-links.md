@@ -9,6 +9,9 @@ without a link). Bad videos are remembered in its inbox folder (`bad_videos.json
 music.db): bad for every song, or wrong for one song; a row naming one is turned down without
 asking YouTube. The phone doesn't learn about a turned-down video, so it keeps playing its own
 pick while the song stays empty (publishing the list is not done).
+Since 2026-11-25 a video one of the phone's playlists holds for the song comes before a search:
+its row has `video_title` = the playlist track's "Artist - Title" (the video's own title isn't
+kept on the phone) and `video_channel` NULL. No change needed on MusicDatabase's side.
 
 Written by the MusicDatabaseApp agent (2026-10-14) for an agent working in `../MusicDatabase`.
 Read MusicDatabase's own `AGENTS.md`, `docs/runbooks/database.md` and

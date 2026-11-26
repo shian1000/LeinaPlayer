@@ -315,6 +315,7 @@ class PlaylistLibrary extends ChangeNotifier {
     final lead = <int, List<PlaylistTrack>>{};
     final lengths = <int, ({Duration known, int unknown})>{};
     final holding = <String, Set<int>>{};
+    final videos = <int, List<YouTubeVideo>>{};
     for (final row in await (await _database()).rawQuery('''
       SELECT t.* FROM playlist_tracks t JOIN playlists p ON p.id = t.playlist_id
       WHERE p.deleted_at IS NULL AND ${scope.where}
@@ -327,8 +328,21 @@ class PlaylistLibrary extends ChangeNotifier {
       lengths[id] = length == null
           ? (known: sum.known, unknown: sum.unknown + 1)
           : (known: sum.known + length, unknown: sum.unknown);
-      for (final key in _trackKeys(track)) {
+      final song = _songOf(track);
+      for (final key in _trackKeys(track, song)) {
         (holding[key] ??= {}).add(id);
+      }
+      if ((song, track.playableVideoId) case (final song?, final video?)) {
+        (videos[song.id] ??= []).add(
+          YouTubeVideo(
+            id: video,
+            title: track.artist == null
+                ? track.title
+                : '${track.artist} - ${track.title}',
+            channel: '',
+            duration: track.duration,
+          ),
+        );
       }
     }
     _playlists = [
@@ -357,6 +371,7 @@ class PlaylistLibrary extends ChangeNotifier {
     ];
     _leadTracks = lead;
     _holding = holding;
+    _songVideos = videos;
     notifyListeners();
     if (linked) onChanged?.call();
   }
@@ -369,14 +384,28 @@ class PlaylistLibrary extends ChangeNotifier {
     for (final key in _hitKeys(hit)) ...?_holding[key],
   };
 
-  /// What [track] can be recognised by, its song found like [playlistHit] finds it. Its names
-  /// count only without a song: two music.db songs may share them.
-  Iterable<String> _trackKeys(PlaylistTrack track) sync* {
+  Map<int, List<YouTubeVideo>> _songVideos = const {};
+
+  /// The videos of the tracks in [playlists] that are music.db song [songId], in playlist order —
+  /// the version the user saved, tried before searching YouTube for a song music.db has no link
+  /// for (`TrackPlayer.findVideo`). Only the track's names are known of each (as "Artist -
+  /// Title", no channel), not the video's own title.
+  List<YouTubeVideo> videosOf(int songId) => _songVideos[songId] ?? const [];
+
+  /// [track]'s song, found like [playlistHit] finds it.
+  CatalogSong? _songOf(PlaylistTrack track) {
     final videoId = track.playableVideoId;
-    final song =
-        (track.mainDbId == null ? null : _catalog.current(track.mainDbId!)) ??
+    return (track.mainDbId == null
+            ? null
+            : _catalog.current(track.mainDbId!)) ??
         (videoId == null ? null : _catalog.findByYouTubeId(videoId)) ??
         playlistSongByName(track, _catalog);
+  }
+
+  /// What [track] can be recognised by, its [song] found by [_songOf]. Its names count only
+  /// without a song: two music.db songs may share them.
+  Iterable<String> _trackKeys(PlaylistTrack track, CatalogSong? song) sync* {
+    final videoId = track.playableVideoId;
     if (videoId != null) yield 'video:$videoId';
     if (track.spotifyTrackId case final spotify?) yield 'spotify:$spotify';
     yield song != null
@@ -780,7 +809,8 @@ class PlaylistLibrary extends ChangeNotifier {
     final keys = {for (final hit in songs) ..._hitKeys(hit)};
     final positions = [
       for (final track in await tracks(playlistId))
-        if (_trackKeys(track).any(keys.contains)) track.position,
+        if (_trackKeys(track, _songOf(track)).any(keys.contains))
+          track.position,
     ];
     if (positions.isEmpty) return;
     final db = await _database();

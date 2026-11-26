@@ -104,7 +104,9 @@ phone only. Format in
 - Reported when `TrackPlayer` finds the video (playing or caching ahead), and after each
   `music.db` load for every phone match of a song music.db still has no link for (matches made
   before this existed, or outside `TrackPlayer` — a shared video recognised as a song). A video
-  YouTube removed meanwhile isn't reported then.
+  YouTube removed meanwhile isn't reported then. Since 2026-11-25 a video one of Biblioteka's
+  playlists has for the song is tried before a search (`PlaylistLibrary.videosOf`): reported
+  with the track's names as `video_title` and no `video_channel` — the format is unchanged.
 - Once per (song, video), waiting or sent; a different video found later for the same song (the
   first one removed, the matches forgotten by hand) is a new row.
 - Files of their own, like corrections. "Czeka na wysłanie" lists them as "Znaleziono: …".

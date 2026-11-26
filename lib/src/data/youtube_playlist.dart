@@ -35,7 +35,7 @@ String? extractPlaylistId(String raw) {
 
 /// Artist and song title of a playlist video — a lite version of MusicDatabase's
 /// `build_metadata_from_item()` (`src/utils/youtube/import_from_playlist.py`; ADR 0003): drops
-/// "| channel" suffixes, hashtags and junk brackets ("(Official Video)", "[HD]", "(2019)"), takes
+/// emoji ([withoutEmoji]), "| channel" suffixes, hashtags and junk brackets ("(Official Video)", "[HD]", "(2019)"), takes
 /// the artist from a "`<Artist> - Topic`" channel, else splits "Artist - Title" (a dash inside a
 /// bracket doesn't split: "Summer Paradise (Future Funk - Vaporwave - Electronic Mix)"; a
 /// " -- " goes first: "18.White House Records & Fisz -- Na sznurowadle - KODEX" is Fisz's
@@ -67,7 +67,7 @@ String? extractPlaylistId(String raw) {
   final read = _readYouTubeTrack(videoTitle, channel, artistNamed);
   if (artistNamed != null &&
       read.fromChannel &&
-      artistNamed(read.artist) == null) {
+      artistNamed(read.artist.replaceFirst(_featSuffix, '')) == null) {
     if (read.hashtags.isNotEmpty) {
       if (artistNamed(read.title) case final artist?) {
         return (artist: artist, title: read.hashtags.first);
@@ -129,6 +129,8 @@ _readYouTubeTrack(
   String channel,
   String? Function(String name)? artistNamed,
 ) {
+  videoTitle = _orIfEmpty(withoutEmoji(videoTitle), videoTitle);
+  channel = _orIfEmpty(withoutEmoji(channel), channel);
   var title = videoTitle
       .replaceAllMapped(_doubledBracket, (m) => '(${m.group(1)!})')
       .replaceFirst(_trackNumber, '');
@@ -189,10 +191,10 @@ _readYouTubeTrack(
     } else {
       fromChannel = split == null || _isJunkOnly(split.$2, split.$1, channel);
       if (split != null && fromChannel) {
-        artist = _cleanChannel(channel);
+        artist = _channelArtist(channel, videoTitle, artistNamed);
         song = split.$1;
       } else {
-        artist = split?.$1 ?? _cleanChannel(channel);
+        artist = split?.$1 ?? _channelArtist(channel, videoTitle, artistNamed);
         song = split?.$2 ?? title;
       }
     }
@@ -274,9 +276,45 @@ String _withoutJunkBrackets(String title) {
 /// full-width brackets were read), and the request shouldn't ask for the junk. Only the junk
 /// brackets and the credits after one go; [title] itself when nothing would be left.
 String requestTitleOfVideo(String title) {
-  final cut = _withoutJunkBrackets(title).replaceAll(_spaces, ' ').trim();
+  final cut = _withoutJunkBrackets(withoutEmoji(title))
+      .replaceAll(_spaces, ' ')
+      .trim();
   return cut.isEmpty ? title : cut;
 }
+
+/// [text] without emoji and pictographic symbols ("Dzieci Burzy z Salki ⚡🌩️", "Apokalipsa 🔥"),
+/// with the variation selectors, skin tones and joiners that belong to them; letters of any
+/// script and ordinary punctuation stay — "©", "®", "™", "‼", "⁉" and arrows too, which
+/// Unicode also counts as pictographic. A joiner (U+200D) goes only between two pictographs:
+/// some scripts need it between letters.
+String withoutEmoji(String text) {
+  if (!_emoji.hasMatch(text)) return text;
+  return text
+      .replaceAll(_emoji, ' ')
+      .replaceAll(_spaces, ' ')
+      // "(Remix 🔥)", "(🔥)": the brackets the emoji leaves behind.
+      .replaceAllMapped(_spaceInBracket, (m) => m.group(1) ?? '')
+      .replaceAll(_emptyBracket, '')
+      .trim();
+}
+
+String _orIfEmpty(String text, String fallback) =>
+    text.isEmpty ? fallback : text;
+
+const _pictograph =
+    r'(?![©®™‼⁉\u{2194}-\u{2199}\u{21A9}\u{21AA}])\p{Extended_Pictographic}';
+// Variation selectors, skin tones, a keycap's mark and a subdivision flag's tags.
+const _emojiModifier =
+    r'[\u{FE0E}\u{FE0F}\u{1F3FB}-\u{1F3FF}\u{20E3}\u{E0020}-\u{E007F}]';
+final _emoji = RegExp(
+  '(?:$_pictograph(?:$_emojiModifier|\u{200D}$_pictograph)*'
+  r'|[#*0-9]\u{FE0F}?\u{20E3}' // a keycap, "1️⃣"
+  r'|[\u{1F1E6}-\u{1F1FF}]{1,2}' // a flag's regional indicators
+  r'|[\u{FE0E}\u{FE0F}])', // a selector left alone
+  unicode: true,
+);
+final _spaceInBracket = RegExp(r'([(\[【（［]) | (?=[)\]】）］])');
+final _emptyBracket = RegExp(r'\s*[(\[【（［][)\]】）］]');
 
 // "nipplepeople FRKA (Official video), Kire Mitrev, Slavica Maras": names listed after the junk
 // bracket that ends the title proper are its credits (the songwriters), not part of it.
@@ -681,10 +719,64 @@ bool _isJunkOnly(String right, String left, String channel) {
       normalizeForSearch(left).replaceAll(' ', '') != name;
 }
 
-/// "DawidPodsiadloVEVO" → "DawidPodsiadlo", "Kamp! Official" → "Kamp!".
-String _cleanChannel(String channel) => channel
-    .replaceAll(RegExp(r'\s*(VEVO|Official)$', caseSensitive: false), '')
-    .trim();
+/// "DawidPodsiadloVEVO" → "DawidPodsiadlo", "Kamp! Official" → "Kamp!", "OfficialClutch" →
+/// "Clutch": "Official" is never part of a name, so it goes in any case.
+String _cleanChannel(String channel) => _orIfEmpty(
+  channel
+      .trim()
+      .replaceFirst(_officialPrefix, '')
+      .replaceAll(_channelSuffix, '')
+      .trim(),
+  channel.trim(),
+);
+
+final _officialPrefix = RegExp(
+  r'^(?:[Oo]fficial\s+|Official(?=\p{Lu}))',
+  unicode: true,
+);
+final _channelSuffix = RegExp(r'\s*(?:VEVO|Official)$', caseSensitive: false);
+// "PomplamooseMusic", "Pomplamoose Music": glued only after a small letter, so "BIGMUSIC" stays.
+final _musicSuffix = RegExp(
+  r'(?:\s+[Mm]usic|(?<=\p{Ll})Music)$',
+  unicode: true,
+);
+final _featSuffix = RegExp(r'\s+feat\.\s.*$');
+
+/// The artist a channel stands for when the video's title names none ([parseYouTubeTrack]):
+/// [_cleanChannel]'s name, and without a "Music" suffix too ("PomplamooseMusic" → Pomplamoose)
+/// when music.db knows that name ([artistNamed]) or [videoTitle] names it — never when music.db
+/// knows the channel's whole name as an artist. A pipe part "`<artist> ft. <guest>`" of the
+/// title ("Les Yeux Noirs (Dark Eyes) | Django Reinhardt | Pomplamoose ft. The Vignes Rooftop
+/// Revival") adds the guest as "feat.".
+String _channelArtist(
+  String channel,
+  String videoTitle,
+  String? Function(String name)? artistNamed,
+) {
+  var name = _cleanChannel(channel);
+  if (artistNamed?.call(name) == null) {
+    final bare = _cleanChannel(name.replaceFirst(_musicSuffix, ''));
+    if (bare != name &&
+        (artistNamed?.call(bare) != null || _titleNames(videoTitle, bare))) {
+      name = bare;
+    }
+  }
+  for (final part in videoTitle.split(_pipe).skip(1)) {
+    final guest = RegExp(
+      '^${RegExp.escape(name)}\\s+(?:feat\\.?|ft\\.?|featuring)\\s+(.+)\$',
+      caseSensitive: false,
+    ).firstMatch(part.trim());
+    if (guest != null) return '$name feat. ${guest.group(1)!.trim()}';
+  }
+  return name;
+}
+
+/// [videoTitle] holds [name] as whole words (at least four letters, so "The" doesn't count).
+bool _titleNames(String videoTitle, String name) {
+  final key = normalizeForSearch(name);
+  if (key.replaceAll(' ', '').length < 4) return false;
+  return ' ${normalizeForSearch(videoTitle)} '.contains(' $key ');
+}
 
 /// `SIAMÉS "Summer Nights"` from channel "SIAMES": the artist repeated at the start of the
 /// title, with a bracket right after it — the artist's logo ("alt-J (∆) Breezeblocks").

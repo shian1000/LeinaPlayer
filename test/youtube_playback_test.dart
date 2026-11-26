@@ -682,6 +682,113 @@ void main() {
       },
     );
 
+    group('a song a Biblioteka playlist has its own video for', () {
+      // MusicDatabase song #5965, reviewed on 2026-11-25: played from outside the playlist
+      // "ダウンロード (2020.08)", the phone searched and reported a remix while that playlist
+      // had the original as a track.
+      final song = CatalogSong(
+        id: 5965,
+        title: 'Nemreš Bolivit',
+        artistLabel: 'Renman',
+        album: 'Space Cat, The Remixes',
+      );
+      const original = YouTubeVideo(
+        id: '-XS-1zFEytA',
+        title: 'Renman - Nemreš Bolivit',
+        channel: '',
+        duration: Duration(seconds: 302),
+      );
+
+      TrackPlayer tracksFor(List<YouTubeVideo> playlistVideos) {
+        tracksWith();
+        return TrackPlayer(
+          player: player,
+          settings: settings,
+          youTubeLibrary: library,
+          outbox: outbox,
+          youTubeAudio: YouTubeAudio(
+            newPipeAvailable: true,
+            newPipe: (id) async => [
+              YouTubeAudioStream(url: 'https://s/$id', itag: 251),
+            ],
+          ),
+          youTubeSearch: YouTubeSearch(
+            newPipeAvailable: true,
+            newPipe: (query) async {
+              searches++;
+              return const [
+                YouTubeVideo(
+                  id: 'szXthhpfkzw',
+                  title: 'Nemreš Bolivit (Space Cat Remix)',
+                  channel: 'Renman - Topic',
+                  duration: Duration(seconds: 289),
+                ),
+                YouTubeVideo(
+                  id: 'search12345',
+                  title: 'Renman - Nemreš Bolivit',
+                  channel: 'Renman',
+                  duration: Duration(seconds: 300),
+                ),
+              ];
+            },
+          ),
+          openExternal: (uri) async => true,
+          playlistVideosOf: (id) => id == song.id ? playlistVideos : const [],
+        );
+      }
+
+      test('its video is played and reported, without a search', () async {
+        final tracks = tracksFor([
+          // The user's other playlist with the remix: not this song.
+          const YouTubeVideo(
+            id: 'remix123456',
+            title: 'Renman - Nemreš Bolivit (Space Cat Remix)',
+            channel: '',
+            duration: Duration(seconds: 289),
+          ),
+          original,
+        ]);
+        expect(
+          (await tracks.play(SearchHit.main(song, const []))).played,
+          isTrue,
+        );
+        expect(searches, 0);
+        expect(backend.opened.last, 'https://s/-XS-1zFEytA');
+        expect(library.matchFor(5965), '-XS-1zFEytA');
+        final found = await outbox.waitingFoundLinks();
+        expect(found.single.songId, 5965);
+        expect(found.single.videoId, '-XS-1zFEytA');
+        expect(found.single.videoTitle, 'Renman - Nemreš Bolivit');
+        expect(found.single.videoChannel, isNull);
+      });
+
+      test(
+        'one removed or not plausible for the song: searched instead',
+        () async {
+          final tracks = tracksFor([
+            original,
+            const YouTubeVideo(
+              id: 'wrong123456',
+              title: 'Renman - Inna piosenka',
+              channel: '',
+            ),
+          ]);
+          await library.markVideoRemoved(original.id);
+          expect(
+            (await tracks.play(SearchHit.main(song, const []))).played,
+            isTrue,
+          );
+          expect(searches, 1);
+          // Not the Topic remix the search also gave.
+          expect(library.matchFor(5965), 'search12345');
+          expect(
+            (await outbox.waitingFoundLinks()).single.videoId,
+            'search12345',
+          );
+        },
+      );
+    });
+
     test('found out while caching ahead: marked, nothing played', () async {
       final tracks = tracksWith();
       final hit = SearchHit.youTubeOnly(

@@ -165,6 +165,7 @@ class TrackPlayer {
     this.mp3Converter,
     this.coverBytes,
     this.onPhoneFileGone,
+    this.playlistVideosOf,
     Future<List<Uri>> Function()? serverAddresses,
     Future<bool> Function()? onWifi,
   }) : _serverAddresses = serverAddresses ?? _noServer,
@@ -202,6 +203,10 @@ class TrackPlayer {
   /// `local.db` forgets it ([LocalLibrary.forgetGone]) and the next source plays the song.
   /// `null`: files aren't checked before playing (tests with made-up paths).
   final Future<void> Function(String path)? onPhoneFileGone;
+
+  /// The videos Biblioteka's playlists have for music.db song id ([PlaylistLibrary.videosOf]),
+  /// tried before searching YouTube ([findVideo]); `null`: none (tests).
+  final List<YouTubeVideo> Function(int songId)? playlistVideosOf;
 
   /// MusicDatabase's server as the phone reaches it now, best address first
   /// ([DatabaseSync.serverAddresses]), for [PlaybackSource.server].
@@ -525,12 +530,31 @@ class TrackPlayer {
     ]);
   }
 
-  /// The best video for [hit], remembered so the next play uses it (or its cached audio) without
-  /// searching again, and the icon turns full; a MusicDatabase song's video also goes to the
-  /// outbox as a suggestion. Finding none is remembered too ([YouTubeLibrary.saveNotFound]).
+  /// The video a Biblioteka playlist has for [hit]'s music.db song, when the matcher finds it
+  /// plausible for the song by the track's names ([pickYouTubeVideo]) and it isn't removed or
+  /// turned down — the version the user saved beats a fresh search (song #5965: played from
+  /// search, the phone found and reported a remix while a playlist held the original).
+  YouTubeVideo? _playlistVideo(SearchHit hit) {
+    final mainSong = hit.mainSong;
+    if (mainSong == null) return null;
+    // In playlist order: the first plausible one, not the matcher's best score.
+    for (final v in playlistVideosOf?.call(mainSong.id) ?? const []) {
+      if (!youTubeLibrary.isVideoRemoved(v.id) &&
+          !youTubeLibrary.isWrongFor(mainSong.id, v.id) &&
+          pickYouTubeVideo(hit.youTubeTarget, [v]) != null) {
+        return v;
+      }
+    }
+    return null;
+  }
+
+  /// The best video for [hit] — a playlist's own ([_playlistVideo]), else YouTube search's —
+  /// remembered so the next play uses it (or its cached audio) without searching again, and
+  /// the icon turns full; a MusicDatabase song's video also goes to the outbox as a suggestion.
+  /// Finding none is remembered too ([YouTubeLibrary.saveNotFound]).
   Future<YouTubeVideo?> findVideo(SearchHit hit) async {
     final mainSong = hit.mainSong;
-    final video = await pickVideo(hit);
+    final video = _playlistVideo(hit) ?? await pickVideo(hit);
     if (video != null) {
       await (mainSong != null
           ? youTubeLibrary.saveMatch(mainSong.id, video)

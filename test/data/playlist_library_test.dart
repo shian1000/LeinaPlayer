@@ -107,6 +107,36 @@ void main() {
   });
 
   test(
+    'a song\'s playlist videos, for a song music.db has no link for',
+    () async {
+      await playlists.importYouTube(
+        data([
+          v('gtc', 'Led Zeppelin - Going To California', 'x', 211),
+          v('p1', 'Pusty', 'Artur Rojek - Topic'),
+          v('zz', 'Nieznany - Utwór (Official Video)', 'Nieznany', 100),
+        ]),
+      );
+      await playlists.importYouTube(
+        YouTubePlaylistData(
+          id: 'PL2',
+          name: 'Druga',
+          owner: null,
+          videos: [v('gtc2', 'Led Zeppelin - Going To California', 'y')],
+        ),
+      );
+      final videos = playlists.videosOf(2);
+      expect({for (final video in videos) video.id}, {'gtc', 'gtc2'});
+      final gtc = videos.firstWhere((video) => video.id == 'gtc');
+      // The track's names, as the matcher reads a video's.
+      expect(gtc.title, 'Led Zeppelin - Going to California');
+      expect(gtc.channel, '');
+      expect(gtc.duration, const Duration(seconds: 211));
+      expect(playlists.videosOf(4).single.id, 'p1');
+      expect(playlists.videosOf(99), isEmpty);
+    },
+  );
+
+  test(
     'a track saved without its MusicDatabase song is recognised by title and '
     'artist, and the song is written into the playlist to sync',
     () async {
