@@ -116,6 +116,7 @@ class NewPipeBridge(val messenger: BinaryMessenger) : MethodChannel.MethodCallHa
                 "mimeType" to it.format?.mimeType,
                 "bitrate" to it.averageBitrate,
                 "delivery" to it.deliveryMethod.name,
+                "trackType" to it.audioTrackType?.name,
             )
         }
     }

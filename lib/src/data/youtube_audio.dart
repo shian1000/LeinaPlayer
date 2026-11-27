@@ -16,6 +16,7 @@ class YouTubeAudioStream {
     required this.itag,
     this.format,
     this.bitrate,
+    this.original,
   });
 
   /// Direct, time-limited address of the audio (valid for a few hours, for this phone only).
@@ -27,6 +28,10 @@ class YouTubeAudioStream {
 
   /// Average bitrate in kb/s, when known.
   final int? bitrate;
+
+  /// Whether this is the video's own audio track (true) or a dubbed / audio-description one
+  /// (false); null when the video has a single track or the method doesn't say.
+  final bool? original;
 
   /// File extension for the cached copy.
   String get extension => switch (itag) {
@@ -177,7 +182,16 @@ class YouTubeAudio {
     YouTubePlaybackMethod.youtubeApp => l10n.youtubeAudioMethodYouTubeApp,
   };
 
-  static YouTubeAudioStream _best(List<YouTubeAudioStream> streams) {
+  static YouTubeAudioStream _best(List<YouTubeAudioStream> all) {
+    // A video with YouTube's automatic dubbing has the same itags once per language, and the
+    // first one isn't necessarily the original (an English talk played in German).
+    final originals = all.where((s) => s.original == true).toList();
+    final notDubbed = all.where((s) => s.original != false).toList();
+    final streams = originals.isNotEmpty
+        ? originals
+        : notDubbed.isNotEmpty
+        ? notDubbed
+        : all;
     for (final itag in _preferredItags) {
       final match = streams.where((s) => s.itag == itag).firstOrNull;
       if (match != null) return match;
@@ -202,6 +216,11 @@ class YouTubeAudio {
             itag: s.tag,
             format: s.container.name,
             bitrate: s.bitrate.kiloBitsPerSecond.round(),
+            original:
+                (s.audioTrack?.displayName.toLowerCase().contains('original') ??
+                    false)
+                ? true
+                : null,
           ),
       ];
     } finally {

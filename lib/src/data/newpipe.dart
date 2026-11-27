@@ -24,6 +24,11 @@ Future<List<YouTubeAudioStream>> newPipeAudioStreams(String videoId) async {
           itag: s['itag']! as int,
           format: s['format'] as String?,
           bitrate: s['bitrate'] as int?,
+          original: switch (s['trackType']) {
+            'ORIGINAL' => true,
+            null => null,
+            _ => false,
+          },
         ),
   ];
 }

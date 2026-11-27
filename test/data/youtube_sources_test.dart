@@ -260,6 +260,30 @@ void main() {
       },
     );
 
+    test('picks the original audio track over dubbed ones', () async {
+      YouTubeAudioStream track(String url, int itag, bool original) =>
+          YouTubeAudioStream(url: url, itag: itag, original: original);
+      Future<String> pick(List<YouTubeAudioStream> streams) async =>
+          (await YouTubeAudio(
+            newPipeAvailable: true,
+            newPipe: (_) async => streams,
+          ).bestStream('v', YouTubePlaybackMethod.defaults)).url;
+
+      expect(
+        await pick([
+          track('de', 251, false),
+          track('en', 251, true),
+          track('fr', 140, false),
+        ]),
+        'en',
+      );
+      expect(
+        await pick([track('de', 251, false), track('en', 140, true)]),
+        'en',
+      );
+      expect(await pick([track('de', 251, false), stream(140, 128)]), 'u140');
+    });
+
     test(
       'tries the switched-on methods in order; NewPipe only on Android',
       () async {
