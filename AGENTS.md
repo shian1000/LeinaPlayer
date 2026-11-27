@@ -77,7 +77,9 @@ server, GitHub for the catalog, a future "Serwer Leina" — "Work in progress :)
 phone's own data apart ([ADR 0018](docs/decisions/0018-sync-sources.md)). Every cache setting is in one screen, Oszczędzanie
 danych i tryb offline › Pamięć podręczna. YouTube: searching it on request, showing which songs
 MusicDatabase links to a video, matching songs without a link on the phone, and streaming the
-audio on Android through NewPipeExtractor, with a cache of played songs — see
+audio on Android through NewPipeExtractor, with a cache of played songs; an age-restricted video
+(no login in NewPipe) gives way to another upload of the song, phone-only, else opens in the
+YouTube app (Sposoby odtwarzania YouTube's switch) — see
 [`youtube.md`](docs/agent-notes/youtube.md). Biblioteka: playlists imported from YouTube or Spotify links or saved from the queue
 (Spotify: first 100 tracks; tracks whose video YouTube removed stay, to be searched again), with
 a share sheet; playlists made on the phone (empty, or from songs via "Dodaj do playlisty"); songs added to

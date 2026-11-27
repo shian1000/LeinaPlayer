@@ -180,7 +180,7 @@ class LocalLibrary extends ChangeNotifier {
   final String? Function() _downloadFolder;
 
   /// `local.db`'s version; a backup from a newer one isn't restored (`user_backup.dart`).
-  static const schemaVersion = 24;
+  static const schemaVersion = 25;
 
   static const _foldersKey = 'local_music.folders';
   static const _lastScanKey = 'local_music.last_scan_ms';
@@ -291,6 +291,7 @@ class LocalLibrary extends ChangeNotifier {
           await _addAddedTrackColumn(db);
           await _createRecordingsTable(db);
           await _createMoodTracksTable(db);
+          await _createAgeRestrictedTable(db);
         },
         onUpgrade: (db, from, _) async {
           if (from < 2) await _createYouTubeTables(db);
@@ -315,6 +316,7 @@ class LocalLibrary extends ChangeNotifier {
           if (from < 22) await _createRecordingsTable(db);
           if (from < 23) await _createMoodTracksTable(db);
           if (from < 24) await _renormalizeKeys(db);
+          if (from < 25) await _createAgeRestrictedTable(db);
         },
       ),
     );
@@ -367,6 +369,20 @@ class LocalLibrary extends ChangeNotifier {
         await db.delete(table, where: '$column = ?', whereArgs: [old]);
       }
     }
+  }
+
+  /// Version 25: videos YouTube plays only to a signed-in adult, each with the other upload of
+  /// the song the phone plays instead (`stand_in_id` NULL: none found at `checked_at`; see
+  /// `youtube_library.dart`).
+  static Future<void> _createAgeRestrictedTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE youtube_age_restricted (
+        video_id VARCHAR PRIMARY KEY,
+        stand_in_id VARCHAR,
+        stand_in_title VARCHAR,
+        stand_in_channel VARCHAR,
+        checked_at INTEGER NOT NULL
+      )''');
   }
 
   /// Version 23: songs music.db doesn't have in the user's own moods (`moods.dart`, ADR 0008).

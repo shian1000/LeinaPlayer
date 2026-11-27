@@ -310,4 +310,73 @@ void main() {
       'ok',
     );
   });
+
+  test('"đ" written "dj" or "d" is the same', () {
+    for (final title in ['Djurdjevdan', 'Durdevdan', 'Đurđevdan']) {
+      expect(
+        pickYouTubeVideo(_song('Goran Bregović', 'Đurđevdan'), [
+          _v('ok', 'Goran Bregovic - $title', 'Bijelo Dugme'),
+        ])?.id,
+        'ok',
+        reason: title,
+      );
+    }
+  });
+
+  test('a duet with someone the song does not name is another performance', () {
+    // Reviewed on 2026-11-27: a TV duet was picked over the song's own upload.
+    expect(
+      pickYouTubeVideo(_song('Goran Bregović', 'Đurđevdan'), [
+        _v(
+          'duet',
+          'Ceca & Goran Bregović - Đurđevdan / Novogodišnji program RTS 2022',
+          'RTS Najlepše narodne pesme',
+          views: 3741756,
+        ),
+        _v('own', 'Goran Bregović - Đurđevdan', 'Some Channel', views: 20000),
+      ])?.id,
+      'own',
+    );
+    // "feat." of the song's own guest, or title first: no other performer.
+    final withGuest = MatchTarget(
+      title: 'Nadprzestrzenie',
+      mainArtists: [MatchArtist('Dawid Podsiadło')],
+      featArtists: [MatchArtist('Kaśka')],
+    );
+    final scores = [
+      for (final s in scoreYouTubeVideos(withGuest, [
+        _v('a', 'Dawid Podsiadło feat. Kaśka - Nadprzestrzenie', 'X'),
+        _v('b', 'Dawid Podsiadło - Nadprzestrzenie', 'X'),
+        _v('c', 'Nadprzestrzenie - Dawid Podsiadło', 'X'),
+      ]))
+        s.score,
+    ];
+    expect(scores[0], greaterThanOrEqualTo(scores[1]));
+    expect(scores[2], scores[1]);
+  });
+
+  test('an alias of the artist: the channel of the video music.db links', () {
+    final target = _song(
+      'Goran Bregović',
+      'Đurđevdan',
+    ).withArtistAlias('Bijelo Dugme');
+    expect(target.query, 'Goran Bregović Đurđevdan');
+    expect(
+      pickYouTubeVideo(target, [
+        _v(
+          'audio',
+          'Bijelo Dugme - Đurđevdan - (Audio 1994) HD',
+          'PGP RTS',
+          views: 5428300,
+        ),
+        _v(
+          'tv',
+          'Ceca & Goran Bregović - Đurđevdan / Novogodišnji program RTS 2022',
+          'RTS Najlepše narodne pesme',
+          views: 3741756,
+        ),
+      ])?.id,
+      'audio',
+    );
+  });
 }

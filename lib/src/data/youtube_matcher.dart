@@ -14,6 +14,8 @@ class MatchArtist {
           if (s.trim().isNotEmpty) s.trim(),
       ];
 
+  MatchArtist._(this.name, this.names);
+
   final String name;
 
   /// [name] first, then the synonyms.
@@ -44,6 +46,21 @@ class MatchTarget {
 
   /// A version's marker ("Live", "Cid Rim Remix"; `songs.version_kind`), never part of [title].
   final String? version;
+
+  /// The same song with [alias] as one more name of its first main artist — the channel of the
+  /// video music.db links, when looking for another upload of it: "Goran Bregović"'s
+  /// "Đurđevdan" was uploaded by "Bijelo Dugme", whose name the song's other uploads carry.
+  MatchTarget withArtistAlias(String alias) => MatchTarget(
+    title: title,
+    mainArtists: [
+      for (final (i, a) in mainArtists.indexed)
+        i == 0 ? MatchArtist._(a.name, [...a.names, alias]) : a,
+    ],
+    featArtists: featArtists,
+    fullAlbum: fullAlbum,
+    coverOf: coverOf,
+    version: version,
+  );
 
   /// What to type into YouTube's search: main artists and the title, no guests (extra words make
   /// YouTube's results worse, not better) — "full album" added for a [fullAlbum], a version's
@@ -158,8 +175,10 @@ final _sourceCredit = RegExp(
 );
 
 // "&" is dropped by normalization, so "Rock & Roll" and "Rock and Roll" only meet without "and".
+// "đ" is written "dj" as often as "d" ("Djurdjevdan", "Durdevdan" for "Đurđevdan"), and
+// normalization makes it "d": "dj" counts as "d" too.
 String _norm(String text) =>
-    normalizeForSearch(text).replaceAll(_and, '').trim();
+    normalizeForSearch(text).replaceAll(_and, '').replaceAll('dj', 'd').trim();
 final _and = RegExp(r'(^| )and(?= |$)');
 String _padded(String text) => ' ${_norm(text)} ';
 String _collapsed(String normalized) => normalized.replaceAll(' ', '');
@@ -228,7 +247,46 @@ const _live = [
   'performance',
   'festival',
   'klub',
+  'program',
+  'eurosong',
+  'eurovision',
 ];
+
+/// Words joining artists' names in a video title ("A & B", "A x B", "A i B").
+const _artistJoins = {'with', 'x', 'i', 'y', 'e', 'et', 'und', 'vs'};
+
+final _artistDash = RegExp(r'\s[-–—]\s');
+
+// A guest credited with "feat." usually sings on the studio recording too.
+final _featGuest = RegExp(r' (?:feat|ft|featuring) .*$');
+
+/// Whether [videoTitle]'s artist part — before its first spaced dash, naming one of the song's
+/// artists — names someone else too: a duet with another singer is another performance
+/// ("Ceca & Goran Bregović - Đurđevdan" for Goran Bregović's). Track numbers ("04.") and
+/// "feat." guests don't count.
+bool _otherPerformer(_Song song, String videoTitle) {
+  final dash = _artistDash.firstMatch(videoTitle);
+  if (dash == null) return false;
+  // Brackets ("(HQ)") and a source before a colon ("FIFA 09 Soundtrack:") name no one.
+  final artistPart = videoTitle
+      .substring(0, dash.start)
+      .replaceAll(_brackets, ' ')
+      .split(':')
+      .last;
+  final left = '${_padded(artistPart).replaceFirst(_featGuest, '')} ';
+  final artists = [...song.mainArtists, ...song.featArtists];
+  bool named(List<String> names) =>
+      names.any((n) => n.isNotEmpty && _hasWord(left, n));
+  if (!artists.any(named) || _hasWord(left, song.core.trim())) return false;
+  return _withoutArtists(left, artists)
+      .split(' ')
+      .any(
+        (w) =>
+            w.isNotEmpty &&
+            !_artistJoins.contains(w) &&
+            int.tryParse(w) == null,
+      );
+}
 
 /// Another arrangement of the song; a bonus instead when the song's title names it.
 const _otherVersion = [
@@ -402,6 +460,7 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
     break;
   }
   if (isTopic && !otherVersion) score += 3;
+  if (_otherPerformer(song, video.title)) score -= 3;
   for (final word in _live) {
     if (_hasWord(title, word) && !_hasWord(song.title, word)) {
       score -= 3;

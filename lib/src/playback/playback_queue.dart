@@ -844,6 +844,11 @@ class PlaybackQueue extends ChangeNotifier {
         moodKey: entry.origin?.moodKey,
         external: outcome.external,
       ));
+      // The YouTube app plays it now: the players show this song, not the one paused before
+      // it, and "Odtwórz" opens it again.
+      if (outcome.external && generation == _generation) {
+        await _tracks.player.park(shown(entry), () => playCurrent());
+      }
       if (generation == _generation) _prefetchAhead();
     }
     return outcome;

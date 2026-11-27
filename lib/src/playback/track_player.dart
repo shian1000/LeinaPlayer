@@ -373,6 +373,7 @@ class TrackPlayer {
           allowExternal: allowExternal,
           onStatus: onStatus,
           externalUri: youTubeUri(hit, listId: youTubeListId),
+          hit: hit,
         );
       case null:
         if (!settings.enabledSources.contains(PlaybackSource.youtube)) {
@@ -515,31 +516,37 @@ class TrackPlayer {
       allowExternal: allowExternal,
       onStatus: onStatus,
       foundVideo: video,
+      hit: hit,
     );
   }
 
   /// The best video YouTube search has for [hit]; nothing is remembered.
   Future<YouTubeVideo?> pickVideo(SearchHit hit) async {
     final target = hit.youTubeTarget;
-    final mainSong = hit.mainSong;
     return pickYouTubeVideo(target, [
       for (final v in await youTubeSearch.search(target.query, settings))
-        if (!youTubeLibrary.isVideoRemoved(v.id) &&
-            !(mainSong != null && youTubeLibrary.isWrongFor(mainSong.id, v.id)))
-          v,
+        if (_usable(hit, v.id)) v,
     ]);
+  }
+
+  /// Not removed from YouTube, nor turned down by MusicDatabase for [hit]'s song.
+  bool _usable(SearchHit hit, String videoId) {
+    final mainSong = hit.mainSong;
+    return !youTubeLibrary.isVideoRemoved(videoId) &&
+        !(mainSong != null && youTubeLibrary.isWrongFor(mainSong.id, videoId));
   }
 
   /// The video a Biblioteka playlist has for [hit]'s music.db song, when the matcher finds it
   /// plausible for the song by the track's names ([pickYouTubeVideo]) and it isn't removed or
   /// turned down — the version the user saved beats a fresh search (song #5965: played from
   /// search, the phone found and reported a remix while a playlist held the original).
-  YouTubeVideo? _playlistVideo(SearchHit hit) {
+  YouTubeVideo? _playlistVideo(SearchHit hit, {bool notAgeRestricted = false}) {
     final mainSong = hit.mainSong;
     if (mainSong == null) return null;
     // In playlist order: the first plausible one, not the matcher's best score.
     for (final v in playlistVideosOf?.call(mainSong.id) ?? const []) {
       if (!youTubeLibrary.isVideoRemoved(v.id) &&
+          !(notAgeRestricted && youTubeLibrary.isAgeRestricted(v.id)) &&
           !youTubeLibrary.isWrongFor(mainSong.id, v.id) &&
           pickYouTubeVideo(hit.youTubeTarget, [v]) != null) {
         return v;
@@ -574,6 +581,53 @@ class TrackPlayer {
     }
     return video;
   }
+
+  /// Another upload of [hit] to play instead of the age-restricted [videoId] — a playlist's
+  /// video, else YouTube search's (one with a video or a "Topic" channel's audio usually has no
+  /// age check), never a video known to have one — remembered with it ([YouTubeLibrary
+  /// .saveStandIn]), found or not. Only on the phone: music.db's link stays, and nothing goes to
+  /// the outbox, as the video is the right one.
+  Future<YouTubeVideo?> findStandIn(SearchHit hit, String videoId) async {
+    var video = _playlistVideo(hit, notAgeRestricted: true);
+    if (video == null) {
+      final target = hit.youTubeTarget;
+      try {
+        final found = await youTubeSearch.search(target.query, settings);
+        // The search usually finds the age-restricted video too: its channel names the act.
+        final channel = found
+            .where((v) => v.id == videoId)
+            .firstOrNull
+            ?.channel;
+        video = pickYouTubeVideo(
+          channel == null
+              ? target
+              : target.withArtistAlias(
+                  channel.replaceFirst(_channelSuffix, ''),
+                ),
+          [
+            for (final v in found)
+              if (_usable(hit, v.id) && !youTubeLibrary.isAgeRestricted(v.id))
+                v,
+          ],
+        );
+      } on YouTubeSearchException catch (e) {
+        debugPrint('Searching a stand-in for $videoId failed: $e');
+        return null;
+      }
+    }
+    if (video?.id == videoId) video = null;
+    await youTubeLibrary.saveStandIn(videoId, video);
+    return video;
+  }
+
+  static final _channelSuffix = RegExp(
+    r'\s*(?:-\s*Topic|VEVO|Official)$',
+    caseSensitive: false,
+  );
+
+  /// [videoId], or the upload played in its place when YouTube age-restricts it.
+  String _playableVideo(String videoId) =>
+      youTubeLibrary.standInFor(videoId) ?? videoId;
 
   /// MusicDatabase's own link of [hit] is [gone]: worth telling MusicDatabase. Not one the
   /// user set in its place ([CatalogSong.userLinks]).
@@ -686,7 +740,11 @@ class TrackPlayer {
     if (!await _cacheYouTube(hit, pin: true)) return DownloadOutcome.failed;
     final videoId = _withRememberedVideo(hit).youtubeVideoId;
     if (_mp3Converter case final convert? when videoId != null) {
-      await youTubeLibrary.convertToMp3(videoId, await _tagsOf(hit), convert);
+      await youTubeLibrary.convertToMp3(
+        _playableVideo(videoId),
+        await _tagsOf(hit),
+        convert,
+      );
     }
     return DownloadOutcome.downloaded;
   }
@@ -719,7 +777,7 @@ class TrackPlayer {
       return true;
     }
     final videoId = hit.youtubeVideoId;
-    return videoId != null && youTubeLibrary.isPinned(videoId);
+    return videoId != null && youTubeLibrary.isPinned(_playableVideo(videoId));
   }
 
   /// "Usuń z pobranych": a server file's copy is deleted, YouTube audio goes back to the cache.
@@ -729,7 +787,11 @@ class TrackPlayer {
       await serverDownloads?.remove(server.id);
     }
     if (hit.youtubeVideoId case final videoId?) {
-      await youTubeLibrary.setPinned(videoId, false, limit: settings.cacheKeep);
+      await youTubeLibrary.setPinned(
+        _playableVideo(videoId),
+        false,
+        limit: settings.cacheKeep,
+      );
     }
   }
 
@@ -751,6 +813,15 @@ class TrackPlayer {
       }
     }
     if (videoId == null) return false;
+    if (youTubeLibrary.isAgeRestricted(videoId)) {
+      if (!settings.ageRestrictedStandIn ||
+          youTubeLibrary.standInFor(videoId) == null &&
+              (youTubeLibrary.noStandInFor(videoId) ||
+                  await findStandIn(hit, videoId) == null)) {
+        return false;
+      }
+      videoId = youTubeLibrary.standInFor(videoId)!;
+    }
     final name = downloadBaseName(hit.artistLabel, hit.title);
     if (youTubeLibrary.isCached(videoId)) {
       if (pin) await youTubeLibrary.setPinned(videoId, true, name: name);
@@ -773,6 +844,12 @@ class TrackPlayer {
         }
       } on YouTubeAudioException catch (e) {
         debugPrint('Caching ahead: ${method.name} for $videoId failed: $e');
+        if (e.ageRestricted && !youTubeLibrary.isAgeRestricted(videoId)) {
+          // Found out before it plays: its stand-in is looked for (and cached) now. A stand-in
+          // that is age-restricted too is marked, so this ends.
+          await youTubeLibrary.markAgeRestricted(videoId);
+          return _cacheYouTube(hit, pin: pin);
+        }
         if (e.gone) {
           // Found out before it plays: another video is looked for (and cached) now, so the
           // queue doesn't stall on it. Each round marks one more video, so this ends.
@@ -803,7 +880,9 @@ class TrackPlayer {
     void Function(String status)? onStatus,
     YouTubeVideo? foundVideo,
     Uri? externalUri,
+    SearchHit? hit,
   }) async {
+    YouTubeVideo? standIn;
     final playback = YouTubePlayback(
       audio: youTubeAudio,
       library: youTubeLibrary,
@@ -814,7 +893,7 @@ class TrackPlayer {
     try {
       final via = await playback.play(
         videoId,
-        (source, {streamQuality}) => NowPlaying(
+        (videoId, source, {streamQuality}) => NowPlaying(
           title: title,
           artist: artist,
           titleLatin: titleLatin,
@@ -831,8 +910,20 @@ class TrackPlayer {
           streamQuality: streamQuality,
         ),
         onConnecting: () => onStatus?.call(l10n.trackPlayerConnectingYouTube),
+        onStatus: onStatus,
         allowExternal: allowExternal,
         externalUri: externalUri,
+        findStandIn: hit == null || !settings.ageRestrictedStandIn
+            ? null
+            : () async {
+                final known = youTubeLibrary.standInFor(videoId);
+                if (known != null) {
+                  return YouTubeVideo(id: known, title: '', channel: '');
+                }
+                if (youTubeLibrary.noStandInFor(videoId)) return null;
+                onStatus?.call(l10n.trackPlayerAgeRestrictedSearching);
+                return standIn = await findStandIn(hit, videoId);
+              },
       );
       switch (via) {
         case YouTubePlayedVia.youtubeApp:
@@ -844,6 +935,11 @@ class TrackPlayer {
         case YouTubePlayedVia.cache || YouTubePlayedVia.stream:
       }
       // The phone picked this video itself, so say which one it is.
+      if (standIn case final standIn?) {
+        return PlayOutcome.played(
+          l10n.trackPlayerAgeRestrictedStandIn(standIn.title, standIn.channel),
+        );
+      }
       return PlayOutcome.played(
         foundVideo == null
             ? null

@@ -12,6 +12,7 @@ import 'package:music_database_app/src/data/source_settings.dart';
 import 'package:music_database_app/src/data/youtube_audio.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
 import 'package:music_database_app/src/data/youtube_search.dart';
+import 'package:music_database_app/src/l10n.dart';
 import 'package:music_database_app/src/playback/playback_queue.dart';
 import 'package:music_database_app/src/playback/player_controller.dart';
 import 'package:music_database_app/src/playback/track_player.dart';
@@ -23,6 +24,7 @@ import 'support/waiting.dart';
 
 class _Backend implements AudioBackend {
   final opened = <String>[];
+  final parked = <String>[];
   int failures = 0;
   final _state = StreamController<({bool playing, bool completed})>.broadcast();
 
@@ -42,6 +44,9 @@ class _Backend implements AudioBackend {
       throw Exception('403');
     }
   }
+
+  @override
+  void showParked(NowPlaying track) => parked.add(track.title);
 
   @override
   Future<void> crossfadeTo(NowPlaying track, Duration fade) async {}
@@ -120,7 +125,7 @@ void main() {
     },
   );
 
-  NowPlaying track(String source, {String? streamQuality}) =>
+  NowPlaying track(String videoId, String source, {String? streamQuality}) =>
       NowPlaying(title: 'T', artist: 'A', source: source, coverSeed: 's');
 
   Future<File> cache(String id) async {
@@ -389,6 +394,35 @@ void main() {
       expect(youTubeUriAt(uri, const Duration(milliseconds: 400)), uri);
     });
 
+    test(
+      'a song opened in the YouTube app is the one the players show',
+      () async {
+        final queue = queueOf();
+        await queue.start([
+          SearchHit.youTubeOnly(
+            title: 'Lipe cvatu',
+            artistLabel: 'A',
+            videoId: 'a',
+          ),
+          SearchHit.youTubeOnly(
+            title: 'Đurđevdan',
+            artistLabel: 'B',
+            videoId: 'b',
+          ),
+        ], 0);
+        expect(player.current?.title, 'Lipe cvatu');
+        newPipeFails = true;
+        final outcome = await queue.next();
+        expect(outcome?.external, isTrue);
+        expect(opened, [Uri.parse('https://www.youtube.com/watch?v=b')]);
+        expect(player.current?.title, 'Đurđevdan');
+        expect(player.playing, isFalse);
+        // The media notification too.
+        expect(backend.parked, ['Đurđevdan']);
+        queue.dispose();
+      },
+    );
+
     test('the last-resort fallback opens it the same way', () async {
       newPipeFails = true;
       final queue = queueOf();
@@ -483,6 +517,214 @@ void main() {
     // Tapped: searched again.
     await tracks.play(hit);
     expect(searches, 2);
+  });
+
+  group('an age-restricted video', () {
+    const restricted = 'adult123456';
+    late List<Uri> openedApp;
+    late List<String> statuses;
+    late List<String> streamed;
+    late int searches;
+    late Outbox outbox;
+    var results = const <YouTubeVideo>[];
+
+    TrackPlayer tracksWith() {
+      openedApp = [];
+      statuses = [];
+      streamed = [];
+      searches = 0;
+      outbox = Outbox(
+        storageRoot: () async => root,
+        factoryOverride: databaseFactoryFfi,
+      );
+      return TrackPlayer(
+        player: player,
+        settings: settings,
+        youTubeLibrary: library,
+        outbox: outbox,
+        youTubeAudio: YouTubeAudio(
+          newPipeAvailable: true,
+          newPipe: (id) async {
+            streamed.add(id);
+            if (id == restricted) {
+              throw PlatformException(code: 'AgeRestrictedContentException');
+            }
+            return [YouTubeAudioStream(url: 'http://s/$id', itag: 251)];
+          },
+        ),
+        youTubeSearch: YouTubeSearch(
+          newPipeAvailable: true,
+          newPipe: (query) async {
+            searches++;
+            return results;
+          },
+        ),
+        openExternal: (uri) async {
+          openedApp.add(uri);
+          return true;
+        },
+      );
+    }
+
+    final song = CatalogSong(
+      id: 7,
+      title: 'Tuono',
+      artistLabel: 'Russell Nash',
+      youtubeVideoId: restricted,
+    );
+
+    setUp(() async {
+      await settings.setYouTubeSearchEnabled(true);
+      results = const [
+        // The age-restricted music video itself turns up too; it's skipped.
+        YouTubeVideo(
+          id: restricted,
+          title: 'Russell Nash - Tuono (Official Video)',
+          channel: 'Russell Nash',
+        ),
+        YouTubeVideo(
+          id: 'topic123456',
+          title: 'Tuono',
+          channel: 'Russell Nash - Topic',
+        ),
+      ];
+    });
+
+    test('another upload of the song plays instead, saying so', () async {
+      final tracks = tracksWith();
+      final hit = SearchHit.main(song, const []);
+      final outcome = await tracks.play(hit, onStatus: statuses.add);
+      expect(outcome.played, isTrue);
+      expect(outcome.external, isFalse);
+      expect(outcome.message, contains('Tuono'));
+      expect(backend.opened.last, 'http://s/topic123456');
+      expect(openedApp, isEmpty);
+      expect(statuses, contains(l10n.trackPlayerAgeRestrictedSearching));
+      expect(library.isAgeRestricted(restricted), isTrue);
+      expect(library.standInFor(restricted), 'topic123456');
+      // music.db's link stays, and MusicDatabase isn't told: the video is the right one.
+      expect(withPhoneYouTube(hit, library).youtubeVideoId, restricted);
+      expect(await outbox.pending(), isEmpty);
+
+      // Next time straight to the stand-in: no search, the original not tried.
+      streamed.clear();
+      final again = await tracks.play(hit, onStatus: statuses.add);
+      expect(again.played, isTrue);
+      expect(searches, 1);
+      expect(streamed, ['topic123456']);
+    });
+
+    test('no other upload: the YouTube app opens it, saying why', () async {
+      results = [results.first];
+      final tracks = tracksWith();
+      final hit = SearchHit.main(song, const []);
+      final outcome = await tracks.play(hit, onStatus: statuses.add);
+      expect(outcome.external, isTrue);
+      expect(outcome.message, l10n.trackPlayerOpenedInYouTubeAppAgeRestricted);
+      expect(openedApp, [
+        Uri.parse('https://www.youtube.com/watch?v=$restricted'),
+      ]);
+      expect(
+        statuses,
+        containsAllInOrder([
+          l10n.trackPlayerAgeRestrictedSearching,
+          l10n.youtubePlaybackOpeningAppAgeRestricted,
+        ]),
+      );
+
+      // Not searched again for a while, nor streamed: the YouTube app at once.
+      streamed.clear();
+      await tracks.play(hit);
+      expect(searches, 1);
+      expect(streamed, isEmpty);
+      expect(openedApp, hasLength(2));
+    });
+
+    test(
+      'the channel of the age-restricted video counts as the artist',
+      () async {
+        // Goran Bregović's "Đurđevdan" was uploaded by "Bijelo Dugme" (music.db song #7042).
+        results = const [
+          YouTubeVideo(
+            id: restricted,
+            title: 'Goran Bregovic - Djurdjevdan',
+            channel: 'Bijelo Dugme',
+          ),
+          YouTubeVideo(
+            id: 'tv123456789',
+            title: 'Ceca & Goran Bregović - Đurđevdan / Novogodišnji program RTS 2022',
+            channel: 'RTS Najlepše narodne pesme',
+            viewCount: 3741756,
+          ),
+          YouTubeVideo(
+            id: 'audio123456',
+            title: 'Bijelo Dugme - Đurđevdan - (Audio 1994) HD',
+            channel: 'PGP RTS',
+            viewCount: 5428300,
+          ),
+        ];
+        final tracks = tracksWith();
+        final hit = SearchHit.main(
+          CatalogSong(
+            id: 7042,
+            title: 'Đurđevdan',
+            artistLabel: 'Goran Bregović',
+            youtubeVideoId: restricted,
+          ),
+          const [],
+        );
+        expect((await tracks.play(hit)).played, isTrue);
+        expect(library.standInFor(restricted), 'audio123456');
+      },
+    );
+
+    test('switched off: the YouTube app at once, no search', () async {
+      await settings.setAgeRestrictedStandIn(false);
+      final tracks = tracksWith();
+      final outcome = await tracks.play(
+        SearchHit.main(song, const []),
+        onStatus: statuses.add,
+      );
+      expect(outcome.external, isTrue);
+      expect(searches, 0);
+      expect(statuses, contains(l10n.youtubePlaybackOpeningAppAgeRestricted));
+    });
+
+    test('found out while caching ahead: the stand-in is cached', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        request.response.add(List.filled(100, 7));
+        await request.response.close();
+      });
+      final cached = TrackPlayer(
+        player: player,
+        settings: settings,
+        youTubeLibrary: library,
+        youTubeAudio: YouTubeAudio(
+          newPipeAvailable: true,
+          newPipe: (id) async {
+            if (id == restricted) {
+              throw PlatformException(code: 'AgeRestrictedContentException');
+            }
+            return [
+              YouTubeAudioStream(
+                url: 'http://127.0.0.1:${server.port}/$id',
+                itag: 251,
+              ),
+            ];
+          },
+        ),
+        youTubeSearch: YouTubeSearch(
+          newPipeAvailable: true,
+          newPipe: (query) async => results,
+        ),
+        openExternal: (uri) async => true,
+      );
+      expect(await cached.prefetch(SearchHit.main(song, const [])), isTrue);
+      expect(library.isAgeRestricted(restricted), isTrue);
+      expect(library.isCached('topic123456'), isTrue);
+    });
   });
 
   group('a video YouTube removed', () {

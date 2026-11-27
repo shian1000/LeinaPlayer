@@ -131,6 +131,7 @@ class SourceSettings extends ChangeNotifier {
   static const defaultLevelingPercent = 50;
   static const downloadFolderKey = 'downloads.folder';
   static const _downloadsAsMp3Key = 'downloads.as_mp3';
+  static const _ageRestrictedStandInKey = 'youtube.age_restricted_stand_in';
 
   /// The longest "Przenikanie utworów", as in the reference app.
   static const maxCrossfadeSeconds = 12;
@@ -166,6 +167,7 @@ class SourceSettings extends ChangeNotifier {
   bool _levelingMeasure = true;
   String? _downloadFolder;
   bool _downloadsAsMp3 = true;
+  bool _ageRestrictedStandIn = true;
 
   /// "Włącz szukanie w serwisie YouTube".
   bool get youTubeSearchEnabled => _youTubeSearchEnabled;
@@ -273,6 +275,11 @@ class SourceSettings extends ChangeNotifier {
   /// offline; on by default — user's decision): songs downloaded before stay as they are.
   bool get downloadsAsMp3 => _downloadsAsMp3;
 
+  /// "Zastępstwo za filmy z ograniczeniem wiekowym" (Sposoby odtwarzania YouTube): another
+  /// upload of the song is searched for and played instead of a video YouTube plays only to a
+  /// signed-in adult.
+  bool get ageRestrictedStandIn => _ageRestrictedStandIn;
+
   /// Cache ahead only on Wi-Fi (Oszczędzanie danych i tryb offline).
   bool get queuePrefetchWifiOnly => _queuePrefetchWifiOnly;
 
@@ -353,6 +360,8 @@ class SourceSettings extends ChangeNotifier {
     _levelingMeasure = prefs.getBool(_levelingMeasureKey) ?? _levelingMeasure;
     _downloadFolder = prefs.getString(downloadFolderKey);
     _downloadsAsMp3 = prefs.getBool(_downloadsAsMp3Key) ?? _downloadsAsMp3;
+    _ageRestrictedStandIn =
+        prefs.getBool(_ageRestrictedStandInKey) ?? _ageRestrictedStandIn;
     _playbackMethodOrder = _withAll(
       YouTubePlaybackMethod.values,
       prefs.getStringList(_playbackMethodOrderKey),
@@ -624,6 +633,15 @@ class SourceSettings extends ChangeNotifier {
     notifyListeners();
     await (await SharedPreferences.getInstance()).setBool(
       _downloadsAsMp3Key,
+      value,
+    );
+  }
+
+  Future<void> setAgeRestrictedStandIn(bool value) async {
+    _ageRestrictedStandIn = value;
+    notifyListeners();
+    await (await SharedPreferences.getInstance()).setBool(
+      _ageRestrictedStandInKey,
       value,
     );
   }

@@ -144,7 +144,9 @@ class PrivacyScreen extends StatelessWidget {
             statusOf([
               if (settings.enabledSources.contains(PlaybackSource.youtube))
                 l10n.privacyScreenStatusPlayback,
-              if (settings.youTubeSearchEnabled) l10n.privacyScreenStatusSearch,
+              if (settings.youTubeSearchEnabled ||
+                  settings.ageRestrictedStandIn)
+                l10n.privacyScreenStatusSearch,
             ]),
           goTo(
             l10n.privacyScreenGoPlaybackSources,

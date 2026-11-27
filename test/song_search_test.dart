@@ -42,6 +42,9 @@ class _FakeBackend implements AudioBackend {
   Future<void> open(NowPlaying track) async => opened.add(track.source);
 
   @override
+  void showParked(NowPlaying track) {}
+
+  @override
   Future<void> crossfadeTo(NowPlaying track, Duration fade) async {}
   @override
   Future<void> play() async {}

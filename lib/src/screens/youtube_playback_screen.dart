@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/source_settings.dart';
+import '../data/youtube_library.dart';
 import '../data/youtube_search.dart';
 import '../l10n.dart';
 import '../theme.dart';
@@ -69,6 +70,18 @@ class YouTubePlaybackScreen extends StatelessWidget {
           Expanded(
             child: ReorderableListView(
               buildDefaultDragHandles: false,
+              footer: SwitchListTile(
+                secondary: const Icon(Icons.eighteen_up_rating_outlined),
+                title: Text(l10n.youtubePlaybackScreenAgeRestrictedStandIn),
+                subtitle: Text(
+                  l10n.youtubePlaybackScreenAgeRestrictedStandInNote,
+                ),
+                value: settings.ageRestrictedStandIn,
+                onChanged: (on) {
+                  settings.setAgeRestrictedStandIn(on);
+                  if (!on) YouTubeLibraryScope.of(context).forgetStandIns();
+                },
+              ),
               onReorderItem: (from, to) {
                 final list = [...order];
                 list.insert(to, list.removeAt(from));

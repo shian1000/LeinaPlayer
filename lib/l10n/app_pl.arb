@@ -4642,7 +4642,19 @@
   "trackPlayerNoConfidentMatch": "Nie znaleziono na YouTube pewnego dopasowania tego utworu.",
   "trackPlayerConnectingYouTube": "Łączę z YouTube…",
   "trackPlayerOpenedInYouTubeApp": "Otwarto w aplikacji YouTube.",
-  "trackPlayerOpenedInYouTubeAppAgeRestricted": "Otwarto w aplikacji YouTube, bo film ma ograniczenie wiekowe — YouTube odtwarza go tylko po zalogowaniu.",
+  "trackPlayerOpenedInYouTubeAppAgeRestricted": "Otwarto w aplikacji YouTube: film ma ograniczenie wiekowe, a innego wgrania tego utworu nie znalazłem. YouTube odtwarza go tylko po zalogowaniu.",
+  "trackPlayerAgeRestrictedSearching": "Ten film ma ograniczenie wiekowe — szukam innego wgrania tego utworu…",
+  "trackPlayerAgeRestrictedStandIn": "Film ma ograniczenie wiekowe, więc gram inne wgranie: „{title}” ({channel})",
+  "@trackPlayerAgeRestrictedStandIn": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
   "trackPlayerFromYouTube": "Z YouTube: „{title}” ({channel})",
   "@trackPlayerFromYouTube": {
     "placeholders": {
@@ -4836,6 +4848,8 @@
     }
   },
   "youtubeExportDialogOpen": "Otwórz w YouTube",
+  "youtubePlaybackOpeningApp": "Otwieram aplikację YouTube…",
+  "youtubePlaybackOpeningAppAgeRestricted": "Film ma ograniczenie wiekowe i nie znalazłem innego wgrania — otwieram aplikację YouTube, która odtworzy go po zalogowaniu…",
   "youtubePlaybackAppFailed": "aplikacja YouTube: nie udało się otworzyć",
   "@youtubePlaybackAppFailed": {
     "description": "One item of a list of errors joined with '; ', shown in brackets after 'Nie udało się odtworzyć z YouTube'"
@@ -4867,6 +4881,8 @@
   "youtubePlaybackScreenYtDlpNote": "Jeszcze niedostępne — serwer bazy danych tego nie obsługuje",
   "youtubePlaybackScreenYouTubeAppNote": "Film otwiera się w oficjalnej aplikacji YouTube",
   "youtubePlaybackScreenTitle": "Sposoby odtwarzania YouTube",
+  "youtubePlaybackScreenAgeRestrictedStandIn": "Zastępstwo za filmy z ograniczeniem wiekowym",
+  "youtubePlaybackScreenAgeRestrictedStandInNote": "Gdy YouTube nie pozwala odtworzyć filmu bez logowania, szukam innego wgrania tego utworu (np. audio z kanału „Topic”) i gram je zamiast niego. Wyłączone: taki film otwiera się w aplikacji YouTube, a znalezione zastępstwa są zapominane.",
   "youtubePlaybackScreenIntro": "Utwór z YouTube gra pierwszym włączonym sposobem od góry; kolejne są używane tylko wtedy, gdy poprzedni zawiedzie. Przeciągnij, aby zmienić kolejność.",
   "youtubeSearchNoMethod": "Nie wybrano sposobu wyszukiwania w Ustawienia › YouTube.",
   "youtubeSearchNotYetAvailable": "jeszcze niedostępne",

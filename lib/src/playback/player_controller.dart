@@ -110,6 +110,10 @@ abstract class AudioBackend {
   /// fades in ("Przenikanie utworów"); from then on [position], [duration], [state] and the
   /// controls are [track]'s.
   Future<void> crossfadeTo(NowPlaying track, Duration fade);
+
+  /// Shows [track] in the media notification without loading it ([PlayerController.park]):
+  /// what's loaded stays there, paused, until the next [open].
+  void showParked(NowPlaying track);
   Future<void> play();
   Future<void> pause();
 
@@ -448,6 +452,9 @@ class JustAudioBackend implements AudioBackend {
   }
 
   @override
+  void showParked(NowPlaying track) => _showTrack(track);
+
+  @override
   Future<void> crossfadeTo(NowPlaying track, Duration fade) async {
     _endFade();
     final outgoing = _player;
@@ -738,6 +745,7 @@ class PlayerController extends ChangeNotifier {
   }) async {
     _fadePending = false;
     await _backend?.pause();
+    _backend?.showParked(track);
     showRestored(track, position: position, duration: duration, resume: resume);
   }
 

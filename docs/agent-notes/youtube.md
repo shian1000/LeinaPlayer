@@ -57,6 +57,15 @@ link. Not counted: a release marker ("Radio Edit", "Album Version", "Remastered"
 ("Acoustic Cover"), and a word that is only an artist's name ("Dub FX"). The song's album is
 never part of the target, so an album named "… The Remixes" makes no remix acceptable.
 
+A duet with someone the song doesn't name — the artist part before the first spaced dash names
+one of the song's artists and someone else ("Ceca & Goran Bregović - Đurđevdan"; joining words
+like "&", "x", "i", brackets, track numbers, a source before a colon and a "feat." guest, who
+usually sings on the studio recording too, don't count) — costs −3 (`_otherPerformer`; the
+benchmark kept 45/36/15, only live and duet uploads lost points), and TV words ("program",
+"Eurosong", "Eurovision") count as live (2026-11-27: a TV duet was picked for Bregović's
+"Đurđevdan"). "đ" is often written "dj": the matcher reads "dj" as "d" on both sides, so
+"Djurdjevdan", "Durdevdan" and "Đurđevdan" meet.
+
 Benchmark against MusicDatabase's own picks (plain Dart, no phone; candidates come from
 youtube_explode, whose results look like NewPipe's — both read YouTube's web search):
 
@@ -95,9 +104,27 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
 - Age-restricted videos (NewPipe's `AgeRestrictedContentException`, `isAgeRestricted`) can't
   be streamed without a signed-in Google account, and NewPipe has no login: yt-dlp with every
   player client (embedded, TV, iOS, VR, creator…) got the same "Sign in to confirm your age"
-  (2026-11, Russell Nash - Tuono). They fall to the next method, the YouTube app, and its note
-  says why (`YouTubePlayedVia.youtubeAppAgeRestricted`) — user's decision to keep it so; such a
-  song plays in the app only from a file (the server's library or the phone).
+  (2026-11, Russell Nash - Tuono). Such a video is remembered (`youtube_age_restricted`) and
+  another upload of the song plays in its place — usually the "Topic" channel's audio or a lyric
+  video, which have no age check: `TrackPlayer.findStandIn` takes a playlist's video, else the
+  matcher's pick from a search, never one known to be age-restricted (user's request,
+  2026-11-27, for people without the server). Its own switch, on by default, under the playback
+  methods (`SourceSettings.ageRestrictedStandIn`) — not "Włącz szukanie w serwisie YouTube",
+  which the Huawei had off. Switching it off forgets the stand-ins found (`forgetStandIns`), so
+  a wrong one is picked again. The search for a stand-in also takes the channel of the
+  age-restricted video (in the same results) as another name of the artist
+  (`MatchTarget.withArtistAlias`): music.db's "Goran Bregović - Đurđevdan" was uploaded by
+  "Bijelo Dugme", whose name the song's other uploads carry. The stand-in is phone-only: music.db's link stays,
+  nothing goes to the outbox (the video is right, just not playable here), and "Pobierz" /
+  caching ahead keep the stand-in's audio. The other streaming methods are skipped once one met
+  the age check. Only when no stand-in is found (remembered for `notFoundFor`) or it fails does
+  the YouTube app open the original; the status line says so before ("szukam innego wgrania…",
+  "otwieram aplikację YouTube…") and the outcome after (`YouTubePlayedVia.youtubeAppAgeRestricted`).
+  A file (the server's library or the phone) still plays before any of this.
+- A queue song handed to the YouTube app is parked in the player (`PlaybackQueue._play` →
+  `PlayerController.park`, `AudioBackend.showParked` for the notification): the full and mini
+  player and the notification show it, paused, and "Odtwórz" opens it again — before
+  2026-11-27 they kept showing the song paused before it while Kolejka was on the new one.
 
 ## What the phone remembers (`youtube_library.dart`, tables in `local.db` v2, v6, v7)
 
@@ -123,6 +150,9 @@ re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the re
   queue and caching ahead skip the song without searching, but a **tap** (`allowExternal`)
   searches again. Expires after `YouTubeLibrary.notFoundFor` (30 days — the video may be
   uploaded later); a found video clears it. Keyed `db:<id>` or `track:<artist>\n<title>`.
+- `youtube_age_restricted` (v25): videos with YouTube's age check, each with its stand-in
+  (`stand_in_id`; NULL with `checked_at` = searched and none found, `checked_at` 0 = not looked
+  for yet). A stand-in removed or age-restricted itself is looked for again at once.
 - `youtube_removed_videos` (v10): videos YouTube no longer has — see
   [`playlists.md`](playlists.md) ("Videos YouTube removed"). `withPhoneYouTube` drops such a
   video from a row — music.db's own link too (`SearchHit.mainVideoRemoved`), so the song is

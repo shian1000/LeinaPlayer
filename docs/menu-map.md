@@ -455,7 +455,11 @@ import, Wyświetlanie, Dane, Aplikacja.
       elsewhere), "Korzystaj z pakietu youtube_explode" (off — YouTube answers 403), "Korzystaj z
       yt-dlp przez serwer" (off, not implemented), "Otwórz w aplikacji YouTube" (on — the last
       resort: opens the video in the YouTube app — inside its YouTube playlist when the song plays
-      from an imported one — or the browser without it, and pauses this app's player).
+      from an imported one — or the browser without it, and pauses this app's player; the song
+      then shows paused in the players and the notification, "Odtwórz" opens it again). Under the
+      list, "Zastępstwo za filmy z ograniczeniem wiekowym" (switch, default on): an age-restricted
+      video gives way to another upload of the song found on YouTube (status lines say so);
+      switched off, such a video opens in the YouTube app and the stand-ins found are forgotten.
   - Ukryte utwory **→ Ukryte utwory** (`hidden_songs_screen.dart`).
   Then section *Przejścia między utworami*:
   "Przenikanie utworów" — slider Wył.–12 s (1 s steps, default off, saved on release): the

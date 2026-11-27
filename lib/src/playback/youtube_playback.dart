@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/audio_quality.dart';
@@ -7,6 +8,7 @@ import '../data/incoming_links.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_audio.dart';
 import '../data/youtube_library.dart';
+import '../data/youtube_video.dart';
 import '../l10n.dart';
 import 'player_controller.dart';
 
@@ -22,7 +24,7 @@ enum YouTubePlayedVia {
   youtubeApp,
 
   /// Handed to the YouTube app after a streaming method met YouTube's age check, which only a
-  /// signed-in app can pass.
+  /// signed-in app can pass, and no other upload of the song played instead.
   youtubeAppAgeRestricted,
 }
 
@@ -96,21 +98,30 @@ class YouTubePlayback {
   final PlayerController player;
   final OpenExternalFn _openExternal;
 
-  /// [track] builds what the player shows for a given source (file path or stream URL);
-  /// [onConnecting] is called before the first attempt that goes over the network. Without
-  /// [allowExternal] the YouTube app method is skipped — the queue moving on by itself, maybe
-  /// with the screen off, must not open another app. [externalUri] is what the YouTube app
-  /// opens (e.g. the song inside its playlist); the video's own page by default.
+  /// [track] builds what the player shows for a given video and source (file path or stream
+  /// URL); [onConnecting] is called before the first attempt that goes over the network, and
+  /// [onStatus] gets short notes on what happens. Without [allowExternal] the YouTube app method
+  /// is skipped — the queue moving on by itself, maybe with the screen off, must not open
+  /// another app. [externalUri] is what the YouTube app opens (e.g. the song inside its
+  /// playlist); the video's own page by default.
+  ///
+  /// A video YouTube plays only to a signed-in adult ([YouTubeLibrary.isAgeRestricted]) gives
+  /// way to the other upload of the song [findStandIn] gives, played with the streaming methods
+  /// alone; only when that fails too does the YouTube app open the video itself.
   Future<YouTubePlayedVia> play(
     String videoId,
-    NowPlaying Function(String source, {String? streamQuality}) track, {
+    NowPlaying Function(String videoId, String source, {String? streamQuality})
+    track, {
     void Function()? onConnecting,
+    void Function(String status)? onStatus,
     bool allowExternal = true,
     Uri? externalUri,
+    Future<YouTubeVideo?> Function()? findStandIn,
   }) async {
     final errors = <String>[];
     var offline = false;
-    var ageRestricted = false;
+    var ageRestricted = library.isAgeRestricted(videoId);
+    var standInTried = false;
     var connecting = false;
     void connect() {
       if (connecting) return;
@@ -118,23 +129,50 @@ class YouTubePlayback {
       onConnecting?.call();
     }
 
+    Future<YouTubePlayedVia?> playStandIn() async {
+      if (standInTried || findStandIn == null) return null;
+      standInTried = true;
+      final standIn = await findStandIn();
+      if (standIn == null) return null;
+      try {
+        return await play(
+          standIn.id,
+          track,
+          onConnecting: connect,
+          onStatus: onStatus,
+          allowExternal: false,
+        );
+      } on YouTubePlaybackException catch (e) {
+        debugPrint('Stand-in ${standIn.id} for $videoId failed: $e');
+        return null;
+      }
+    }
+
     // Downloaded with "Pobierz": played from the phone whatever the methods are.
     if (library.isPinned(videoId)) {
       final file = await library.cachedFile(videoId);
-      if (file != null && await player.play(track(file.path))) {
+      if (file != null && await player.play(track(videoId, file.path))) {
         return YouTubePlayedVia.cache;
       }
+    }
+    if (ageRestricted) {
+      if (await playStandIn() case final via?) return via;
     }
     for (final method in settings.activePlaybackMethods) {
       switch (method) {
         case YouTubePlaybackMethod.cache:
           final file = await library.cachedFile(videoId);
-          if (file != null && await player.play(track(file.path))) {
+          if (file != null && await player.play(track(videoId, file.path))) {
             return YouTubePlayedVia.cache;
           }
         case YouTubePlaybackMethod.youtubeApp:
           if (!allowExternal) continue;
           connect();
+          onStatus?.call(
+            ageRestricted
+                ? l10n.youtubePlaybackOpeningAppAgeRestricted
+                : l10n.youtubePlaybackOpeningApp,
+          );
           if (await _openExternal(externalUri ?? youTubeWatchUri(videoId))) {
             // The video plays elsewhere now; don't play something else on top of it.
             if (player.playing) await player.togglePlay();
@@ -146,6 +184,8 @@ class YouTubePlayback {
         case YouTubePlaybackMethod.newPipe ||
             YouTubePlaybackMethod.explode ||
             YouTubePlaybackMethod.ytDlpServer:
+          // Every streaming method meets the same age check.
+          if (ageRestricted) continue;
           connect();
           // YouTube sometimes refuses one stream address (HTTP 403) and accepts a freshly
           // resolved one moments later, so a failed play gets one more try.
@@ -153,7 +193,11 @@ class YouTubePlayback {
             try {
               final stream = await audio.streamFrom(method, videoId);
               if (await player.play(
-                track(stream.url, streamQuality: youTubeStreamQuality(stream)),
+                track(
+                  videoId,
+                  stream.url,
+                  streamQuality: youTubeStreamQuality(stream),
+                ),
               )) {
                 if (settings.playbackMethods.contains(
                   YouTubePlaybackMethod.cache,
@@ -185,7 +229,11 @@ class YouTubePlayback {
               }
               errors.add(e.message);
               offline |= e.offline;
-              ageRestricted |= e.ageRestricted;
+              if (e.ageRestricted && !ageRestricted) {
+                ageRestricted = true;
+                await library.markAgeRestricted(videoId);
+                if (await playStandIn() case final via?) return via;
+              }
               break;
             }
           }

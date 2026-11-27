@@ -41,6 +41,9 @@ class YouTubeCacheEntry {
 ///   sure match — remembered for [notFoundFor], so they aren't searched again on every play.
 /// - `youtube_removed_videos`: videos YouTube no longer has ([markVideoRemoved]); a playlist's
 ///   or the phone's own video that's among them isn't used ([isVideoRemoved]).
+/// - `youtube_age_restricted`: videos YouTube plays only to a signed-in adult, which no
+///   streaming method here can be ([markAgeRestricted]), each with another upload of the song
+///   the phone plays in its place ([standInFor]) — music.db's link stays as it is.
 /// - `youtube_cache`: audio of played videos, in `<support dir>/youtube_cache/`, at most the
 ///   user's limit; the least recently played goes first. Videos downloaded with "Pobierz"
 ///   ([setPinned]) stay there outside the limit until taken off again — or go to the user's
@@ -71,11 +74,37 @@ class YouTubeLibrary extends ChangeNotifier {
   Map<String, String> _trackMatches = const {};
   Map<String, DateTime> _notFound = const {};
   Set<String> _removedVideos = const {};
+  Map<String, _AgeRestricted> _ageRestricted = const {};
 
   /// Whether YouTube no longer has [videoId] (playing or re-importing found out).
   bool isVideoRemoved(String videoId) =>
       _removedVideos.contains(videoId) ||
       _badVideos.everySong.contains(videoId);
+
+  /// Whether YouTube asked to sign in to confirm the viewer's age for [videoId].
+  bool isAgeRestricted(String videoId) => _ageRestricted.containsKey(videoId);
+
+  /// The other upload played instead of the age-restricted [videoId], when one was found and
+  /// is still on YouTube.
+  String? standInFor(String videoId) {
+    final standIn = _ageRestricted[videoId]?.standIn;
+    return standIn == null ||
+            isVideoRemoved(standIn) ||
+            isAgeRestricted(standIn)
+        ? null
+        : standIn;
+  }
+
+  /// Whether a stand-in for [videoId] was looked for lately without finding one, so the YouTube
+  /// app is the only way left until [notFoundFor] passes. A stand-in that has since gone (or
+  /// turned out age-restricted too) is looked for again at once.
+  bool noStandInFor(String videoId) {
+    final entry = _ageRestricted[videoId];
+    return entry != null &&
+        entry.standIn == null &&
+        entry.checkedAt != null &&
+        _now().difference(entry.checkedAt!) < notFoundFor;
+  }
 
   /// MusicDatabase turned [videoId] down for this song ([BadVideos.forSong]).
   bool isWrongFor(int mainDbId, String videoId) =>
@@ -361,6 +390,16 @@ class YouTubeLibrary extends ChangeNotifier {
       for (final row in await db.query('youtube_removed_videos'))
         row['video_id']! as String,
     };
+    _ageRestricted = {
+      for (final row in await db.query('youtube_age_restricted'))
+        row['video_id']! as String: _AgeRestricted(
+          row['stand_in_id'] as String?,
+          switch (row['checked_at']! as int) {
+            0 => null,
+            final ms => DateTime.fromMillisecondsSinceEpoch(ms),
+          },
+        ),
+    };
     await db.delete(
       'youtube_not_found',
       where: 'checked_at <= ?',
@@ -480,6 +519,63 @@ class YouTubeLibrary extends ChangeNotifier {
     _removedVideos = {..._removedVideos, videoId};
     _matches = {..._matches}..removeWhere((_, v) => v == videoId);
     _trackMatches = {..._trackMatches}..removeWhere((_, v) => v == videoId);
+    notifyListeners();
+  }
+
+  /// YouTube plays [videoId] only to a signed-in adult: remembered, so the next play goes
+  /// straight to its stand-in ([saveStandIn]).
+  Future<void> markAgeRestricted(String videoId) async {
+    if (isAgeRestricted(videoId)) return;
+    await (await _database()).insert('youtube_age_restricted', {
+      'video_id': videoId,
+      'checked_at': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    _ageRestricted = {
+      ..._ageRestricted,
+      videoId: const _AgeRestricted(null, null),
+    };
+    notifyListeners();
+  }
+
+  /// [standIn] is played instead of the age-restricted [videoId]; `null`: searching found none.
+  Future<void> saveStandIn(String videoId, YouTubeVideo? standIn) async {
+    final now = _now();
+    final db = await _database();
+    final row = {
+      'stand_in_id': standIn?.id,
+      'stand_in_title': standIn?.title,
+      'stand_in_channel': standIn?.channel,
+      'checked_at': now.millisecondsSinceEpoch,
+    };
+    if (await db.update(
+          'youtube_age_restricted',
+          row,
+          where: 'video_id = ?',
+          whereArgs: [videoId],
+        ) ==
+        0) {
+      await db.insert('youtube_age_restricted', {'video_id': videoId, ...row});
+    }
+    _ageRestricted = {
+      ..._ageRestricted,
+      videoId: _AgeRestricted(standIn?.id, now),
+    };
+    notifyListeners();
+  }
+
+  /// Every stand-in found so far is forgotten ("Zastępstwo…" switched off), so each is looked
+  /// for again — a wrong one isn't kept for good. The age-restricted videos stay known.
+  Future<void> forgetStandIns() async {
+    await (await _database()).update('youtube_age_restricted', {
+      'stand_in_id': null,
+      'stand_in_title': null,
+      'stand_in_channel': null,
+      'checked_at': 0,
+    });
+    _ageRestricted = {
+      for (final id in _ageRestricted.keys)
+        id: const _AgeRestricted(null, null),
+    };
     notifyListeners();
   }
 
@@ -845,4 +941,12 @@ class YouTubeLibraryScope extends InheritedNotifier<YouTubeLibrary> {
   static YouTubeLibrary? maybeOf(BuildContext context) => context
       .dependOnInheritedWidgetOfExactType<YouTubeLibraryScope>()
       ?.notifier;
+}
+
+/// A row of `youtube_age_restricted`; [checkedAt] `null`: no stand-in looked for yet.
+class _AgeRestricted {
+  const _AgeRestricted(this.standIn, this.checkedAt);
+
+  final String? standIn;
+  final DateTime? checkedAt;
 }
