@@ -568,7 +568,13 @@ import, Wyświetlanie, Dane, Aplikacja.
     usual `plain_latin`; "ALA-LC" for a day, user's correction 2026-11-26) / Słowiańska ("Bazowana na alfabetach słowiańskich": the server's
     `latin_alternatives["uk-slavic"]`, "biľšisť, liudy, Ľviv"; songs it didn't send that for keep
     the usual one) — `UkrainianTransliteration`, `appearance.ukrainian_transliteration`
-    (user's request, 2026-11-26).
+    (user's request, 2026-11-26). It also picks artists' names: music.db's
+    `name_transliterations` (MusicDatabase's `name-transliterations-for-musicdatabaseapp.md`)
+    has a Ukrainian artist's `uk-national` and `uk-slavic` forms; Słowiańska shows the
+    `uk-slavic` one in place of `name_latin` (`SongCatalog.latinAlternatives`, by the name, through
+    `latinNamesOf` and the notification), Narodowa keeps `name_latin` / the Latin synonym and
+    falls back to `uk-national` when the artist has neither. Titles and albums have no rows yet
+    (2026-11-27).
   - "Języki wyłączone z transliteracji" **→ a checkbox list** (subtitle: the ticked ones or
     "Żaden") — `nonLatinLanguages` in `latin_names.dart` (music.db's `songs.language` codes
     written in another alphabet, shown by their names and sorted by them) that music.db has songs in, no counts (user's choice); a song with any

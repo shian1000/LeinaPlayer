@@ -70,7 +70,7 @@ tekstów piosenek" (Nigdy / Na życzenie — a button in the lyrics card / Zawsz
 transliteracji" (Pobierz z serwera / Przelicz na miejscu, both, one or none ticked): the server's
 Latin text comes with the lyrics (`Lyrics.latin` / `latinAlternatives`, `lyrics_transliteration.dart`,
 [hand-off](docs/handoffs/musicdatabase-lyrics-transliteration.md)), "Alternatywne metody
-transliteracji › Ukraiński" picks Narodowa (the server's usual one, the national system of 2010) or Słowiańska (its `uk-slavic`);
+transliteracji › Ukraiński" picks Narodowa (the server's usual one, the national system of 2010) or Słowiańska (its `uk-slavic`) for the lyrics and for artists' names (music.db's `name_transliterations`, also searched — `SongCatalog.latinAlternatives`);
 the phone's own is only an [idea](docs/ideas/lyrics-transliteration.md) ("Work in progress :)"). Ustawienia › Synchronizacja gives the catalog, the account's library, requests for
 MusicDatabase and problem reports each their own sources, switched and ordered (the private
 server, GitHub for the catalog, a future "Serwer Leina" — "Work in progress :)"), with the
@@ -368,7 +368,10 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   player passes `version`, `coverOf` and `language` along, as `NowPlaying` does); raw values stay for keys, matching, sharing text and requests to MusicDatabase.
   A Latin form shown outside them (an artist in the stats, Home's artist cards) goes through
   `latinNamesOf(context, language: <the song's songs.language>)`, never the bare
-  `ThemeController.latinNames`: "Języki wyłączone z transliteracji" switches it off per language.
+  `ThemeController.latinNames`: "Języki wyłączone z transliteracji" switches it off per language,
+  and "Alternatywne metody transliteracji" swaps in the picked method's forms of artists' names
+  (`LatinNamesShown.forms`, from `SongCatalog.latinAlternatives`, keyed by the name — titles and
+  albums take `.names.show`, as no other method has their forms yet).
 - music.db's `songs.language` holds ISO 639-3 codes ("pol", several as "eng / jpn", `zxx` no
   words, `und` not known — MusicDatabase's `language-codes-for-musicdatabaseapp.md`), read,
   compared and shown through `language_codes.dart`: `languagesOf` / `isKnownLanguage` (skips

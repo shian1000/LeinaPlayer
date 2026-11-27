@@ -35,6 +35,7 @@ import 'src/data/server_trust.dart';
 import 'src/data/smart_playlists.dart';
 import 'src/data/hidden_songs.dart';
 import 'src/data/server_downloads.dart';
+import 'src/data/lyrics_transliteration.dart';
 import 'src/data/song_catalog.dart';
 import 'src/data/startup_covers.dart';
 import 'src/data/source_settings.dart';
@@ -303,7 +304,12 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
   /// Takes effect from the next song the notification shows.
   void _updateNotificationNames() => widget.mediaSession
     ?..latinNames = _themeController.latinNames
-    ..excludedLanguages = _themeController.excludedLanguages;
+    ..excludedLanguages = _themeController.excludedLanguages
+    ..latinForms =
+        _themeController.ukrainianTransliteration ==
+            UkrainianTransliteration.slavic
+        ? _songCatalog.latinAlternatives[ukrainianSlavicMethod] ?? const {}
+        : const {};
 
   void _updateNotificationLike() =>
       widget.mediaSession?.liked = switch (_playbackQueue.current) {
@@ -503,6 +509,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.addListener(_updateChooserLook);
     _updateNotificationNames();
     _themeController.addListener(_updateNotificationNames);
+    _songCatalog.addListener(_updateNotificationNames);
     widget.mediaSession?.onLike = _likeFromNotification;
     _playbackQueue.addListener(_updateNotificationLike);
     _likedSongs.addListener(_updateNotificationLike);
@@ -1026,6 +1033,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _themeController.removeListener(_updateCoverLook);
     _themeController.removeListener(_updateChooserLook);
     _themeController.removeListener(_updateNotificationNames);
+    _songCatalog.removeListener(_updateNotificationNames);
     _playbackQueue.removeListener(_updateNotificationLike);
     _likedSongs.removeListener(_updateNotificationLike);
     _songCatalog.removeListener(_forgetSettledMatches);

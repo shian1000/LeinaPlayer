@@ -146,6 +146,10 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   /// "Języki wyłączone z transliteracji": their songs' names go without the Latin form.
   Set<String> excludedLanguages = const {};
 
+  /// Names' forms of the method picked under "Alternatywne metody transliteracji"
+  /// ([LatinNamesShown.forms]).
+  Map<String, String> latinForms = const {};
+
   final players = (
     AudioPlayer(handleInterruptions: false),
     AudioPlayer(handleInterruptions: false),
@@ -238,7 +242,10 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
         track.coverOf,
         latin: latinNames.shown,
       ),
-      artist: latinNames.show(track.artist, track.artistLatin),
+      artist: LatinNamesShown(
+        latinNames,
+        latinForms,
+      ).show(track.artist, track.artistLatin),
       duration: duration,
       artUri: art,
     );

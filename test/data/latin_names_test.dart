@@ -40,4 +40,21 @@ void main() {
     expect(LatinNames.instead.show('Кино', 'Kino'), 'Kino');
     expect(LatinNames.instead.show('Кино', null), 'Кино');
   });
+
+  test('a picked method\'s form in place of music.db\'s, by the name', () {
+    const slavic = LatinNamesShown(LatinNames.inBrackets, {
+      'Океан Ельзи': 'Okean Eľzy',
+    });
+    expect(
+      slavic.show('Океан Ельзи', 'Okean Elzy'),
+      'Океан Ельзи (Okean Eľzy)',
+    );
+    expect(slavic.show('Кино', 'Kino'), 'Кино (Kino)');
+    expect(
+      const LatinNamesShown(LatinNames.original, {
+        'Океан Ельзи': 'Okean Eľzy',
+      }).show('Океан Ельзи', 'Okean Elzy'),
+      'Океан Ельзи',
+    );
+  });
 }

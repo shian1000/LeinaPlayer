@@ -3,9 +3,10 @@
 ///
 /// The forms come from music.db, where the owner keeps them by hand (`songs.title_latin`,
 /// `artists.name_latin`, `albums.title_latin` — see the hand-off
-/// `docs/handoffs/musicdatabase-latin-names.md`). The phone never transliterates on its own
-/// (user's decision): an artist without `name_latin` falls back to a Latin-only entry of its
-/// `artists.synonyms`; a title or album without one shows nothing extra.
+/// `docs/handoffs/musicdatabase-latin-names.md`) and in `name_transliterations`, worked out by
+/// MusicDatabase per method. The phone never transliterates on its own (user's decision): an
+/// artist without `name_latin` falls back to a Latin-only entry of its `artists.synonyms`, then
+/// its Ukrainian national form; a title or album without one shows nothing extra.
 library;
 
 import 'language_codes.dart';
@@ -36,6 +37,9 @@ String? latinSynonym(String? synonyms) {
   return null;
 }
 
+/// MusicDatabase's name for the Ukrainian national system (2010) in `name_transliterations`.
+const ukrainianNationalMethod = 'uk-national';
+
 /// "Кино (Kino)", or just [text] without a [latin] form.
 String withLatin(String text, String? latin) =>
     latin == null ? text : '$text ($latin)';
@@ -61,6 +65,20 @@ enum LatinNames {
 
   /// Whether the Latin form is shown at all (a cover's credit takes it then).
   bool get shown => this != original;
+}
+
+/// [names] with the Latin forms of a method picked under "Alternatywne metody transliteracji"
+/// ([forms], by the name: [SongCatalog.latinAlternatives]) in place of music.db's usual ones.
+class LatinNamesShown {
+  const LatinNamesShown(this.names, [this.forms = const {}]);
+
+  final LatinNames names;
+  final Map<String, String> forms;
+
+  String show(String text, String? latin) =>
+      names.show(text, forms[text] ?? latin);
+
+  bool get shown => names.shown;
 }
 
 /// Languages written in an alphabet other than Latin, by music.db's `songs.language` codes —

@@ -429,6 +429,59 @@ void main() {
       expect(catalog.artistNamed('Nobody'), isNull);
     });
 
+    test('name_transliterations: the national form fills a missing Latin '
+        'form, the Slavic one is kept by name; both found by search', () async {
+      final path = (await sync.localFile('music.db')).path;
+      await writeMusicDb(path);
+      final db = await databaseFactoryFfi.openDatabase(path);
+      await db.execute('ALTER TABLE artists ADD COLUMN name_latin VARCHAR');
+      await db.execute(
+        'CREATE TABLE name_transliterations (id INTEGER PRIMARY KEY, '
+        'table_name TEXT NOT NULL, row_id INTEGER NOT NULL, '
+        'column_name TEXT NOT NULL, method TEXT NOT NULL, '
+        'value TEXT NOT NULL, source TEXT NOT NULL)',
+      );
+      await db.rawInsert(
+        "INSERT INTO artists (id, name, synonyms, name_latin) VALUES "
+        "(7, 'Океан Ельзи', NULL, 'Okean Elzy'), "
+        "(8, 'Бумбокс', 'familyboombox', NULL), "
+        "(9, 'Пиріг і батіг', NULL, NULL)",
+      );
+      await db.rawInsert(
+        'INSERT INTO name_transliterations '
+        '(table_name, row_id, column_name, method, value, source) VALUES '
+        "('artists', 7, 'name', 'uk-national', 'Okean Elzy', 'romanize'), "
+        "('artists', 7, 'name', 'uk-slavic', 'Okean Eľzy', 'romanize'), "
+        "('artists', 9, 'name', 'uk-national', 'Pyrih i batih', 'romanize'), "
+        "('artists', 9, 'name', 'uk-slavic', 'Pyrih i batih', 'romanize')",
+      );
+      await db.rawInsert(
+        'INSERT INTO songs (id, title, language, artist_id) VALUES '
+        "(6, 'Обійми', 'ukr', 7), (7, 'Вахтёрам', 'ukr', 8), "
+        "(8, 'Пісня', 'ukr', 9)",
+      );
+      await db.rawInsert(
+        "INSERT INTO additional_song_artists VALUES (6, 8, 'feat')",
+      );
+      await db.close();
+      await catalog.ensureLoaded();
+
+      expect(catalog.byId(6)!.artistLatin, 'Okean Elzy feat. familyboombox');
+      expect(catalog.byId(8)!.artistLatin, 'Pyrih i batih');
+      final slavic = catalog.latinAlternatives['uk-slavic']!;
+      expect(slavic['Океан Ельзи'], 'Okean Eľzy');
+      expect(
+        slavic['Океан Ельзи feat. Бумбокс'],
+        'Okean Eľzy feat. familyboombox',
+      );
+      // No other form: nothing to swap.
+      expect(slavic.containsKey('Бумбокс'), isFalse);
+      expect(slavic.containsKey('Пиріг і батіг'), isTrue);
+
+      expect(catalog.search('okean elzy').single.id, 6);
+      expect(catalog.search('pyrih').single.id, 8);
+    });
+
     test('by a video\'s title and channel: the owner\'s "Gitara (2018.01)" '
         'uploads', () async {
       final path = (await sync.localFile('music.db')).path;

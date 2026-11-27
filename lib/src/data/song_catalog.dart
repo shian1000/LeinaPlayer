@@ -13,6 +13,7 @@ import 'database_sync.dart';
 import 'feat_credit.dart';
 import 'language_codes.dart';
 import 'latin_names.dart';
+import 'lyrics_transliteration.dart';
 import 'playlist_library.dart';
 import 'project_names.dart';
 import 'song_requests.dart';
@@ -436,6 +437,7 @@ typedef _CatalogRead = ({
   RejectedSongRequests rejected,
   SettledSongRequests settled,
   Map<int, int?> idChanges,
+  Map<String, Map<String, String>> latinAlternatives,
   String? filesError,
 });
 
@@ -566,6 +568,14 @@ class SongCatalog extends ChangeNotifier {
     return id == null ? null : current(id);
   }
 
+  Map<String, Map<String, String>> _latinAlternatives = const {};
+
+  /// Latin forms of names by a method other than music.db's usual one, by method
+  /// ("uk-slavic") and the name itself — an artist's or a song's whole artist label
+  /// ([CatalogSong.artistLabel]): what "Alternatywne metody transliteracji" shows instead
+  /// (`latinNamesOf`).
+  Map<String, Map<String, String>> get latinAlternatives => _latinAlternatives;
+
   /// When the `music.db` now loaded was downloaded (`DatabaseSync.lastSync` at load time).
   DateTime? get loadedSyncTime => _loadedSyncTime;
   int get songCount => _songs.length;
@@ -659,6 +669,7 @@ class SongCatalog extends ChangeNotifier {
         _rejectedSongRequests = read.rejected;
         _settledSongRequests = read.settled;
         _idChanges = read.idChanges;
+        _latinAlternatives = read.latinAlternatives;
         _searchTexts = null;
         _byTitle = null;
         _byMarkedTitle = null;
@@ -733,7 +744,11 @@ class SongCatalog extends ChangeNotifier {
         ))
           row['name']! as String,
       };
-      final songRows = _querySongs(db, tables);
+      final songRows = _querySongs(
+        db,
+        tables,
+        _readArtistTransliterations(db, tables),
+      );
       final badVideos = _readBadVideos(db, tables);
       final additionalVideos = _readAdditionalVideos(db, tables);
       final videoDurations = _readVideoDurations(db, tables);
@@ -743,8 +758,9 @@ class SongCatalog extends ChangeNotifier {
       final settled = SettledSongRequests.read(db);
       final idChanges = _readIdChanges(db, tables);
       final serverFiles = await serverFilesRead;
+      final alternatives = <String, Map<String, String>>{};
       return (
-        songs: _songsOf(songRows, serverFiles.files),
+        songs: _songsOf(songRows, serverFiles.files, alternatives),
         badVideos: badVideos,
         additionalVideos: additionalVideos,
         videoDurations: videoDurations,
@@ -753,6 +769,7 @@ class SongCatalog extends ChangeNotifier {
         rejected: rejected,
         settled: settled,
         idChanges: idChanges,
+        latinAlternatives: alternatives,
         filesError: serverFiles.error,
       );
     } finally {
@@ -800,9 +817,10 @@ class SongCatalog extends ChangeNotifier {
   }
 
   /// `songs` with their artists, as rows, and each song's additional artists.
-  static ({ResultSet rows, Map<int, List<_Artist>> extra}) _querySongs(
+  static _SongRows _querySongs(
     Database db,
     Set<String> tables,
+    Map<int, Map<String, String>> transliterations,
   ) {
     // Older databases have no youtube_video_id / spotify_url / music_video_youtube_id column.
     final columns = {
@@ -844,34 +862,94 @@ class SongCatalog extends ChangeNotifier {
                ${covers ? 'c.name' : 'NULL'} AS covered_name,
                ${covers ? 'c.synonyms' : 'NULL'} AS covered_synonyms,
                ${covers && artistLatin != 'NULL' ? 'c.name_latin' : 'NULL'} AS covered_latin,
-               a.name AS artist, a.origin, a.synonyms, $artistLatin AS name_latin
+               ${covers ? 'c.id' : 'NULL'} AS covered_id,
+               a.id AS artist_id, a.name AS artist, a.origin, a.synonyms,
+               $artistLatin AS name_latin
         FROM songs s JOIN artists a ON a.id = s.artist_id
         ${covers ? 'LEFT JOIN artists c ON c.id = s.covered_artist_id' : ''}''',
     );
-    return (rows: rows, extra: _readAdditionalArtists(db, tables, artistLatin));
+    return (
+      rows: rows,
+      extra: _readAdditionalArtists(db, tables, artistLatin, transliterations),
+      transliterations: transliterations,
+    );
   }
 
+  /// `name_transliterations` (MusicDatabase's migration 0027): each artist's name in Latin
+  /// letters by method ("uk-slavic"), worked out by MusicDatabase; empty before the table.
+  static Map<int, Map<String, String>> _readArtistTransliterations(
+    Database db,
+    Set<String> tables,
+  ) {
+    if (!tables.contains('name_transliterations')) return const {};
+    final result = <int, Map<String, String>>{};
+    for (final row in db.select(
+      "SELECT row_id, method, value FROM name_transliterations "
+      "WHERE table_name = 'artists' AND column_name = 'name'",
+    )) {
+      final value = (row['value'] as String?)?.trim();
+      if (value == null || value.isEmpty) continue;
+      (result[row['row_id']! as int] ??= {})[row['method']! as String] = value;
+    }
+    return result;
+  }
+
+  /// The songs, filling [alternatives] with each name's and artist label's form of a method
+  /// other than music.db's usual one ([SongCatalog.latinAlternatives]).
   static List<CatalogSong> _songsOf(
-    ({ResultSet rows, Map<int, List<_Artist>> extra}) query,
+    _SongRows query,
     Map<int, ServerFile> serverFiles,
+    Map<String, Map<String, String>> alternatives,
   ) => [
     for (final row in query.rows)
-      _song(row, [
-        _artistOf(row, 'main'),
-        ...?query.extra[row['id']! as int],
-      ], serverFiles[row['id']! as int]),
+      _song(
+        row,
+        [
+          _artistOf(row, 'main', query.transliterations),
+          ...?query.extra[row['id']! as int],
+        ],
+        serverFiles[row['id']! as int],
+        query.transliterations,
+        alternatives,
+      ),
   ];
 
   static CatalogSong _song(
     Map<String, Object?> row,
     List<_Artist> artists,
     ServerFile? serverFile,
+    Map<int, Map<String, String>> transliterations,
+    Map<String, Map<String, String>> alternatives,
   ) {
     String? present(String? s) => s == null || s.trim().isEmpty ? null : s;
     final otherNames = [
-      for (final a in artists) ...[?present(a.synonyms), ?present(a.nameLatin)],
+      for (final a in artists) ...[
+        ?present(a.synonyms),
+        ?present(a.nameLatin),
+        ...a.transliterations.values,
+      ],
     ];
-    final covered = _coverOfRow(row);
+    final coveredForms =
+        transliterations[row['covered_id'] as int?] ?? const {};
+    final covered = _coverOfRow(row, coveredForms);
+    final artistLatin = _artistLatinLabel(artists);
+    final label = _artistLabel(artists);
+    for (final method in _alternativeMethods) {
+      final forms = alternatives[method] ??= {};
+      if (_artistLatinLabel(artists, method) case final latin?
+          when latin != artistLatin) {
+        forms[label] = latin;
+      }
+      for (final a in artists) {
+        if (a.transliterations[method] case final latin?) forms[a.name] = latin;
+      }
+      if ((covered?.name, coveredForms[method]) case (
+        final name?,
+        final latin?,
+      )) {
+        forms[name] = latin;
+      }
+    }
     final version = _versionOfRow(row);
     return CatalogSong(
       id: row['id']! as int,
@@ -898,13 +976,13 @@ class SongCatalog extends ChangeNotifier {
         coverOf: covered?.name,
         version: version?.marker,
       ),
-      artistLabel: _artistLabel(artists),
+      artistLabel: label,
       artistNames: [for (final a in artists) a.name],
       origins: [for (final a in artists) ?present(a.origin)],
       synonyms: otherNames,
       titleLatin: row['title_latin'] as String?,
       albumLatin: row['album_latin'] as String?,
-      artistLatin: _artistLatinLabel(artists),
+      artistLatin: artistLatin,
       otherTitles: _otherTitlesOf(row['other_titles'] as String?),
       coverOf: covered,
       version: version,
@@ -933,7 +1011,10 @@ class SongCatalog extends ChangeNotifier {
     );
   }
 
-  static CoverOf? _coverOfRow(Map<String, Object?> row) {
+  static CoverOf? _coverOfRow(
+    Map<String, Object?> row,
+    Map<String, String> transliterations,
+  ) {
     final name = row['covered_name'] as String?;
     if (name == null) {
       final title = (row['covered_title'] as String?)?.trim();
@@ -943,26 +1024,37 @@ class SongCatalog extends ChangeNotifier {
       name,
       latinFormOf(name, row['covered_latin'] as String?) ??
           (hasNonLatinLetters(name)
-              ? latinSynonym(row['covered_synonyms'] as String?)
+              ? latinSynonym(row['covered_synonyms'] as String?) ??
+                    transliterations[ukrainianNationalMethod]
               : null),
     );
   }
 
-  /// `artists.synonyms` with `name_latin` added, as one comma-separated list.
+  /// Methods some languages can be shown in instead of music.db's usual Latin forms
+  /// (Transliteracja › "Alternatywne metody transliteracji").
+  static const _alternativeMethods = [ukrainianSlavicMethod];
+
+  /// `artists.synonyms` with `name_latin` and the name's transliterations added, as one
+  /// comma-separated list.
   static String? _otherNames(_Artist a) => [
-    for (final s in [a.synonyms, a.nameLatin])
+    for (final s in [a.synonyms, a.nameLatin, ...a.transliterations.values])
       if (s != null && s.trim().isNotEmpty) s,
   ].join(', ');
 
-  /// [_artistLabel] in Latin letters: each artist's `name_latin`, else (for a name in another
-  /// alphabet) its first Latin synonym; `null` when no artist needs one, or one has none.
-  static String? _artistLatinLabel(List<_Artist> artists) {
+  /// [_artistLabel] in Latin letters: each artist's form of [method] when given and it has
+  /// one, else its `name_latin`, else (for a name in another alphabet) its first Latin synonym
+  /// or its Ukrainian national form; `null` when no artist needs one, or one has none.
+  static String? _artistLatinLabel(List<_Artist> artists, [String? method]) {
     if (!artists.any((a) => hasNonLatinLetters(a.name))) return null;
     final latin = <_Artist>[];
     for (final a in artists) {
       final name =
+          (hasNonLatinLetters(a.name) ? a.transliterations[method] : null) ??
           latinFormOf(a.name, a.nameLatin) ??
-          (hasNonLatinLetters(a.name) ? latinSynonym(a.synonyms) : a.name);
+          (hasNonLatinLetters(a.name)
+              ? latinSynonym(a.synonyms) ??
+                    a.transliterations[ukrainianNationalMethod]
+              : a.name);
       if (name == null) return null;
       latin.add((
         role: a.role,
@@ -970,6 +1062,7 @@ class SongCatalog extends ChangeNotifier {
         origin: a.origin,
         synonyms: a.synonyms,
         nameLatin: null,
+        transliterations: const {},
       ));
     }
     return _artistLabel(latin);
@@ -984,12 +1077,17 @@ class SongCatalog extends ChangeNotifier {
             .firstMatch(url)
             ?.group(1);
 
-  static _Artist _artistOf(Map<String, Object?> row, String role) => (
+  static _Artist _artistOf(
+    Map<String, Object?> row,
+    String role,
+    Map<int, Map<String, String>> transliterations,
+  ) => (
     role: role,
     name: (row['artist'] ?? row['name'])! as String,
     origin: row['origin'] as String?,
     synonyms: row['synonyms'] as String?,
     nameLatin: row['name_latin'] as String?,
+    transliterations: transliterations[row['artist_id'] as int?] ?? const {},
   );
 
   /// `song_id_changes`: what each old id became when MusicDatabase merged or renumbered a song
@@ -1079,17 +1177,18 @@ class SongCatalog extends ChangeNotifier {
     Database db,
     Set<String> tables,
     String nameLatin,
+    Map<int, Map<String, String>> transliterations,
   ) {
     if (!tables.contains('additional_song_artists')) return const {};
     final rows = db.select('''
-      SELECT x.song_id, x.role, a.name, a.origin, a.synonyms,
+      SELECT x.song_id, x.role, a.id AS artist_id, a.name, a.origin, a.synonyms,
              $nameLatin AS name_latin
       FROM additional_song_artists x JOIN artists a ON a.id = x.artist_id
       ORDER BY x.song_id, a.name''');
     final result = <int, List<_Artist>>{};
     for (final row in rows) {
       (result[row['song_id']! as int] ??= []).add(
-        _artistOf(row, row['role']! as String),
+        _artistOf(row, row['role']! as String, transliterations),
       );
     }
     return result;
@@ -1539,6 +1638,15 @@ typedef _Artist = ({
   String? origin,
   String? synonyms,
   String? nameLatin,
+
+  /// The name's Latin forms by method (`name_transliterations`).
+  Map<String, String> transliterations,
+});
+
+typedef _SongRows = ({
+  ResultSet rows,
+  Map<int, List<_Artist>> extra,
+  Map<int, Map<String, String>> transliterations,
 });
 
 /// Makes the [SongCatalog] reachable from any screen.
