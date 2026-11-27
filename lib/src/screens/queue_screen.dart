@@ -28,9 +28,10 @@ import '../widgets/song_selection.dart';
 /// plays it (skipping the ones before it); the handle moves it; dragging a row left takes it out,
 /// right makes it play next or moves it to the end ([SourceSettings.swipePlaysNext]). A long
 /// press ticks songs to come, for the bar of what can be done to all of them — the queue's own
-/// moves, and "Więcej", the menu a long press opens on the other rows. The queue that playing
+/// moves, and "Więcej", the menu a long press opens on the other rows. A tapped heading folds
+/// its songs away; a folded group moves as a whole by its handle. The queue that playing
 /// something else replaced comes back with "Przywróć poprzednią kolejkę".
-class QueueScreen extends StatelessWidget {
+class QueueScreen extends StatefulWidget {
   const QueueScreen({super.key});
 
   /// How many of the songs before the current one are shown (user's choice).
@@ -66,15 +67,13 @@ class QueueScreen extends StatelessWidget {
     final name = origin.playlistName;
     if (identical(origin, queue.mainOrigin)) {
       final query = origin.searchQuery;
-      return name != null
-          ? l10n.queueScreenNextFrom(name)
-          : query != null
-          ? l10n.queueScreenNextFromSearch(query)
-          : l10n.queueScreenNext;
+      return name ??
+          (query != null
+              ? l10n.queueScreenNextFromSearch(query)
+              : l10n.queueScreenNext);
     }
-    return name != null
-        ? l10n.queueScreenFromPlaylist(name)
-        : l10n.queueScreenNextInQueue;
+    // Just the playlist's name: "Z playlisty: …" left the long ones no room (user's request).
+    return name ?? l10n.queueScreenNextInQueue;
   }
 
   /// Saves [songs] (every song listed: the shown previous ones, the one playing, what comes
@@ -202,35 +201,76 @@ class QueueScreen extends StatelessWidget {
   }
 
   @override
+  State<QueueScreen> createState() => _QueueScreenState();
+}
+
+class _QueueScreenState extends State<QueueScreen> {
+  // Kept while the app runs, so the queue opens folded as it was left; groups by their origin,
+  // songs added one by one (no origin) all as one.
+  static final _folded = Expando<bool>();
+  static bool _singlesFolded = false;
+
+  bool _isFolded(QueueOrigin? origin) =>
+      origin == null ? _singlesFolded : _folded[origin] ?? false;
+
+  void _toggleFolded(QueueOrigin? origin) => setState(() {
+    if (origin == null) {
+      _singlesFolded = !_singlesFolded;
+    } else {
+      _folded[origin] = !_isFolded(origin);
+    }
+  });
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final queue = PlaybackQueueScope.of(context);
     final current = queue.current;
     final upcoming = queue.upcoming;
-    final previous = queue.history.reversed.take(previousShown).toList();
+    final previous = queue.history.reversed
+        .take(QueueScreen.previousShown)
+        .toList();
     final moodFilter = MoodFilterScope.maybeOf(context);
     final filtering = moodFilter?.active ?? false;
 
-    // Headings (strings) and songs, as the list shows them.
+    // Headings and songs, as the list shows them: a folded group only by its heading.
     final items = <Object>[];
     var clearShown = false;
     for (final (i, entry) in upcoming.indexed) {
       if (i == 0 || !identical(upcoming[i - 1].origin, entry.origin)) {
         items.add((
-          text: heading(queue, entry.origin),
+          text: QueueScreen.heading(queue, entry.origin),
           clear: !clearShown && !queue.isMain(entry),
-          at: i,
+          songs: upcoming
+              .skip(i)
+              .takeWhile((e) => identical(e.origin, entry.origin))
+              .toList(),
         ));
         if (!queue.isMain(entry)) clearShown = true;
       }
-      items.add(entry);
+      if (!_isFolded(entry.origin)) items.add(entry);
     }
 
+    // How many songs come before [to] in [rest], a folded group's counted too.
+    int songsBefore(List<Object> rest, int to) => rest
+        .take(to)
+        .map(
+          (item) => item is QueueEntry
+              ? 1
+              : item is _Group && _isFolded(item.songs.first.origin)
+              ? item.songs.length
+              : 0,
+        )
+        .fold(0, (a, b) => a + b);
+
     void reorder(int from, int to) {
-      final entry = items[from];
-      if (entry is! QueueEntry) return;
+      final item = items[from];
       final rest = [...items]..removeAt(from);
-      queue.move(entry, rest.take(to).whereType<QueueEntry>().length);
+      if (item is QueueEntry) {
+        queue.move(item, songsBefore(rest, to));
+      } else if (item is _Group) {
+        queue.moveGroup(item.songs, songsBefore(rest, to));
+      }
     }
 
     // Its own messenger: "Usunięto z kolejki" goes when the screen closes, instead of covering
@@ -239,7 +279,7 @@ class QueueScreen extends StatelessWidget {
       child: SongSelectionArea(
         all: () => {for (final entry in queue.upcoming) entry.key: entry.hit},
         untickGone: true,
-        actions: (context) => _selectionActions(context, queue),
+        actions: (context) => QueueScreen._selectionActions(context, queue),
         child: Scaffold(
           appBar: AppBar(
             backgroundColor: palette.surface,
@@ -266,7 +306,7 @@ class QueueScreen extends StatelessWidget {
                   builder: (context) => IconButton(
                     tooltip: l10n.queueScreenSaveAsPlaylist,
                     icon: const Icon(Icons.playlist_add),
-                    onPressed: () => _saveAsPlaylist(context, [
+                    onPressed: () => QueueScreen._saveAsPlaylist(context, [
                       for (final entry in previous.reversed) entry.hit,
                       current,
                       for (final entry in upcoming) entry.hit,
@@ -288,7 +328,7 @@ class QueueScreen extends StatelessWidget {
           ),
           body: CustomScrollView(
             // Opens at the song playing; the songs before it are above, scrolled to.
-            center: _nowPlayingKey,
+            center: QueueScreen._nowPlayingKey,
             slivers: [
               // Before the centre the list grows upwards: the newest song is first.
               SliverList.list(
@@ -299,7 +339,7 @@ class QueueScreen extends StatelessWidget {
                 ],
               ),
               SliverToBoxAdapter(
-                key: _nowPlayingKey,
+                key: QueueScreen._nowPlayingKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -318,7 +358,7 @@ class QueueScreen extends StatelessWidget {
               SliverReorderableList(
                 itemCount: items.length,
                 onReorderItem: reorder,
-                proxyDecorator: _liftedRow,
+                proxyDecorator: QueueScreen._liftedRow,
                 itemBuilder: (context, i) {
                   final item = items[i];
                   if (item is QueueEntry) {
@@ -328,15 +368,16 @@ class QueueScreen extends StatelessWidget {
                       index: i,
                     );
                   }
-                  final heading = item as ({String text, bool clear, int at});
-                  final origin = upcoming[heading.at].origin;
-                  final group = upcoming
-                      .skip(heading.at)
-                      .takeWhile((entry) => identical(entry.origin, origin))
-                      .toList();
+                  final heading = item as _Group;
+                  final group = heading.songs;
+                  final origin = group.first.origin;
+                  final folded = _isFolded(origin);
                   final playlistGroup = origin?.playlistName != null;
                   final tile = _Heading(
                     heading.text,
+                    folded: folded,
+                    count: group.length,
+                    onTap: () => _toggleFolded(origin),
                     action: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -356,7 +397,8 @@ class QueueScreen extends StatelessWidget {
                           IconButton(
                             tooltip: l10n.queueScreenRemoveGroup,
                             icon: const Icon(Icons.playlist_remove, size: 22),
-                            onPressed: () => _remove(context, queue, group),
+                            onPressed: () =>
+                                QueueScreen._remove(context, queue, group),
                           ),
                         ],
                         if (heading.clear)
@@ -364,11 +406,27 @@ class QueueScreen extends StatelessWidget {
                             onPressed: queue.clearAdded,
                             child: Text(l10n.queueScreenClear),
                           ),
+                        // Only folded: an open group's songs would stay behind while its
+                        // heading moved.
+                        if (folded)
+                          ReorderableDragStartListener(
+                            index: i,
+                            child: Semantics(
+                              label: l10n.queueScreenDragGroup,
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                child: Icon(Icons.drag_handle),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   );
                   return KeyedSubtree(
-                    key: ValueKey('heading ${heading.at}'),
+                    key: ValueKey('heading ${group.first.key}'),
                     child: tile,
                   );
                 },
@@ -433,30 +491,72 @@ class QueueScreen extends StatelessWidget {
   }
 }
 
+/// A heading over the songs to come and the run of them it names.
+typedef _Group = ({String text, bool clear, List<QueueEntry> songs});
+
 class _Heading extends StatelessWidget {
-  const _Heading(this.text, {this.action});
+  const _Heading(
+    this.text, {
+    this.action,
+    this.onTap,
+    this.folded = false,
+    this.count = 0,
+  });
 
   final String text;
   final Widget? action;
 
+  /// Folds the group's songs away or shows them again; `null` for a heading of no group.
+  final VoidCallback? onTap;
+  final bool folded;
+
+  /// How many songs the folded group holds, shown under its name.
+  final int count;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 20, 8, 4),
-    child: Row(
-      children: [
-        Expanded(
-          child: ScrollingText(
-            text,
-            style: const TextStyle(
-              fontSize: AppFontSize.emphasis,
-              fontWeight: FontWeight.bold,
+  Widget build(BuildContext context) {
+    final onTap = this.onTap;
+    final title = ScrollingText(
+      text,
+      style: const TextStyle(
+        fontSize: AppFontSize.emphasis,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final row = Padding(
+      padding: EdgeInsets.fromLTRB(onTap == null ? 16 : 8, 20, 8, 4),
+      child: Row(
+        children: [
+          if (onTap != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(
+                folded ? Icons.chevron_right : Icons.expand_more,
+                semanticLabel: folded
+                    ? l10n.queueScreenExpandGroup
+                    : l10n.queueScreenCollapseGroup,
+              ),
             ),
+          Expanded(
+            child: folded
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      title,
+                      Text(
+                        trackCountLabel(count),
+                        style: TextStyle(color: context.palette.textSecondary),
+                      ),
+                    ],
+                  )
+                : title,
           ),
-        ),
-        ?action,
-      ],
-    ),
-  );
+          ?action,
+        ],
+      ),
+    );
+    return onTap == null ? row : InkWell(onTap: onTap, child: row);
+  }
 }
 
 class _Empty extends StatelessWidget {

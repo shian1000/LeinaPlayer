@@ -38,7 +38,7 @@ music library on the server when its `files.db` knows one (source "Prywatny serw
 [ADR 0010](docs/decisions/0010-server-files.md)), a play queue (playlists, "Dodaj do kolejki" —
 at the very end — / "Odtwórz jako następny" for songs, playlists, moods, albums and links
 saved "Na później", each entry remembering the playlist it was queued from, shuffle, the queue
-screen with reordering and swipe-to-remove, caching the next songs ahead; remembered across
+screen with reordering, swipe-to-remove and groups folded and moved whole, caching the next songs ahead; remembered across
 restarts, and so is the queue of several songs that playing something else replaced, brought
 back by Kolejka's "Przywróć poprzednią kolejkę"), crossfading into the next song (Ustawienia ›
 Odtwarzanie, 0–12 s), volume leveling there too (Android's DynamicsProcessing on both

@@ -212,6 +212,29 @@ void main() {
     },
   );
 
+  test('a group moves as a whole and never splits another one', () async {
+    await queue.start([_file('a'), _file('b'), _file('c')], 0);
+    final origin = QueueOrigin(playlistName: 'P', playlistId: 7);
+    await queue.playNext([_file('x')]);
+    await queue.add([_file('p1'), _file('p2')], origin: origin);
+    expect(titles(queue.upcoming), ['x', 'b', 'c', 'p1', 'p2']);
+    List<QueueEntry> group() => [
+      for (final e in queue.upcoming)
+        if (identical(e.origin, origin)) e,
+    ];
+
+    queue.moveGroup(group(), 0);
+    expect(titles(queue.upcoming), ['p1', 'p2', 'x', 'b', 'c']);
+
+    // Dropped between "b" and "c", it goes after the whole main group.
+    queue.moveGroup(group(), 2);
+    expect(titles(queue.upcoming), ['x', 'b', 'c', 'p1', 'p2']);
+
+    queue.moveGroup(queue.upcoming.skip(1).take(2).toList(), 3);
+    expect(titles(queue.upcoming), ['x', 'p1', 'p2', 'b', 'c']);
+    expect(queue.upcoming.any((e) => e.pinned), isFalse);
+  });
+
   test(
     '"Dodaj do kolejki" plays at the very end, after the playlist',
     () async {
@@ -627,15 +650,15 @@ void main() {
       await showQueue(tester);
       expect(find.text('Teraz odtwarzane'), findsOneWidget);
       expect(find.text('Następne w kolejce'), findsOneWidget);
-      expect(find.text('Z playlisty: Inna'), findsOneWidget);
-      expect(find.text('Następne z: Do auta'), findsOneWidget);
+      expect(find.text('Inna'), findsOneWidget);
+      expect(find.text('Do auta'), findsOneWidget);
       expect(find.text('Wyczyść kolejkę'), findsOneWidget);
 
       await tester.tap(find.text('c'));
       await tester.pump();
       expect(backend.opened.last, '/music/c.mp3');
       // The songs added are after the playlist: still to come.
-      expect(find.text('Następne z: Do auta'), findsNothing);
+      expect(find.text('Do auta'), findsNothing);
       expect(find.text('Następne w kolejce'), findsOneWidget);
 
       await tester.tap(find.text('Losowo: wył.'));
@@ -694,7 +717,7 @@ void main() {
       });
       await showQueue(tester);
 
-      await tester.drag(find.text('Z playlisty: Inna'), const Offset(-300, 0));
+      await tester.drag(find.text('Inna'), const Offset(-300, 0));
       await settle(tester);
       expect(titles(queue.upcoming), ['p', 'q']);
 

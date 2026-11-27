@@ -183,13 +183,20 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     would cut "Poprzedni" short and lose songs when shuffle is turned off), dimmed, oldest first; tapping one plays it and puts the
     songs after it, the current one too, back at the front of the queue. Then everything after it with a heading over
     each run of songs queued from the same place: "Następne w kolejce" (single songs added by
-    hand), "Z playlisty: <name>" (a playlist added as a whole), "Następne z: <playlist /
-    „query” w wyszukiwarce>" (the main songs). "Wyczyść kolejkę" on the first heading of added
+    hand), "<name>" (a playlist added as a whole), "<playlist>" / "Następne z: „query” w
+    wyszukiwarce" (the main songs; a playlist's heading is just its name — user's request,
+    2026-11-27, the longer forms left no room beside the group's buttons). "Wyczyść kolejkę" on the first heading of added
     songs drops everything added by hand. A heading of songs from a playlist (**implemented**) has
     "Losowo w tej grupie" (its songs in random order where they are; shuffle leaves them after
     that), "Powtórz tę grupę" (copies of its songs right after it) and "Usuń tę grupę z kolejki"
     ("Usunięto z kolejki: N utw." with Cofnij) — the button only: a group can't be swiped away
-    (user's decision). Each row has a drag handle (≡) to move it anywhere —
+    (user's decision). Tapping any of these headings (**implemented**, chevron on its left)
+    folds its songs away ("Zwiń / Rozwiń tę grupę"; the folded heading shows "N utworów");
+    folded state is kept while the app runs, not across restarts. A folded group has its own
+    drag handle and moves as a whole (`PlaybackQueue.moveGroup`): dropped inside another group
+    it goes after it, so groups never split; the main group moved keeps shuffling in its new
+    place (not pinned). An open group has no handle — its songs would stay behind while the
+    heading moved. Each row has a drag handle (≡) to move it anywhere —
     it keeps its origin, and shuffle no longer moves it. Dragging a row left takes it out
     ("Usunięto z kolejki" with Cofnij — the reference app does the same), right makes it play
     next — or moves it to the end, with Ustawienia › Odtwarzanie › "Przeciągnięcie utworu w

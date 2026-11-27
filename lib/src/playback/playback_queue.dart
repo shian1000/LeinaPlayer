@@ -733,6 +733,37 @@ class PlaybackQueue extends ChangeNotifier {
     _prefetchAhead();
   }
 
+  /// Moves a group of songs (the queue screen's heading — a run queued from one place, hidden
+  /// ones in it too) as a whole to [to], counted like [move]'s among the songs shown without it,
+  /// and then on past the group it would split: groups stay whole. Unlike [move] it doesn't pin
+  /// them, so shuffle still mixes the main songs, now in their new places.
+  void moveGroup(List<QueueEntry> group, int to) {
+    final places = group.map(_upcoming.indexOf).where((at) => at >= 0);
+    if (places.isEmpty) return;
+    final first = places.reduce(min), last = places.reduce(max);
+    final origin = _upcoming[first].origin;
+    final moving = [
+      for (final entry in _upcoming.sublist(first, last + 1))
+        if (identical(entry.origin, origin)) entry,
+    ];
+    _upcoming.removeWhere(moving.contains);
+    final shown = _upcoming.where(_shown).toList();
+    var at = to.clamp(0, shown.length);
+    while (at > 0 &&
+        at < shown.length &&
+        identical(shown[at - 1].origin, shown[at].origin)) {
+      at++;
+    }
+    final index = at == 0
+        ? 0
+        : at >= shown.length
+        ? _upcoming.length
+        : _upcoming.indexOf(shown[at - 1]) + 1;
+    _upcoming.insertAll(index, moving);
+    notifyListeners();
+    _prefetchAhead();
+  }
+
   /// A group of songs from one playlist plays once more: copies of them go right after it.
   void repeatGroup(List<QueueEntry> group) {
     final last = group.map(_upcoming.indexOf).fold(-1, max);

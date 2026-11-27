@@ -3125,14 +3125,6 @@
   "profileScreenScheduledMusic": "Zaplanowana muzyka",
   "profileScreenSettings": "Ustawienia",
   "queueScreenNextInQueue": "Następne w kolejce",
-  "queueScreenNextFrom": "Następne z: {name}",
-  "@queueScreenNextFrom": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
   "queueScreenNextFromSearch": "Następne z: „{query}” w wyszukiwarce",
   "@queueScreenNextFromSearch": {
     "placeholders": {
@@ -3142,14 +3134,6 @@
     }
   },
   "queueScreenNext": "Następne",
-  "queueScreenFromPlaylist": "Z playlisty: {name}",
-  "@queueScreenFromPlaylist": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
   "queueScreenSaveAsPlaylist": "Zapisz kolejkę jako playlistę",
   "queueScreenPlaylistName": "Nazwa playlisty",
   "queueScreenSaved": "Zapisano w Bibliotece: „{name}” ({tracks})",
@@ -3194,6 +3178,9 @@
   "queueScreenShuffleGroup": "Losowo w tej grupie",
   "queueScreenRepeatGroup": "Powtórz tę grupę",
   "queueScreenRemoveGroup": "Usuń tę grupę z kolejki",
+  "queueScreenCollapseGroup": "Zwiń tę grupę",
+  "queueScreenExpandGroup": "Rozwiń tę grupę",
+  "queueScreenDragGroup": "Przeciągnij, aby przenieść całą grupę",
   "queueScreenClear": "Wyczyść kolejkę",
   "queueScreenShuffleOn": "Losowo: wł.",
   "queueScreenShuffleOff": "Losowo: wył.",
