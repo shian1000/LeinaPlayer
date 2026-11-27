@@ -202,8 +202,16 @@ full screen "Witaj w Leina Player" — "Pobierać bazę danych muzyki z GitHuba?
     next — or moves it to the end, with Ustawienia › Odtwarzanie › "Przeciągnięcie utworu w
     prawo" set to "Dodaj do kolejki" ("Usunięto z kolejki" is the screen's own SnackBar — it goes after 4 s, even with
     Cofnij, and with the screen). Tapping a row plays it (added songs before it are dropped, main songs before it
-    count as played). "Losowo: wł./wył." and "Nastroje: wł./wył." (**→ Filtr nastrojów**) at the
-    bottom; songs the filter hides aren't listed. The moon in the app bar **→ Nastrój dla
+    count as played). "Losowo: wł./wył.", "Nastroje: wł./wył." (**→ Filtr nastrojów**) and
+    "Nagraj nastrój" (**implemented**, `MoodRecorder`, user's request 2026-11-27) at the
+    bottom; songs the filter hides aren't listed. "Nagraj nastrój" makes an empty mood of the
+    user's own, "Nagrany nastrój <date>, <time>" (shown in Biblioteka at once, renamed on its
+    screen like any other; synced like the user's moods, phone-only while logged out), and from
+    then on every song heard for a minute — a song shorter than that: 90 % of it — goes into it
+    (listened time as the stats count it: seeks and pauses don't count; nothing the YouTube app
+    plays; the song playing when it's switched on counts from where it is). The button then reads "Nagrywanie nastroju" (red dot); tapping it stops, with
+    "Pokaż" opening the mood. Recording stays on across restarts, and stops by itself once the
+    mood is gone (deleted, another account logged in). The moon in the app bar **→ Nastrój dla
     wszystkich utworów** for every song listed (the shown "Poprzednie" too — user's choice).
     "Zapisz kolejkę jako playlistę" (**implemented**, `Icons.playlist_add` in the app bar): asks
     for a name and saves every song listed, in the screen's order, as a new Biblioteka

@@ -3184,6 +3184,36 @@
   "queueScreenClear": "Wyczyść kolejkę",
   "queueScreenShuffleOn": "Losowo: wł.",
   "queueScreenShuffleOff": "Losowo: wył.",
+  "queueScreenRecordMood": "Nagraj nastrój",
+  "queueScreenRecordingMood": "Nagrywanie nastroju",
+  "queueScreenRecordedMoodName": "Nagrany nastrój {when}",
+  "@queueScreenRecordedMoodName": {
+    "description": "Nagrany nastrój 27 listopada, 14:05",
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "queueScreenRecordStarted": "Nagrywanie nastroju „{name}”: trafi do niego każdy utwór słuchany co najmniej minutę",
+  "@queueScreenRecordStarted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "queueScreenRecordStopped": "Zakończono nagrywanie nastroju „{name}”: {count}",
+  "@queueScreenRecordStopped": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "queueScreenMoodsOn": "Nastroje: wł.",
   "queueScreenMoodsOff": "Nastroje: wył.",
   "queueScreenRemoved": "Usunięto z kolejki: „{title}”",

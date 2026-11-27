@@ -153,7 +153,8 @@ Nastroje (moods): global ones from `tag.db` and the user's own (synced the same 
 while logged out; own ones also hold songs music.db doesn't have, moved to its song once it has
 them — [hand-off](docs/handoffs/musicdatabase-mood-tracks.md)), playing shuffled, songs added from any song's menu, found by name in song search; users with MusicDatabase's `edit_global_moods`
 permission also edit global moods ([ADR 0008](docs/decisions/0008-moods.md)); a whole playlist,
-mood or the queue can be put into a mood at once (after "Czy na pewno?"). A mood filter makes
+mood or the queue can be put into a mood at once (after "Czy na pewno?"). Kolejka's "Nagraj nastrój" records
+a new mood of the user's own from every song heard for a minute while it's on (`MoodRecorder`). A mood filter makes
 the queue hide and pass over songs outside the ticked moods (or with a mood, for "Utwory bez
 nastroju"); while it's on the full player shows a "Nastrój" button for the current song.
 YouTube and Spotify links shared to the app or opened with it import the playlist / album or play
@@ -299,7 +300,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   crossfading), `PlaybackQueue` (what plays
   next), `TrackPlayer` (plays one song from the user's preferred source, no UI), `QueueSession`
   (the queue and position saved across restarts), `Downloads` ("Pobierz": songs and playlists kept on the phone for good), `YouTubePlayback` (the user's ordered ways
-  of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) `ScheduledMusic` (Ja's scheduled start and stop, `scheduled_music.dart`), `InterruptedPlayers` (what a phone call paused and whether to play on after it) and `ListeningTracker` (the listened time of each play, from
+  of playing a YouTube video) and `LoudnessMeasurer` (measures the loudness of recordings the phone has whole, in the background) `ScheduledMusic` (Ja's scheduled start and stop, `scheduled_music.dart`), `InterruptedPlayers` (what a phone call paused and whether to play on after it) and `MoodRecorder` (Kolejka's "Nagraj nastrój": songs heard for a minute into a new mood) and `ListeningTracker` (the listened time of each play, from
   `PlayerController.positionChanges`, for the stats). Never pause between songs — see
   [`local-library.md`](docs/agent-notes/local-library.md) (Android 12+ freezes the app).
 - `lib/src/theme.dart`, `lib/src/theme_controller.dart` — the built-in theme and the appearance
@@ -337,7 +338,7 @@ playlists with MusicDatabase (`playlist_sync.dart`, used by `PlaylistLibrary.syn
   `LocalLibraryScope`, `YouTubeLibraryScope`, `OutboxScope`, `AccountScope`, `YouTubeAccountScope`, `PlaylistLibraryScope`, `MoodLibraryScope`, `MoodFilterScope`, `PlayHistoryScope`, `ListeningLogScope`, `LaterLinksScope`, `LibraryFoldersScope`, `DownloadsScope`, `HiddenSongsScope`, `PlaylistBookmarksScope`, `SearchHistoryScope`, `AppUpdatesScope`, `SavedSongsScope`, `LikedSongsScope`, `SavedSongsSyncScope`, `SmartPlaylistsScope`, `HomeLayoutScope`,
   `AlbumCoversScope`, `CustomCoversScope`,
   `PlayerScope`,
-  `PlaybackQueueScope`, `ScheduledMusicScope`, `SourceSettingsScope`; plus
+  `PlaybackQueueScope`, `MoodRecorderScope`, `ScheduledMusicScope`, `SourceSettingsScope`; plus
   `YouTubeScope`, an `InheritedWidget` so tests can swap YouTube search, audio and playlist
   fetching); no
   state-management package. Settings persist via `shared_preferences`.

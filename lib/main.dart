@@ -47,6 +47,7 @@ import 'src/data/youtube_search.dart';
 import 'src/l10n.dart';
 import 'src/playback/downloads.dart';
 import 'src/playback/listening_tracker.dart';
+import 'src/playback/mood_recorder.dart';
 import 'src/playback/playback_queue.dart';
 import 'src/playback/player_controller.dart';
 import 'src/playback/queue_session.dart';
@@ -421,6 +422,22 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
       ..._moodLibrary.globalMoods,
     ].where((m) => m.key == key).firstOrNull,
   );
+  late final _moodRecorder = MoodRecorder(
+    played: _playbackQueue.played,
+    positions: _player.positionChanges,
+    playing: () => _player.playing,
+    duration: () => _player.duration,
+    createMood: _moodLibrary.createUnique,
+    addSong: (uid, hit) async {
+      final mood = _moodLibrary.userMoods
+          .where((m) => m.uid == uid)
+          .firstOrNull;
+      // Before the moods are read the mood isn't gone, just not known yet.
+      if (mood == null) return !_moodLibrary.loaded;
+      await _moodLibrary.setHits(mood, [hit], true);
+      return true;
+    },
+  );
   late final _queueSession = QueueSession(
     queue: _playbackQueue,
     player: _player,
@@ -531,6 +548,9 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
         (Object e) => debugPrint('Loading liked songs failed: $e'),
       ),
     ]);
+    _moodRecorder.load().catchError(
+      (Object e) => debugPrint('Loading the mood recording failed: $e'),
+    );
     _scheduledMusic.load().catchError(
       (Object e) => debugPrint('Loading the scheduled music failed: $e'),
     );
@@ -1025,6 +1045,7 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
     _lifecycle.dispose();
     _historySub.cancel();
     _listeningTracker.dispose();
+    _moodRecorder.dispose();
     _listeningLog.dispose();
     _incomingLinks.dispose();
     _queueSession.dispose();
@@ -1149,48 +1170,51 @@ class _MusicDatabaseAppState extends State<MusicDatabaseApp> {
                                                                       child: ListenableBuilder(
                                                                         listenable:
                                                                             _themeController,
-                                                                        builder: (context, _) => MaterialApp(
-                                                                          title:
-                                                                              appName,
-                                                                          debugShowCheckedModeBanner:
-                                                                              false,
-                                                                          theme: buildAppTheme(
-                                                                            _themeController.light,
-                                                                          ),
-                                                                          darkTheme: buildAppTheme(
-                                                                            _themeController.dark,
-                                                                          ),
-                                                                          themeMode:
-                                                                              _themeController.themeMode,
-                                                                          locale:
-                                                                              _themeController.locale,
-                                                                          supportedLocales:
-                                                                              AppLocalizations.supportedLocales,
-                                                                          localizationsDelegates:
-                                                                              AppLocalizations.localizationsDelegates,
-                                                                          localeListResolutionCallback: (
-                                                                            locales,
-                                                                            _,
-                                                                          ) => resolveSystemLocale(locales),
-                                                                          // Tab screens have no AppBar to set the status-bar icon colour, so
-                                                                          // match it to the active theme here (dark icons on light themes and
-                                                                          // vice versa).
-                                                                          builder: (context, child) {
-                                                                            syncAppLocale(
-                                                                              context,
-                                                                            );
-                                                                            return AnnotatedRegion<
-                                                                              SystemUiOverlayStyle
-                                                                            >(
-                                                                              value: Theme.of(context).brightness == Brightness.light
-                                                                                  ? SystemUiOverlayStyle.dark
-                                                                                  : SystemUiOverlayStyle.light,
-                                                                              child: child!,
-                                                                            );
-                                                                          },
-                                                                          home: AppShell(
-                                                                            links:
-                                                                                _incomingLinks.links,
+                                                                        builder: (context, _) => MoodRecorderScope(
+                                                                          notifier:
+                                                                              _moodRecorder,
+                                                                          child: MaterialApp(
+                                                                            title:
+                                                                                appName,
+                                                                            debugShowCheckedModeBanner:
+                                                                                false,
+                                                                            theme: buildAppTheme(
+                                                                              _themeController.light,
+                                                                            ),
+                                                                            darkTheme: buildAppTheme(
+                                                                              _themeController.dark,
+                                                                            ),
+                                                                            themeMode:
+                                                                                _themeController.themeMode,
+                                                                            locale:
+                                                                                _themeController.locale,
+                                                                            supportedLocales:
+                                                                                AppLocalizations.supportedLocales,
+                                                                            localizationsDelegates:
+                                                                                AppLocalizations.localizationsDelegates,
+                                                                            localeListResolutionCallback: (
+                                                                              locales,
+                                                                              _,
+                                                                            ) => resolveSystemLocale(locales),
+                                                                            // Tab screens have no AppBar to set the status-bar icon colour, so
+                                                                            // match it to the active theme here (dark icons on light themes and
+                                                                            // vice versa).
+                                                                            builder: (context, child) {
+                                                                              syncAppLocale(
+                                                                                context,
+                                                                              );
+                                                                              return AnnotatedRegion<
+                                                                                SystemUiOverlayStyle
+                                                                              >(
+                                                                                value: Theme.of(context).brightness == Brightness.light
+                                                                                    ? SystemUiOverlayStyle.dark
+                                                                                    : SystemUiOverlayStyle.light,
+                                                                                child: child!,
+                                                                              );
+                                                                            },
+                                                                            home: AppShell(
+                                                                              links: _incomingLinks.links,
+                                                                            ),
                                                                           ),
                                                                         ),
                                                                       ),

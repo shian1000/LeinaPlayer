@@ -7,6 +7,7 @@ import '../data/playlist_library.dart';
 import '../data/source_settings.dart';
 import '../data/youtube_library.dart';
 import '../l10n.dart';
+import '../playback/mood_recorder.dart';
 import '../playback/playback_queue.dart';
 import '../theme.dart';
 import '../widgets/scrolling_text.dart';
@@ -17,6 +18,7 @@ import '../widgets/mood_sheet.dart';
 import '../widgets/queue_toast.dart';
 import '../widgets/song_cover.dart';
 import '../widgets/swipe_actions.dart';
+import 'mood_screen.dart';
 import 'playlist_screen.dart';
 import '../widgets/song_names.dart';
 import '../widgets/song_selection.dart';
@@ -442,8 +444,8 @@ class _QueueScreenState extends State<QueueScreen> {
                 : SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
                         children: [
                           TextButton.icon(
                             onPressed: () => queue.setShuffle(!queue.shuffle),
@@ -480,6 +482,9 @@ class _QueueScreenState extends State<QueueScreen> {
                                 ),
                               ),
                             ),
+                          if (MoodRecorderScope.maybeOf(context) != null &&
+                              MoodLibraryScope.maybeOf(context) != null)
+                            const _RecordMoodButton(),
                         ],
                       ),
                     ),
@@ -489,6 +494,102 @@ class _QueueScreenState extends State<QueueScreen> {
       ),
     );
   }
+}
+
+/// "Nagraj nastrój": switches [MoodRecorder] on, into a new mood named by the date (renamed
+/// later on the mood's screen), or off, with "Pokaż" opening the mood.
+class _RecordMoodButton extends StatelessWidget {
+  const _RecordMoodButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final recorder = MoodRecorderScope.maybeOf(context)!;
+    final moods = MoodLibraryScope.of(context);
+    final recording = recorder.recording;
+    return TextButton.icon(
+      onPressed: () => recording
+          ? _stop(context, recorder, moods)
+          : _start(context, recorder, moods),
+      icon: Icon(
+        recording ? Icons.fiber_manual_record : Icons.radio_button_checked,
+        color: recording ? Theme.of(context).colorScheme.error : null,
+      ),
+      label: Text(
+        recording ? l10n.queueScreenRecordingMood : l10n.queueScreenRecordMood,
+        style: TextStyle(
+          color: recording ? palette.accent : palette.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  static Future<void> _start(
+    BuildContext context,
+    MoodRecorder recorder,
+    MoodLibrary moods,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final now = DateTime.now();
+    final time = '${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+    try {
+      await recorder.start(
+        l10n.queueScreenRecordedMoodName('${dayMonthLabel(now)}, $time'),
+      );
+    } catch (e) {
+      debugPrint('Starting a mood recording failed: $e');
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+    final mood = _recorded(recorder.moodUid, moods);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(l10n.queueScreenRecordStarted(mood?.name ?? '')),
+        ),
+      );
+  }
+
+  static Future<void> _stop(
+    BuildContext context,
+    MoodRecorder recorder,
+    MoodLibrary moods,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final mood = _recorded(recorder.moodUid, moods);
+    await recorder.stop();
+    if (mood == null) return;
+    final current = moods.current(mood) ?? mood;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.queueScreenRecordStopped(
+              current.name,
+              trackCountLabel(current.songIds.length + current.tracks.length),
+            ),
+          ),
+          // With an action a SnackBar otherwise stays until closed by hand.
+          persist: false,
+          action: SnackBarAction(
+            label: l10n.queueScreenShow,
+            onPressed: () => navigator.push(
+              MaterialPageRoute<void>(
+                builder: (_) => MoodScreen(mood: current),
+              ),
+            ),
+          ),
+        ),
+      );
+  }
+
+  static Mood? _recorded(String? uid, MoodLibrary moods) =>
+      moods.userMoods.where((m) => m.uid == uid).firstOrNull;
 }
 
 /// A heading over the songs to come and the run of them it names.

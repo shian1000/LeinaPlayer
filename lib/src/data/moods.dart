@@ -647,6 +647,18 @@ class MoodLibrary extends ChangeNotifier {
     return null;
   }
 
+  /// An empty mood named [name], or "[name] (2)"… when that one's taken (Kolejka's "Nagraj
+  /// nastrój"); returns its [Mood.uid].
+  Future<String> createUnique(String name) async {
+    var unique = name.trim();
+    for (var n = 2; _userMoods.any((m) => m.name == unique); n++) {
+      unique = '${name.trim()} ($n)';
+    }
+    final problem = await create(unique);
+    if (problem != null) throw StateError(problem);
+    return _userMoods.firstWhere((m) => m.name == unique).uid!;
+  }
+
   /// The user's own [mood] under another name; returns why not, like [create].
   Future<String?> rename(Mood mood, String name) async {
     if (mood.global) return l10n.moodsGlobalRename;
