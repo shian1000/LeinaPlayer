@@ -8,6 +8,7 @@ import 'package:music_database_app/src/data/local_library.dart';
 import 'package:music_database_app/src/data/mp3_conversion.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/youtube_library.dart';
+import 'package:music_database_app/src/data/youtube_matcher.dart';
 import 'package:music_database_app/src/data/youtube_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -237,6 +238,76 @@ void main() {
       expect(third.notFoundSong(3), isFalse);
     },
   );
+
+  test(
+    '"not found" from before the matcher last changed is searched again',
+    () async {
+      now = youTubeMatcherChangedAt.subtract(const Duration(hours: 1));
+      final library = newLibrary();
+      await library.load();
+      await library.saveNotFound(artist: 'Mikhail Krug', title: 'Кольщик');
+      final before = newLibrary();
+      await before.load();
+      // A clock still before the change keeps it.
+      expect(before.notFoundTrack('Mikhail Krug', 'Кольщик'), isTrue);
+
+      now = youTubeMatcherChangedAt.add(const Duration(hours: 1));
+      await library.saveNotFound(artist: 'Butyrka', title: 'По этапу');
+      final after = newLibrary();
+      await after.load();
+      expect(after.notFoundTrack('Mikhail Krug', 'Кольщик'), isFalse);
+      expect(after.notFoundTrack('Butyrka', 'По этапу'), isTrue);
+    },
+  );
+
+  test('videos found in Cyrillic before the matcher got stricter are searched again', () async {
+    now = youTubeMatcherStricterAt.subtract(const Duration(hours: 1));
+    final library = newLibrary();
+    await library.load();
+    await library.saveTrackMatch(
+      'Mikhail Krug',
+      'Водочку пьём',
+      const YouTubeVideo(
+        id: 'ru',
+        title: 'Водочку пьем (Версия)',
+        channel: 'Михаил Круг',
+      ),
+    );
+    await library.saveTrackMatch(
+      'Fleetwood Mac',
+      'Gypsy',
+      const YouTubeVideo(
+        id: 'en',
+        title: 'Gypsy',
+        channel: 'Fleetwood Mac - Topic',
+      ),
+    );
+    await library.saveMatch(
+      7,
+      const YouTubeVideo(id: 'ch', title: 'Song', channel: 'Группа КИНО'),
+    );
+    final before = newLibrary();
+    await before.load();
+    // A clock still before the change keeps them.
+    expect(before.matchForTrack('Mikhail Krug', 'Водочку пьём'), 'ru');
+
+    now = youTubeMatcherStricterAt.add(const Duration(hours: 1));
+    await library.saveTrackMatch(
+      'Butyrka',
+      'По этапу',
+      const YouTubeVideo(
+        id: 'new',
+        title: 'Бутырка - По этапу',
+        channel: 'Бутырка',
+      ),
+    );
+    final after = newLibrary();
+    await after.load();
+    expect(after.matchForTrack('Mikhail Krug', 'Водочку пьём'), isNull);
+    expect(after.matchFor(7), isNull);
+    expect(after.matchForTrack('Fleetwood Mac', 'Gypsy'), 'en');
+    expect(after.matchForTrack('Butyrka', 'По этапу'), 'new');
+  });
 
   test(
     'rows show what the phone learned on YouTube since they were made',

@@ -201,9 +201,15 @@ class SearchHit {
         : stored;
   }
 
+  /// Without a MusicDatabase song, a Spotify track's artists come joined ("Way Out West, Eelke
+  /// Kleijn"): each of them is also one of the artist's names, so "Way Out West - Surrender
+  /// (Eelke Kleijn Remix)" counts — [MatchArtist] reads them as comma-separated synonyms.
   MatchTarget get youTubeTarget =>
       mainSong?.youTubeTarget ??
-      MatchTarget(title: title, mainArtists: [MatchArtist(artistLabel)]);
+      MatchTarget(
+        title: title,
+        mainArtists: [MatchArtist(artistLabel, artistLabel)],
+      );
   bool get onPhone => phoneFiles.isNotEmpty;
 
   /// The song's file on MusicDatabase's server ([PlaybackSource.server]).

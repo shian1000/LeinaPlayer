@@ -66,6 +66,35 @@ benchmark kept 45/36/15, only live and duet uploads lost points), and TV words (
 "Đurđevdan"). "đ" is often written "dj": the matcher reads "dj" as "d" on both sides, so
 "Djurdjevdan", "Durdevdan" and "Đurđevdan" meet.
 
+Cyrillic (2026-11-28, the "GTA: Криминальная Россия" Spotify playlist: 25 of 38 tracks found
+nothing). Spotify names Russian acts in Latin letters ("Mikhail Krug", "Garyk Krichevsky",
+"Butyrka") while their uploads say "Михаил Круг"; the artist gate turned every one down. When the
+song or the video has Cyrillic, the title and artist gates (and the own-channel +1) also compare
+both sides in loose Latin letters (`_loose`: transliterated, then the spellings
+transliterations disagree on — kh/h, ts/c, y/j/i, w/v, "ii" — made one), so "Garyk Krichevsky"
+and "Гарик Кричевский" are both "garik krichevski", and "Obozhayu (Обожаю)" finds "Обожаю". Only a
+matching key, never shown (names are never transliterated on the phone). Latin against Latin is
+compared as before (the benchmark gave the same picks before and after: 48 same / 34 other / 12
+none of 94). The keyword lists have Russian words too
+(normalized: "й" is "и"): "концерт", "вживую" are live, "версия", "ремикс", "кавер" another
+version, "караоке", "минусовка", "реакция" not the song, "клип", "текст" a video — before them the
+phone played "Водочку пьем (Версия)" and a "(Юбилейный концерт)" for studio songs. Still missed:
+names that sound alike but aren't spelled alike ("Car-Man" / "Кар-Мэн").
+
+A track known only by name (`SearchHit.youTubeOnly`, a Spotify track not in music.db) has its
+artists joined ("Way Out West, Eelke Kleijn"); each of them is also one of the artist's names
+(`MatchArtist(label, label)` reads them as synonyms), so the label's own "Way Out West - Surrender
+(Eelke Kleijn Remix)" passes the artist gate. The query is unchanged.
+
+"Not found" results from before the matcher last learned to find more are searched again:
+`youTubeMatcherChangedAt` in `youtube_matcher.dart`, checked when `YouTubeLibrary` loads (a clock
+still before it, as in tests, keeps them). Move it forward with every such change. The other way
+round, `youTubeMatcherStricterAt`: videos the phone found itself before the matcher learned to
+turn more down are searched again — only those whose title or channel is in Cyrillic, as that's
+all the 2026-11-28 change (Russian keywords) affects; widen it for a change that isn't about
+Cyrillic. Finding the same video again reports nothing new to MusicDatabase (the outbox skips a
+song + video already reported).
+
 Benchmark against MusicDatabase's own picks (plain Dart, no phone; candidates come from
 youtube_explode, whose results look like NewPipe's — both read YouTube's web search):
 
@@ -75,7 +104,11 @@ dart run tool/youtube_match_benchmark.dart <music.db> 120 --offline  # cached re
 ```
 
 Search results are cached in `build/youtube_match_benchmark/candidates.json`, 4 s apart — tune
-offline instead of re-querying YouTube. On 113 songs (2026-10-11): 56% the same video as
+offline instead of re-querying YouTube. The sample is every k-th song of the given music.db, so
+it shifts whenever that file gains songs (MusicDatabase's automation adds them every few minutes)
+and `--offline` then scores only the few cached ones ("Songs: 2"): benchmark a snapshot
+(`sqlite3 <music.db> ".backup <copy>"`), run once online to fill the cache, then compare the old
+and new matcher on it offline with the same sample size. On 113 songs (2026-10-11): 56% the same video as
 MusicDatabase, 39% another one (mostly as good or better: official audio instead of a fan
 re-upload MusicDatabase picked), 5% none; MusicDatabase's video wasn't in the results at all for
 17%. Known wrong picks left: an artist name contained in another's ("Aurora" in "Aurora Olivas").

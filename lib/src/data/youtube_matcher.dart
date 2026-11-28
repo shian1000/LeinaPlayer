@@ -75,6 +75,21 @@ class MatchTarget {
   ].join(' ').trim();
 }
 
+/// When [pickYouTubeVideo] last learned to find videos it turned down before: what the phone
+/// remembered as not found on YouTube until then is searched again (`YouTubeLibrary`, like
+/// after its `notFoundFor`). Move it forward with such a change.
+final youTubeMatcherChangedAt = DateTime(2026, 11, 28);
+
+/// When [pickYouTubeVideo] last learned to turn down videos it took before — 2026-11-28: live
+/// and other versions named in Russian ("Концерт", "Версия"). A video the phone found itself
+/// before then whose title or channel is in Cyrillic is searched again (`YouTubeLibrary`); the
+/// rest stay. Move it forward with such a change (and widen what's searched again if the change
+/// isn't about Cyrillic).
+final youTubeMatcherStricterAt = DateTime(2026, 11, 28, 9, 30);
+
+/// Whether [text] has Cyrillic letters.
+bool hasCyrillic(String text) => _cyrillic.hasMatch(text);
+
 /// A candidate with its score; [rejected] says why it can't be the song at all.
 class ScoredVideo {
   const ScoredVideo(this.video, this.score, {this.rejected});
@@ -141,10 +156,32 @@ class _Song {
         for (final a in target.featArtists) [for (final n in a.names) _norm(n)],
       ],
       fullAlbum = target.fullAlbum,
-      isCover = target.coverOf != null;
+      isCover = target.coverOf != null,
+      cyrillic = _cyrillic.hasMatch(
+        [
+          target.title,
+          for (final a in [...target.mainArtists, ...target.featArtists])
+            ...a.names,
+        ].join(' '),
+      ) {
+    looseTitle = _loose(title);
+    looseCore = _loose(core);
+    looseMainArtists = [
+      for (final names in mainArtists) [for (final n in names) _loose(n)],
+    ];
+  }
 
   /// Whole title, " padded " for whole-word `contains`.
   final String title;
+
+  /// [title], [core] and [mainArtists] in loose Latin letters ([_loose]), for a song or video in
+  /// Cyrillic.
+  late final String looseTitle;
+  late final String looseCore;
+  late final List<List<String>> looseMainArtists;
+
+  /// Whether the title or a name is in Cyrillic.
+  final bool cyrillic;
 
   /// Title without bracketed parts ("(Remix)", "[Live]"), which candidates often drop.
   final String core;
@@ -181,6 +218,67 @@ String _norm(String text) =>
     normalizeForSearch(text).replaceAll(_and, '').replaceAll('dj', 'd').trim();
 final _and = RegExp(r'(^| )and(?= |$)');
 String _padded(String text) => ' ${_norm(text)} ';
+
+final _cyrillic = RegExp(r'[Ѐ-ӿ]');
+
+/// Cyrillic letters (lower case, after [normalizeForSearch] — "й" and "ё" are "и" and "е" by
+/// then) in Latin ones: one letter each, then those written with more.
+const _cyrillicOne = 'абвгдезиклмнопрстуфыэіїєґўјћђ';
+const _latinOne = 'abvgdeziklmnoprstufyeiiegujcd';
+const _cyrillicMore = {
+  'ж': 'zh',
+  'х': 'kh',
+  'ц': 'ts',
+  'ч': 'ch',
+  'ш': 'sh',
+  'щ': 'shch',
+  'ю': 'yu',
+  'я': 'ya',
+  'ъ': '',
+  'ь': '',
+  'љ': 'lj',
+  'њ': 'nj',
+  'џ': 'dz',
+  'ѕ': 'dz',
+};
+final _cyrillicLatin = <String, String>{
+  for (var i = 0; i < _cyrillicOne.length; i++) _cyrillicOne[i]: _latinOne[i],
+  ..._cyrillicMore,
+};
+
+/// Spellings that differ between ways of writing Russian in Latin letters ("Mikhail"/"Mihail",
+/// "Sergey"/"Sergei", "Krichevsky"/"Krichevskiy", "Nagovitsyn"/"Nagovicin"), each read as one.
+const _looseSpellings = [
+  ('shch', 'sh'),
+  ('sch', 'sh'),
+  ('tch', 'ch'),
+  ('kh', 'h'),
+  ('x', 'ks'),
+  ('tz', 'c'),
+  ('ts', 'c'),
+  ('w', 'v'),
+  ('j', 'i'),
+  ('y', 'i'),
+];
+final _iRun = RegExp('i+');
+
+/// [normalized] (already [_norm]ed) in loose Latin letters: Cyrillic transliterated, and the
+/// spellings transliterations disagree on made one ([_looseSpellings]). Spotify names Russian
+/// acts in Latin letters ("Mikhail Krug", "Garyk Krichevsky") while their uploads say "Михаил
+/// Круг", "Гарик Кричевский"; compared this way, both are "mihail krug", "garik krichevski".
+/// Only for matching — never shown (names are never transliterated on the phone).
+String _loose(String normalized) {
+  final buffer = StringBuffer();
+  for (final char in normalized.split('')) {
+    buffer.write(_cyrillicLatin[char] ?? char);
+  }
+  var text = buffer.toString();
+  for (final (from, to) in _looseSpellings) {
+    text = text.replaceAll(from, to);
+  }
+  return text.replaceAll(_iRun, 'i');
+}
+
 String _collapsed(String normalized) => normalized.replaceAll(' ', '');
 
 bool _hasWord(String padded, String phrase) => padded.contains(' $phrase ');
@@ -223,6 +321,18 @@ const _notTheSong = [
   'making of',
   'interview',
   'wywiad',
+  // Russian ("й" is "и" after normalization)
+  'караоке',
+  'минус',
+  'минусовка',
+  'реакция',
+  'обзор',
+  'урок',
+  'разбор',
+  'пародия',
+  'треилер',
+  'тизер',
+  'интервью',
 ];
 
 /// Live recordings: essentially never the studio version.
@@ -250,6 +360,12 @@ const _live = [
   'program',
   'eurosong',
   'eurovision',
+  'концерт',
+  'вживую',
+  'живьем',
+  'выступление',
+  'фестиваль',
+  'евровидение',
 ];
 
 /// Words joining artists' names in a video title ("A & B", "A x B", "A i B").
@@ -308,6 +424,12 @@ const _otherVersion = [
   'dub',
   'mashup',
   'bootleg',
+  'ремикс',
+  'версия',
+  'кавер',
+  'акустика',
+  'акустическая',
+  'оркестр',
 ];
 
 /// A video rather than an audio upload — a format preference, not a wrong song.
@@ -327,6 +449,10 @@ const _video = [
   'napisy',
   'visualizer',
   'visualiser',
+  'клип',
+  'видеоклип',
+  'текст',
+  'текст песни',
 ];
 
 const _official = [
@@ -385,11 +511,18 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
   final title = _padded(video.title);
   final channelNorm = _norm(video.channel);
   final isTopic = channelNorm.endsWith(' topic');
-  final channel = _collapsed(
-    channelNorm
-        .replaceAll(RegExp(r' topic$'), '')
-        .replaceAll(RegExp(r'vevo$'), ''),
-  );
+  final channelName = channelNorm
+      .replaceAll(RegExp(r' topic$'), '')
+      .replaceAll(RegExp(r'vevo$'), '');
+  final channel = _collapsed(channelName);
+  // A song or video in Cyrillic is also compared in loose Latin letters ([_loose]): Spotify's
+  // "Mikhail Krug" is "Михаил Круг" on YouTube. Latin against Latin stays as it was.
+  final loose =
+      song.cyrillic ||
+      _cyrillic.hasMatch(video.title) ||
+      _cyrillic.hasMatch(video.channel);
+  final looseTitle = loose ? _loose(title) : null;
+  final looseChannel = loose ? _collapsed(_loose(channelName)) : null;
 
   for (final word in _notTheSong) {
     if (song.fullAlbum && _fullAlbumWords.contains(word)) continue;
@@ -399,12 +532,15 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
   }
 
   // Title: the song's title (or its unbracketed core) as whole words of the video title.
+  bool titleHas(String phrase, String loosePhrase) =>
+      _hasWord(title, phrase.trim()) ||
+      (looseTitle != null && _hasWord(looseTitle, loosePhrase.trim()));
   var score = 0.0;
-  if (_hasWord(title, song.title.trim())) {
+  if (titleHas(song.title, song.looseTitle)) {
     // Matching the bracketed part too ("(Instrumental)", "(Remix X)") is the strongest sign
     // of the right version.
     score += song.marked ? 3 : 1;
-  } else if (!_hasWord(title, song.core.trim())) {
+  } else if (!titleHas(song.core, song.looseCore)) {
     return reject('tytuł');
   }
 
@@ -414,15 +550,31 @@ ScoredVideo _score(_Song song, YouTubeVideo video) {
     (n) =>
         n.isNotEmpty && (_hasWord(title, n) || channel.contains(_collapsed(n))),
   );
-  final mainFound = song.mainArtists.where(present).length;
+  bool loosePresent(List<String> names) =>
+      looseTitle != null &&
+      names.any(
+        (n) =>
+            n.isNotEmpty &&
+            (_hasWord(looseTitle, n) || looseChannel!.contains(_collapsed(n))),
+      );
+  final mainFound = [
+    for (final (i, names) in song.mainArtists.indexed)
+      if (present(names) || loosePresent(song.looseMainArtists[i])) i,
+  ].length;
   if (mainFound == 0) return reject('wykonawca');
   score += mainFound - 1;
   score += 0.5 * song.featArtists.where(present).length;
   // The artist's own channel, or a label's VEVO one (soundtracks are often uploaded there).
+  bool ownChannel(String name, String channel) =>
+      name.isNotEmpty && channel == _collapsed(name);
   if (channelNorm.endsWith('vevo') ||
       song.mainArtists.any(
-        (names) => names.any((n) => n.isNotEmpty && channel == _collapsed(n)),
-      )) {
+        (names) => names.any((n) => ownChannel(n, channel)),
+      ) ||
+      (looseChannel != null &&
+          song.looseMainArtists.any(
+            (names) => names.any((n) => ownChannel(n, looseChannel)),
+          ))) {
     score += 1;
   }
 

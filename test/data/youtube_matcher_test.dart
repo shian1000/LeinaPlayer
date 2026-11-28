@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_database_app/src/data/combined_search.dart';
 import 'package:music_database_app/src/data/song_catalog.dart';
 import 'package:music_database_app/src/data/youtube_matcher.dart';
 import 'package:music_database_app/src/data/youtube_video.dart';
@@ -377,6 +378,109 @@ void main() {
         ),
       ])?.id,
       'audio',
+    );
+  });
+
+  test('a Latin name finds its Cyrillic upload, and the other way round', () {
+    // Spotify's names for the GTA: Criminal Russia playlist (2026-11-28).
+    expect(
+      pickYouTubeVideo(_song('Garyk Krichevsky', 'Мой номер 245'), [
+        _v('v', 'Гарик Кричевский - Мой номер 245', 'Studio Bob'),
+      ])?.id,
+      'v',
+    );
+    expect(
+      pickYouTubeVideo(_song('Mikhail Boyarskiy', 'Зеленоглазое такси'), [
+        _v('v', 'Зеленоглазое такси', 'Михаил Боярский - Topic'),
+      ])?.id,
+      'v',
+    );
+    expect(
+      pickYouTubeVideo(_song('Sergey Nagovitsyn', 'Разбитая судьба'), [
+        _v('v', 'Сергей Наговицын - Разбитая судьба', 'Шансон'),
+      ])?.id,
+      'v',
+    );
+    // A Latin title with the original in brackets.
+    expect(
+      pickYouTubeVideo(_song('Mikhail Shufutinsky', 'Obozhayu (Обожаю)'), [
+        _v('v', 'Обожаю', 'Михаил Шуфутинский'),
+      ])?.id,
+      'v',
+    );
+    expect(
+      pickYouTubeVideo(_song('Кино', 'Gruppa krovi'), [
+        _v('v', 'Kino - Gruppa Krovi', 'Omnistar East'),
+      ])?.id,
+      'v',
+    );
+  });
+
+  test('live and other versions named in Russian count like English ones', () {
+    // What the phone picked for the GTA: Criminal Russia playlist before (2026-11-28).
+    expect(
+      pickYouTubeVideo(_song('Mikhail Krug', 'Водочку пьём'), [
+        _v('version', 'Водочку пьем (Версия)', 'Михаил Круг', views: 90000),
+        _v('song', 'Михаил Круг - Водочку пьём', 'Золото Шансона'),
+      ])?.id,
+      'song',
+    );
+    expect(
+      pickYouTubeVideo(_song('Vyacheslav Dobrynin', 'Синий туман'), [
+        _v(
+          'concert',
+          'Вячеслав Добрынин - Синий туман (Юбилейный концерт)',
+          'Vyacheslav Dobrynin',
+          views: 900000,
+        ),
+        _v('song', 'Синий туман', 'Вячеслав Добрынин - Topic', views: 50000),
+      ])?.id,
+      'song',
+    );
+    expect(
+      pickYouTubeVideo(_song('Комбинация', 'American Boy'), [
+        _v('karaoke', 'Комбинация - American Boy (караоке)', 'Karaoke'),
+      ]),
+      isNull,
+    );
+  });
+
+  test('loose Latin letters still need the right song and artist', () {
+    expect(
+      pickYouTubeVideo(_song('Mikhail Krug', 'Кольщик'), [
+        _v('other', 'Михаил Круг - Владимирский централ', 'Золото Шансона'),
+        _v('someone', 'Сергей Трофимов - Кольщик', 'Сергей Трофимов'),
+      ]),
+      isNull,
+    );
+    // Latin against Latin is compared as it was: "y" and "i" stay apart.
+    expect(
+      pickYouTubeVideo(_song('Sergey Trofimov', 'Aleshka'), [
+        _v('v', 'Sergei Trofimov - Aleshka', 'Channel'),
+      ]),
+      isNull,
+    );
+  });
+
+  test('any one of a Spotify track\'s joined artists will do', () {
+    final target = SearchHit.youTubeOnly(
+      title: 'Surrender - Eelke Kleijn Remix',
+      artistLabel: 'Way Out West, Eelke Kleijn',
+      videoId: null,
+    ).youTubeTarget;
+    expect(
+      target.query,
+      'Way Out West, Eelke Kleijn Surrender - Eelke Kleijn Remix',
+    );
+    expect(
+      pickYouTubeVideo(target, [
+        _v(
+          'v',
+          'Way Out West - Surrender (Eelke Kleijn Remix)',
+          'Hope Recordings',
+        ),
+      ])?.id,
+      'v',
     );
   });
 }

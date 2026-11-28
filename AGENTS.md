@@ -62,7 +62,8 @@ playlists and moods show a collage of their songs' covers or a picture the user 
 (synced with the account) ([`covers.md`](docs/agent-notes/covers.md)). Names in another
 alphabet are shown with their Latin form, "Кино (Kino)", or by it alone, "Kino" (Wygląd › Transliteracja ›
 "Nazwy w alfabecie łacińskim", `LatinNames`): only music.db's `title_latin` / `name_latin` columns or an artist's Latin synonym,
-never transliterated on the phone (user's decision); the forms are sent as field corrections
+never transliterated on the phone for display (user's decision; the YouTube matcher's loose Latin
+key only compares names — [`youtube.md`](docs/agent-notes/youtube.md)); the forms are sent as field corrections
 ([hand-off](docs/handoffs/musicdatabase-latin-names.md)). Transliteracja also has "Języki
 wyłączone z transliteracji" (songs in a ticked language keep their original names and lyrics —
 `ThemeController.latinNamesFor`), "Transliteracja

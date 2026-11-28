@@ -9,6 +9,7 @@ import 'download_files.dart';
 import 'mp3_conversion.dart';
 import 'song_catalog.dart';
 import 'text_normalizer.dart';
+import 'youtube_matcher.dart';
 import 'youtube_video.dart';
 
 /// One cached audio file.
@@ -378,6 +379,7 @@ class YouTubeLibrary extends ChangeNotifier {
 
   Future<void> load() async {
     final db = await _database();
+    await _forgetMatchesBeforeStricter(db);
     _matches = {
       for (final row in await db.query('youtube_matches'))
         row['main_db_id']! as int: row['video_id']! as String,
@@ -400,10 +402,19 @@ class YouTubeLibrary extends ChangeNotifier {
           },
         ),
     };
+    // Expired, or from before the matcher learned to find more ([youTubeMatcherChangedAt]; a
+    // clock still before that change, as in tests, keeps them).
+    final expired = _now().subtract(notFoundFor);
+    final matcherChanged = youTubeMatcherChangedAt.isAfter(_now())
+        ? expired
+        : youTubeMatcherChangedAt;
     await db.delete(
       'youtube_not_found',
-      where: 'checked_at <= ?',
-      whereArgs: [_now().subtract(notFoundFor).millisecondsSinceEpoch],
+      where: 'checked_at <= ? OR checked_at < ?',
+      whereArgs: [
+        expired.millisecondsSinceEpoch,
+        matcherChanged.millisecondsSinceEpoch,
+      ],
     );
     _notFound = {
       for (final row in await db.query('youtube_not_found'))
@@ -644,6 +655,34 @@ class YouTubeLibrary extends ChangeNotifier {
     _notFound = {..._notFound}..removeWhere((key, _) => notFound.contains(key));
     notifyListeners();
     return songs.length + notFound.length;
+  }
+
+  /// Drops the videos the phone found itself in Cyrillic before [youTubeMatcherStricterAt] — the
+  /// matcher may turn them down now ("Водочку пьем (Версия)" for the studio song) — so their songs
+  /// are searched again. A clock still before it, as in tests, keeps them.
+  Future<void> _forgetMatchesBeforeStricter(Database db) async {
+    if (youTubeMatcherStricterAt.isAfter(_now())) return;
+    final before = youTubeMatcherStricterAt.millisecondsSinceEpoch;
+    for (final (table, key) in [
+      ('youtube_matches', 'main_db_id'),
+      ('youtube_track_matches', 'track_key'),
+    ]) {
+      final stale = [
+        for (final row in await db.query(
+          table,
+          columns: [key, 'video_title', 'channel'],
+          where: 'matched_at < ?',
+          whereArgs: [before],
+        ))
+          if (hasCyrillic(
+            '${row['video_title'] ?? ''} ${row['channel'] ?? ''}',
+          ))
+            row[key],
+      ];
+      for (final id in stale) {
+        await db.delete(table, where: '$key = ?', whereArgs: [id]);
+      }
+    }
   }
 
   /// Forgets every video the phone found itself, so the songs are searched again (e.g. with a
